@@ -27,6 +27,12 @@ projection, rotation, and tolerance-based point comparison. Location-only
 operations live under `Point`; vector-only operations live under the
 measure-polymorphic `Vector<'Unit>` type.
 
+It also translates `svg_path/trig.gleam`. Degree-facing functions accept or
+return `float<degree>`, radian conversions use `float<radian>`, and inverse
+trigonometric inputs and ordinary trigonometric outputs remain dimensionless.
+The exact axis, diagonal, quarter-turn, and safe eighth-turn cases from the
+Gleam implementation are preserved.
+
 Run the current tests with:
 
 ```shell

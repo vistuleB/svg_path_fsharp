@@ -21,27 +21,16 @@ module Vector =
     let up: Vector<1> = create 0.0 -1.0
     let down: Vector<1> = create 0.0 1.0
 
-    let private normalizedDegrees (degrees: float<degree>) : float =
-        let remainder = (Degree.toFloat degrees) % 360.0
-        if remainder < 0.0 then remainder + 360.0 else remainder
-
     /// Return the unit vector pointing at a clockwise SVG angle.
     let direction (degrees: float<degree>) : Vector<1> =
-        match normalizedDegrees degrees with
-        | 0.0 -> right
-        | 90.0 -> down
-        | 180.0 -> left
-        | 270.0 -> up
-        | normalized ->
-            let radians = normalized * System.Math.PI / 180.0
-            create (cos radians) (sin radians)
+        create (Trig.cosDegrees degrees) (Trig.sinDegrees degrees)
 
     /// Return the clockwise SVG heading in the range [0, 360).
     /// The zero vector has heading zero.
     let heading (vector: Vector<'Unit>) : float<degree> =
-        let raw = System.Math.Atan2(float vector.Y, float vector.X) * 180.0 / System.Math.PI
-        let normalized = if raw < 0.0 then raw + 360.0 else raw
-        Degree.fromFloat normalized
+        let raw = Trig.atan2Degrees vector.Y vector.X
+        let normalized = if raw < 0.0<degree> then raw + Degree.fromFloat 360.0 else raw
+        normalized
 
     /// Return the clockwise aperture from one vector to another in [0, 360).
     let clockwiseAperture (fromVector: Vector<'From>) (toVector: Vector<'To>) : float<degree> =

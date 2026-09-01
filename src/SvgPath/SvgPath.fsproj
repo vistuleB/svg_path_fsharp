@@ -35,5 +35,6 @@
     <Compile Include="Congruency.fs" />
     <Compile Include="Effects.fs" />
     <Compile Include="Marker.fs" />
+    <Compile Include="Parse.fs" />
   </ItemGroup>
 </Project>

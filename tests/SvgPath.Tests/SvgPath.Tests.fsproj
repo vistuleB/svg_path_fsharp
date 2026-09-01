@@ -35,6 +35,7 @@
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="EffectsTests.fs" />
     <Compile Include="MarkerTests.fs" />
+    <Compile Include="ParseTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

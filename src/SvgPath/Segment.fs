@@ -64,6 +64,7 @@ type SegmentError =
         distance: float<length>
     | AlreadyClosed
     | InvalidWiggleTolerance of float<length>
+    | InvalidDirectionRelativeTolerance of float
 
 type PointMapError<'error> =
     | PointMappingError of 'error
@@ -89,6 +90,15 @@ type Path =
 type FillRule =
     | Nonzero
     | EvenOdd
+
+[<Struct>]
+type Directions =
+    { Incoming: Point<1> option
+      Outgoing: Point<1> option }
+
+[<Struct>]
+type DirectionOptions =
+    { RelativeTolerance: float }
 
 [<Struct>]
 type BoundingBox =
@@ -315,6 +325,62 @@ module Segment =
             Ellipse.endpointToCenter endpoint
             |> Result.map (fun arc -> Ellipse.arcSecondDerivative arc t)
             |> Result.mapError (fun _ -> DegenerateArc)
+
+    let defaultDirectionOptions = { RelativeTolerance = 1.0e-9 }
+
+    let private directionFromCandidates options candidates =
+        let scaleSquared =
+            candidates
+            |> List.fold (fun scale candidate -> max scale (Point.squaredNorm candidate)) 0.0<length^2>
+        let thresholdSquared = options.RelativeTolerance * options.RelativeTolerance * scaleSquared
+        candidates
+        |> List.tryPick (fun candidate ->
+            let magnitudeSquared = Point.squaredNorm candidate
+            if magnitudeSquared > thresholdSquared then Point.normalize candidate else None)
+
+    let private endpointDirection options incoming segment =
+        let candidates =
+            match segment, incoming with
+            | Line(startPoint, endPoint), _ -> [ Point.displacement startPoint endPoint ]
+            | QuadraticBezier(startPoint, control, endPoint), false ->
+                [ Point.displacement startPoint control; Point.displacement startPoint endPoint ]
+            | QuadraticBezier(startPoint, control, endPoint), true ->
+                [ Point.displacement control endPoint; Point.displacement startPoint endPoint ]
+            | CubicBezier(startPoint, control1, control2, endPoint), false ->
+                [ Point.displacement startPoint control1
+                  Point.displacement startPoint control2
+                  Point.displacement startPoint endPoint ]
+            | CubicBezier(startPoint, control1, control2, endPoint), true ->
+                [ Point.displacement control2 endPoint
+                  Point.displacement control1 endPoint
+                  Point.displacement startPoint endPoint ]
+            | Arc _, _ -> []
+        directionFromCandidates options candidates
+
+    /// Return singularity-safe unit traversal directions at a segment parameter.
+    let directionsWith options segment t =
+        if options.RelativeTolerance < 0.0 || not (System.Double.IsFinite options.RelativeTolerance) then
+            Error(InvalidDirectionRelativeTolerance options.RelativeTolerance)
+        else
+            match segment with
+            | Arc _ ->
+                derivative segment t
+                |> Result.map (fun derivative ->
+                    let direction = Point.normalize derivative
+                    if t = 0.0<parameter> then { Incoming = None; Outgoing = direction }
+                    elif t = 1.0<parameter> then { Incoming = direction; Outgoing = None }
+                    else { Incoming = direction; Outgoing = direction })
+            | _ when t = 0.0<parameter> ->
+                Ok { Incoming = None; Outgoing = endpointDirection options false segment }
+            | _ when t = 1.0<parameter> ->
+                Ok { Incoming = endpointDirection options true segment; Outgoing = None }
+            | _ ->
+                split segment t
+                |> Result.map (fun (left, right) ->
+                    { Incoming = endpointDirection options true left
+                      Outgoing = endpointDirection options false right })
+
+    let directions segment t = directionsWith defaultDirectionOptions segment t
 
     let projection target sample =
         let candidates = [ 0 .. 64 ] |> List.map (fun index -> Parameter.fromFloat (float index / 64.0))

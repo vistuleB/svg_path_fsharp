@@ -34,5 +34,6 @@
     <Compile Include="Clip.fs" />
     <Compile Include="Congruency.fs" />
     <Compile Include="Effects.fs" />
+    <Compile Include="Marker.fs" />
   </ItemGroup>
 </Project>

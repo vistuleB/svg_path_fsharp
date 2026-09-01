@@ -34,6 +34,7 @@
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="EffectsTests.fs" />
+    <Compile Include="MarkerTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

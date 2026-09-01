@@ -12,6 +12,7 @@ type Segment =
 
 type SegmentError =
     | DegenerateArc
+    | EmptySubpath
     | InvalidLinearizeTolerance of float<length>
     | InvalidLinearizeMaxDepth of int
     | LinearizeMaxDepthReached of float<length>

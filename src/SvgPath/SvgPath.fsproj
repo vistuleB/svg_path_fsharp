@@ -17,5 +17,6 @@
     <Compile Include="Curvature.fs" />
     <Compile Include="SmallestEnclosingCircle.fs" />
     <Compile Include="Area.fs" />
+    <Compile Include="BasicShapes.fs" />
   </ItemGroup>
 </Project>

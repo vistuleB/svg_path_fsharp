@@ -13,6 +13,7 @@
     <Compile Include="TrigTests.fs" />
     <Compile Include="RootTests.fs" />
     <Compile Include="BezierTests.fs" />
+    <Compile Include="CurvatureTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

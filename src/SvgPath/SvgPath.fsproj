@@ -13,5 +13,7 @@
     <Compile Include="Ellipse.fs" />
     <Compile Include="Root.fs" />
     <Compile Include="Bezier.fs" />
+    <Compile Include="Segment.fs" />
+    <Compile Include="Curvature.fs" />
   </ItemGroup>
 </Project>

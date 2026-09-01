@@ -1,65 +1,59 @@
 namespace SvgPath
 
 [<Struct>]
-type Vector<[<Measure>] 'Unit> =
+type Point<[<Measure>] 'Unit> =
     { X: float<'Unit>
       Y: float<'Unit> }
 
-[<Struct>]
-type Point =
-    { X: float<length>
-      Y: float<length> }
-
 [<RequireQualifiedAccess>]
-module Vector =
-    let create (x: float<'Unit>) (y: float<'Unit>) : Vector<'Unit> = { X = x; Y = y }
+module Point =
+    let create (x: float<'Unit>) (y: float<'Unit>) : Point<'Unit> = { X = x; Y = y }
 
-    let right: Vector<1> = create 1.0 0.0
-    let left: Vector<1> = create -1.0 0.0
+    let right: Point<1> = create 1.0 0.0
+    let left: Point<1> = create -1.0 0.0
 
     // SVG's positive Y axis points down on the displayed page.
-    let up: Vector<1> = create 0.0 -1.0
-    let down: Vector<1> = create 0.0 1.0
+    let up: Point<1> = create 0.0 -1.0
+    let down: Point<1> = create 0.0 1.0
 
-    /// Return the unit vector pointing at a clockwise SVG angle.
-    let direction (degrees: float<degree>) : Vector<1> =
+    /// Return the unit coordinate pair pointing at a clockwise SVG angle.
+    let direction (degrees: float<degree>) : Point<1> =
         create (Trig.cosDegrees degrees) (Trig.sinDegrees degrees)
 
-    /// Return the clockwise SVG heading in the range [0, 360).
-    /// The zero vector has heading zero.
-    let heading (vector: Vector<'Unit>) : float<degree> =
-        let raw = Trig.atan2Degrees vector.Y vector.X
-        let normalized = if raw < 0.0<degree> then raw + Degree.fromFloat 360.0 else raw
-        normalized
+    /// Return the clockwise heading in the range [0, 360).
+    /// The zero pair has heading zero.
+    let heading (point: Point<'Unit>) : float<degree> =
+        let raw = Trig.atan2Degrees point.Y point.X
+        if raw < 0.0<degree> then raw + Degree.fromFloat 360.0 else raw
 
-    /// Return the clockwise aperture from one vector to another in [0, 360).
-    let clockwiseAperture (fromVector: Vector<'From>) (toVector: Vector<'To>) : float<degree> =
-        let difference = Degree.toFloat (heading toVector) - Degree.toFloat (heading fromVector)
+    /// Return the clockwise aperture from one coordinate pair to another in [0, 360).
+    let clockwiseAperture (fromPoint: Point<'From>) (toPoint: Point<'To>) : float<degree> =
+        let difference = Degree.toFloat (heading toPoint) - Degree.toFloat (heading fromPoint)
         Degree.fromFloat (if difference < 0.0 then difference + 360.0 else difference)
 
-    let add (left: Vector<'Unit>) (right: Vector<'Unit>) : Vector<'Unit> =
+    let add (left: Point<'Unit>) (right: Point<'Unit>) : Point<'Unit> =
         create (left.X + right.X) (left.Y + right.Y)
 
-    let subtract (left: Vector<'Unit>) (right: Vector<'Unit>) : Vector<'Unit> =
+    let subtract (left: Point<'Unit>) (right: Point<'Unit>) : Point<'Unit> =
         create (left.X - right.X) (left.Y - right.Y)
 
-    let negate (vector: Vector<'Unit>) : Vector<'Unit> = create -vector.X -vector.Y
+    let negate (point: Point<'Unit>) : Point<'Unit> = create -point.X -point.Y
 
-    let scale (factor: float<'Factor>) (vector: Vector<'Unit>) : Vector<'Factor * 'Unit> =
-        create (factor * vector.X) (factor * vector.Y)
+    let scale (factor: float<'Factor>) (point: Point<'Unit>) : Point<'Factor * 'Unit> =
+        create (factor * point.X) (factor * point.Y)
 
-    let dot (left: Vector<'Left>) (right: Vector<'Right>) : float<'Left * 'Right> =
+    let dot (left: Point<'Left>) (right: Point<'Right>) : float<'Left * 'Right> =
         left.X * right.X + left.Y * right.Y
 
-    let cross (left: Vector<'Left>) (right: Vector<'Right>) : float<'Left * 'Right> =
+    let cross (left: Point<'Left>) (right: Point<'Right>) : float<'Left * 'Right> =
         left.X * right.Y - left.Y * right.X
 
-    let squaredNorm (vector: Vector<'Unit>) : float<'Unit^2> = dot vector vector
+    let squaredNorm (point: Point<'Unit>) : float<'Unit^2> = dot point point
 
     /// Uses hypot rather than sqrt(x*x + y*y) to avoid intermediate overflow.
-    let norm (vector: Vector<'Unit>) : float<'Unit> =
-        let absoluteX = abs (float vector.X)
-        let absoluteY = abs (float vector.Y)
+    let norm (point: Point<'Unit>) : float<'Unit> =
+        let absoluteX = abs (float point.X)
+        let absoluteY = abs (float point.Y)
         let larger = max absoluteX absoluteY
         let smaller = min absoluteX absoluteY
 
@@ -74,71 +68,47 @@ module Vector =
 
         LanguagePrimitives.FloatWithMeasure<'Unit> magnitude
 
-    let normalize (vector: Vector<'Unit>) : Vector<1> option =
-        let magnitude = norm vector
+    let normalize (point: Point<'Unit>) : Point<1> option =
+        let magnitude = norm point
+        if float magnitude = 0.0 then None else Some(create (point.X / magnitude) (point.Y / magnitude))
 
-        if float magnitude = 0.0 then
-            None
-        else
-            Some(create (vector.X / magnitude) (vector.Y / magnitude))
-
-    let project (vector: Vector<'Projected>) (onto: Vector<'Onto>) : Vector<'Projected> option =
+    let project (point: Point<'Projected>) (onto: Point<'Onto>) : Point<'Projected> option =
         let denominator = squaredNorm onto
+        if float denominator = 0.0 then None else Some(scale (dot point onto / denominator) onto)
 
-        if float denominator = 0.0 then
-            None
-        else
-            Some(scale (dot vector onto / denominator) onto)
-
-    let scalarProjection
-        (vector: Vector<'Projected>)
-        (onto: Vector<'Onto>)
-        : float<'Projected> option =
+    let scalarProjection (point: Point<'Projected>) (onto: Point<'Onto>) : float<'Projected> option =
         let magnitude = norm onto
-
-        if float magnitude = 0.0 then
-            None
-        else
-            Some(dot vector onto / magnitude)
+        if float magnitude = 0.0 then None else Some(dot point onto / magnitude)
 
     /// Rotate by 90 degrees clockwise in displayed SVG coordinates.
-    let rotateClockwise (vector: Vector<'Unit>) : Vector<'Unit> =
-        create -vector.Y vector.X
+    let rotateClockwise (point: Point<'Unit>) : Point<'Unit> = create -point.Y point.X
 
     /// Rotate by 90 degrees counterclockwise in displayed SVG coordinates.
-    let rotateCounterclockwise (vector: Vector<'Unit>) : Vector<'Unit> =
-        create vector.Y -vector.X
+    let rotateCounterclockwise (point: Point<'Unit>) : Point<'Unit> = create point.Y -point.X
 
-[<RequireQualifiedAccess>]
-module Point =
-    let create (x: float<length>) (y: float<length>) : Point = { X = x; Y = y }
+    let displacement (fromPoint: Point<'Unit>) (toPoint: Point<'Unit>) : Point<'Unit> =
+        subtract toPoint fromPoint
 
-    let displacement (fromPoint: Point) (toPoint: Point) : Vector<length> =
-        Vector.create (toPoint.X - fromPoint.X) (toPoint.Y - fromPoint.Y)
+    let translate (offset: Point<'Unit>) (point: Point<'Unit>) : Point<'Unit> = add point offset
 
-    let translate (vector: Vector<length>) (point: Point) : Point =
-        { X = point.X + vector.X
-          Y = point.Y + vector.Y }
+    let squaredDistance (left: Point<'Unit>) (right: Point<'Unit>) : float<'Unit^2> =
+        displacement left right |> squaredNorm
 
-    let squaredDistance (left: Point) (right: Point) : float<length^2> =
-        displacement left right |> Vector.squaredNorm
+    /// Uses the overflow-resistant norm.
+    let distance (left: Point<'Unit>) (right: Point<'Unit>) : float<'Unit> =
+        displacement left right |> norm
 
-    /// Uses the overflow-resistant vector norm.
-    let distance (left: Point) (right: Point) : float<length> =
-        displacement left right |> Vector.norm
-
-    let interpolate (startPoint: Point) (endPoint: Point) (t: float<parameter>) : Point =
+    let interpolate (startPoint: Point<'Unit>) (endPoint: Point<'Unit>) (t: float<parameter>) : Point<'Unit> =
         displacement startPoint endPoint
-        |> Vector.scale (Parameter.ratio t)
+        |> scale (Parameter.ratio t)
         |> fun offset -> translate offset startPoint
 
-    let midpoint (left: Point) (right: Point) : Point =
+    let midpoint (left: Point<'Unit>) (right: Point<'Unit>) : Point<'Unit> =
         interpolate left right (Parameter.fromFloat 0.5)
 
     /// Test Euclidean nearness. Negative, infinite, and NaN tolerances are rejected.
-    let near (tolerance: float<length>) (left: Point) (right: Point) : bool =
-        let rawTolerance = Length.toFloat tolerance
-
+    let near (tolerance: float<'Unit>) (left: Point<'Unit>) (right: Point<'Unit>) : bool =
+        let rawTolerance = float tolerance
         rawTolerance >= 0.0
         && System.Double.IsFinite rawTolerance
         && squaredDistance left right <= tolerance * tolerance

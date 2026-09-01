@@ -4,7 +4,7 @@ open SvgPath
 open Xunit
 
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
-let private vector x y = Vector.create (Length.fromFloat x) (Length.fromFloat y)
+let private coordinatePair x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private degrees value = Degree.fromFloat value
 
 [<Fact>]
@@ -41,62 +41,62 @@ let ``degree and radian conversion is explicit`` () =
 
 [<Fact>]
 let ``SVG basis directions and headings use displayed coordinates`` () =
-    Assert.Equal(Vector.right, Vector.direction (degrees 0.0))
-    Assert.Equal(Vector.down, Vector.direction (degrees 90.0))
-    Assert.Equal(Vector.left, Vector.direction (degrees 180.0))
-    Assert.Equal(Vector.up, Vector.direction (degrees 270.0))
-    Assert.Equal(0.0, Vector.heading Vector.right |> Degree.toFloat, 12)
-    Assert.Equal(90.0, Vector.heading Vector.down |> Degree.toFloat, 12)
-    Assert.Equal(0.0, Vector.heading (Vector.create 0.0 0.0) |> Degree.toFloat, 12)
+    Assert.Equal(Point.right, Point.direction (degrees 0.0))
+    Assert.Equal(Point.down, Point.direction (degrees 90.0))
+    Assert.Equal(Point.left, Point.direction (degrees 180.0))
+    Assert.Equal(Point.up, Point.direction (degrees 270.0))
+    Assert.Equal(0.0, Point.heading Point.right |> Degree.toFloat, 12)
+    Assert.Equal(90.0, Point.heading Point.down |> Degree.toFloat, 12)
+    Assert.Equal(0.0, Point.heading (Point.create 0.0 0.0) |> Degree.toFloat, 12)
 
 [<Fact>]
 let ``clockwise apertures are normalized to one turn`` () =
-    Assert.Equal(0.0, Vector.clockwiseAperture Vector.right Vector.right |> Degree.toFloat, 12)
-    Assert.Equal(90.0, Vector.clockwiseAperture Vector.right Vector.down |> Degree.toFloat, 12)
-    Assert.Equal(270.0, Vector.clockwiseAperture Vector.down Vector.right |> Degree.toFloat, 12)
+    Assert.Equal(0.0, Point.clockwiseAperture Point.right Point.right |> Degree.toFloat, 12)
+    Assert.Equal(90.0, Point.clockwiseAperture Point.right Point.down |> Degree.toFloat, 12)
+    Assert.Equal(270.0, Point.clockwiseAperture Point.down Point.right |> Degree.toFloat, 12)
 
 [<Fact>]
-let ``vector arithmetic preserves and combines measures`` () =
-    let a = vector 3.0 4.0
-    let b = vector 1.0 -2.0
-    let dot: float<length^2> = Vector.dot a b
-    let cross: float<length^2> = Vector.cross a b
+let ``coordinate-pair arithmetic preserves and combines measures`` () =
+    let a = coordinatePair 3.0 4.0
+    let b = coordinatePair 1.0 -2.0
+    let dot: float<length^2> = Point.dot a b
+    let cross: float<length^2> = Point.cross a b
 
-    Assert.Equal(vector 4.0 2.0, Vector.add a b)
-    Assert.Equal(vector 2.0 6.0, Vector.subtract a b)
-    Assert.Equal(vector -1.0 2.0, Vector.negate b)
-    Assert.Equal(vector 6.0 8.0, Vector.scale 2.0 a)
+    Assert.Equal(coordinatePair 4.0 2.0, Point.add a b)
+    Assert.Equal(coordinatePair 2.0 6.0, Point.subtract a b)
+    Assert.Equal(coordinatePair -1.0 2.0, Point.negate b)
+    Assert.Equal(coordinatePair 6.0 8.0, Point.scale 2.0 a)
     Assert.Equal(-5.0, float dot, 12)
     Assert.Equal(-10.0, float cross, 12)
 
 [<Fact>]
 let ``norm avoids intermediate overflow`` () =
-    let large = vector 1.0e200 0.0
-    Assert.Equal(1.0e200, Vector.norm large |> Length.toFloat)
+    let large = coordinatePair 1.0e200 0.0
+    Assert.Equal(1.0e200, Point.norm large |> Length.toFloat)
 
 [<Fact>]
-let ``normalization and projections reject the zero vector`` () =
-    let a = vector 3.0 4.0
-    let horizontal = vector 2.0 0.0
-    let zero = vector 0.0 0.0
+let ``normalization and projections reject the zero coordinate pair`` () =
+    let a = coordinatePair 3.0 4.0
+    let horizontal = coordinatePair 2.0 0.0
+    let zero = coordinatePair 0.0 0.0
 
-    let unit = Vector.normalize a |> Option.get
-    let projected = Vector.project a horizontal |> Option.get
-    let scalar = Vector.scalarProjection a horizontal |> Option.get
+    let unit = Point.normalize a |> Option.get
+    let projected = Point.project a horizontal |> Option.get
+    let scalar = Point.scalarProjection a horizontal |> Option.get
 
     Assert.Equal(0.6, unit.X, 12)
     Assert.Equal(0.8, unit.Y, 12)
-    Assert.Equal(vector 3.0 0.0, projected)
+    Assert.Equal(coordinatePair 3.0 0.0, projected)
     Assert.Equal(3.0, Length.toFloat scalar, 12)
-    Assert.Equal(None, Vector.normalize zero)
-    Assert.Equal(None, Vector.project a zero)
-    Assert.Equal(None, Vector.scalarProjection a zero)
+    Assert.Equal(None, Point.normalize zero)
+    Assert.Equal(None, Point.project a zero)
+    Assert.Equal(None, Point.scalarProjection a zero)
 
 [<Fact>]
 let ``rotations have visual SVG semantics`` () =
-    let a = vector 2.0 3.0
-    Assert.Equal(vector -3.0 2.0, Vector.rotateClockwise a)
-    Assert.Equal(vector 3.0 -2.0, Vector.rotateCounterclockwise a)
+    let a = coordinatePair 2.0 3.0
+    Assert.Equal(coordinatePair -3.0 2.0, Point.rotateClockwise a)
+    Assert.Equal(coordinatePair 3.0 -2.0, Point.rotateCounterclockwise a)
 
 [<Fact>]
 let ``point midpoint interpolation and nearness match Gleam contracts`` () =

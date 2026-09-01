@@ -20,6 +20,7 @@ type SegmentError =
     | InvalidOverlapTolerance of float<length>
     | InvalidOverlapSamples of int
     | NonAffineOverlapCorrespondence
+    | InvalidSubpathParameter of segmentIndex: int * t: float<parameter> * length: int
 
 [<Struct>]
 type Subpath =
@@ -29,6 +30,16 @@ type Subpath =
 
 [<Struct>]
 type Path = { Subpaths: Subpath list }
+
+[<Struct>]
+type SubpathParameter =
+    { SegmentIndex: int
+      T: float<parameter> }
+
+[<Struct>]
+type PathParameter =
+    { SubpathIndex: int
+      At: SubpathParameter }
 
 type FillRule =
     | Nonzero
@@ -225,6 +236,17 @@ module Subpath =
     let segments subpath = subpath.Segments
     let start subpath = if List.isEmpty subpath.Segments then None else Some subpath.Start
     let finish subpath = subpath.Segments |> List.tryLast |> Option.map Segment.finish
+    let parameterCanonicalize subpath parameter =
+        let length = List.length subpath.Segments
+        if length = 0 then Error EmptySubpath
+        elif parameter.SegmentIndex < 0 || parameter.SegmentIndex >= length
+             || parameter.T < 0.0<parameter> || parameter.T > 1.0<parameter> then
+            Error(InvalidSubpathParameter(parameter.SegmentIndex, parameter.T, length))
+        elif parameter.T = 1.0<parameter> && parameter.SegmentIndex + 1 < length then
+            Ok { SegmentIndex = parameter.SegmentIndex + 1; T = 0.0<parameter> }
+        elif subpath.Closed && parameter.T = 1.0<parameter> && parameter.SegmentIndex = length - 1 then
+            Ok { SegmentIndex = 0; T = 0.0<parameter> }
+        else Ok parameter
     let toLinesWith options subpath =
         subpath.Segments
         |> List.fold (fun state segment ->

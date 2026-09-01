@@ -19,5 +19,6 @@
     <Compile Include="Area.fs" />
     <Compile Include="BasicShapes.fs" />
     <Compile Include="OverlapDetection.fs" />
+    <Compile Include="Overlaps.fs" />
   </ItemGroup>
 </Project>

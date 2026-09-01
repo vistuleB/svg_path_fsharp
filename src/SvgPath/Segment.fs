@@ -13,9 +13,13 @@ type Segment =
 type SegmentError =
     | DegenerateArc
     | EmptySubpath
+    | SplitOutsideSegment
     | InvalidLinearizeTolerance of float<length>
     | InvalidLinearizeMaxDepth of int
     | LinearizeMaxDepthReached of float<length>
+    | InvalidOverlapTolerance of float<length>
+    | InvalidOverlapSamples of int
+    | NonAffineOverlapCorrespondence
 
 [<Struct>]
 type Subpath =
@@ -55,6 +59,13 @@ module Segment =
         | CubicBezier(_, _, _, endPoint) -> endPoint
         | Arc endpoint -> endpoint.End
 
+    let reverse segment =
+        match segment with
+        | Line(startPoint, endPoint) -> Line(endPoint, startPoint)
+        | QuadraticBezier(startPoint, control, endPoint) -> QuadraticBezier(endPoint, control, startPoint)
+        | CubicBezier(startPoint, control1, control2, endPoint) -> CubicBezier(endPoint, control2, control1, startPoint)
+        | Arc endpoint -> Arc { endpoint with Start = endpoint.End; End = endpoint.Start; Sweep = not endpoint.Sweep }
+
     let private asBezier segment =
         match segment with
         | Line(startPoint, endPoint) -> LinearBezierData(startPoint, endPoint)
@@ -67,6 +78,35 @@ module Segment =
         match segment with
         | Arc endpoint -> Ellipse.endpointToCenter endpoint |> Result.map (fun arc -> Ellipse.arcPoint arc t) |> Result.mapError (fun _ -> DegenerateArc)
         | _ -> Ok(Bezier.point (asBezier segment) t)
+
+    let private fromBezier curve =
+        match curve with
+        | LinearBezierData(startPoint, endPoint) -> Line(startPoint, endPoint)
+        | QuadraticBezierData(startPoint, control, endPoint) -> QuadraticBezier(startPoint, control, endPoint)
+        | CubicBezierData(startPoint, control1, control2, endPoint) -> CubicBezier(startPoint, control1, control2, endPoint)
+
+    let rec betweenInside segment fromParameter toParameter =
+        if fromParameter < 0.0<parameter> || fromParameter > 1.0<parameter>
+           || toParameter < 0.0<parameter> || toParameter > 1.0<parameter> then Error SplitOutsideSegment
+        elif fromParameter > toParameter then
+            betweenInside segment toParameter fromParameter |> Result.map reverse
+        elif fromParameter = toParameter then
+            point segment fromParameter |> Result.map (fun sample -> Line(sample, sample))
+        else
+            match segment with
+            | Arc endpoint ->
+                Ellipse.endpointToCenter endpoint
+                |> Result.mapError (fun _ -> DegenerateArc)
+                |> Result.map (fun arc ->
+                    let _, afterStart = Ellipse.splitArc arc fromParameter
+                    let relative = (toParameter - fromParameter) / (1.0<parameter> - fromParameter) |> Parameter.fromFloat
+                    let piece, _ = Ellipse.splitArc afterStart relative
+                    Arc(Ellipse.centerToEndpoint piece))
+            | _ ->
+                let _, afterStart = Bezier.split (asBezier segment) fromParameter
+                let relative = (toParameter - fromParameter) / (1.0<parameter> - fromParameter) |> Parameter.fromFloat
+                let piece, _ = Bezier.split afterStart relative
+                Ok(fromBezier piece)
 
     let derivative segment t : Result<Point<length / parameter>, SegmentError> =
         match segment with
@@ -101,6 +141,35 @@ module Segment =
             Ellipse.endpointToCenter endpoint
             |> Result.map (fun arc -> Ellipse.arcSecondDerivative arc t)
             |> Result.mapError (fun _ -> DegenerateArc)
+
+    let projection target sample =
+        let candidates = [ 0 .. 64 ] |> List.map (fun index -> Parameter.fromFloat (float index / 64.0))
+        let distanceSquared t = point target t |> Result.map (Point.squaredDistance sample)
+        let rec refine t iterations =
+            if iterations = 0 then t
+            else
+                match point target t, derivative target t, secondDerivative target t with
+                | Ok curvePoint, Ok first, Ok second ->
+                    let offset = Point.displacement sample curvePoint
+                    let numerator = Point.dot offset first
+                    let denominator = Point.dot first first + Point.dot offset second
+                    if denominator = 0.0<length^2 / parameter^2> then t
+                    else
+                        let step = numerator / denominator
+                        let next = max 0.0<parameter> (min 1.0<parameter> (t - step))
+                        if abs (next - t) <= 1.0e-14<parameter> then next else refine next (iterations - 1)
+                | _ -> t
+        candidates
+        |> List.fold (fun state t ->
+            state
+            |> Result.bind (fun evaluated ->
+                distanceSquared t |> Result.map (fun distance -> (t, distance) :: evaluated))) (Ok [])
+        |> Result.bind (fun evaluated ->
+            let initial = evaluated |> List.minBy snd |> fst
+            let t = refine initial 24
+            point target t |> Result.map (fun projected -> t, projected, Point.distance sample projected))
+
+    let distance target sample = projection target sample |> Result.map (fun (_, _, distance) -> distance)
 
     let private controlDistanceToChord startPoint endPoint control =
         let chord = Point.displacement startPoint endPoint

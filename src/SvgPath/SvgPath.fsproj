@@ -18,5 +18,6 @@
     <Compile Include="SmallestEnclosingCircle.fs" />
     <Compile Include="Area.fs" />
     <Compile Include="BasicShapes.fs" />
+    <Compile Include="OverlapDetection.fs" />
   </ItemGroup>
 </Project>

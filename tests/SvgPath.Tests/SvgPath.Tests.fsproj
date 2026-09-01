@@ -21,6 +21,7 @@
     <Compile Include="OverlapDetectionTests.fs" />
     <Compile Include="OverlapsTests.fs" />
     <Compile Include="IntersectionsTests.fs" />
+    <Compile Include="EncountersTests.fs" />
     <Compile Include="TransformTests.fs" />
     <Compile Include="ConvexHullTests.fs" />
     <Compile Include="DegeneracyTests.fs" />

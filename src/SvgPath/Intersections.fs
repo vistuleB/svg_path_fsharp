@@ -7,6 +7,18 @@ type SegmentIntersection =
       Point: Point<length> }
 
 [<Struct>]
+type SubpathIntersection =
+    { Point: Point<length>
+      LeftParameters: SubpathParameter list
+      RightParameters: SubpathParameter list }
+
+[<Struct>]
+type PathIntersection =
+    { Point: Point<length>
+      LeftParameters: PathParameter list
+      RightParameters: PathParameter list }
+
+[<Struct>]
 type IntersectionOptions =
     { Tolerance: float<length>
       MaxDepth: int }
@@ -209,18 +221,157 @@ module Intersections =
                     else loop rest found (examined + 1))
         loop initial [] 0
 
-    let segmentWith left right options =
+    let validateOptions options =
         if options.Tolerance < 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidIntersectionTolerance options.Tolerance)
         elif options.MaxDepth <= 0 then Error(InvalidIntersectionMaxDepth options.MaxDepth)
-        else
+        else Ok()
+
+    let segmentWithoutOverlapPrecheckWith left right options =
+        validateOptions options
+        |> Result.bind (fun () ->
+            endpointCandidates left right options.Tolerance
+            |> Result.bind (fun endpoints ->
+                search left right options (initialWindows options.MaxDepth)
+                |> Result.map (List.fold (fun found item -> insert options.Tolerance item found) endpoints >> List.sortBy (fun item -> item.LeftT, item.RightT))))
+
+    let segmentWith left right options =
+        validateOptions options
+        |> Result.bind (fun () ->
             OverlapDetection.detect left right options.Tolerance
             |> Result.bind (function
                 | _ :: _ -> Error OverlappingSegments
-                | [] ->
-                    endpointCandidates left right options.Tolerance
-                    |> Result.bind (fun endpoints ->
-                        search left right options (initialWindows options.MaxDepth)
-                        |> Result.map (List.fold (fun found item -> insert options.Tolerance item found) endpoints >> List.sortBy (fun item -> item.LeftT, item.RightT))))
+                | [] -> segmentWithoutOverlapPrecheckWith left right options))
 
     let segment left right = segmentWith left right defaultOptions
+
+    let private canonicalSubpathParameter subpath parameterValue =
+        Subpath.parameterCanonicalize subpath parameterValue
+
+    let private sortUniqueSubpathParameters (subpath: Subpath) (parameters: SubpathParameter list) =
+        parameters
+        |> List.fold (fun state parameterValue ->
+            state
+            |> Result.bind (fun found ->
+                canonicalSubpathParameter subpath parameterValue
+                |> Result.map (fun canonical ->
+                    if List.contains canonical found then found else canonical :: found))) (Ok [])
+        |> Result.map (List.sortBy (fun parameterValue -> parameterValue.SegmentIndex, parameterValue.T))
+
+    let private insertSubpathIntersection
+        (tolerance: float<length>)
+        (point: Point<length>)
+        (leftParameter: SubpathParameter)
+        (rightParameter: SubpathParameter)
+        (found: SubpathIntersection list) =
+        let rec insert (accumulated: SubpathIntersection list) (remaining: SubpathIntersection list) =
+            match remaining with
+            | [] ->
+                List.rev accumulated
+                @ [ ({ Point = point
+                       LeftParameters = [ leftParameter ]
+                       RightParameters = [ rightParameter ] } : SubpathIntersection) ]
+            | first :: rest when Point.distance first.Point point <= tolerance ->
+                List.rev accumulated
+                @ ({ first with
+                        LeftParameters = leftParameter :: first.LeftParameters
+                        RightParameters = rightParameter :: first.RightParameters } :: rest)
+            | first :: rest -> insert (first :: accumulated) rest
+        insert [] found
+
+    let subpathWithoutOverlapPrecheckWith (left: Subpath) (right: Subpath) options =
+        validateOptions options
+        |> Result.bind (fun () ->
+            let pairs =
+                [ for leftIndex, leftSegment in List.indexed left.Segments do
+                    for rightIndex, rightSegment in List.indexed right.Segments do
+                        yield leftIndex, leftSegment, rightIndex, rightSegment ]
+            pairs
+            |> List.fold (fun state (leftIndex, leftSegment, rightIndex, rightSegment) ->
+                state
+                |> Result.bind (fun found ->
+                    OverlapDetection.detect leftSegment rightSegment options.Tolerance
+                    |> Result.bind (function
+                        | _ :: _ -> Ok found
+                        | [] ->
+                            segmentWithoutOverlapPrecheckWith leftSegment rightSegment options
+                            |> Result.map (fun intersections ->
+                                intersections
+                                |> List.fold (fun grouped intersection ->
+                                    insertSubpathIntersection
+                                        options.Tolerance
+                                        intersection.Point
+                                        { SegmentIndex = leftIndex; T = intersection.LeftT }
+                                        { SegmentIndex = rightIndex; T = intersection.RightT }
+                                        grouped) found)))) (Ok([]: SubpathIntersection list))
+            |> Result.bind (fun grouped ->
+                grouped
+                |> List.fold (fun state (intersection: SubpathIntersection) ->
+                    state
+                    |> Result.bind (fun normalized ->
+                        sortUniqueSubpathParameters left intersection.LeftParameters
+                        |> Result.bind (fun leftParameters ->
+                            sortUniqueSubpathParameters right intersection.RightParameters
+                            |> Result.map (fun rightParameters ->
+                                { intersection with
+                                    LeftParameters = leftParameters
+                                    RightParameters = rightParameters } :: normalized)))) (Ok([]: SubpathIntersection list))
+                |> Result.map (List.sortBy (fun (intersection: SubpathIntersection) ->
+                    intersection.LeftParameters
+                    |> List.tryHead
+                    |> Option.map (fun parameterValue -> parameterValue.SegmentIndex, parameterValue.T)
+                    |> Option.defaultValue (System.Int32.MaxValue, 1.0<parameter>)))))
+
+    let segmentSubpathWithoutOverlapPrecheckWith segmentValue subpathValue options =
+        subpathWithoutOverlapPrecheckWith (Subpath.ofSegment segmentValue) subpathValue options
+        |> Result.map (List.map (fun (intersection: SubpathIntersection) ->
+            let segmentParameters = intersection.LeftParameters |> List.map (fun value -> value.T)
+            let segmentParameter = segmentParameters |> List.tryHead |> Option.defaultValue 0.0<parameter>
+            intersection.Point, segmentParameter, intersection.RightParameters))
+
+    let pathWithoutOverlapPrecheckWith (left: Path) (right: Path) options =
+        validateOptions options
+        |> Result.bind (fun () ->
+            let pairs =
+                [ for leftIndex, leftSubpath in List.indexed left.Subpaths do
+                    for rightIndex, rightSubpath in List.indexed right.Subpaths do
+                        yield leftIndex, leftSubpath, rightIndex, rightSubpath ]
+            let insertPath
+                (intersection: SubpathIntersection)
+                leftIndex
+                rightIndex
+                (found: PathIntersection list) =
+                let lifted: PathIntersection =
+                    { Point = intersection.Point
+                      LeftParameters =
+                        intersection.LeftParameters
+                        |> List.map (fun at -> { SubpathIndex = leftIndex; At = at })
+                      RightParameters =
+                        intersection.RightParameters
+                        |> List.map (fun at -> { SubpathIndex = rightIndex; At = at }) }
+                match found |> List.tryFindIndex (fun existing -> Point.distance existing.Point lifted.Point <= options.Tolerance) with
+                | None -> lifted :: found
+                | Some index ->
+                    found
+                    |> List.mapi (fun current existing ->
+                        if current <> index then existing
+                        else
+                            { existing with
+                                LeftParameters = List.distinct (lifted.LeftParameters @ existing.LeftParameters)
+                                RightParameters = List.distinct (lifted.RightParameters @ existing.RightParameters) })
+            pairs
+            |> List.fold (fun state (leftIndex, leftSubpath, rightIndex, rightSubpath) ->
+                state
+                |> Result.bind (fun found ->
+                    subpathWithoutOverlapPrecheckWith leftSubpath rightSubpath options
+                    |> Result.map (fun intersections ->
+                        intersections
+                        |> List.fold (fun grouped (intersection: SubpathIntersection) -> insertPath intersection leftIndex rightIndex grouped) found))) (Ok([]: PathIntersection list))
+            |> Result.map (List.sortBy (fun (intersection: PathIntersection) ->
+                intersection.LeftParameters
+                |> List.tryHead
+                |> Option.map (fun parameterValue ->
+                    parameterValue.SubpathIndex,
+                    parameterValue.At.SegmentIndex,
+                    parameterValue.At.T)
+                |> Option.defaultValue (System.Int32.MaxValue, System.Int32.MaxValue, 1.0<parameter>))))

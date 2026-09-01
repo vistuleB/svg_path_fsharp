@@ -34,6 +34,7 @@ type SegmentError =
     | InvalidIntersectionMaxDepth of int
     | IntersectionTerminalWindowLimitExceeded of int
     | OverlappingSegments
+    | InternalOverlapParameterCorrespondenceInconsistency
     | InvalidContainmentTolerance of float<length>
     | InvalidContainmentSamples of int
     | InvalidContainmentMaxIterations of int

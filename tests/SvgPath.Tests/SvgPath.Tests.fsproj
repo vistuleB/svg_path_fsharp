@@ -22,6 +22,7 @@
     <Compile Include="OverlapsTests.fs" />
     <Compile Include="IntersectionsTests.fs" />
     <Compile Include="TransformTests.fs" />
+    <Compile Include="ConvexHullTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

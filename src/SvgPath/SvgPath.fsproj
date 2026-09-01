@@ -22,5 +22,6 @@
     <Compile Include="Overlaps.fs" />
     <Compile Include="Intersections.fs" />
     <Compile Include="Transform.fs" />
+    <Compile Include="ConvexHull.fs" />
   </ItemGroup>
 </Project>

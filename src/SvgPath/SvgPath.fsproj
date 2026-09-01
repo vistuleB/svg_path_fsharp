@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="Units.fs" />
+    <Compile Include="Format.fs" />
     <Compile Include="Trig.fs" />
     <Compile Include="Point.fs" />
     <Compile Include="Affine.fs" />

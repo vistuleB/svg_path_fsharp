@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="PointTests.fs" />
+    <Compile Include="FormatTests.fs" />
     <Compile Include="AffineTests.fs" />
     <Compile Include="EllipseTests.fs" />
     <Compile Include="TrigTests.fs" />

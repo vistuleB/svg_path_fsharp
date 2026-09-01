@@ -26,5 +26,6 @@
     <Compile Include="Degeneracy.fs" />
     <Compile Include="WindingField.fs" />
     <Compile Include="Congruency.fs" />
+    <Compile Include="Effects.fs" />
   </ItemGroup>
 </Project>

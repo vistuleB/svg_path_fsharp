@@ -25,5 +25,6 @@
     <Compile Include="ConvexHull.fs" />
     <Compile Include="Degeneracy.fs" />
     <Compile Include="WindingField.fs" />
+    <Compile Include="Congruency.fs" />
   </ItemGroup>
 </Project>

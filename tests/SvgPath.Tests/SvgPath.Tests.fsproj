@@ -25,6 +25,7 @@
     <Compile Include="ConvexHullTests.fs" />
     <Compile Include="DegeneracyTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
+    <Compile Include="CongruencyTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -20,6 +20,10 @@ type SegmentError =
     | InvalidOverlapTolerance of float<length>
     | InvalidOverlapSamples of int
     | NonAffineOverlapCorrespondence
+    | InvalidIntersectionTolerance of float<length>
+    | InvalidIntersectionMaxDepth of int
+    | IntersectionTerminalWindowLimitExceeded of int
+    | OverlappingSegments
     | InvalidSubpathParameter of segmentIndex: int * t: float<parameter> * length: int
 
 [<Struct>]

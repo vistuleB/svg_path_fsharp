@@ -19,6 +19,7 @@
     <Compile Include="BasicShapesTests.fs" />
     <Compile Include="OverlapDetectionTests.fs" />
     <Compile Include="OverlapsTests.fs" />
+    <Compile Include="IntersectionsTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

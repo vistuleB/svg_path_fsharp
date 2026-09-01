@@ -27,7 +27,7 @@ module WindingField =
               60.0<degree>; 75.0<degree>; 90.0<degree>; 105.0<degree>
               120.0<degree>; 135.0<degree>; 150.0<degree>; 165.0<degree> ] }
 
-    let private validateOptions options =
+    let validateOptions options =
         if options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidContainmentTolerance options.Tolerance)
         elif options.Samples <= 0 then Error(InvalidContainmentSamples options.Samples)

@@ -222,7 +222,7 @@ module Intersections =
         loop initial [] 0
 
     let validateOptions options =
-        if options.Tolerance < 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
+        if options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidIntersectionTolerance options.Tolerance)
         elif options.MaxDepth <= 0 then Error(InvalidIntersectionMaxDepth options.MaxDepth)
         else Ok()

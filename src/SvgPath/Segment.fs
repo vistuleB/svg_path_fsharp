@@ -19,6 +19,16 @@ type EndpointPolicy =
     | WiggleThenBridgeWith of float<length>
     | Custom of (Segment -> Segment -> bool -> Segment list)
 
+[<Struct>]
+type SubpathParameter =
+    { SegmentIndex: int
+      T: float<parameter> }
+
+[<Struct>]
+type PathParameter =
+    { SubpathIndex: int
+      At: SubpathParameter }
+
 type SegmentError =
     | DegenerateArc
     | EmptySubpath
@@ -44,6 +54,7 @@ type SegmentError =
     | CannotMapArcNonlinearly
     | InvalidSubpathParameter of segmentIndex: int * t: float<parameter> * length: int
     | InvalidPathParameter of subpathIndex: int * length: int
+    | InvalidSubpathInterval of fromValue: SubpathParameter * toValue: SubpathParameter
     | InvalidSplice of start: int * delete: int * length: int
     | Discontinuous of
         previousIndex: int *
@@ -74,16 +85,6 @@ type Path =
     private { subpathList: Subpath list }
 
     member this.Subpaths = this.subpathList
-
-[<Struct>]
-type SubpathParameter =
-    { SegmentIndex: int
-      T: float<parameter> }
-
-[<Struct>]
-type PathParameter =
-    { SubpathIndex: int
-      At: SubpathParameter }
 
 type FillRule =
     | Nonzero

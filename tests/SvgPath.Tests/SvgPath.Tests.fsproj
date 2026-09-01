@@ -23,6 +23,7 @@
     <Compile Include="IntersectionsTests.fs" />
     <Compile Include="TransformTests.fs" />
     <Compile Include="ConvexHullTests.fs" />
+    <Compile Include="DegeneracyTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

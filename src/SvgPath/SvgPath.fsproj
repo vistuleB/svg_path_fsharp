@@ -23,5 +23,6 @@
     <Compile Include="Intersections.fs" />
     <Compile Include="Transform.fs" />
     <Compile Include="ConvexHull.fs" />
+    <Compile Include="Degeneracy.fs" />
   </ItemGroup>
 </Project>

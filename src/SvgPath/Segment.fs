@@ -34,6 +34,12 @@ type SegmentError =
     | InvalidIntersectionMaxDepth of int
     | IntersectionTerminalWindowLimitExceeded of int
     | OverlappingSegments
+    | InvalidContainmentTolerance of float<length>
+    | InvalidContainmentSamples of int
+    | InvalidContainmentMaxIterations of int
+    | InvalidContainmentRayAngle of float<degree>
+    | IndeterminateWindingSideLevels
+    | InconsistentWindingSideLevels
     | CannotMapArcNonlinearly
     | InvalidSubpathParameter of segmentIndex: int * t: float<parameter> * length: int
     | InvalidPathParameter of subpathIndex: int * length: int

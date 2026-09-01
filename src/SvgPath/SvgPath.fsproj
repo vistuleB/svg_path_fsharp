@@ -39,5 +39,6 @@
     <Compile Include="Serialize.fs" />
     <Compile Include="Svg.fs" />
     <Compile Include="Arrangement.fs" />
+    <Compile Include="Csg.fs" />
   </ItemGroup>
 </Project>

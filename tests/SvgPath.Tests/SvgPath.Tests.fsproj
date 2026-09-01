@@ -39,6 +39,7 @@
     <Compile Include="SerializeTests.fs" />
     <Compile Include="SvgTests.fs" />
     <Compile Include="ArrangementTests.fs" />
+    <Compile Include="CsgTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

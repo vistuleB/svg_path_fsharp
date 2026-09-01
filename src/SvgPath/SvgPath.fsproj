@@ -36,5 +36,6 @@
     <Compile Include="Effects.fs" />
     <Compile Include="Marker.fs" />
     <Compile Include="Parse.fs" />
+    <Compile Include="Serialize.fs" />
   </ItemGroup>
 </Project>

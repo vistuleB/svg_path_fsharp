@@ -9,5 +9,6 @@
     <Compile Include="Units.fs" />
     <Compile Include="Trig.fs" />
     <Compile Include="Point.fs" />
+    <Compile Include="Root.fs" />
   </ItemGroup>
 </Project>

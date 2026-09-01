@@ -33,6 +33,14 @@ trigonometric inputs and ordinary trigonometric outputs remain dimensionless.
 The exact axis, diagonal, quarter-turn, and safe eighth-turn cases from the
 Gleam implementation are preserved.
 
+The root-finding translation treats polynomial coefficients as values with one
+shared unit and roots as `float<parameter>`. Polynomial evaluation explicitly
+unwraps that nominal parameter as the dimensionless polynomial variable.
+Polynomial options keep coefficient/value tolerances in the coefficient unit
+and root tolerances in parameter space. General bisection uses separate value
+and parameter tolerances; the Gleam API currently combines those two roles in
+one `Float`.
+
 Run the current tests with:
 
 ```shell

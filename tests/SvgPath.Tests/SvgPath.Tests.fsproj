@@ -27,6 +27,7 @@
     <Compile Include="ClipTests.fs" />
     <Compile Include="TransformTests.fs" />
     <Compile Include="TransformSerializeTests.fs" />
+    <Compile Include="TransformParseTests.fs" />
     <Compile Include="ConvexHullTests.fs" />
     <Compile Include="DegeneracyTests.fs" />
     <Compile Include="WindingFieldTests.fs" />

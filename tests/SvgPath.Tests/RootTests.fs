@@ -217,51 +217,6 @@ let ``degree-specific unit-interval helpers classify roots`` () =
     Assert.Equal(NegativeToPositive, cubic.Kind)
 
 [<Fact>]
-let ``bisection separates value tolerance from parameter tolerance`` () =
-    let options: BisectionOptions<length> =
-        { ParameterTolerance = parameter 1.0e-9
-          ValueTolerance = coefficient 1.0e-12
-          MaxIterations = 100 }
-
-    let solution =
-        Root.bisectWith
-            (fun t -> coefficient (Parameter.ratio t * Parameter.ratio t - 2.0))
-            (parameter 0.0)
-            (parameter 2.0)
-            options
-        |> unwrap
-
-    near 1.414213562 solution
-
-[<Fact>]
-let ``bisection reports bracket and iteration errors`` () =
-    let options: BisectionOptions<length> =
-        { ParameterTolerance = parameter 1.0e-9
-          ValueTolerance = coefficient 1.0e-9
-          MaxIterations = 1 }
-
-    match
-        Root.bisectWith
-            (fun t -> coefficient (Parameter.ratio t - 0.3))
-            (parameter 0.0)
-            (parameter 1.0)
-            options
-    with
-    | Error(MaxIterationsReached(estimate, value)) ->
-        near 0.5 estimate
-        Assert.Equal(0.2, Length.toFloat value, 12)
-    | result -> failwithf "unexpected result: %A" result
-
-    match
-        Root.bisect
-            (fun t -> coefficient (Parameter.ratio t * Parameter.ratio t + 1.0))
-            (parameter 0.0)
-            (parameter 2.0)
-    with
-    | Error(NotBracketed _) -> ()
-    | result -> failwithf "unexpected result: %A" result
-
-[<Fact>]
 let ``custom bisection certification preserves its bracket`` () =
     let isolation =
         Root.bisectIsolationUntil

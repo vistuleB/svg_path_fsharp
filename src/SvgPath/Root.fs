@@ -14,11 +14,6 @@ type PolynomialOptions<[<Measure>] 'Value> =
       ValueTolerance: float<'Value>
       MaxIterations: int }
 
-type BisectionOptions<[<Measure>] 'Value> =
-    { ParameterTolerance: float<parameter>
-      ValueTolerance: float<'Value>
-      MaxIterations: int }
-
 [<Struct>]
 type RootIsolation =
     { Lower: float<parameter>
@@ -68,11 +63,6 @@ module Root =
     let defaultPolynomialOptions<[<Measure>] 'Value> () : PolynomialOptions<'Value> =
         { CoefficientTolerance = measured<'Value> 1.0e-12
           ParameterTolerance = Parameter.fromFloat 1.0e-9
-          ValueTolerance = measured<'Value> 1.0e-9
-          MaxIterations = 100 }
-
-    let defaultBisectionOptions<[<Measure>] 'Value> () : BisectionOptions<'Value> =
-        { ParameterTolerance = Parameter.fromFloat 1.0e-9
           ValueTolerance = measured<'Value> 1.0e-9
           MaxIterations = 100 }
 
@@ -462,57 +452,6 @@ module Root =
                 polynomialRootsWith coefficients -bound bound options
 
     let cubic a b c d = cubicWith (defaultPolynomialOptions ()) a b c d
-
-    let rec private bisectLoop
-        (f: float<parameter> -> float<'Value>)
-        (left: float<parameter>)
-        (leftValue: float<'Value>)
-        (right: float<parameter>)
-        (options: BisectionOptions<'Value>)
-        (remainingIterations: int)
-        : Result<float<parameter>, RootError<'Value>> =
-        let midpoint = left + (right - left) / 2.0
-        let midpointValue = f midpoint
-
-        if
-            isCloseToZero midpointValue options.ValueTolerance
-            || (right - left) / 2.0 <= options.ParameterTolerance
-        then
-            Ok midpoint
-        elif remainingIterations <= 1 then
-            Error(MaxIterationsReached(midpoint, midpointValue))
-        elif sameSign leftValue midpointValue then
-            bisectLoop f midpoint midpointValue right options (remainingIterations - 1)
-        else
-            bisectLoop f left leftValue midpoint options (remainingIterations - 1)
-
-    let bisectWith
-        (f: float<parameter> -> float<'Value>)
-        (left: float<parameter>)
-        (right: float<parameter>)
-        (options: BisectionOptions<'Value>)
-        : Result<float<parameter>, RootError<'Value>> =
-        if options.ParameterTolerance <= 0.0<parameter> || not (isFinite options.ParameterTolerance) then
-            Error(InvalidParameterTolerance options.ParameterTolerance)
-        elif options.ValueTolerance < measured<'Value> 0.0 || not (isFinite options.ValueTolerance) then
-            Error(InvalidValueTolerance options.ValueTolerance)
-        elif options.MaxIterations <= 0 then
-            Error(InvalidMaxIterations options.MaxIterations)
-        else
-            let left, right = orderedBracket left right
-            let leftValue = f left
-            let rightValue = f right
-
-            if isCloseToZero leftValue options.ValueTolerance then
-                Ok left
-            elif isCloseToZero rightValue options.ValueTolerance then
-                Ok right
-            elif sameSign leftValue rightValue then
-                Error(NotBracketed(left, right, leftValue, rightValue))
-            else
-                bisectLoop f left leftValue right options options.MaxIterations
-
-    let bisect f left right = bisectWith f left right (defaultBisectionOptions ())
 
     let rec private bisectIsolationLoop
         (f: float<parameter> -> float<'Value>)

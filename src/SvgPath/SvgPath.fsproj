@@ -21,5 +21,6 @@
     <Compile Include="OverlapDetection.fs" />
     <Compile Include="Overlaps.fs" />
     <Compile Include="Intersections.fs" />
+    <Compile Include="Transform.fs" />
   </ItemGroup>
 </Project>

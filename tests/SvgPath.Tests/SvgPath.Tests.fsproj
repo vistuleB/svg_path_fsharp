@@ -20,6 +20,7 @@
     <Compile Include="OverlapDetectionTests.fs" />
     <Compile Include="OverlapsTests.fs" />
     <Compile Include="IntersectionsTests.fs" />
+    <Compile Include="TransformTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

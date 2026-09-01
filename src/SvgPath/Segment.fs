@@ -13,6 +13,7 @@ type Segment =
 type SegmentError =
     | DegenerateArc
     | EmptySubpath
+    | EmptyPath
     | SplitOutsideSegment
     | InvalidLinearizeTolerance of float<length>
     | InvalidLinearizeMaxDepth of int
@@ -50,6 +51,22 @@ type FillRule =
     | EvenOdd
 
 [<Struct>]
+type BoundingBox =
+    { Min: Point<length>
+      Max: Point<length> }
+
+[<RequireQualifiedAccess>]
+module BoundingBox =
+    let fromPoint point = { Min = point; Max = point }
+
+    let union left right =
+        { Min = Point.create (min left.Min.X right.Min.X) (min left.Min.Y right.Min.Y)
+          Max = Point.create (max left.Max.X right.Max.X) (max left.Max.Y right.Max.Y) }
+
+    let center box =
+        Point.create ((box.Min.X + box.Max.X) / 2.0) ((box.Min.Y + box.Max.Y) / 2.0)
+
+[<Struct>]
 type LinearizeOptions =
     { Tolerance: float<length>
       MaxDepth: int }
@@ -73,6 +90,25 @@ module Segment =
         | QuadraticBezier(_, _, endPoint)
         | CubicBezier(_, _, _, endPoint) -> endPoint
         | Arc endpoint -> endpoint.End
+
+    let boundingBox segment =
+        match segment with
+        | Line(startPoint, endPoint) ->
+            Ok
+                { Min = Point.create (min startPoint.X endPoint.X) (min startPoint.Y endPoint.Y)
+                  Max = Point.create (max startPoint.X endPoint.X) (max startPoint.Y endPoint.Y) }
+        | QuadraticBezier(startPoint, control, endPoint) ->
+            let box = Bezier.boundingBox (QuadraticBezierData(startPoint, control, endPoint))
+            Ok { Min = box.Min; Max = box.Max }
+        | CubicBezier(startPoint, control1, control2, endPoint) ->
+            let box = Bezier.boundingBox (CubicBezierData(startPoint, control1, control2, endPoint))
+            Ok { Min = box.Min; Max = box.Max }
+        | Arc endpoint ->
+            Ellipse.endpointToCenter endpoint
+            |> Result.map (fun arc ->
+                let box = Ellipse.arcBoundingBox arc
+                { Min = box.Min; Max = box.Max })
+            |> Result.mapError (fun _ -> DegenerateArc)
 
     let reverse segment =
         match segment with
@@ -240,6 +276,18 @@ module Subpath =
     let segments subpath = subpath.Segments
     let start subpath = if List.isEmpty subpath.Segments then None else Some subpath.Start
     let finish subpath = subpath.Segments |> List.tryLast |> Option.map Segment.finish
+    let boundingBox subpath =
+        match subpath.Segments with
+        | [] -> Error EmptySubpath
+        | first :: rest ->
+            Segment.boundingBox first
+            |> Result.bind (fun initial ->
+                rest
+                |> List.fold (fun state segment ->
+                    state
+                    |> Result.bind (fun box ->
+                        Segment.boundingBox segment
+                        |> Result.map (BoundingBox.union box))) (Ok initial))
     let parameterCanonicalize subpath parameter =
         let length = List.length subpath.Segments
         if length = 0 then Error EmptySubpath
@@ -260,6 +308,19 @@ module Subpath =
 
 [<RequireQualifiedAccess>]
 module Path =
+    let boundingBox path =
+        match path.Subpaths with
+        | [] -> Error EmptyPath
+        | first :: rest ->
+            Subpath.boundingBox first
+            |> Result.bind (fun initial ->
+                rest
+                |> List.fold (fun state subpath ->
+                    state
+                    |> Result.bind (fun box ->
+                        Subpath.boundingBox subpath
+                        |> Result.map (BoundingBox.union box))) (Ok initial))
+
     let toLinesWith options path =
         path.Subpaths
         |> List.fold (fun state subpath ->

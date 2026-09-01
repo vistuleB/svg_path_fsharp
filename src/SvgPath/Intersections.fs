@@ -12,11 +12,6 @@ type IntersectionOptions =
       MaxDepth: int }
 
 [<Struct>]
-type private IntersectionBox =
-    { Min: Point<length>
-      Max: Point<length> }
-
-[<Struct>]
 type private IntersectionWindow =
     { LeftFrom: float<parameter>
       LeftTo: float<parameter>
@@ -46,25 +41,6 @@ module Intersections =
 
     let private midpoint (left: Point<length>) (right: Point<length>) =
         Point.create ((left.X + right.X) / 2.0) ((left.Y + right.Y) / 2.0)
-
-    let private segmentBox segment =
-        match segment with
-        | Line(startPoint, endPoint) ->
-            Ok
-                { Min = Point.create (min startPoint.X endPoint.X) (min startPoint.Y endPoint.Y)
-                  Max = Point.create (max startPoint.X endPoint.X) (max startPoint.Y endPoint.Y) }
-        | QuadraticBezier(startPoint, control, endPoint) ->
-            let box = Bezier.boundingBox (QuadraticBezierData(startPoint, control, endPoint))
-            Ok { Min = box.Min; Max = box.Max }
-        | CubicBezier(startPoint, control1, control2, endPoint) ->
-            let box = Bezier.boundingBox (CubicBezierData(startPoint, control1, control2, endPoint))
-            Ok { Min = box.Min; Max = box.Max }
-        | Arc endpoint ->
-            Ellipse.endpointToCenter endpoint
-            |> Result.map (fun arc ->
-                let box = Ellipse.arcBoundingBox arc
-                { Min = box.Min; Max = box.Max })
-            |> Result.mapError (fun _ -> DegenerateArc)
 
     let private boxesOverlap slack left right =
         left.Max.X + slack >= right.Min.X
@@ -200,7 +176,7 @@ module Intersections =
         | Error error, _
         | _, Error error -> Error error
         | Ok leftPiece, Ok rightPiece ->
-            match segmentBox leftPiece, segmentBox rightPiece with
+            match Segment.boundingBox leftPiece, Segment.boundingBox rightPiece with
             | Error error, _
             | _, Error error -> Error error
             | Ok leftBox, Ok rightBox when not (boxesOverlap enclosureSlack leftBox rightBox) -> Ok(None, false)

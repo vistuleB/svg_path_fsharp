@@ -14,6 +14,7 @@
     <Compile Include="RootTests.fs" />
     <Compile Include="BezierTests.fs" />
     <Compile Include="CurvatureTests.fs" />
+    <Compile Include="SmallestEnclosingCircleTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -10,6 +10,7 @@
     <Compile Include="Trig.fs" />
     <Compile Include="Point.fs" />
     <Compile Include="Affine.fs" />
+    <Compile Include="Ellipse.fs" />
     <Compile Include="Root.fs" />
     <Compile Include="Bezier.fs" />
   </ItemGroup>

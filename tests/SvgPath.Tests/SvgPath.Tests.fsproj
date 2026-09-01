@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="PointTests.fs" />
     <Compile Include="AffineTests.fs" />
+    <Compile Include="EllipseTests.fs" />
     <Compile Include="TrigTests.fs" />
     <Compile Include="RootTests.fs" />
     <Compile Include="BezierTests.fs" />

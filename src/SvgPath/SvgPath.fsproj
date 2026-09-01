@@ -37,5 +37,7 @@
     <Compile Include="Marker.fs" />
     <Compile Include="Parse.fs" />
     <Compile Include="Serialize.fs" />
+    <Compile Include="Svg.fs" />
+    <Compile Include="Arrangement.fs" />
   </ItemGroup>
 </Project>

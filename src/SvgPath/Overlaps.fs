@@ -152,10 +152,7 @@ module Overlaps =
                    Correspondence = piece.Correspondence } : SegmentSubpathOverlapPiece)) }
 
     let segmentSubpathWith segmentValue subpathValue tolerance =
-        let segmentSubpath =
-            { Start = Segment.start segmentValue
-              Segments = [ segmentValue ]
-              Closed = false }
+        let segmentSubpath = Subpath.ofSegment segmentValue
         subpathWith segmentSubpath subpathValue tolerance
         |> Result.map (List.map segmentSubpathFromSubpath)
 
@@ -276,10 +273,7 @@ module Overlaps =
                    Correspondence = piece.Correspondence } : SubpathOverlapPiece)) }
 
     let segmentSubpathOverlapSubpathParameter overlap segmentParameter segmentValue subpathValue =
-        let segmentSubpath =
-            { Start = Segment.start segmentValue
-              Segments = [ segmentValue ]
-              Closed = false }
+        let segmentSubpath = Subpath.ofSegment segmentValue
         subpathOverlapRightParameter
             (segmentSubpathAsSubpath overlap)
             { SegmentIndex = 0; T = segmentParameter }
@@ -287,10 +281,7 @@ module Overlaps =
             subpathValue
 
     let segmentSubpathOverlapSegmentParameter overlap subpathParameter segmentValue subpathValue =
-        let segmentSubpath =
-            { Start = Segment.start segmentValue
-              Segments = [ segmentValue ]
-              Closed = false }
+        let segmentSubpath = Subpath.ofSegment segmentValue
         subpathOverlapLeftParameter
             (segmentSubpathAsSubpath overlap)
             subpathParameter

@@ -16,13 +16,9 @@ module BasicShapes =
     let private degrees value = Degree.fromFloat value
 
     let private closed segments =
-        match segments with
-        | [] -> Error(PathError EmptySubpath)
-        | first :: _ ->
-            Ok
-                { Start = Segment.start first
-                  Segments = segments
-                  Closed = true }
+        Subpath.create segments
+        |> Result.bind (Subpath.setClosed true)
+        |> Result.mapError PathError
 
     let private radii
         (width: float<length>)
@@ -92,17 +88,14 @@ module BasicShapes =
 
     let line x1 y1 x2 y2 =
         let startPoint, endPoint = Point.create x1 y1, Point.create x2 y2
-        Ok { Start = startPoint; Segments = [ Line(startPoint, endPoint) ]; Closed = false }
+        Subpath.create [ Line(startPoint, endPoint) ] |> Result.mapError PathError
 
     let polyline points =
         match points with
         | [] | [ _ ] -> Error(PathError EmptySubpath)
-        | first :: _ ->
-            Ok { Start = first; Segments = points |> List.pairwise |> List.map Line; Closed = false }
+        | _ -> Subpath.polyline points |> Result.mapError PathError
 
     let polygon points =
         match points with
         | [] | [ _ ] -> Error(PathError EmptySubpath)
-        | first :: _ ->
-            let points = if List.last points = first then points else points @ [ first ]
-            Ok { Start = first; Segments = points |> List.pairwise |> List.map Line; Closed = true }
+        | _ -> Subpath.polygon points |> Result.mapError PathError

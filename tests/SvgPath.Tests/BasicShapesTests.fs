@@ -31,7 +31,7 @@ let ``rounded rectangle uses four elliptical quarter arcs`` () =
 let ``rectangle copies and clamps omitted radii`` () =
     let copied = BasicShapes.rect (length 0.0) (length 0.0) (length 20.0) (length 20.0) (Some(length 5.0)) None |> Result.defaultWith (failwithf "%A")
     let clamped = BasicShapes.rect (length 0.0) (length 0.0) (length 20.0) (length 10.0) (Some(length 50.0)) (Some(length 50.0)) |> Result.defaultWith (failwithf "%A")
-    let firstArc subpath = subpath.Segments |> List.pick (function Arc arc -> Some arc | _ -> None)
+    let firstArc (subpath: Subpath) = subpath.Segments |> List.pick (function Arc arc -> Some arc | _ -> None)
     Assert.Equal(point 5.0 5.0, (firstArc copied).Radius)
     Assert.Equal(point 10.0 5.0, (firstArc clamped).Radius)
 

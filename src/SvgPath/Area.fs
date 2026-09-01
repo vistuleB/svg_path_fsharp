@@ -62,24 +62,24 @@ module Area =
         | Arc endpoint -> Arc { endpoint with Start = rebase endpoint.Start; End = rebase endpoint.End }
 
     let signedSubpath subpath =
-        match subpath.Segments with
+        match Subpath.segments subpath with
         | [] -> 0.0<length^2>
-        | segments -> segments |> List.sumBy (rebaseSegment subpath.Start >> signedSegment)
+        | segments -> segments |> List.sumBy (rebaseSegment (Subpath.start subpath) >> signedSegment)
 
-    let signedPath path = path.Subpaths |> List.sumBy signedSubpath
+    let signedPath path = Path.subpaths path |> List.sumBy signedSubpath
 
     let private addEdge startPoint endPoint edges =
         if startPoint = endPoint then edges else { Start = startPoint; Finish = endPoint } :: edges
 
     let private edges path =
-        path.Subpaths
+        Path.subpaths path
         |> List.fold (fun edges subpath ->
-            match subpath.Segments with
+            match Subpath.segments subpath with
             | [] -> edges
             | segments ->
                 let edges = segments |> List.fold (fun edges segment -> addEdge (Segment.start segment) (Segment.finish segment) edges) edges
                 let finish = segments |> List.last |> Segment.finish
-                addEdge finish subpath.Start edges) []
+                addEdge finish (Subpath.start subpath) edges) []
 
     let private edgeIntersectionX left right =
         let leftDirection = Point.displacement left.Start left.Finish
@@ -181,7 +181,7 @@ module Area =
     let pathWith path fillRule options = arrangementArea path (FillRuleArea fillRule) options
     let path pathValue fillRule = pathWith pathValue fillRule Segment.defaultLinearizeOptions
 
-    let private asPath subpath = { Subpaths = [ subpath ] }
+    let private asPath subpath = Path.singleton subpath
     let absoluteSubpathWith subpath options = absolutePathWith (asPath subpath) options
     let absoluteSubpath subpath = absoluteSubpathWith subpath Segment.defaultLinearizeOptions
     let subpathWith subpath fillRule options = pathWith (asPath subpath) fillRule options

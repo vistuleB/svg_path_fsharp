@@ -134,35 +134,43 @@ module Transform =
     let segmentToSubpathGracefully input transform =
         match segment input transform with
         | Ok transformed ->
-            Ok { Start = Segment.start transformed; Segments = [ transformed ]; Closed = false }
+            Ok(Subpath.ofSegment transformed)
         | Error DegenerateArcTransform ->
             match input with
             | Arc endpoint ->
                 Ellipse.collapsedArcSubpath
                     endpoint.Start endpoint.Radius endpoint.XAxisRotation
                     endpoint.LargeArc endpoint.Sweep endpoint.End transform
-                |> Result.map (fun points ->
-                    let segments = linesBetween points
-                    { Start = points |> List.tryHead |> Option.defaultValue (point transform endpoint.Start)
-                      Segments = segments
-                      Closed = false })
                 |> Result.mapError (fun _ -> DegenerateArcTransform)
+                |> Result.bind (fun points ->
+                    let segments = linesBetween points
+                    match segments with
+                    | [] -> Ok(Subpath.empty (points |> List.tryHead |> Option.defaultValue (point transform endpoint.Start)))
+                    | _ -> Subpath.create segments |> Result.mapError (fun _ -> DegenerateArcTransform))
             | _ -> Error DegenerateArcTransform
         | Error error -> Error error
 
     let private transformSubpathWith transformSegment input transform =
         validate transform
         |> Result.bind (fun _ ->
-            input.Segments
+            Subpath.segments input
             |> List.fold (fun state original ->
                 state
                 |> Result.bind (fun transformed ->
                     transformSegment original transform
                     |> Result.map (fun next -> transformed @ next))) (Ok []))
-        |> Result.map (fun segments ->
-            { Start = point transform input.Start
-              Segments = segments
-              Closed = input.Closed })
+        |> Result.bind (fun segments ->
+            let transformedStart = point transform (Subpath.start input)
+            let rebuilt =
+                match segments with
+                | [] -> Ok(Subpath.empty transformedStart)
+                | _ -> Subpath.create segments
+
+            rebuilt
+            |> Result.bind (fun subpath ->
+                if Subpath.isClosed input then Subpath.setClosed true subpath
+                else Ok subpath)
+            |> Result.mapError PathError)
 
     let subpath input transform =
         transformSubpathWith
@@ -173,7 +181,7 @@ module Transform =
         transformSubpathWith
             (fun segmentValue transform ->
                 segmentToSubpathGracefully segmentValue transform
-                |> Result.map (fun subpath -> subpath.Segments))
+                |> Result.map Subpath.segments)
             input transform
 
     let subpathAboutPoint input transform center = subpath input (aboutPoint transform center)
@@ -193,13 +201,13 @@ module Transform =
     let private transformPathWith transformSubpath input transform =
         validate transform
         |> Result.bind (fun _ ->
-            input.Subpaths
+            Path.subpaths input
             |> List.fold (fun state original ->
                 state
                 |> Result.bind (fun transformed ->
                     transformSubpath original transform
                     |> Result.map (fun next -> next :: transformed))) (Ok []))
-        |> Result.map (fun subpaths -> { Subpaths = List.rev subpaths })
+        |> Result.map (List.rev >> Path.ofSubpaths)
 
     let path input transform = transformPathWith subpath input transform
     let pathGracefully input transform = transformPathWith subpathGracefully input transform

@@ -6,13 +6,10 @@ open Xunit
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
 let private polyline points =
-    let segments = points |> List.pairwise |> List.map Line
-    { Start = List.head points; Segments = segments; Closed = false }
+    Subpath.polyline points |> Result.defaultWith (failwithf "%A")
 
 let private polygon points =
-    let startPoint = List.head points
-    let segments = (points @ [ startPoint ]) |> List.pairwise |> List.map Line
-    { Start = startPoint; Segments = segments; Closed = true }
+    Subpath.polygon points |> Result.defaultWith (failwithf "%A")
 
 let private square x y size =
     [ point x y; point (x + size) y; point (x + size) (y + size); point x (y + size) ]
@@ -38,25 +35,16 @@ let ``signed area remains stable after a large translation`` () =
 
 [<Fact>]
 let ``Bezier and arc signed areas use exact integrals`` () =
-    let quadratic =
-        { Start = point 0.0 0.0
-          Segments = [ QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0) ]
-          Closed = false }
-    let cubic =
-        { Start = point 0.0 0.0
-          Segments = [ CubicBezier(point 0.0 0.0, point 0.0 10.0, point 10.0 10.0, point 10.0 0.0) ]
-          Closed = false }
+    let quadratic = Subpath.ofSegment (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0))
+    let cubic = Subpath.ofSegment (CubicBezier(point 0.0 0.0, point 0.0 10.0, point 10.0 10.0, point 10.0 0.0))
     let semicircle =
-        { Start = point -10.0 0.0
-          Segments =
-            [ Arc
-                { Start = point -10.0 0.0
-                  Radius = point 10.0 10.0
-                  XAxisRotation = Degree.fromFloat 0.0
-                  LargeArc = false
-                  Sweep = true
-                  End = point 10.0 0.0 } ]
-          Closed = false }
+        Subpath.ofSegment (Arc
+            { Start = point -10.0 0.0
+              Radius = point 10.0 10.0
+              XAxisRotation = Degree.fromFloat 0.0
+              LargeArc = false
+              Sweep = true
+              End = point 10.0 0.0 })
     assertAreaNear 1.0e-10<length^2> 133.33333333333334<length^2> (abs (Area.signedSubpath quadratic))
     assertAreaNear 1.0e-10<length^2> 60.0<length^2> (abs (Area.signedSubpath cubic))
     assertAreaNear 1.0e-10<length^2> 157.07963267948966<length^2> (abs (Area.signedSubpath semicircle))
@@ -88,8 +76,8 @@ let ``bow tie has fill area but zero signed area`` () =
 let ``path fill rules combine nested subpaths`` () =
     let outer = polyline (square 0.0 0.0 20.0)
     let inner = polyline (square 5.0 5.0 10.0)
-    let same = { Subpaths = [ outer; inner ] }
-    let opposite = { Subpaths = [ outer; polyline (List.rev (square 5.0 5.0 10.0)) ] }
+    let same = Path.ofSubpaths [ outer; inner ]
+    let opposite = Path.ofSubpaths [ outer; polyline (List.rev (square 5.0 5.0 10.0)) ]
     Assert.Equal(Ok 400.0<length^2>, Area.path same Nonzero)
     Assert.Equal(Ok 300.0<length^2>, Area.path same EvenOdd)
     Assert.Equal(Ok 500.0<length^2>, Area.absolutePath same)

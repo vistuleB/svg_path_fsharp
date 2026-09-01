@@ -8,9 +8,7 @@ let private parameter value = Parameter.fromFloat value
 
 let private polyline xs =
     let points = xs |> List.map (fun x -> point x 0.0)
-    { Start = List.head points
-      Segments = points |> List.pairwise |> List.map Line
-      Closed = false }
+    Subpath.polyline points |> Result.defaultWith (failwithf "%A")
 
 let private assertParameterNear expected actual =
     Assert.True(abs (expected - actual) <= parameter 1.0e-9, $"expected {expected}, got {actual}")
@@ -80,21 +78,21 @@ let ``subpath overlap merges connected pieces and canonicalizes aliases`` () =
 let ``disconnected coincident portions remain separate overlaps`` () =
     let left = polyline [ 0.0; 4.0; 4.0; 6.0; 6.0; 10.0 ]
     let lifted =
-        { left with
-            Segments =
-                [ Line(point 0.0 0.0, point 4.0 0.0)
-                  Line(point 4.0 0.0, point 4.0 2.0)
-                  Line(point 4.0 2.0, point 6.0 2.0)
-                  Line(point 6.0 2.0, point 6.0 0.0)
-                  Line(point 6.0 0.0, point 10.0 0.0) ] }
+        Subpath.create
+            [ Line(point 0.0 0.0, point 4.0 0.0)
+              Line(point 4.0 0.0, point 4.0 2.0)
+              Line(point 4.0 2.0, point 6.0 2.0)
+              Line(point 6.0 2.0, point 6.0 0.0)
+              Line(point 6.0 0.0, point 10.0 0.0) ]
+        |> Result.defaultWith (failwithf "%A")
     let baseline = polyline [ 0.0; 10.0 ]
     let overlaps = Overlaps.subpath baseline lifted |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, List.length overlaps)
 
 [<Fact>]
 let ``path overlap retains source subpath indices and maps addresses`` () =
-    let left = { Subpaths = [ polyline [ 20.0; 30.0 ]; polyline [ 0.0; 10.0 ] ] }
-    let right = { Subpaths = [ polyline [ 0.0; 5.0; 10.0 ] ] }
+    let left = Path.ofSubpaths [ polyline [ 20.0; 30.0 ]; polyline [ 0.0; 10.0 ] ]
+    let right = Path.ofSubpaths [ polyline [ 0.0; 5.0; 10.0 ] ]
     let overlap =
         Overlaps.path left right
         |> Result.defaultWith (failwithf "%A")
@@ -128,4 +126,4 @@ let ``invalid geometric tolerance propagates through higher-level APIs`` () =
         Overlaps.subpathWith subpath subpath -1.0<length>)
     Assert.Equal(
         Error(InvalidOverlapTolerance -1.0<length>),
-        Overlaps.pathWith { Subpaths = [ subpath ] } { Subpaths = [ subpath ] } -1.0<length>)
+        Overlaps.pathWith (Path.singleton subpath) (Path.singleton subpath) -1.0<length>)

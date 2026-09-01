@@ -75,15 +75,16 @@ let ``collapsed arc can be handled strictly or gracefully`` () =
     | Ok subpath ->
         Assert.False(List.isEmpty subpath.Segments)
         Assert.Equal(point 0.0 0.0, subpath.Start)
-        Assert.Equal(Some(point 10.0 0.0), Subpath.finish subpath)
+        Assert.Equal(point 10.0 0.0, Subpath.finish subpath)
     | Error error -> failwithf "%A" error
 
 [<Fact>]
 let ``subpath and path transforms preserve closure and ordering`` () =
     let first = Line(point 0.0 0.0, point 1.0 0.0)
     let second = Line(point 1.0 0.0, point 0.0 0.0)
-    let closed = { Start = point 0.0 0.0; Segments = [ first; second ]; Closed = true }
-    let path = { Subpaths = [ closed; { closed with Closed = false } ] }
+    let openSubpath = Subpath.create [ first; second ] |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.setClosed true openSubpath |> Result.defaultWith (failwithf "%A")
+    let path = Path.ofSubpaths [ closed; openSubpath ]
     let transformed =
         Transform.translatePath path 4.0<length> 7.0<length>
         |> Result.defaultWith (failwithf "%A")

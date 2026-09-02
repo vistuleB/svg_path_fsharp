@@ -26,20 +26,6 @@ module Clip =
     let private compareParameters left right =
         compare (left.SegmentIndex, left.T) (right.SegmentIndex, right.T)
 
-    let private segmentLength (tolerance: float<length>) (segmentValue: Segment) =
-        Segment.toLinesWith
-            { Tolerance = max 1.0e-12<length> (tolerance / 32.0)
-              MaxDepth = 32 }
-            segmentValue
-        |> Result.map (List.sumBy (fun line -> Point.distance (Segment.start line) (Segment.finish line)))
-
-    let private subpathLength (tolerance: float<length>) (subpathValue: Subpath) =
-        subpathValue.Segments
-        |> List.fold (fun state segmentValue ->
-            state
-            |> Result.bind (fun total ->
-                segmentLength tolerance segmentValue |> Result.map ((+) total))) (Ok 0.0<length>)
-
     let private intervalSubpath
         (subpathValue: Subpath)
         (fromValue: SubpathParameter)
@@ -60,10 +46,10 @@ module Clip =
         elif subpathValue.Closed && compareParameters first second > 0 then
             Cut.atParameters subpathValue [ second; first ]
             |> Result.bind (function
-                | [ _; wrapped ] -> subpathLength tolerance wrapped
+                | [ _; wrapped ] -> Subpath.length wrapped
                 | _ -> Error(InvalidSubpathInterval(first, second)))
         else
-            intervalSubpath subpathValue first second |> Result.bind (subpathLength tolerance)
+            intervalSubpath subpathValue first second |> Result.bind Subpath.length
 
     let private uniqueParameters tolerance subpathValue parameters =
         parameters
@@ -116,31 +102,12 @@ module Clip =
             |> uniqueParameters options.Tolerance input)
 
     let private samplePoint options (subpathValue: Subpath) =
-        let linearizeOptions: LinearizeOptions =
-            { Tolerance = max 1.0e-12<length> (options.Tolerance / 32.0)
-              MaxDepth = 32 }
-        Subpath.toLinesWith linearizeOptions subpathValue
-        |> Result.bind (fun linearized ->
-            let lines = linearized.Segments
-            let lengths = lines |> List.map (fun line -> Point.distance (Segment.start line) (Segment.finish line))
-            let total = List.sum lengths
-            if total <= options.Tolerance then Subpath.point subpathValue { SegmentIndex = 0; T = 0.0<parameter> }
+        Subpath.length subpathValue
+        |> Result.bind (fun total ->
+            if total <= options.Tolerance then
+                Subpath.point subpathValue { SegmentIndex = 0; T = 0.0<parameter> }
             else
-                let target = total / 2.0
-                let rec locate traversed remainingLines remainingLengths =
-                    match remainingLines, remainingLengths with
-                    | line :: _, lineLength :: _ when traversed + lineLength >= target ->
-                        if lineLength = 0.0<length> then Ok(Segment.start line)
-                        else
-                            let portion = float ((target - traversed) / lineLength)
-                            let startPoint = Segment.start line
-                            let finishPoint = Segment.finish line
-                            Ok(Point.create
-                                (startPoint.X + portion * (finishPoint.X - startPoint.X))
-                                (startPoint.Y + portion * (finishPoint.Y - startPoint.Y)))
-                    | _ :: restLines, lineLength :: restLengths -> locate (traversed + lineLength) restLines restLengths
-                    | _ -> Ok(Subpath.finish subpathValue)
-                locate 0.0<length> lines lengths)
+                Subpath.pointAtLength subpathValue (total / 2.0))
 
     let private isInside clipRegion fillRule options subpathValue =
         samplePoint options subpathValue

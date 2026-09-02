@@ -566,24 +566,26 @@ module Segment =
         elif options.MaxIterations <= 0 then Error(InvalidCrossingMaxIterations options.MaxIterations)
         else Ok()
 
-    let crossingsWith segment measure (options: CrossingOptions) =
-        let sameSign a b = (a < 0.0 && b < 0.0) || (a > 0.0 && b > 0.0)
+    let crossingsWith segment (measure: Point<length> -> float<length>) (options: CrossingOptions) =
+        let sameSign (a: float<length>) (b: float<length>) =
+            (a < 0.0<length> && b < 0.0<length>)
+            || (a > 0.0<length> && b > 0.0<length>)
         let value (t: float<parameter>) = point segment t |> Result.map measure
         let rec refine (leftT: float<parameter>) leftValue (rightT: float<parameter>) remaining =
             let middle = leftT + (rightT - leftT) / 2.0
             value middle
             |> Result.bind (fun middleValue ->
-                if abs middleValue <= float options.SignedLineDistanceTolerance then Ok middle
+                if abs middleValue <= options.SignedLineDistanceTolerance then Ok middle
                 elif remaining <= 1 || middle = leftT || middle = rightT then
-                    Error(CrossingMaxIterationsReached(middle, LanguagePrimitives.FloatWithMeasure<length> middleValue))
+                    Error(CrossingMaxIterationsReached(middle, middleValue))
                 elif sameSign leftValue middleValue then refine middle middleValue rightT (remaining - 1)
                 else refine leftT leftValue middle (remaining - 1))
         let window (previousT: float<parameter>) previousValue (nextT: float<parameter>) nextValue =
-            if previousValue = 0.0 then Ok(Some previousT)
-            elif nextValue = 0.0 then Ok(Some nextT)
+            if previousValue = 0.0<length> then Ok(Some previousT)
+            elif nextValue = 0.0<length> then Ok(Some nextT)
             elif sameSign previousValue nextValue then Ok None
-            elif abs previousValue <= float options.SignedLineDistanceTolerance then Ok(Some previousT)
-            elif abs nextValue <= float options.SignedLineDistanceTolerance then Ok(Some nextT)
+            elif abs previousValue <= options.SignedLineDistanceTolerance then Ok(Some previousT)
+            elif abs nextValue <= options.SignedLineDistanceTolerance then Ok(Some nextT)
             else refine previousT previousValue nextT options.MaxIterations |> Result.map Some
         let insertUnique (value: float<parameter>) (values: float<parameter> list) =
             match values with

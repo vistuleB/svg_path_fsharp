@@ -201,7 +201,7 @@ let ``maximum-length subdivision preserves exact endpoints`` () =
 [<Fact>]
 let ``segment crossings and minimization match scalar sampling contracts`` () =
     let segment = Line(point 0.0 0.0, point 10.0 0.0)
-    let crossings = Segment.crossings segment (fun sample -> float sample.X - 4.0) |> Result.defaultWith (failwithf "%A")
+    let crossings = Segment.crossings segment (fun sample -> sample.X - 4.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Single(crossings) |> ignore
     Assert.InRange(float crossings.Head, 0.399999999, 0.400000001)
     let minimum = Segment.minimize segment (fun sample -> (float sample.X - 7.0) ** 2.0) |> Result.defaultWith (failwithf "%A")

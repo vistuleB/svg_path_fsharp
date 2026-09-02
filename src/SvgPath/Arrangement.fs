@@ -948,6 +948,88 @@ module Arrangement =
                                   To = max occurrence.From occurrence.To
                                   Reversed = occurrence.Reversed })) })
 
+    let private certifySegmentEdgesExist (graph: ArrangementGraph) images =
+        images
+        |> List.collect (fun (image: ArrangementSourceSegmentImage) -> image.Edges)
+        |> List.fold (fun state image ->
+            state
+            |> Result.bind (fun () ->
+                if graph.Edges |> List.exists (fun edge -> edge.Id = image.EdgeId) then Ok()
+                else Error(MissingArrangementEdge image.EdgeId))) (Ok())
+
+    let private edgeImagesContainSource (edgeImages: ArrangementEdgeImage list) edgeId segmentIndex fromParameter toParameter reversed =
+        edgeImages
+        |> List.exists (fun image ->
+            image.EdgeId = edgeId
+            && (image.Sources
+                |> List.exists (fun (source: ArrangementEdgeSourceImage) ->
+                    source.SegmentIndex = segmentIndex
+                    && source.From = fromParameter
+                    && source.To = toParameter
+                    && source.Reversed = reversed)))
+
+    let private segmentImagesContainEdge (segmentImages: ArrangementSourceSegmentImage list) segmentIndex edgeId fromParameter toParameter reversed =
+        segmentImages
+        |> List.exists (fun image ->
+            image.SegmentIndex = segmentIndex
+            && (image.Edges
+                |> List.exists (fun (edge: ArrangementSegmentEdgeImage) ->
+                    edge.EdgeId = edgeId
+                    && min edge.From edge.To = fromParameter
+                    && max edge.From edge.To = toParameter
+                    && edge.Reversed = reversed)))
+
+    let private certifyImageCorrespondence (segmentImages: ArrangementSourceSegmentImage list) (edgeImages: ArrangementEdgeImage list) =
+        segmentImages
+        |> List.fold (fun state (image: ArrangementSourceSegmentImage) ->
+            image.Edges
+            |> List.fold (fun state (edge: ArrangementSegmentEdgeImage) ->
+                state
+                |> Result.bind (fun () ->
+                    if edgeImagesContainSource edgeImages edge.EdgeId image.SegmentIndex (min edge.From edge.To) (max edge.From edge.To) edge.Reversed then Ok()
+                    else Error InternalNormalizationError)) state) (Ok())
+        |> Result.bind (fun () ->
+            edgeImages
+            |> List.fold (fun state (image: ArrangementEdgeImage) ->
+                image.Sources
+                |> List.fold (fun state (source: ArrangementEdgeSourceImage) ->
+                    state
+                    |> Result.bind (fun () ->
+                        if segmentImagesContainEdge segmentImages source.SegmentIndex image.EdgeId source.From source.To source.Reversed then Ok()
+                        else Error InternalNormalizationError)) state) (Ok()))
+
+    let private certifySegmentImageGeometry (graph: ArrangementGraph) segments images tolerance =
+        images
+        |> List.fold (fun state (image: ArrangementSourceSegmentImage) ->
+            state
+            |> Result.bind (fun () ->
+                match List.tryItem image.SegmentIndex segments with
+                | None -> Error InternalNormalizationError
+                | Some source ->
+                    image.Edges
+                    |> List.fold (fun state imageEdge ->
+                        state
+                        |> Result.bind (fun () ->
+                            match graph.Edges |> List.tryFind (fun edge -> edge.Id = imageEdge.EdgeId) with
+                            | None -> Error(MissingArrangementEdge imageEdge.EdgeId)
+                            | Some edge ->
+                                Segment.point source imageEdge.From
+                                |> Result.mapError ArrangementSegmentError
+                                |> Result.bind (fun sourceA ->
+                                    Segment.point source imageEdge.To
+                                    |> Result.mapError ArrangementSegmentError
+                                    |> Result.bind (fun sourceB ->
+                                        let edgeA, edgeB =
+                                            if imageEdge.Reversed then Segment.finish edge.Segment, Segment.start edge.Segment
+                                            else Segment.start edge.Segment, Segment.finish edge.Segment
+                                        if Point.distance sourceA edgeA <= tolerance && Point.distance sourceB edgeB <= tolerance then Ok()
+                                        else Error InternalNormalizationError)))) state)) (Ok())
+
+    let private certifySegmentBuild graph segments segmentImages edgeImages tolerance =
+        certifySegmentEdgesExist graph segmentImages
+        |> Result.bind (fun () -> certifyImageCorrespondence segmentImages edgeImages)
+        |> Result.bind (fun () -> certifySegmentImageGeometry graph segments segmentImages tolerance)
+
     /// Build directly from a flat segment list without source normalization.
     let buildWith segments vertexTolerance minimumChord (endpointSliverTolerance: float<parameter>) =
         if vertexTolerance <= 0.0<length> || not (finite vertexTolerance) then Error(InvalidArrangementTolerance vertexTolerance)
@@ -968,10 +1050,12 @@ module Arrangement =
                 |> Result.bind (fun images ->
                     let images = markOwnership images
                     let edgeImages = edgeSourceImages graph images
-                    cyclicOrders graph vertexTolerance
-                    |> Result.map (fun orders ->
-                        let graph = { graph with CyclicOrders = orders }
-                        { Graph = graph; Segments = segments; SegmentImages = images; EdgeImages = edgeImages })))
+                    certifySegmentBuild graph segments images edgeImages vertexTolerance
+                    |> Result.bind (fun () ->
+                        cyclicOrders graph vertexTolerance
+                        |> Result.map (fun orders ->
+                            let graph = { graph with CyclicOrders = orders }
+                            { Graph = graph; Segments = segments; SegmentImages = images; EdgeImages = edgeImages }))))
 
     /// Build an arrangement and preserve each input path segment's edge image.
     let build (paths: Path list) tolerance minimumChord =

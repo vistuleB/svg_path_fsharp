@@ -518,9 +518,6 @@ module Offset =
     let private defaultTrimmingSamples = 5
     let private defaultMiterLimit = 4.0
     let private tangentEpsilon = 1.0e-6<length / parameter>
-    // The Gleam implementation reuses `tangent_epsilon` for this normalized
-    // direction sum.  Its numerical value is retained here, but the quantity
-    // is dimensionless rather than a derivative magnitude.
     let private tangentAgreementEpsilon = 1.0e-6
     let private pointTolerance = 1.0e-9<length>
     let private pointParameterTolerance = 1.0e-9<parameter>

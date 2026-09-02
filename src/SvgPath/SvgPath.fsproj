@@ -39,6 +39,7 @@
     <Compile Include="Serialize.fs" />
     <Compile Include="Svg.fs" />
     <Compile Include="Arrangement.fs" />
+    <Compile Include="ArrangementDrawing.fs" />
     <Compile Include="Csg.fs" />
     <Compile Include="Offset.fs" />
     <Compile Include="Stroke.fs" />

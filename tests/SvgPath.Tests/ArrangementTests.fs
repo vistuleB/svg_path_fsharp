@@ -157,3 +157,34 @@ module ArrangementTests =
         | Ok contours ->
             Assert.Equal(2, contours.Length)
             Assert.All(contours, fun contour -> Assert.True(contour.Closed))
+
+    let private drawingEdge segment =
+        { Id = 0
+          Segment = segment
+          Bounds = Segment.boundingBox segment |> Result.defaultWith (failwithf "%A")
+          StartVertex = 0
+          EndVertex = 1
+          ForwardMultiplicity = 1
+          ReverseMultiplicity = 0 }
+
+    [<Fact>]
+    let ``edge annotation pose follows midpoint tangent`` () =
+        let pose = ArrangementDrawing.edgeAnnotationPose (drawingEdge (line 0.0 0.0 10.0 0.0))
+        Assert.Equal(Ok { Point = point 5.0 0.0; Rotation = 90.0<degree> }, pose)
+
+    [<Fact>]
+    let ``edge annotation pose uses incoming direction at stationary reversal`` () =
+        let segment = QuadraticBezier(point 1.0 0.0, point -1.0 0.0, point 1.0 0.0)
+        let pose = ArrangementDrawing.edgeAnnotationPose (drawingEdge segment)
+        Assert.Equal(Ok { Point = point 0.0 0.0; Rotation = 270.0<degree> }, pose)
+
+    [<Fact>]
+    let ``edge annotation pose rejects directionless geometry`` () =
+        let p = point 1.0 2.0
+        Assert.Equal(Error IndeterminateDirection, ArrangementDrawing.edgeAnnotationPose (drawingEdge (Line(p, p))))
+
+    [<Fact>]
+    let ``direction arrow recovers a collapsed cubic endpoint direction`` () =
+        let finish = point 10.0 10.0
+        let segment = CubicBezier(point 0.0 0.0, point 0.0 10.0, finish, finish)
+        Assert.True(ArrangementDrawing.segmentDirectionArrow segment "red" |> Result.isOk)

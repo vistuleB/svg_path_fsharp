@@ -239,11 +239,7 @@ module ConvexHull =
                 | Error _ -> approximate
                 | Ok fixedPoint ->
                     let coefficients = cubicTangencyCoefficients startPoint control1 control2 endPoint fixedPoint
-                    let options: PolynomialOptions<1> =
-                        { CoefficientTolerance = 1.0e-12
-                          ParameterTolerance = 1.0e-12<parameter>
-                          ValueTolerance = 1.0e-12
-                          MaxIterations = 100 }
+                    let options: PolynomialOptions = { MaxIterations = 100 }
                     match Root.polynomialRootIsolationsWith coefficients
                             (max 0.0<parameter> (approximate - 0.08<parameter>))
                             (min 1.0<parameter> (approximate + 0.08<parameter>)) options with

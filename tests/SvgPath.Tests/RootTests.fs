@@ -86,7 +86,7 @@ let ``cubic solver finds distinct and repeated real roots`` () =
 
 [<Fact>]
 let ``polynomial isolation preserves even roots and five simple roots`` () =
-    let options: PolynomialOptions<length> = Root.defaultPolynomialOptions ()
+    let options: PolynomialOptions = Root.defaultPolynomialOptions ()
 
     let repeated =
         Root.polynomialRootsWith
@@ -116,11 +116,7 @@ let ``polynomial isolation preserves even roots and five simple roots`` () =
 
 [<Fact>]
 let ``root isolation retains a sign-changing bracket`` () =
-    let options: PolynomialOptions<length> =
-        { CoefficientTolerance = coefficient 1.0e-12
-          ParameterTolerance = parameter 0.01
-          ValueTolerance = coefficient 1.0e-12
-          MaxIterations = 100 }
+    let options: PolynomialOptions = { MaxIterations = 100 }
 
     let coefficients = [ coefficient 1.0; coefficient 0.0; coefficient 0.0; coefficient -2.0 ]
 
@@ -134,11 +130,42 @@ let ``root isolation retains a sign-changing bracket`` () =
     let lowerValue = Root.evaluatePolynomial coefficients isolation.Lower
     let upperValue = Root.evaluatePolynomial coefficients isolation.Upper
     Assert.True(lowerValue * upperValue <= 0.0<length^2>)
-    Assert.True((isolation.Upper - isolation.Lower) / 2.0 <= options.ParameterTolerance)
+    Assert.True(isolation.Upper - isolation.Lower <= parameter 1.0e-9)
+
+[<Fact>]
+let ``direct polynomial roots receive the fixed parameter window`` () =
+    let isolation =
+        Root.polynomialRootIsolationsWith
+            [ coefficient 1.0; coefficient -1.0; coefficient 0.25 ]
+            (parameter 0.0)
+            (parameter 1.0)
+            (Root.defaultPolynomialOptions ())
+        |> unwrap
+        |> List.exactlyOne
+
+    Assert.Equal(parameter 0.5, isolation.Estimate)
+    Assert.Equal(parameter (0.5 - 1.0e-9 / 2.0), isolation.Lower)
+    Assert.Equal(parameter (0.5 + 1.0e-9 / 2.0), isolation.Upper)
+
+[<Fact>]
+let ``polynomial classification is coefficient-scale independent`` () =
+    let classify scale =
+        Root.classifiedPolynomialRootsWith
+            [ coefficient scale; coefficient 0.0; coefficient 0.0 ]
+            (parameter -1.0)
+            (parameter 1.0)
+            (Root.defaultPolynomialOptions ())
+        |> unwrap
+        |> List.exactlyOne
+        |> _.Kind
+
+    Assert.Equal(PositiveToPositive, classify 1.0e-18)
+    Assert.Equal(PositiveToPositive, classify 1.0)
+    Assert.Equal(PositiveToPositive, classify 1.0e18)
 
 [<Fact>]
 let ``classified roots distinguish crossings even roots and endpoints`` () =
-    let options: PolynomialOptions<length> = Root.defaultPolynomialOptions ()
+    let options: PolynomialOptions = Root.defaultPolynomialOptions ()
 
     let crossing =
         Root.classifiedPolynomialRootsWith
@@ -167,11 +194,28 @@ let ``classified roots distinguish crossings even roots and endpoints`` () =
     Assert.True(Root.isSignChangeRoot crossing.Kind)
     Assert.Equal(PositiveToPositive, positiveEven.Kind)
     Assert.False(Root.isCrossingRoot positiveEven.Kind)
-    Assert.Equal(Ambiguous, endpoint.Kind)
+    Assert.Equal(NegativeToPositive, endpoint.Kind)
+
+    let endPoint =
+        Root.realLinear01Roots (coefficient -1.0) (coefficient 1.0) options
+        |> unwrap
+        |> List.exactlyOne
+
+    let negativeEvenEndpoint =
+        Root.realQuadratic01Roots
+            (coefficient -1.0)
+            (coefficient 0.0)
+            (coefficient 0.0)
+            options
+        |> unwrap
+        |> List.exactlyOne
+
+    Assert.Equal(PositiveToNegative, endPoint.Kind)
+    Assert.Equal(NegativeToNegative, negativeEvenEndpoint.Kind)
 
 [<Fact>]
 let ``classified root isolation validates maximum iterations`` () =
-    let options: PolynomialOptions<length> =
+    let options: PolynomialOptions =
         { Root.defaultPolynomialOptions () with
             MaxIterations = 0 }
 
@@ -183,7 +227,7 @@ let ``classified root isolation validates maximum iterations`` () =
 
 [<Fact>]
 let ``degree-specific unit-interval helpers classify roots`` () =
-    let options: PolynomialOptions<length> = Root.defaultPolynomialOptions ()
+    let options: PolynomialOptions = Root.defaultPolynomialOptions ()
 
     let linear =
         Root.realLinear01Roots (coefficient 1.0) (coefficient -0.25) options

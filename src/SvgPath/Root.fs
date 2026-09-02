@@ -8,11 +8,7 @@ type QuadraticOptions<[<Measure>] 'Value> =
     { CoefficientTolerance: float<'Value>
       RepeatedRootPolicy: RepeatedRootPolicy }
 
-type PolynomialOptions<[<Measure>] 'Value> =
-    { CoefficientTolerance: float<'Value>
-      ParameterTolerance: float<parameter>
-      ValueTolerance: float<'Value>
-      MaxIterations: int }
+type PolynomialOptions = { MaxIterations: int }
 
 [<Struct>]
 type RootIsolation =
@@ -33,8 +29,6 @@ type ClassifiedRoot =
       Kind: RootKind }
 
 type RootError<[<Measure>] 'Value> =
-    | InvalidParameterTolerance of float<parameter>
-    | InvalidValueTolerance of float<'Value>
     | InvalidMaxIterations of int
     | NotBracketed of
         left: float<parameter> *
@@ -45,26 +39,20 @@ type RootError<[<Measure>] 'Value> =
 
 [<RequireQualifiedAccess>]
 module Root =
+    let private parameterTolerance = Parameter.fromFloat 1.0e-9
+    let private relativeValueTolerance = 1.0e-12
+
     let private measured<[<Measure>] 'Unit> (value: float) : float<'Unit> =
         LanguagePrimitives.FloatWithMeasure<'Unit> value
 
     let private orderedBracket left right =
         if left <= right then left, right else right, left
 
-    let private isFinite (value: float<'Unit>) = System.Double.IsFinite(float value)
-
-    let private isCloseToZero (value: float<'Unit>) (tolerance: float<'Unit>) =
-        abs value <= tolerance
-
     let private sameSign (a: float<'Unit>) (b: float<'Unit>) =
         (a < measured<'Unit> 0.0 && b < measured<'Unit> 0.0)
         || (a > measured<'Unit> 0.0 && b > measured<'Unit> 0.0)
 
-    let defaultPolynomialOptions<[<Measure>] 'Value> () : PolynomialOptions<'Value> =
-        { CoefficientTolerance = measured<'Value> 1.0e-12
-          ParameterTolerance = Parameter.fromFloat 1.0e-9
-          ValueTolerance = measured<'Value> 1.0e-9
-          MaxIterations = 100 }
+    let defaultPolynomialOptions () : PolynomialOptions = { MaxIterations = 100 }
 
     let private coefficientIsZero (value: float<'Value>) (tolerance: float<'Value>) =
         if float tolerance = 0.0 then value = measured<'Value> 0.0 else abs value < tolerance
@@ -150,23 +138,40 @@ module Root =
         |> List.mapi (fun index coefficient -> coefficient * float (degree - index))
         |> List.take (max 0 degree)
 
-    let private normalizePolynomialCoefficients coefficients tolerance =
+    let private polynomialValueScale (coefficients: float<'Value> list) : float<'Value> =
+        coefficients |> List.fold (fun scale coefficient -> max scale (abs coefficient)) (measured<'Value> 0.0)
+
+    let private polynomialCoefficientTolerance<[<Measure>] 'Value>
+        (coefficients: float<'Value> list)
+        : float<'Value> =
+        polynomialValueScale coefficients * relativeValueTolerance
+
+    let private valueIsCloseToZero<[<Measure>] 'Value>
+        (value: float<'Value>)
+        (scale: float<'Value>)
+        : bool =
+        abs value <= scale * relativeValueTolerance
+
+    let private normalizePolynomialCoefficients<[<Measure>] 'Value>
+        (coefficients: float<'Value> list)
+        : float<'Value> list =
         let rec loop remaining =
             match remaining with
-            | first :: rest when not (List.isEmpty rest) && coefficientIsZero first tolerance -> loop rest
+            | first :: rest when
+                not (List.isEmpty rest)
+                && coefficientIsZero first (polynomialCoefficientTolerance remaining) ->
+                loop rest
             | _ -> remaining
 
         loop coefficients
 
-    let private consolidateIsolations tolerance isolations =
-        let tolerance = max tolerance (Parameter.fromFloat 0.0)
-
+    let private distinctIsolations isolations =
         isolations
         |> List.sortBy _.Estimate
         |> List.fold
             (fun kept isolation ->
                 match kept with
-                | previous :: _ when abs (isolation.Estimate - previous.Estimate) <= tolerance -> kept
+                | previous :: _ when isolation.Estimate = previous.Estimate -> kept
                 | _ -> isolation :: kept)
             []
         |> List.rev
@@ -182,12 +187,12 @@ module Root =
         let midpoint = left + (right - left) / 2.0
         let midpointValue = evaluatePolynomial coefficients midpoint
 
-        if (right - left) / 2.0 <= tolerance then
+        if right - left <= tolerance then
             Ok { Lower = left; Estimate = midpoint; Upper = right }
         elif remainingIterations <= 1 then
             Error(MaxIterationsReached(midpoint, midpointValue))
         elif midpointValue = 0.0<_> then
-            Ok { Lower = midpoint; Estimate = midpoint; Upper = midpoint }
+            Ok { Lower = left; Estimate = midpoint; Upper = right }
         elif sameSign leftValue midpointValue then
             refinePolynomialBracket coefficients midpoint midpointValue right tolerance (remainingIterations - 1)
         else
@@ -196,15 +201,20 @@ module Root =
     let private crossingRoots
         (coefficients: float<'Value> list)
         (boundaries: float<parameter> list)
-        (options: PolynomialOptions<'Value>)
+        (options: PolynomialOptions)
         : Result<RootIsolation list, RootError<'Value>> =
         let rec loop remaining found =
             match remaining with
             | left :: (right :: _ as tail) ->
                 let leftValue = evaluatePolynomial coefficients left
                 let rightValue = evaluatePolynomial coefficients right
+                let valueScale = polynomialValueScale coefficients
 
-                if sameSign leftValue rightValue || leftValue = 0.0<_> || rightValue = 0.0<_> then
+                if
+                    sameSign leftValue rightValue
+                    || valueIsCloseToZero leftValue valueScale
+                    || valueIsCloseToZero rightValue valueScale
+                then
                     loop tail found
                 else
                     match
@@ -213,7 +223,7 @@ module Root =
                             left
                             leftValue
                             right
-                            options.ParameterTolerance
+                            parameterTolerance
                             options.MaxIterations
                     with
                     | Error error -> Error error
@@ -226,13 +236,23 @@ module Root =
         (coefficients: float<'Value> list)
         (lower: float<parameter>)
         (upper: float<parameter>)
-        (options: PolynomialOptions<'Value>)
+        (options: PolynomialOptions)
         : Result<RootIsolation list, RootError<'Value>> =
         match coefficients with
         | []
         | [ _ ] -> Ok []
         | [ a; b ] ->
-            linearWithTolerance a b options.CoefficientTolerance
+            linearWithTolerance a b (polynomialCoefficientTolerance coefficients)
+            |> fun roots -> inside roots lower upper
+            |> List.map (fun root -> { Lower = root; Estimate = root; Upper = root })
+            |> Ok
+        | [ a; b; c ] ->
+            quadraticWith
+                { CoefficientTolerance = polynomialCoefficientTolerance coefficients
+                  RepeatedRootPolicy = ConsolidateRepeatedRoot }
+                a
+                b
+                c
             |> fun roots -> inside roots lower upper
             |> List.map (fun root -> { Lower = root; Estimate = root; Upper = root })
             |> Ok
@@ -240,33 +260,67 @@ module Root =
             match polynomialRootIsolationsValid (polynomialDerivative coefficients) lower upper options with
             | Error error -> Error error
             | Ok derivativeRoots ->
-                let critical = consolidateIsolations options.ParameterTolerance derivativeRoots
+                let critical = distinctIsolations derivativeRoots
                 let criticalValues = critical |> List.map _.Estimate
+                let valueScale = polynomialValueScale coefficients
 
                 let repeated =
                     critical
                     |> List.filter (fun isolation ->
-                        isCloseToZero
-                            (evaluatePolynomial coefficients isolation.Estimate)
-                            options.ValueTolerance)
+                        valueIsCloseToZero (evaluatePolynomial coefficients isolation.Estimate) valueScale)
+                    |> List.map (fun isolation ->
+                        { Lower = isolation.Estimate
+                          Estimate = isolation.Estimate
+                          Upper = isolation.Estimate })
 
                 let endpoints =
                     [ lower; upper ]
                     |> List.filter (fun value ->
-                        isCloseToZero (evaluatePolynomial coefficients value) options.ValueTolerance)
+                        valueIsCloseToZero (evaluatePolynomial coefficients value) valueScale)
                     |> List.map (fun root -> { Lower = root; Estimate = root; Upper = root })
 
                 match crossingRoots coefficients (lower :: (criticalValues @ [ upper ])) options with
                 | Error error -> Error error
                 | Ok crossing ->
                     endpoints @ repeated @ crossing
-                    |> consolidateIsolations options.ParameterTolerance
+                    |> distinctIsolations
                     |> Ok
 
-    let private validatePolynomialOptions (options: PolynomialOptions<'Value>) =
-        if options.ParameterTolerance <= 0.0<parameter> || not (isFinite options.ParameterTolerance) then
-            Error(InvalidParameterTolerance options.ParameterTolerance)
-        elif options.MaxIterations <= 0 then
+    let private finalizeRootWindows isolations domainLower domainUpper =
+        let isolations = distinctIsolations isolations
+
+        let rec loop remaining previousEstimate finalized =
+            match remaining with
+            | [] -> List.rev finalized
+            | isolation :: rest ->
+                let leftLimit =
+                    match previousEstimate with
+                    | None -> domainLower
+                    | Some previous -> previous + (isolation.Estimate - previous) / 2.0
+
+                let rightLimit =
+                    match rest with
+                    | [] -> domainUpper
+                    | next :: _ -> isolation.Estimate + (next.Estimate - isolation.Estimate) / 2.0
+
+                let windowLower, windowUpper =
+                    if isolation.Lower = isolation.Upper then
+                        isolation.Estimate - parameterTolerance / 2.0,
+                        isolation.Estimate + parameterTolerance / 2.0
+                    else
+                        isolation.Lower, isolation.Upper
+
+                let finalizedIsolation =
+                    { Lower = max leftLimit windowLower
+                      Estimate = isolation.Estimate
+                      Upper = min rightLimit windowUpper }
+
+                loop rest (Some isolation.Estimate) (finalizedIsolation :: finalized)
+
+        loop isolations None []
+
+    let private validatePolynomialOptions (options: PolynomialOptions) =
+        if options.MaxIterations <= 0 then
             Error(InvalidMaxIterations options.MaxIterations)
         else
             Ok()
@@ -275,128 +329,85 @@ module Root =
         (coefficients: float<'Value> list)
         (lower: float<parameter>)
         (upper: float<parameter>)
-        (options: PolynomialOptions<'Value>) =
+        (options: PolynomialOptions) =
         match validatePolynomialOptions options with
         | Error error -> Error error
         | Ok() ->
-            let tolerance = max options.CoefficientTolerance (measured<'Value> 0.0)
-            let normalized = normalizePolynomialCoefficients coefficients tolerance
+            let normalized = normalizePolynomialCoefficients coefficients
             let lower, upper = orderedBracket lower upper
             polynomialRootIsolationsValid normalized lower upper options
+            |> Result.map (fun isolations -> finalizeRootWindows isolations lower upper)
 
     let polynomialRootsWith
         (coefficients: float<'Value> list)
         (lower: float<parameter>)
         (upper: float<parameter>)
-        (options: PolynomialOptions<'Value>) =
+        (options: PolynomialOptions) =
         polynomialRootIsolationsWith coefficients lower upper options
         |> Result.map (List.map _.Estimate)
 
-    let rec private sampleRootSide
-        (coefficients: float<'Value> list)
-        (candidate: float<parameter>)
-        (fallbackFrom: float<parameter>)
-        (intervalEdge: float<parameter>)
-        (direction: int)
-        (valueTolerance: float<'Value>)
-        (parameterTolerance: float<parameter>)
-        (remainingExpansions: int)
-        : float<'Value> option =
-        let beyondEdge =
-            (direction < 0 && candidate <= intervalEdge)
-            || (direction > 0 && candidate >= intervalEdge)
+    let private signedNonzero<[<Measure>] 'Value>
+        (value: float<'Value>)
+        (scale: float<'Value>) =
+        if valueIsCloseToZero value scale then None elif value < 0.0<_> then Some -1 else Some 1
 
-        if beyondEdge then
-            None
-        else
-            let value = evaluatePolynomial coefficients candidate
-
-            if not (isCloseToZero value valueTolerance) then
-                Some value
-            elif remainingExpansions <= 0 then
-                None
-            else
-                let distance = max (abs (candidate - fallbackFrom) * 2.0) (parameterTolerance * 2.0)
-                let nextCandidate = fallbackFrom + float direction * distance
-
-                sampleRootSide
-                    coefficients
-                    nextCandidate
-                    fallbackFrom
-                    intervalEdge
-                    direction
-                    valueTolerance
-                    parameterTolerance
-                    (remainingExpansions - 1)
-
-    let private signedNonzero value tolerance =
-        if isCloseToZero value tolerance then None elif value < 0.0<_> then Some -1 else Some 1
-
-    let private classifyRoot
-        (coefficients: float<'Value> list)
-        (isolation: RootIsolation)
-        (lower: float<parameter>)
-        (upper: float<parameter>)
-        (options: PolynomialOptions<'Value>)
-        : RootKind =
-        let valueTolerance = max options.ValueTolerance (measured<'Value> 0.0)
-
-        let leftCandidate =
-            if isolation.Lower < isolation.Estimate then
-                isolation.Lower
-            else
-                isolation.Estimate - options.ParameterTolerance
-
-        let rightCandidate =
-            if isolation.Upper > isolation.Estimate then
-                isolation.Upper
-            else
-                isolation.Estimate + options.ParameterTolerance
-
-        let left =
-            sampleRootSide
-                coefficients
-                leftCandidate
-                isolation.Estimate
-                lower
-                -1
-                valueTolerance
-                options.ParameterTolerance
-                32
-
-        let right =
-            sampleRootSide
-                coefficients
-                rightCandidate
-                isolation.Estimate
-                upper
-                1
-                valueTolerance
-                options.ParameterTolerance
-                32
-
-        match left |> Option.bind (fun value -> signedNonzero value valueTolerance), right |> Option.bind (fun value -> signedNonzero value valueTolerance) with
+    let private classifyRootSigns<[<Measure>] 'Value>
+        (leftValue: float<'Value>)
+        (rightValue: float<'Value>)
+        (valueScale: float<'Value>) =
+        match signedNonzero leftValue valueScale, signedNonzero rightValue valueScale with
         | Some -1, Some 1 -> NegativeToPositive
         | Some 1, Some -1 -> PositiveToNegative
         | Some -1, Some -1 -> NegativeToNegative
         | Some 1, Some 1 -> PositiveToPositive
         | _ -> Ambiguous
 
+    let private classifyRootFromDerivatives<[<Measure>] 'Value>
+        (coefficients: float<'Value> list)
+        (estimate: float<parameter>) =
+        let rec loop derivative order =
+            match derivative with
+            | [] -> Ambiguous
+            | _ ->
+                let value = evaluatePolynomial derivative estimate
+
+                if valueIsCloseToZero value (polynomialValueScale derivative) then
+                    loop (polynomialDerivative derivative) (order + 1)
+                else
+                    match order % 2 = 1, value > 0.0<_> with
+                    | true, true -> NegativeToPositive
+                    | true, false -> PositiveToNegative
+                    | false, true -> PositiveToPositive
+                    | false, false -> NegativeToNegative
+
+        loop (polynomialDerivative coefficients) 1
+
+    let private classifyRoot
+        (coefficients: float<'Value> list)
+        (isolation: RootIsolation)
+        : RootKind =
+        let valueScale = polynomialValueScale coefficients
+        let leftValue = evaluatePolynomial coefficients isolation.Lower
+        let rightValue = evaluatePolynomial coefficients isolation.Upper
+
+        match classifyRootSigns leftValue rightValue valueScale with
+        | Ambiguous -> classifyRootFromDerivatives coefficients isolation.Estimate
+        | kind -> kind
+
     let classifiedPolynomialRootsWith
         (coefficients: float<'Value> list)
         (lower: float<parameter>)
         (upper: float<parameter>)
-        (options: PolynomialOptions<'Value>)
+        (options: PolynomialOptions)
         : Result<ClassifiedRoot list, RootError<'Value>> =
-        let tolerance = max options.CoefficientTolerance (measured<'Value> 0.0)
-        let normalized = normalizePolynomialCoefficients coefficients tolerance
+        let normalized = normalizePolynomialCoefficients coefficients
         let lower, upper = orderedBracket lower upper
 
         polynomialRootIsolationsWith normalized lower upper options
         |> Result.map (
             List.map (fun isolation ->
                 { Isolation = isolation
-                  Kind = classifyRoot normalized isolation lower upper options })
+                  Kind = classifyRoot normalized isolation })
         )
 
     let realLinear01Roots a b options =
@@ -423,7 +434,7 @@ module Root =
         |> Parameter.fromFloat
 
     let cubicWith
-        (options: PolynomialOptions<'Value>)
+        (options: PolynomialOptions)
         (a: float<'Value>)
         (b: float<'Value>)
         (c: float<'Value>)
@@ -432,8 +443,7 @@ module Root =
         match validatePolynomialOptions options with
         | Error error -> Error error
         | Ok() ->
-            let tolerance = max options.CoefficientTolerance (measured<'Value> 0.0)
-            let coefficients = normalizePolynomialCoefficients [ a; b; c; d ] tolerance
+            let coefficients = normalizePolynomialCoefficients [ a; b; c; d ]
 
             match coefficients with
             | []
@@ -441,7 +451,7 @@ module Root =
             | [ linearA; linearB ] -> Ok(linear linearA linearB)
             | [ quadraticA; quadraticB; quadraticC ] ->
                 quadraticWith
-                    { CoefficientTolerance = options.CoefficientTolerance
+                    { CoefficientTolerance = polynomialCoefficientTolerance coefficients
                       RepeatedRootPolicy = ConsolidateRepeatedRoot }
                     quadraticA
                     quadraticB

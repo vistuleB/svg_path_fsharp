@@ -106,7 +106,7 @@ module Encounters =
                             Intersections.segmentWithoutOverlapPrecheckWith leftPortion rightPortion options
                             |> Result.map (fun local ->
                                 local
-                                |> List.fold (fun accumulated intersection ->
+                                |> List.fold (fun accumulated (intersection: SegmentIntersection) ->
                                     let mapped =
                                         { intersection with
                                             LeftT = interpolate leftWindow.From leftWindow.To intersection.LeftT

@@ -45,8 +45,14 @@ type SegmentError =
     | NonAffineOverlapCorrespondence
     | InvalidIntersectionTolerance of float<length>
     | InvalidIntersectionMaxDepth of int
+    | InvalidIntersectionParameterSnapExponent of int
     | IntersectionTerminalWindowLimitExceeded of int
     | OverlappingSegments
+    | InternalOverlapClassificationInconsistency
+    | InternalUncertifiedSegmentIntersection of
+        leftDistance: float<length> * rightDistance: float<length> * tolerance: float<length>
+    | InvalidSelfIntersectionMinimumArcLengthSeparation of float<length>
+    | InvalidSelfIntersectionDistanceTolerance of float<length>
     | InternalOverlapParameterCorrespondenceInconsistency
     | InvalidCrossingTolerance of float<length>
     | InvalidCrossingSamples of int

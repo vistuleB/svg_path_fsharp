@@ -507,11 +507,11 @@ module Arrangement =
             | Ok intersections ->
                 let intersections =
                     intersections
-                    |> List.filter (fun hit ->
+                    |> List.filter (fun (hit: SegmentIntersection) ->
                         not (commonEndpointSliver tolerance endpointSliverTolerance left right hit.LeftT hit.RightT))
                 Ok(
-                    intersections |> List.fold (fun cuts hit -> addCut hit.LeftT cuts) leftCuts,
-                    intersections |> List.fold (fun cuts hit -> addCut hit.RightT cuts) rightCuts)
+                    intersections |> List.fold (fun cuts (hit: SegmentIntersection) -> addCut hit.LeftT cuts) leftCuts,
+                    intersections |> List.fold (fun cuts (hit: SegmentIntersection) -> addCut hit.RightT cuts) rightCuts)
 
     let private endpointCuts tolerance endpointSliverTolerance source target sourceCuts targetCuts =
         [ 0.0<parameter>; 1.0<parameter> ]

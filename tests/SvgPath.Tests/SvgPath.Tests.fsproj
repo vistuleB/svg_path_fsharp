@@ -9,11 +9,13 @@
   <ItemGroup>
     <Compile Include="InternalNumberTests.fs" />
     <Compile Include="PointTests.fs" />
+    <Compile Include="PointAdditionalTests.fs" />
     <Compile Include="FormatTests.fs" />
     <Compile Include="InspectTests.fs" />
     <Compile Include="AffineTests.fs" />
     <Compile Include="EllipseTests.fs" />
     <Compile Include="TrigTests.fs" />
+    <Compile Include="TrigAdditionalTests.fs" />
     <Compile Include="RootTests.fs" />
     <Compile Include="BezierTests.fs" />
     <Compile Include="SegmentTests.fs" />
@@ -36,12 +38,14 @@
     <Compile Include="DegeneracyTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
+    <Compile Include="CongruencyAdditionalTests.fs" />
     <Compile Include="EffectsTests.fs" />
     <Compile Include="MarkerTests.fs" />
     <Compile Include="ParseTests.fs" />
     <Compile Include="ParseParityTests.fs" />
     <Compile Include="ParseW3cParityTests.fs" />
     <Compile Include="SerializeTests.fs" />
+    <Compile Include="RoundtripTests.fs" />
     <Compile Include="SvgTests.fs" />
     <Compile Include="ArrangementTests.fs" />
     <Compile Include="CsgTests.fs" />

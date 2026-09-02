@@ -77,13 +77,17 @@ module Congruency =
         match points with
         | [] -> Error()
         | _ ->
-            let count = float (List.length points)
             let sum source =
                 points
-                |> List.fold (fun (x, y) pair ->
+                |> List.fold (fun (count, x, y) pair ->
                     let point = source pair
-                    x + point.X, y + point.Y) (0.0<length>, 0.0<length>)
-                |> fun (x, y) -> Point.create (x / count) (y / count)
+                    let nextCount = count + 1
+                    let previousWeight = float count / float nextCount
+                    let nextWeight = 1.0 / float nextCount
+                    nextCount,
+                    x * previousWeight + point.X * nextWeight,
+                    y * previousWeight + point.Y * nextWeight) (0, 0.0<length>, 0.0<length>)
+                |> fun (_, x, y) -> Point.create x y
             Ok(sum _.Source, sum _.Target)
 
     let private rmsError points transform =

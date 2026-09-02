@@ -7,31 +7,31 @@ let private degrees value = Degree.fromFloat value
 let private asFloat value = Degree.toFloat value
 
 [<Fact>]
-let ``degree and radian conversions carry their measures`` () =
-    let radians: float<radian> = Degree.toRadians (degrees 180.0)
-    let roundTrip: float<degree> = Radian.toDegrees radians
-
-    Assert.Equal(System.Math.PI, Radian.toFloat radians, 12)
-    Assert.Equal(180.0, asFloat roundTrip, 12)
-
-[<Fact>]
 let ``sin degrees returns exact values at quarter turns`` () =
     Assert.Equal(0.0, Trig.sinDegrees (degrees 0.0))
     Assert.Equal(1.0, Trig.sinDegrees (degrees 90.0))
     Assert.Equal(0.0, Trig.sinDegrees (degrees 180.0))
+    Assert.Equal(-1.0, Trig.sinDegrees (degrees 270.0))
+    Assert.Equal(0.0, Trig.sinDegrees (degrees 360.0))
     Assert.Equal(-1.0, Trig.sinDegrees (degrees -90.0))
 
 [<Fact>]
 let ``cos degrees returns exact values at quarter turns`` () =
+    Assert.Equal(1.0, Trig.cosDegrees (degrees 0.0))
+    Assert.Equal(0.0, Trig.cosDegrees (degrees 90.0))
+    Assert.Equal(-1.0, Trig.cosDegrees (degrees 180.0))
+    Assert.Equal(0.0, Trig.cosDegrees (degrees 270.0))
     Assert.Equal(1.0, Trig.cosDegrees (degrees 360.0))
     Assert.Equal(0.0, Trig.cosDegrees (degrees -90.0))
 
 [<Fact>]
-let ``tangent returns exact safe eighth turns`` () =
+let ``tan degrees returns exact values at safe eighth turns`` () =
     Assert.Equal(0.0, Trig.tanDegrees (degrees 0.0))
     Assert.Equal(1.0, Trig.tanDegrees (degrees 45.0))
     Assert.Equal(-1.0, Trig.tanDegrees (degrees 135.0))
+    Assert.Equal(0.0, Trig.tanDegrees (degrees 180.0))
     Assert.Equal(1.0, Trig.tanDegrees (degrees 225.0))
+    Assert.Equal(-1.0, Trig.tanDegrees (degrees 315.0))
     Assert.Equal(-1.0, Trig.tanDegrees (degrees -45.0))
 
 [<Fact>]
@@ -53,7 +53,7 @@ let ``atan2 degrees returns exact diagonal angles`` () =
     Assert.Equal(-45.0, angle -1.0 1.0)
 
 [<Fact>]
-let ``other angles delegate to ordinary trigonometry`` () =
+let ``trig degrees uses math for other angles`` () =
     Assert.Equal(0.5, Trig.sinDegrees (degrees 30.0), 6)
     Assert.Equal(0.5, Trig.cosDegrees (degrees 60.0), 6)
     Assert.Equal(0.577350269, Trig.tanDegrees (degrees 30.0), 6)
@@ -62,7 +62,7 @@ let ``other angles delegate to ordinary trigonometry`` () =
     Assert.Equal(60.0, Trig.acosDegrees 0.5 |> Option.get |> asFloat, 6)
 
 [<Fact>]
-let ``acos rejects values outside its domain`` () =
+let ``acos degrees rejects values outside its domain`` () =
     Assert.Equal(None, Trig.acosDegrees -1.000001)
     Assert.Equal(None, Trig.acosDegrees 1.000001)
 
@@ -75,9 +75,3 @@ let ``degree functions accept large finite angles`` () =
     Assert.InRange(sine, -1.0, 1.0)
     Assert.InRange(cosine, -1.0, 1.0)
     Assert.False(System.Double.IsNaN tangent)
-
-[<Fact>]
-let ``non-finite angles propagate as NaN instead of failing normalization`` () =
-    Assert.True(Trig.sinDegrees (degrees infinity) |> System.Double.IsNaN)
-    Assert.True(Trig.cosDegrees (degrees -infinity) |> System.Double.IsNaN)
-    Assert.True(Trig.tanDegrees (degrees nan) |> System.Double.IsNaN)

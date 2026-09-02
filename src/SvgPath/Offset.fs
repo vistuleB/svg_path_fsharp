@@ -524,6 +524,8 @@ module Offset =
     let private tangentAgreementEpsilon = 1.0e-6
     let private pointTolerance = 1.0e-9<length>
     let private pointParameterTolerance = 1.0e-9<parameter>
+    let private directionDeterminantTolerance = 1.0e-9
+    let private angleToleranceDegrees = 1.0e-9<degree>
     let private arrangementTolerance = 2.0e-9<length>
     let private submergedSideSamplingDistance = 5.0e-8<length>
     let private bandOrientationSideSamplingDistance = 1.0e-4<length>
@@ -2648,7 +2650,7 @@ module Offset =
         (rightStart: Point<length>) (rightDirection: Point<1>) =
         let delta = Point.displacement leftStart rightStart
         let determinant = Point.cross leftDirection rightDirection
-        if abs determinant <= float pointTolerance then Error()
+        if abs determinant <= directionDeterminantTolerance then Error()
         else
             let leftT = Point.cross delta rightDirection / determinant
             let rightT = Point.cross delta leftDirection / determinant
@@ -2692,7 +2694,7 @@ module Offset =
             let startRadius = Point.displacement corner startPoint
             let endRadius = Point.displacement corner finish
             let angle = signedAngle startRadius endRadius
-            if abs angle <= 1.0e-9<degree> then
+            if abs angle <= angleToleranceDegrees then
                 Ok(lineSegmentsBetween [ startPoint; finish ])
             else
                 Ok [ Arc

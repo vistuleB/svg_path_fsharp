@@ -41,6 +41,7 @@
     <Compile Include="ArrangementTests.fs" />
     <Compile Include="CsgTests.fs" />
     <Compile Include="OffsetTests.fs" />
+    <Compile Include="StrokeTests.fs" />
     <Compile Include="OffsetParityTests.fs" />
   </ItemGroup>
 

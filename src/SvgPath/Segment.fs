@@ -781,7 +781,7 @@ module Segment =
     let rayCrossings segment origin direction =
         rayCrossingsWith segment origin direction defaultCrossingOptions
 
-    let private validateLengthOptions (options: LengthOptions) =
+    let validateLengthOptions (options: LengthOptions) =
         if options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidLengthTolerance options.Tolerance)
         elif options.MaxDepth <= 0 then Error(InvalidLengthMaxDepth options.MaxDepth)

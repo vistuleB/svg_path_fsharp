@@ -41,5 +41,6 @@
     <Compile Include="Arrangement.fs" />
     <Compile Include="Csg.fs" />
     <Compile Include="Offset.fs" />
+    <Compile Include="Stroke.fs" />
   </ItemGroup>
 </Project>

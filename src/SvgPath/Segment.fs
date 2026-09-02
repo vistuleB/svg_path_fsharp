@@ -205,7 +205,7 @@ type LinearizeOptions =
 
 [<RequireQualifiedAccess>]
 module Segment =
-    let private distanceParameterTolerance = 1.0e-9<parameter>
+    let private curveParameterTolerance = 1.0e-9<parameter>
 
     let defaultLinearizeOptions =
         { Tolerance = 0.01<length>
@@ -587,7 +587,7 @@ module Segment =
             else refine previousT previousValue nextT options.MaxIterations |> Result.map Some
         let insertUnique (value: float<parameter>) (values: float<parameter> list) =
             match values with
-            | previous :: _ when abs (float (previous - value)) <= float options.SignedLineDistanceTolerance -> values
+            | previous :: _ when abs (previous - value) <= curveParameterTolerance -> values
             | _ -> value :: values
         validateCrossingOptions options
         |> Result.bind (fun () ->
@@ -1114,7 +1114,7 @@ module Segment =
             let close value = abs value <= stationaryValueTolerance
             let insertNearUnique value candidates =
                 match candidates with
-                | previous :: _ when abs (previous - value) <= distanceParameterTolerance -> candidates
+                | previous :: _ when abs (previous - value) <= curveParameterTolerance -> candidates
                 | _ -> value :: candidates
 
             let refineWindow leftT leftValue rightT =

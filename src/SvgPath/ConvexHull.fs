@@ -129,6 +129,21 @@ module ConvexHull =
         { VertexIndex: int
           Point: Point<length> }
 
+    [<Struct>]
+    type private LoopTangentCandidate =
+        { Param: LoopParam
+          Point: Point<length> }
+
+    type private TangentSearchOrientation =
+        | ExactSearchOrientation of clockwise: bool
+        | LineLikeSearchOrientation of clockwise: bool
+        | DegenerateSearchOrientation
+
+    type private TangentOrientation =
+        | FoundTangentOrientation of clockwise: bool
+        | NoTangentOrientation
+        | ConflictingTangentOrientation
+
     let defaultWidthSearchOptions =
         { Accuracy = 1.0e-9<length>
           MaxDepth = 20 }
@@ -187,11 +202,11 @@ module ConvexHull =
                 | QuadraticBezier _ | Arc _ -> [ segment; Line(endPoint, startPoint) ]
                 | CubicBezier _ -> []
         match pieces with
-        | [] -> Error ConvexHullConstructionFailed
+        | [] -> Error LoopUnionCollapsed
         | _ ->
             Subpath.createWith WiggleThenBridge pieces
             |> Result.bind (Subpath.setClosedWith WiggleThenBridge true)
-            |> Result.mapError ConvexHullPathError
+            |> Result.mapError ConstructionPathError
 
     let private supportCandidates segment direction =
         match segment with
@@ -389,7 +404,7 @@ module ConvexHull =
         |> Result.bind (fun segments ->
             Subpath.createWith WiggleThenBridge segments
             |> Result.bind (Subpath.setClosedWith WiggleThenBridge true))
-        |> Result.mapError ConvexHullPathError
+        |> Result.mapError ConstructionPathError
 
     let private normalizeAngle (angle: float<degree>) =
         let value = Degree.toFloat angle
@@ -590,7 +605,7 @@ module ConvexHull =
             match loopSupportDominance loopA loopB with
             | true, _ -> Ok left
             | false, true -> Ok right
-            | false, false -> Error ConvexHullConstructionFailed
+            | false, false -> Error LoopUnionCollapsed
         | segments -> Ok segments
 
     let private polygonSignedArea points =
@@ -966,6 +981,245 @@ module ConvexHull =
                 Subpath.createWith WiggleThenBridge segments
                 |> Result.mapError ConstructionPathError
 
+    let private orientationFromTurn turn scale =
+        let tolerance = 1.0e-9 * scale
+        if turn > tolerance then Some true
+        elif turn < -tolerance then Some false
+        else None
+
+    let private endpointTangentOrientation segments index =
+        let count = List.length segments
+        let segment = List.item index segments
+        let previous = List.item (previousIndex index count) segments
+        match Segment.derivative previous 1.0<parameter>, Segment.derivative segment 0.0<parameter> with
+        | Ok arriving, Ok leaving ->
+            orientationFromTurn
+                (float (Point.cross arriving leaving))
+                (float (Point.norm arriving * Point.norm leaving))
+        | _ -> None
+
+    let private loopTangentOrientation segments =
+        [ 0 .. List.length segments - 1 ]
+        |> List.choose (endpointTangentOrientation segments)
+        |> List.distinct
+        |> function
+            | [] -> NoTangentOrientation
+            | [ orientation ] -> FoundTangentOrientation orientation
+            | _ -> ConflictingTangentOrientation
+
+    let private lineLikeOrientation vertices point =
+        match vertices with
+        | [ a; b ] ->
+            let edge = Point.displacement a b
+            let offset = Point.displacement a point
+            match orientationFromTurn (float (Point.cross edge offset)) (float (Point.norm edge * Point.norm offset)) with
+            | Some orientation -> not orientation
+            | None -> true
+        | _ -> true
+
+    let private tangentSearchOrientation segments point =
+        let vertices = loopVertices segments
+        match orientationClockwise vertices with
+        | Some orientation -> ExactSearchOrientation orientation
+        | None ->
+            match loopTangentOrientation segments with
+            | FoundTangentOrientation orientation -> ExactSearchOrientation orientation
+            | NoTangentOrientation when List.length vertices = 2 -> LineLikeSearchOrientation(lineLikeOrientation vertices point)
+            | NoTangentOrientation | ConflictingTangentOrientation -> DegenerateSearchOrientation
+
+    let private loopVertexParam segments point =
+        match segments |> List.tryFindIndex (fun segment -> Point.distance (Segment.start segment) point <= pointTolerance) with
+        | Some index -> Ok { SegmentIndex = index; T = 0.0<parameter> }
+        | None -> Error TangentSearchDegenerateLoop
+
+    let private buildOpenSubpathFromSegments segments =
+        segments
+        |> List.filter (segmentIsPointLike >> not)
+        |> function
+            | [] -> Error TangentSearchDegenerateLoop
+            | segments -> Subpath.createWith WiggleThenBridge segments |> Result.mapError ConstructionPathError
+
+    let private segmentChainIsOutside segments point clockwise =
+        match segments with
+        | [] -> false
+        | segment :: _ ->
+            match Segment.point segment 0.5<parameter>, Segment.derivative segment 0.5<parameter> with
+            | Ok q, Ok tangent -> pointLoopView point q tangent tangent clockwise = OutsidePoint
+            | _ -> false
+
+    let private loopTangentChainsToSubpaths loop first second point clockwise =
+        let firstSegments = loopPieceSegments loop first.Param second.Param
+        let secondSegments = loopPieceSegments loop second.Param first.Param
+        buildOpenSubpathFromSegments firstSegments
+        |> Result.bind (fun firstSubpath ->
+            buildOpenSubpathFromSegments secondSegments
+            |> Result.map (fun secondSubpath ->
+                if segmentChainIsOutside firstSegments point clockwise then firstSubpath, secondSubpath
+                else secondSubpath, firstSubpath))
+
+    let private lineLikeLoopTangentSubpaths loop point clockwise =
+        match loopVertices loop.Segments with
+        | [ a; b ] ->
+            loopVertexParam loop.Segments a
+            |> Result.bind (fun aParam ->
+                loopVertexParam loop.Segments b
+                |> Result.bind (fun bParam ->
+                    loopTangentChainsToSubpaths loop
+                        { Param = aParam; Point = a }
+                        { Param = bParam; Point = b }
+                        point clockwise))
+        | _ -> Error TangentSearchDegenerateLoop
+
+    let private segmentPointTangentRoots segment point =
+        match segment with
+        | Line _ -> Ok []
+        | QuadraticBezier(startPoint, control, endPoint) ->
+            let s = Point.displacement point startPoint
+            let a = Point.displacement startPoint control
+            let b = Point.add (Point.subtract startPoint (Point.scale 2.0 control)) endPoint
+            Root.quadratic (Point.cross a b) (Point.cross s b) (Point.cross s a)
+            |> List.filter (fun t -> t >= 0.0<parameter> && t <= 1.0<parameter>)
+            |> Ok
+        | CubicBezier(startPoint, control1, control2, endPoint) ->
+            Ok(cubicPointTangentRoots startPoint control1 control2 endPoint point)
+        | Arc data ->
+            Ellipse.endpointToCenter data
+            |> Result.mapError (fun _ -> ConstructionPathError DegenerateArc)
+            |> Result.bind (fun arc ->
+                let translated = Point.displacement arc.Center point
+                let cosine = Trig.cosDegrees (-arc.XAxisRotation)
+                let sine = Trig.sinDegrees (-arc.XAxisRotation)
+                let local = Point.create
+                                (cosine * translated.X - sine * translated.Y)
+                                (sine * translated.X + cosine * translated.Y)
+                let a = local.X * arc.Radius.Y
+                let b = -local.Y * arc.Radius.X
+                let c = arc.Radius.X * arc.Radius.Y
+                let magnitude = sqrt (float (a * a + b * b)) * 1.0<length^2>
+                if magnitude <= pointTolerance * 1.0<length> || c > magnitude + pointTolerance * 1.0<length> then Ok []
+                else
+                    let ratio = max -1.0 (min 1.0 (float (c / magnitude)))
+                    match Trig.acosDegrees ratio with
+                    | None -> Error(ConstructionPathError DegenerateArc)
+                    | Some offset ->
+                        let baseAngle = Trig.atan2Degrees (float b) (float a)
+                        [ baseAngle - offset; baseAngle + offset ]
+                        |> List.collect (fun angle ->
+                            [ -1; 0; 1 ]
+                            |> List.map (fun turn ->
+                                Parameter.fromFloat
+                                    (float ((angle + float turn * 360.0<degree> - arc.StartAngle) / arc.DeltaAngle))))
+                        |> List.filter (fun t -> t >= -sameT && t <= 1.0<parameter> + sameT)
+                        |> List.map (fun t -> max 0.0<parameter> (min 1.0<parameter> t))
+                        |> Ok)
+
+    let private uniqueSortedParameters values =
+        values
+        |> List.sort
+        |> List.fold (fun kept value ->
+            match kept with
+            | previous :: _ when abs (value - previous) <= sameT -> kept
+            | _ -> value :: kept) []
+        |> List.rev
+
+    let private exactLoopTangentCandidates loop point clockwise =
+        let segments = loop.Segments
+        [ 0 .. List.length segments - 1 ]
+        |> List.fold (fun state index ->
+            state
+            |> Result.bind (fun candidates ->
+                let segment = List.item index segments
+                let previous = List.item (previousIndex index (List.length segments)) segments
+                match Segment.derivative previous 1.0<parameter>, Segment.derivative segment 0.0<parameter> with
+                | Ok arriving, Ok leaving ->
+                    let endpoint = Segment.start segment
+                    let endpointCandidates =
+                        if pointLoopView point endpoint arriving leaving clockwise = TangentPoint then
+                            [ { Param = { SegmentIndex = index; T = 0.0<parameter> }; Point = endpoint } ]
+                        else []
+                    segmentPointTangentRoots segment point
+                    |> Result.bind (fun roots ->
+                        roots
+                        |> List.filter (fun t -> t > sameT && t < 1.0<parameter> - sameT)
+                        |> uniqueSortedParameters
+                        |> List.fold (fun interiorState t ->
+                            interiorState
+                            |> Result.bind (fun interior ->
+                                Segment.point segment t
+                                |> Result.mapError ConstructionPathError
+                                |> Result.map (fun q ->
+                                    { Param = { SegmentIndex = index; T = t }; Point = q } :: interior))) (Ok [])
+                        |> Result.map (fun interior -> candidates @ endpointCandidates @ List.rev interior))
+                | Error error, _ | _, Error error -> Error(ConstructionPathError error))) (Ok [])
+
+    let private pointExactLoopTangentSubpaths loop point =
+        match tangentSearchOrientation loop.Segments point with
+        | DegenerateSearchOrientation -> Error TangentSearchDegenerateLoop
+        | LineLikeSearchOrientation clockwise -> lineLikeLoopTangentSubpaths loop point clockwise
+        | ExactSearchOrientation clockwise ->
+            validateChordPolygonConvex (loopVertices loop.Segments) clockwise
+            |> Result.bind (fun () ->
+                loop.Segments
+                |> List.tryFindIndex (fun segment -> Result.isError (internalSegmentTangentMonotone segment clockwise))
+                |> function
+                    | Some index -> Error(TangentSearchNonConvexVertex index)
+                    | None -> exactLoopTangentCandidates loop point clockwise)
+            |> Result.bind (function
+                | [ first; second ] -> loopTangentChainsToSubpaths loop first second point clockwise
+                | tangents -> Error(TangentSearchExpectedTwoTangencies(List.length tangents)))
+
+    let internalPointExactLoopTangentSubpaths segments point =
+        pointExactLoopTangentSubpaths { Segments = segments; Enclosure = loopVertices segments } point
+
+    let private loopPlusPointHull loop point =
+        pointExactLoopTangentSubpaths loop point
+        |> Result.bind (fun (_, kept) ->
+            let startPoint = kept.Start
+            let endPoint = kept.Segments |> List.last |> Segment.finish
+            let segments = kept.Segments @ [ Line(endPoint, point); Line(point, startPoint) ]
+            Subpath.createWith WiggleThenBridge segments
+            |> Result.bind (Subpath.setClosedWith WiggleThenBridge true)
+            |> Result.mapError ConstructionPathError
+            |> Result.map (fun subpath -> { loop with Segments = subpath.Segments }))
+
+    let internalLoopPlusPointHull segments point =
+        loopPlusPointHull { Segments = segments; Enclosure = loopVertices segments } point
+        |> Result.map _.Segments
+
+    let private unionLoopWithPoint loop point =
+        match pointChordPolygonLoopSeparation loop point with
+        | None -> Ok loop
+        | Some(direction, _) ->
+            let pointLoop = { Segments = [ Line(point, point) ]; Enclosure = [ point ] }
+            findSeededWorstDirection loop pointLoop direction loopUnionSeedMaxDrift
+            |> Result.map (fun (lower, upper) ->
+                match loopUnion loop pointLoop [ lower; upper ] |> unionPieceSegments loop pointLoop with
+                | [] -> loop
+                | segments -> { loop with Segments = segments })
+
+    let private dumbRepairLoopWithPoint loop point =
+        match loopPlusPointHull loop point with
+        | Ok repaired -> Ok repaired
+        | Error(TangentSearchExpectedTwoTangencies _)
+        | Error TangentSearchDegenerateLoop -> unionLoopWithPoint loop point
+        | Error error -> Error error
+
+    let private repairLoopWithPoints loop points =
+        points
+        |> List.fold (fun state point ->
+            state
+            |> Result.bind (fun current ->
+                match pointChordPolygonLoopSeparation current point with
+                | None -> Ok current
+                | Some _ -> dumbRepairLoopWithPoint current point)) (Ok loop)
+
+    let private dumbRepairLoopWithPoints loop points =
+        repairLoopWithPoints loop (points @ points)
+
+    let internalLoopPlusPointsHull segments points =
+        dumbRepairLoopWithPoints { Segments = segments; Enclosure = loopVertices segments } points
+        |> Result.map _.Segments
+
     let private vertexChainIsOutside vertices point clockwise =
         match vertices with
         | [ a; b ] ->
@@ -1003,10 +1257,21 @@ module ConvexHull =
     let internalPointChordPolygonTangentSubpaths segments point =
         chordPolygonTangentSubpaths segments point
 
-    let private finalRepairLoop current sourceLoops =
-        sourceLoops
-        |> List.fold (fun state addition ->
-            state |> Result.bind (fun repaired -> ambitiousRepairLoopWithLoop repaired addition)) (Ok current)
+    let private finalRepairLoop current sourceLoops repairMode =
+        (match repairMode with
+        | "ambitious" ->
+            sourceLoops
+            |> List.fold (fun state addition ->
+                state |> Result.bind (fun repaired -> ambitiousRepairLoopWithLoop repaired addition)) (Ok current)
+        | "dumb" ->
+            sourceLoops
+            |> List.collect loopEndpoints
+            |> List.fold (fun distinct point ->
+                if List.exists (fun existing -> Point.distance existing point <= pointTolerance) distinct then distinct
+                else point :: distinct) []
+            |> List.rev
+            |> dumbRepairLoopWithPoints current
+        | _ -> Ok current)
 
     let private prefilterLoops loops =
         match loops with
@@ -1023,7 +1288,7 @@ module ConvexHull =
                     not (loop.Enclosure |> List.forall (polygonStrictlyContains envelope)))
             if List.isEmpty filtered then loops else filtered
 
-    let private constructSegmentHull segment =
+    let private constructSegmentHullInternal segment =
         match segment with
         | Line _ | QuadraticBezier _ | Arc _ -> exactSimpleSegmentHull segment
         | CubicBezier _ when segmentIsPointLike segment -> exactSimpleSegmentHull (Line(Segment.start segment, Segment.finish segment))
@@ -1032,11 +1297,11 @@ module ConvexHull =
     let private buildClosedSubpath segments =
         Subpath.createWith WiggleThenBridge segments
         |> Result.bind (Subpath.setClosedWith WiggleThenBridge true)
-        |> Result.mapError ConvexHullPathError
+        |> Result.mapError ConstructionPathError
 
-    let private segmentsHullCore segments =
+    let private segmentsHullWithRepairMode segments repairMode =
         segments
-        |> List.map constructSegmentHull
+        |> List.map constructSegmentHullInternal
         |> List.fold (fun state next ->
             state
             |> Result.bind (fun loops -> next |> Result.map (fun subpath -> subpath.Segments :: loops))) (Ok [])
@@ -1049,7 +1314,7 @@ module ConvexHull =
                     [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
             let loops = List.rev reversedLoops |> List.map (fun segments -> { Segments = segments; Enclosure = enclosure segments }) |> prefilterLoops
             match loops with
-            | [] -> Error ConvexHullConstructionFailed
+            | [] -> Error LoopUnionCollapsed
             | first :: rest ->
                 rest
                 |> List.fold (fun state addition ->
@@ -1057,8 +1322,18 @@ module ConvexHull =
                     |> Result.bind (fun current ->
                         unionLoopSegments current.Segments addition.Segments
                         |> Result.map (fun union -> { Segments = union; Enclosure = enclosure union }))) (Ok first)
-                |> Result.bind (fun union -> finalRepairLoop union loops))
+                |> Result.bind (fun union -> finalRepairLoop union loops repairMode))
         |> Result.bind (fun loop -> buildClosedSubpath loop.Segments)
+
+    let private publicError = function
+        | ConstructionPathError error -> ConvexHullPathError error
+        | _ -> ConvexHullConstructionFailed
+
+    let private segmentsHullCore segments =
+        segmentsHullWithRepairMode segments "ambitious" |> Result.mapError publicError
+
+    let private constructSegmentHull segment =
+        constructSegmentHullInternal segment |> Result.mapError publicError
 
     /// Compute a curve-preserving representation of a segment's convex hull.
     let segmentHull segment = constructSegmentHull segment
@@ -1078,6 +1353,16 @@ module ConvexHull =
                 if List.isEmpty subpath.Segments then [ Line(subpath.Start, subpath.Start) ]
                 else subpath.Segments)
             |> segmentsHullCore
+
+    let internalPathHullWithRepairMode (path: Path) repairMode =
+        match path.Subpaths with
+        | [] -> Error(ConstructionPathError EmptyPath)
+        | subpaths ->
+            subpaths
+            |> List.collect (fun subpath ->
+                if List.isEmpty subpath.Segments then [ Line(subpath.Start, subpath.Start) ]
+                else subpath.Segments)
+            |> fun segments -> segmentsHullWithRepairMode segments repairMode
 
     /// Compute a point collection's hull through the same curve-preserving
     /// loop-union and repair path used by segment, subpath, and path hulls.
@@ -1436,9 +1721,10 @@ module ConvexHull =
                 minimumWidthDecision (segmentsExtent segments) (BoundingBox.diameter bounds) tolerance 20)
 
     let internalConvexSubpathAddSegmentAndTestWidth (hull: Subpath) segment tolerance =
-        constructSegmentHull segment
+        constructSegmentHullInternal segment
         |> Result.bind (fun addition -> unionLoopSegments hull.Segments addition.Segments)
         |> Result.bind buildClosedSubpath
+        |> Result.mapError publicError
         |> Result.bind (fun combinedHull ->
             internalConvexSubpathMinimumWidthDecision combinedHull tolerance
             |> Result.map (fun decision -> combinedHull, decision))

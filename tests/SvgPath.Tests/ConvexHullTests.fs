@@ -32,6 +32,17 @@ let private squareLoop () =
       Line(point 10.0 10.0, point 0.0 10.0)
       Line(point 0.0 10.0, point 0.0 0.0) ]
 
+let private roundedTriangleLoop () =
+    [ Line(point 0.0 0.0, point 10.0 0.0)
+      QuadraticBezier(point 10.0 0.0, point 15.0 5.0, point 10.0 10.0)
+      Line(point 10.0 10.0, point 0.0 0.0) ]
+
+let private conflictingTangentLineLikeLoop () =
+    let a = point 0.0 0.0
+    let b = point 10.0 0.0
+    [ CubicBezier(a, point (10.0 / 3.0) (10.0 / 3.0), point (20.0 / 3.0) (10.0 / 3.0), b)
+      CubicBezier(b, point (20.0 / 3.0) 0.0, point (-10.0 / 3.0) 0.0, a) ]
+
 [<Fact>]
 let ``point hull rejects an empty collection`` () =
     Assert.Equal(Error(ConvexHullPathError EmptyPath), ConvexHull.pointsHull [])
@@ -271,3 +282,48 @@ let ``point chord polygon tangent split preserves outside and inside chains`` ()
     Assert.Equal(point 10.0 10.0, inside.Start)
     Assert.Equal(point 10.0 0.0, Segment.finish (List.last inside.Segments))
     Assert.Equal(3, List.length inside.Segments)
+
+[<Fact>]
+let ``exact point tangent split preserves square boundary chains`` () =
+    let outside, inside =
+        ConvexHull.internalPointExactLoopTangentSubpaths (squareLoop ()) (point 15.0 5.0)
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(point 10.0 0.0, outside.Start)
+    Assert.Equal(point 10.0 10.0, Segment.finish (List.last outside.Segments))
+    Assert.Single(outside.Segments) |> ignore
+    Assert.Equal(3, List.length inside.Segments)
+
+[<Fact>]
+let ``exact point tangent split finds quadratic interior tangencies`` () =
+    let outside, inside =
+        ConvexHull.internalPointExactLoopTangentSubpaths (roundedTriangleLoop ()) (point 14.0 5.0)
+        |> Result.defaultWith (failwithf "%A")
+    let rootOffset = sqrt 15.0
+    Assert.True(Point.distance outside.Start (point 11.0 (5.0 - rootOffset)) <= 1.0e-8<length>)
+    Assert.True(Point.distance (Segment.finish (List.last outside.Segments)) (point 11.0 (5.0 + rootOffset)) <= 1.0e-8<length>)
+    Assert.Single(outside.Segments) |> ignore
+    Assert.Equal(4, List.length inside.Segments)
+
+[<Fact>]
+let ``exact tangent search rejects conflicting line-like orientation`` () =
+    Assert.Equal(
+        Error TangentSearchDegenerateLoop,
+        ConvexHull.internalLoopPlusPointHull (conflictingTangentLineLikeLoop ()) (point 5.0 4.0))
+
+[<Fact>]
+let ``loop plus point replaces the visible square edge`` () =
+    let outsidePoint = point 15.0 5.0
+    let segments =
+        ConvexHull.internalLoopPlusPointHull (squareLoop ()) outsidePoint
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(5, List.length segments)
+    Assert.Contains(segments, fun segment -> Segment.start segment = outsidePoint || Segment.finish segment = outsidePoint)
+
+[<Fact>]
+let ``loop plus points absorbs outside points`` () =
+    let points = [ point 5.0 5.0; point 15.0 5.0; point 5.0 15.0 ]
+    let segments =
+        ConvexHull.internalLoopPlusPointsHull (squareLoop ()) points
+        |> Result.defaultWith (failwithf "%A")
+    for candidate in points do
+        Assert.Equal(None, ConvexHull.internalPointChordPolygonLoopSeparation segments candidate)

@@ -124,6 +124,11 @@ module ConvexHull =
         | LoopPieceA of LoopParam * LoopParam
         | LoopPieceB of LoopParam * LoopParam
 
+    [<Struct>]
+    type private TangentCandidate =
+        { VertexIndex: int
+          Point: Point<length> }
+
     let defaultWidthSearchOptions =
         { Accuracy = 1.0e-9<length>
           MaxDepth = 20 }
@@ -303,7 +308,28 @@ module ConvexHull =
                         |> List.filter (fun isolation -> abs (isolation.Estimate - other) > 1.0e-6<parameter>)
                         |> List.sortBy (fun isolation -> abs (isolation.Estimate - approximate))
                         |> List.tryHead
-                        |> Option.map _.Estimate
+                        |> Option.map (fun isolation ->
+                            if isolation.Lower = isolation.Upper then isolation.Estimate
+                            else
+                                let lowerValue = Root.evaluatePolynomial coefficients isolation.Lower
+                                let upperValue = Root.evaluatePolynomial coefficients isolation.Upper
+                                let sameSign a b = (a < 0.0 && b < 0.0) || (a > 0.0 && b > 0.0)
+                                if sameSign lowerValue upperValue then isolation.Estimate
+                                else
+                                    Root.bisectIsolationUntil
+                                        (Root.evaluatePolynomial coefficients)
+                                        isolation.Lower
+                                        isolation.Upper
+                                        100
+                                        (fun lower upper ->
+                                            match Segment.betweenInside source lower upper with
+                                            | Error _ -> false
+                                            | Ok portion ->
+                                                match Segment.boundingBox portion with
+                                                | Error _ -> false
+                                                | Ok bounds -> BoundingBox.diameter bounds <= pointTolerance)
+                                    |> Result.map _.Estimate
+                                    |> Result.defaultValue isolation.Estimate)
                         |> Option.defaultValue approximate
             | _ -> approximate
 
@@ -765,6 +791,217 @@ module ConvexHull =
                     let bounds = List.reduce BoundingBox.union boxes
                     [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
         pointChordPolygonLoopSeparation { Segments = segments; Enclosure = enclosure } point
+
+    let internalPointLoopView point atPoint arriving leaving clockwise =
+        let sight = Point.displacement point atPoint
+        let arrivingTurn = Point.cross sight arriving
+        let leavingTurn = Point.cross sight leaving
+        let oppositeSigns a b = (a < 0.0<_> && b > 0.0<_>) || (a > 0.0<_> && b < 0.0<_>)
+
+        if arrivingTurn = 0.0<_> || leavingTurn = 0.0<_> || oppositeSigns arrivingTurn leavingTurn then
+            TangentPoint
+        elif clockwise then
+            if arrivingTurn < 0.0<_> then OutsidePoint else InsidePoint
+        else
+            if arrivingTurn > 0.0<_> then OutsidePoint else InsidePoint
+
+    let private curvatureViolation values clockwise =
+        let wrongWay value =
+            if clockwise then max 0.0 -value else max 0.0 value
+
+        let violation = values |> List.fold (fun worst value -> max worst (wrongWay value)) 0.0
+        if violation = 0.0 then Ok() else Error violation
+
+    let internalSegmentTangentMonotone segment clockwise =
+        match segment with
+        | Line _ -> Ok()
+        | QuadraticBezier(startPoint, control, endPoint) ->
+            let arriving = Point.displacement startPoint control
+            let leaving = Point.displacement control endPoint
+            curvatureViolation [ float (Point.cross arriving leaving) ] clockwise
+        | CubicBezier(startPoint, control1, control2, endPoint) ->
+            let a = Point.displacement startPoint control1
+            let b = Point.displacement control1 control2
+            let c = Point.displacement control2 endPoint
+            let u = a
+            let v = Point.scale 2.0 (Point.subtract b a)
+            let w = Point.add (Point.subtract a (Point.scale 2.0 b)) c
+            let qa = float (Point.cross v w)
+            let qb = 2.0 * float (Point.cross u w)
+            let qc = float (Point.cross u v)
+            let candidates =
+                if qa = 0.0 then [ 0.0; 1.0 ]
+                else
+                    let critical = -qb / (2.0 * qa)
+                    if critical > 0.0 && critical < 1.0 then [ 0.0; 1.0; critical ] else [ 0.0; 1.0 ]
+            candidates
+            |> List.map (fun t -> qa * t * t + qb * t + qc)
+            |> fun values -> curvatureViolation values clockwise
+        | Arc data ->
+            if data.Sweep = clockwise then Ok() else Error 1.0
+
+    let private normalizeTangencyCoefficients coefficients =
+        let scale = coefficients |> List.fold (fun largest coefficient -> max largest (abs coefficient)) 0.0
+        if scale = 0.0 then coefficients else coefficients |> List.map (fun coefficient -> coefficient / scale)
+
+    let private cubicPointTangentCoefficients startPoint control1 control2 endPoint point =
+        let a =
+            Point.add
+                (Point.add (Point.scale -1.0 startPoint) (Point.scale 3.0 control1))
+                (Point.add (Point.scale -3.0 control2) endPoint)
+        let b =
+            Point.add
+                (Point.add (Point.scale 3.0 startPoint) (Point.scale -6.0 control1))
+                (Point.scale 3.0 control2)
+        let c = Point.scale 3.0 (Point.displacement startPoint control1)
+        let s = Point.displacement point startPoint
+        [ -float (Point.cross a b)
+          -2.0 * float (Point.cross a c)
+          3.0 * float (Point.cross s a) - float (Point.cross b c)
+          2.0 * float (Point.cross s b)
+          float (Point.cross s c) ]
+        |> normalizeTangencyCoefficients
+
+    let private tangentWindowIsGeometricallySmall segment lower upper =
+        match Segment.betweenInside segment lower upper with
+        | Error _ -> false
+        | Ok portion ->
+            match Segment.boundingBox portion with
+            | Error _ -> false
+            | Ok bounds -> BoundingBox.diameter bounds <= pointTolerance
+
+    let private refinePolynomialTangentIsolation coefficients segment isolation =
+        if isolation.Lower = isolation.Upper then isolation.Estimate
+        else
+            let lowerValue = Root.evaluatePolynomial coefficients isolation.Lower
+            let upperValue = Root.evaluatePolynomial coefficients isolation.Upper
+            let sameSign a b = (a < 0.0 && b < 0.0) || (a > 0.0 && b > 0.0)
+            if sameSign lowerValue upperValue then isolation.Estimate
+            else
+                Root.bisectIsolationUntil
+                    (Root.evaluatePolynomial coefficients)
+                    isolation.Lower
+                    isolation.Upper
+                    100
+                    (tangentWindowIsGeometricallySmall segment)
+                |> Result.map _.Estimate
+                |> Result.defaultValue isolation.Estimate
+
+    let private cubicPointTangentRoots startPoint control1 control2 endPoint point =
+        let coefficients = cubicPointTangentCoefficients startPoint control1 control2 endPoint point
+        let segment = CubicBezier(startPoint, control1, control2, endPoint)
+        Root.polynomialRootIsolationsWith
+            coefficients
+            (Parameter.fromFloat 0.0)
+            (Parameter.fromFloat 1.0)
+            { MaxIterations = 100 }
+        |> Result.defaultValue []
+        |> List.map (refinePolynomialTangentIsolation coefficients segment)
+
+    let internalCubicPointTangentRoots segment point =
+        match segment with
+        | CubicBezier(startPoint, control1, control2, endPoint) ->
+            cubicPointTangentRoots startPoint control1 control2 endPoint point
+        | _ -> []
+
+    let internalRefineChordTangent segment approximate other =
+        refineChordTangent segment approximate other
+
+    let private orientationClockwise vertices =
+        let signed = polygonSignedArea vertices
+        if abs signed <= pointTolerance * pointTolerance then None else Some(signed > 0.0<length^2>)
+
+    let private pointLoopView point atPoint arriving leaving clockwise =
+        internalPointLoopView point atPoint arriving leaving clockwise
+
+    let private previousIndex index count = if index <= 0 then count - 1 else index - 1
+
+    let private vertexView vertices point index clockwise =
+        let count = List.length vertices
+        let previous = List.item (previousIndex index count) vertices
+        let current = List.item index vertices
+        let next = List.item (nextIndex index count) vertices
+        pointLoopView
+            point
+            current
+            (Point.displacement previous current)
+            (Point.displacement current next)
+            clockwise
+
+    let private turnAgainstOrientation turn scale clockwise =
+        let tolerance = 1.0e-9 * scale
+        if clockwise then max 0.0 (-tolerance - turn) else max 0.0 (turn - tolerance)
+
+    let private validateChordPolygonConvex vertices clockwise =
+        let count = List.length vertices
+        [ 0 .. count - 1 ]
+        |> List.tryFind (fun index ->
+            let previous = List.item (previousIndex index count) vertices
+            let current = List.item index vertices
+            let next = List.item (nextIndex index count) vertices
+            let arriving = Point.displacement previous current
+            let leaving = Point.displacement current next
+            let turn = float (Point.cross arriving leaving)
+            let scale = float (Point.norm arriving * Point.norm leaving)
+            turnAgainstOrientation turn scale clockwise <> 0.0)
+        |> function
+            | None -> Ok()
+            | Some index -> Error(TangentSearchNonConvexVertex index)
+
+    let private vertexChain vertices fromIndex toIndex =
+        let count = List.length vertices
+        let rec loop current accumulated =
+            let accumulated = List.item current vertices :: accumulated
+            if current = toIndex then List.rev accumulated
+            else loop (nextIndex current count) accumulated
+        loop fromIndex []
+
+    let private subpathFromVertices vertices =
+        vertices
+        |> List.pairwise
+        |> List.map Line
+        |> function
+            | [] -> Error TangentSearchDegenerateLoop
+            | segments ->
+                Subpath.createWith WiggleThenBridge segments
+                |> Result.mapError ConstructionPathError
+
+    let private vertexChainIsOutside vertices point clockwise =
+        match vertices with
+        | [ a; b ] ->
+            let direction = Point.displacement a b
+            pointLoopView point (Point.midpoint a b) direction direction clockwise = OutsidePoint
+        | a :: b :: c :: _ ->
+            pointLoopView point b (Point.displacement a b) (Point.displacement b c) clockwise = OutsidePoint
+        | _ -> false
+
+    let private chordPolygonTangentSubpaths segments point =
+        let vertices = loopVertices segments
+        match orientationClockwise vertices with
+        | None -> Error TangentSearchDegenerateLoop
+        | Some clockwise ->
+            validateChordPolygonConvex vertices clockwise
+            |> Result.bind (fun () ->
+                let tangents =
+                    [ 0 .. List.length vertices - 1 ]
+                    |> List.choose (fun index ->
+                        if vertexView vertices point index clockwise = TangentPoint then
+                            Some { VertexIndex = index; Point = List.item index vertices }
+                        else None)
+                match tangents with
+                | [ first; second ] ->
+                    let firstChain = vertexChain vertices first.VertexIndex second.VertexIndex
+                    let secondChain = vertexChain vertices second.VertexIndex first.VertexIndex
+                    subpathFromVertices firstChain
+                    |> Result.bind (fun firstSubpath ->
+                        subpathFromVertices secondChain
+                        |> Result.map (fun secondSubpath ->
+                            if vertexChainIsOutside firstChain point clockwise then firstSubpath, secondSubpath
+                            else secondSubpath, firstSubpath))
+                | _ -> Error(TangentSearchExpectedTwoTangencies(List.length tangents)))
+
+    let internalPointChordPolygonTangentSubpaths segments point =
+        chordPolygonTangentSubpaths segments point
 
     let private finalRepairLoop current sourceLoops =
         sourceLoops

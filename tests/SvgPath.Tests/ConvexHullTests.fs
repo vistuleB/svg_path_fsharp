@@ -26,6 +26,12 @@ let private narrowArcLoop () =
           End = endPoint }
       Line(endPoint, startPoint) ]
 
+let private squareLoop () =
+    [ Line(point 0.0 0.0, point 10.0 0.0)
+      Line(point 10.0 0.0, point 10.0 10.0)
+      Line(point 10.0 10.0, point 0.0 10.0)
+      Line(point 0.0 10.0, point 0.0 0.0) ]
+
 [<Fact>]
 let ``point hull rejects an empty collection`` () =
     Assert.Equal(Error(ConvexHullPathError EmptyPath), ConvexHull.pointsHull [])
@@ -182,3 +188,86 @@ let ``ambitious repair preserves a narrow exposed arc slice`` () =
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(4, List.length segments)
     Assert.Contains(segments, function Arc _ -> true | _ -> false)
+
+[<Fact>]
+let ``point loop view follows loop orientation`` () =
+    Assert.Equal(
+        OutsidePoint,
+        ConvexHull.internalPointLoopView
+            (point 15.0 5.0) (point 10.0 5.0) (Point.create 0.0<length> 1.0<length>)
+            (Point.create 0.0<length> 1.0<length>) true)
+    Assert.Equal(
+        InsidePoint,
+        ConvexHull.internalPointLoopView
+            (point 15.0 5.0) (point 0.0 5.0) (Point.create 0.0<length> -1.0<length>)
+            (Point.create 0.0<length> -1.0<length>) true)
+    Assert.Equal(
+        TangentPoint,
+        ConvexHull.internalPointLoopView
+            (point 15.0 5.0) (point 10.0 10.0) (Point.create 0.0<length> 1.0<length>)
+            (Point.create -1.0<length> 0.0<length>) false)
+    Assert.Equal(
+        OutsidePoint,
+        ConvexHull.internalPointLoopView
+            (point 15.0 5.0) (point 10.0 5.0) (Point.create 0.0<length> -1.0<length>)
+            (Point.create 0.0<length> -1.0<length>) false)
+
+[<Fact>]
+let ``segment tangent monotonicity handles every segment kind`` () =
+    let line = Line(point 0.0 0.0, point 1.0 0.0)
+    let clockwiseQuadratic = QuadraticBezier(point 0.0 0.0, point 1.0 0.0, point 1.0 1.0)
+    let clockwiseArc =
+        Arc
+            { Start = point 0.0 0.0
+              Radius = point 1.0 1.0
+              XAxisRotation = 0.0<degree>
+              LargeArc = false
+              Sweep = true
+              End = point 1.0 1.0 }
+    Assert.Equal(Ok(), ConvexHull.internalSegmentTangentMonotone line true)
+    Assert.Equal(Ok(), ConvexHull.internalSegmentTangentMonotone clockwiseQuadratic true)
+    Assert.True(Result.isError (ConvexHull.internalSegmentTangentMonotone clockwiseQuadratic false))
+    Assert.Equal(Ok(), ConvexHull.internalSegmentTangentMonotone clockwiseArc true)
+    Assert.True(Result.isError (ConvexHull.internalSegmentTangentMonotone clockwiseArc false))
+
+[<Fact>]
+let ``cubic point tangent roots preserve a repeated root`` () =
+    let segment =
+        CubicBezier(
+            point 0.0 0.0,
+            point (1.0 / 3.0) 0.0,
+            point (2.0 / 3.0) (1.0 / 3.0),
+            point 1.0 1.0)
+    let roots = ConvexHull.internalCubicPointTangentRoots segment (point 0.37 0.1369)
+    Assert.Single roots |> ignore
+    Assert.True(abs (Parameter.ratio (List.head roots) - 0.37) <= 1.0e-9)
+
+[<Fact>]
+let ``cubic chord tangent refinement is geometric and scale independent`` () =
+    let family expected scale =
+        CubicBezier(
+            point 0.0 0.0,
+            point (scale / 3.0) 0.0,
+            point (2.0 * scale / 3.0) (-2.0 * expected * scale / 3.0),
+            point scale ((1.0 - 2.0 * expected) * scale))
+
+    for expected in [ 0.12; 0.37; 0.5; 0.88 ] do
+        for scale in [ 0.000001; 1.0; 1.0e12 ] do
+            let refined =
+                ConvexHull.internalRefineChordTangent
+                    (family expected scale)
+                    (Parameter.fromFloat (expected + 0.05))
+                    (Parameter.fromFloat 0.0)
+            Assert.True(abs (Parameter.ratio refined - expected) <= 1.0e-9)
+
+[<Fact>]
+let ``point chord polygon tangent split preserves outside and inside chains`` () =
+    let outside, inside =
+        ConvexHull.internalPointChordPolygonTangentSubpaths (squareLoop ()) (point 15.0 5.0)
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(point 10.0 0.0, outside.Start)
+    Assert.Equal(point 10.0 10.0, Segment.finish (List.last outside.Segments))
+    Assert.Single(outside.Segments) |> ignore
+    Assert.Equal(point 10.0 10.0, inside.Start)
+    Assert.Equal(point 10.0 0.0, Segment.finish (List.last inside.Segments))
+    Assert.Equal(3, List.length inside.Segments)

@@ -55,34 +55,83 @@ module Encounters =
             && rightWindow.From >= min overlap.RightFrom overlap.RightTo
             && rightWindow.To <= max overlap.RightFrom overlap.RightTo)
 
-    let private insert
-        (tolerance: float<length>)
-        (candidate: SegmentIntersection)
-        (found: SegmentIntersection list) =
-        if found
-           |> List.exists (fun existing ->
-               Point.distance existing.Point candidate.Point <= tolerance) then found
-        else candidate :: found
-
     let private parameterInside value fromValue toValue =
         value >= min fromValue toValue && value <= max fromValue toValue
 
-    let private followsOverlap
-        (left: Segment)
-        (right: Segment)
-        (tolerance: float<length>)
-        (intersection: SegmentIntersection)
-        (overlap: SegmentOverlap) =
-        if not (parameterInside intersection.LeftT overlap.LeftFrom overlap.LeftTo)
-           || not (parameterInside intersection.RightT overlap.RightFrom overlap.RightTo) then false
+    let private segmentParametersAreStalled segment first second tolerance =
+        if first = second then Ok true
         else
-            let mappedRight = Overlaps.segmentOverlapRightParameter overlap intersection.LeftT
-            let mappedLeft = Overlaps.segmentOverlapLeftParameter overlap intersection.RightT
-            match Segment.point right mappedRight, Segment.point left mappedLeft with
-            | Ok rightPoint, Ok leftPoint ->
-                Point.distance rightPoint intersection.Point <= tolerance
-                && Point.distance leftPoint intersection.Point <= tolerance
-            | _ -> false
+            Segment.betweenInside segment (min first second) (max first second)
+            |> Result.bind Segment.length
+            |> Result.map (fun motion -> motion <= tolerance)
+
+    let rec private intersectionFollowsAnOverlap left right tolerance (intersection: SegmentIntersection) (overlaps: SegmentOverlap list) =
+        match overlaps with
+        | [] -> Ok false
+        | overlap :: rest ->
+            if not (parameterInside intersection.LeftT overlap.LeftFrom overlap.LeftTo)
+               || not (parameterInside intersection.RightT overlap.RightFrom overlap.RightTo) then
+                intersectionFollowsAnOverlap left right tolerance intersection rest
+            else
+                let mappedRight = Overlaps.segmentOverlapRightParameter overlap intersection.LeftT
+                let mappedLeft = Overlaps.segmentOverlapLeftParameter overlap intersection.RightT
+                segmentParametersAreStalled left intersection.LeftT mappedLeft tolerance
+                |> Result.bind (fun leftStalled ->
+                    segmentParametersAreStalled right intersection.RightT mappedRight tolerance
+                    |> Result.bind (fun rightStalled ->
+                        if leftStalled && rightStalled then Ok true
+                        else intersectionFollowsAnOverlap left right tolerance intersection rest))
+
+    let private selfIntersectionsThroughLeftOverlap (intersection: SegmentIntersection) (overlap: SegmentOverlap) =
+        [ intersection.LeftT, intersection.RightT; intersection.RightT, intersection.LeftT ]
+        |> List.choose (fun (throughOverlap, remainingLeft) ->
+            if parameterInside throughOverlap overlap.LeftFrom overlap.LeftTo then
+                Some
+                    { Point = intersection.Point
+                      LeftT = remainingLeft
+                      RightT = Overlaps.segmentOverlapRightParameter overlap throughOverlap }
+            else None)
+
+    let private selfIntersectionsThroughRightOverlap (intersection: SegmentIntersection) (overlap: SegmentOverlap) =
+        [ intersection.LeftT, intersection.RightT; intersection.RightT, intersection.LeftT ]
+        |> List.choose (fun (throughOverlap, remainingRight) ->
+            if parameterInside throughOverlap overlap.RightFrom overlap.RightTo then
+                Some
+                    { Point = intersection.Point
+                      LeftT = Overlaps.segmentOverlapLeftParameter overlap throughOverlap
+                      RightT = remainingRight }
+            else None)
+
+    let private overlapOffDiagonalSelfIntersections left right (overlaps: SegmentOverlap list) tolerance =
+        let options =
+            { MinimumArcLengthSeparation = tolerance
+              DistanceTolerance = tolerance }
+        Intersections.segmentSelfWith left options
+        |> Result.bind (fun leftSelf ->
+            Intersections.segmentSelfWith right options
+            |> Result.map (fun rightSelf ->
+                let fromLeft = overlaps |> List.collect (fun overlap -> leftSelf |> List.collect (fun intersection -> selfIntersectionsThroughLeftOverlap intersection overlap))
+                let fromRight = overlaps |> List.collect (fun overlap -> rightSelf |> List.collect (fun intersection -> selfIntersectionsThroughRightOverlap intersection overlap))
+                fromLeft @ fromRight))
+
+    let rec private hasGeometricDuplicate (candidate: SegmentIntersection) (existing: SegmentIntersection list) left right tolerance =
+        match existing with
+        | [] -> Ok false
+        | intersection :: rest ->
+            segmentParametersAreStalled left candidate.LeftT intersection.LeftT tolerance
+            |> Result.bind (fun leftStalled ->
+                segmentParametersAreStalled right candidate.RightT intersection.RightT tolerance
+                |> Result.bind (fun rightStalled ->
+                    if leftStalled && rightStalled then Ok true
+                    else hasGeometricDuplicate candidate rest left right tolerance))
+
+    let private uniqueSegmentIntersections (intersections: SegmentIntersection list) left right tolerance =
+        intersections
+        |> List.fold (fun state intersection ->
+            state
+            |> Result.bind (fun unique ->
+                hasGeometricDuplicate intersection unique left right tolerance
+                |> Result.map (fun duplicate -> if duplicate then unique else intersection :: unique))) (Ok [])
 
     let private pointEncounters
         (left: Segment)
@@ -111,16 +160,20 @@ module Encounters =
                                         { intersection with
                                             LeftT = interpolate leftWindow.From leftWindow.To intersection.LeftT
                                             RightT = interpolate rightWindow.From rightWindow.To intersection.RightT }
-                                    insert options.Tolerance mapped accumulated) found)))
+                                    mapped :: accumulated) found)))
             pairs
             |> List.fold (fun state pair -> state |> Result.bind (fun found -> inspectPair found pair)) (Ok [])
-            |> Result.map (fun (intersections: SegmentIntersection list) ->
-                intersections
-                |> List.filter (fun intersection ->
-                    overlaps
-                    |> List.exists (followsOverlap left right options.Tolerance intersection)
-                    |> not)
-                |> List.sortBy (fun (intersection: SegmentIntersection) -> intersection.LeftT, intersection.RightT))
+            |> Result.bind (fun windowIntersections ->
+                overlapOffDiagonalSelfIntersections left right overlaps options.Tolerance
+                |> Result.bind (fun selfIntersections ->
+                    (windowIntersections @ selfIntersections)
+                    |> List.fold (fun state (intersection: SegmentIntersection) ->
+                        state
+                        |> Result.bind (fun kept ->
+                            intersectionFollowsAnOverlap left right options.Tolerance intersection overlaps
+                            |> Result.map (fun follows -> if follows then kept else intersection :: kept))) (Ok [])
+                    |> Result.bind (fun candidates -> uniqueSegmentIntersections candidates left right options.Tolerance)
+                    |> Result.map (List.sortBy (fun intersection -> intersection.LeftT))))
 
     let segmentWith left right options =
         Intersections.validateOptions options
@@ -171,10 +224,8 @@ module Encounters =
 
     let path left right = pathWith left right Intersections.defaultOptions
 
-    let private segmentLength (tolerance: float<length>) (segmentValue: Segment) =
-        let linearizationTolerance = max 1.0e-12<length> (tolerance / 32.0)
-        Segment.toLinesWith { Tolerance = linearizationTolerance; MaxDepth = 32 } segmentValue
-        |> Result.map (List.sumBy (fun line -> Point.distance (Segment.start line) (Segment.finish line)))
+    let private segmentLength (_tolerance: float<length>) (segmentValue: Segment) =
+        Segment.length segmentValue
 
     let private segmentMotion
         (tolerance: float<length>)

@@ -162,16 +162,15 @@ let ``trimmed path normalization drops empty source subpaths`` () =
 [<Fact>]
 let ``untrimmed band shares recursive subdivision between sides`` () =
     let source =
-        Subpath.ofSegment (CubicBezier(point 0.0 0.0, point 0.0 12.0, point 10.0 -12.0, point 10.0 0.0))
-    let options =
-        { Offset.defaultOptions with
-            Fitting = { Offset.defaultFittingOptions with Tolerance = 0.005<length> } }
-    let result =
-        Offset.subpathBandUntrimmedWith source -1.0<length> 2.0<length> options
+        Subpath.ofSegment (CubicBezier(point 0.0 0.0, point 1.0 0.0, point 1.0 0.0, point 1.0 1.0))
+    let correspondences =
+        Offset.internalSynchronizedOffsetTrace source 0.0<length> -0.27<length> Offset.defaultOptions
         |> Result.defaultWith (fun error -> failwithf "%A" error)
-    Assert.Equal(2, result.Subpaths.Length)
-    Assert.Equal(result.Subpaths[0].Segments.Length, result.Subpaths[1].Segments.Length)
-    Assert.True(result.Subpaths[0].Segments.Length > 1)
+    let paired = correspondences |> List.filter (fun item -> not item.InnerStalled && not item.OuterStalled)
+    let spans leaves =
+        leaves |> List.map (fun leaf -> leaf.SourceSegmentIndex, leaf.PreparedFrom, leaf.PreparedTo, leaf.Generation)
+    Assert.NotEmpty(paired)
+    Assert.All(paired, fun item -> Assert.True(spans item.InnerLeaves = spans item.OuterLeaves))
 
 [<Fact>]
 let ``untrimmed band accepts reversed offset order`` () =

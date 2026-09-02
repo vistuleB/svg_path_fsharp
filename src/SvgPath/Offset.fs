@@ -517,8 +517,8 @@ module Offset =
     let private defaultSamples = 10
     let private defaultTrimmingSamples = 5
     let private defaultMiterLimit = 4.0
-    let private tangentEpsilon = 1.0e-6<length / parameter>
-    let private tangentAgreementEpsilon = 1.0e-6
+    let inline private smallUnitDivisionTolerance<[<Measure>] 'Unit> () : float<'Unit> =
+        LanguagePrimitives.FloatWithMeasure<'Unit> 1.0e-6
     let private pointTolerance = 1.0e-9<length>
     let private pointParameterTolerance = 1.0e-9<parameter>
     let private directionDeterminantTolerance = 1.0e-9
@@ -611,7 +611,7 @@ module Offset =
                 Error(DegenerateTangent t)
             else
                 let sum = Point.add incoming outgoing
-                if Point.norm sum > tangentAgreementEpsilon then
+                if Point.norm sum > smallUnitDivisionTolerance () then
                     match Point.normalize sum with
                     | Some direction -> Ok direction
                     | None -> Error(DegenerateTangent t)
@@ -720,7 +720,7 @@ module Offset =
 
     let private averagedBoundaryTangent leftTangent rightTangent =
         let sum = Point.add leftTangent rightTangent
-        if Point.norm sum > tangentAgreementEpsilon then
+        if Point.norm sum > smallUnitDivisionTolerance () then
             Point.normalize sum |> Option.defaultValue leftTangent
         else
             leftTangent
@@ -1583,7 +1583,9 @@ module Offset =
             | _, Error error -> Error error
 
     let private unitVector t point =
-        Point.normalize point |> Option.map Ok |> Option.defaultValue (Error(DegenerateTangent t))
+        let norm = Point.norm point
+        if norm > smallUnitDivisionTolerance () then Ok(Point.scale (1.0 / norm) point)
+        else Error(DegenerateTangent t)
 
     let private signedAngle a b = Trig.atan2Degrees (Point.cross a b) (Point.dot a b)
 
@@ -1785,7 +1787,7 @@ module Offset =
         match Segment.derivative segment t, Segment.secondDerivative segment t with
         | Ok derivative, Ok second ->
             let speed = Point.norm derivative
-            if speed <= tangentEpsilon then Error(DegenerateTangent t)
+            if speed <= smallUnitDivisionTolerance () then Error(DegenerateTangent t)
             else
                 let tangentChange =
                     Point.subtract
@@ -1897,7 +1899,10 @@ module Offset =
             | SegmentEnd -> 1.0<parameter>, 1.0<parameter> - curvatureParameterTolerance * 2.0
         let directionAt t =
             offsetDerivative source.Segment t offset
-            |> Result.bind (unitVector t)
+            |> Result.bind (fun derivative ->
+                Point.normalize derivative
+                |> Option.map Ok
+                |> Option.defaultValue (Error(DegenerateTangent t)))
         if isReversal && reachesOffsetRadius then
             match directionAt interiorT with
             | Ok direction -> Ok direction
@@ -1911,7 +1916,10 @@ module Offset =
         let oppositeT = if endpoint = SegmentStart then 1.0<parameter> else 0.0<parameter>
         let oppositeDirection =
             offsetDerivative source.Segment oppositeT offset
-            |> Result.bind (unitVector oppositeT)
+            |> Result.bind (fun derivative ->
+                Point.normalize derivative
+                |> Option.map Ok
+                |> Option.defaultValue (Error(DegenerateTangent oppositeT)))
         eJoinFreeEndpointOffsetDirection source offset endpoint isReversal reachesOffsetRadius
         |> Result.map (fun direction ->
             if not isReversal then FitPositionAndDirection direction

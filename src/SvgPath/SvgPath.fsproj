@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Units.fs" />
     <Compile Include="InternalNumber.fs" />
     <Compile Include="Format.fs" />

@@ -205,6 +205,8 @@ type LinearizeOptions =
 
 [<RequireQualifiedAccess>]
 module Segment =
+    let private distanceParameterTolerance = 1.0e-9<parameter>
+
     let defaultLinearizeOptions =
         { Tolerance = 0.01<length>
           MaxDepth = 20 }
@@ -978,7 +980,7 @@ module Segment =
                     elif midpointDistance <= rightDistance then midpointT
                     else rightT)))
 
-    let private derivativeScaleSquared segment =
+    let private derivativeScale segment =
         match segment with
         | Line(startPoint, endPoint) -> Ok(Point.distance startPoint endPoint)
         | QuadraticBezier(startPoint, control, endPoint) ->
@@ -991,7 +993,9 @@ module Segment =
                 abs (Degree.toRadians arc.DeltaAngle |> Radian.toFloat)
                 * max (abs arc.Radius.X) (abs arc.Radius.Y))
             |> Result.mapError (fun _ -> DegenerateArc)
-        |> Result.map (fun scale -> scale * scale)
+
+    let private derivativeScaleSquared segment =
+        derivativeScale segment |> Result.map (fun scale -> scale * scale)
 
     let private tangentialErrorIsImproving segment previousT previousValue proposalT proposalValue =
         derivative segment previousT
@@ -1104,41 +1108,44 @@ module Segment =
                 |> Result.bind (fun roots -> smallestProjection sample segment (0.0<parameter> :: 1.0<parameter> :: List.rev roots))))
 
     let private arcProjectionWith sample segment (options: DistanceOptions) =
-        let close value = abs value <= options.Tolerance * 1.0<length / parameter>
-        let insertNearUnique value candidates =
-            match candidates with
-            | previous :: _ when abs (previous - value) <= options.Tolerance * 1.0<parameter / length> -> candidates
-            | _ -> value :: candidates
+        derivativeScale segment
+        |> Result.bind (fun scale ->
+            let stationaryValueTolerance = options.Tolerance * scale / 1.0<parameter>
+            let close value = abs value <= stationaryValueTolerance
+            let insertNearUnique value candidates =
+                match candidates with
+                | previous :: _ when abs (previous - value) <= distanceParameterTolerance -> candidates
+                | _ -> value :: candidates
 
-        let refineWindow leftT leftValue rightT =
-            refineProjectionWindowByBisection
-                sample segment options.Tolerance leftT leftValue rightT
-                options.MaxIterations options.MaxIterations
-            |> Result.map Some
+            let refineWindow leftT leftValue rightT =
+                refineProjectionWindowByBisection
+                    sample segment options.Tolerance leftT leftValue rightT
+                    options.MaxIterations options.MaxIterations
+                |> Result.map Some
 
-        distanceStationaryValue sample segment 0.0<parameter>
-        |> Result.bind (fun firstValue ->
-            let rec scan
-                index
-                (previousT: float<parameter>)
-                (previousValue: float<length^2 / parameter>)
-                (candidates: float<parameter> list) =
-                if index > options.Samples then Ok candidates
-                else
-                    let nextT = Parameter.fromFloat(float index / float options.Samples)
-                    distanceStationaryValue sample segment nextT
-                    |> Result.bind (fun nextValue ->
-                        let candidate =
-                            if close previousValue then Ok(Some previousT)
-                            elif close nextValue then Ok(Some nextT)
-                            elif sameSign previousValue nextValue then Ok None
-                            else refineWindow previousT previousValue nextT
-                        candidate
-                        |> Result.bind (fun candidate ->
-                            let candidates = match candidate with Some t -> insertNearUnique t candidates | None -> candidates
-                            scan (index + 1) nextT nextValue candidates))
-            scan 1 0.0<parameter> firstValue [ 1.0<parameter>; 0.0<parameter> ]
-            |> Result.bind (smallestProjection sample segment))
+            distanceStationaryValue sample segment 0.0<parameter>
+            |> Result.bind (fun firstValue ->
+                let rec scan
+                    index
+                    (previousT: float<parameter>)
+                    (previousValue: float<length^2 / parameter>)
+                    (candidates: float<parameter> list) =
+                    if index > options.Samples then Ok candidates
+                    else
+                        let nextT = Parameter.fromFloat(float index / float options.Samples)
+                        distanceStationaryValue sample segment nextT
+                        |> Result.bind (fun nextValue ->
+                            let candidate =
+                                if close previousValue then Ok(Some previousT)
+                                elif close nextValue then Ok(Some nextT)
+                                elif sameSign previousValue nextValue then Ok None
+                                else refineWindow previousT previousValue nextT
+                            candidate
+                            |> Result.bind (fun candidate ->
+                                let candidates = match candidate with Some t -> insertNearUnique t candidates | None -> candidates
+                                scan (index + 1) nextT nextValue candidates))
+                scan 1 0.0<parameter> firstValue [ 1.0<parameter>; 0.0<parameter> ]
+                |> Result.bind (smallestProjection sample segment)))
 
     let projectionWith target sample (options: DistanceOptions) =
         validateDistanceOptions options

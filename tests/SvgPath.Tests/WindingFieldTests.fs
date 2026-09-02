@@ -17,6 +17,75 @@ let ``clockwise SVG polygon has positive winding`` () =
     Assert.Equal(Ok BoundaryWinding, WindingField.pathWinding (point 2.0 1.0) path)
 
 [<Fact>]
+let ``subpath containment implicitly closes an open subpath`` () =
+    let subpath =
+        Subpath.create
+            [ Line(point 0.0 0.0, point 2.0 0.0)
+              Line(point 2.0 0.0, point 2.0 2.0)
+              Line(point 2.0 2.0, point 0.0 2.0) ]
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(Ok Inside, WindingField.subpathContainment (point 1.0 1.0) subpath Nonzero)
+    Assert.Equal(Ok Outside, WindingField.subpathContainment (point 3.0 1.0) subpath Nonzero)
+    Assert.Equal(Ok Boundary, WindingField.subpathContainment (point 0.0 1.0) subpath Nonzero)
+
+[<Fact>]
+let ``subpath containment supports both fill rules`` () =
+    let twice =
+        Subpath.create
+            [ Line(point 0.0 0.0, point 2.0 0.0)
+              Line(point 2.0 0.0, point 2.0 2.0)
+              Line(point 2.0 2.0, point 0.0 2.0)
+              Line(point 0.0 2.0, point 0.0 0.0)
+              Line(point 0.0 0.0, point 2.0 0.0)
+              Line(point 2.0 0.0, point 2.0 2.0)
+              Line(point 2.0 2.0, point 0.0 2.0)
+              Line(point 0.0 2.0, point 0.0 0.0) ]
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(Ok Inside, WindingField.subpathContainment (point 1.0 1.0) twice Nonzero)
+    Assert.Equal(Ok Outside, WindingField.subpathContainment (point 1.0 1.0) twice EvenOdd)
+
+[<Fact>]
+let ``subpath containment handles a ray through a vertex`` () =
+    let triangle = polygon [ point 0.0 0.0; point 10.0 5.0; point 0.0 10.0 ]
+    Assert.Equal(Ok Inside, WindingField.subpathContainment (point 2.0 5.0) triangle Nonzero)
+    Assert.Equal(Ok Outside, WindingField.subpathContainment (point 12.0 5.0) triangle Nonzero)
+
+[<Fact>]
+let ``subpath containment handles curved boundaries`` () =
+    let curve = QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
+    let subpath = Subpath.create [ curve ] |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(Ok Boundary, WindingField.subpathContainment (point 10.0 10.0) subpath Nonzero)
+    Assert.Equal(Ok Inside, WindingField.subpathContainment (point 10.0 5.0) subpath Nonzero)
+
+[<Fact>]
+let ``subpath containment honors boundary tolerance`` () =
+    let square = polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
+    let options = { WindingField.defaultOptions with Tolerance = 0.001<length> }
+    Assert.Equal(
+        Ok Boundary,
+        WindingField.subpathContainmentWith (point -0.0005 5.0) square Nonzero options)
+
+[<Fact>]
+let ``move-only subpath is outside after option validation`` () =
+    let empty = Subpath.empty (point 5.0 5.0)
+    Assert.Equal(Ok Outside, WindingField.subpathContainment (point 5.0 5.0) empty Nonzero)
+    let invalid = { WindingField.defaultOptions with Samples = 0 }
+    Assert.Equal(
+        Error(InvalidContainmentSamples 0),
+        WindingField.subpathContainmentWith (point 5.0 5.0) empty Nonzero invalid)
+
+[<Fact>]
+let ``path containment combines winding and parity once per subpath`` () =
+    let outer = polygon [ point 0.0 0.0; point 20.0 0.0; point 20.0 20.0; point 0.0 20.0 ]
+    let same = polygon [ point 5.0 5.0; point 15.0 5.0; point 15.0 15.0; point 5.0 15.0 ]
+    let opposite = polygon [ point 5.0 5.0; point 5.0 15.0; point 15.0 15.0; point 15.0 5.0 ]
+    let center = point 10.0 10.0
+    Assert.Equal(Ok Inside, WindingField.pathContainment center (Path.ofSubpaths [ outer; same ]) Nonzero)
+    Assert.Equal(Ok Outside, WindingField.pathContainment center (Path.ofSubpaths [ outer; same ]) EvenOdd)
+    Assert.Equal(Ok Outside, WindingField.pathContainment center (Path.ofSubpaths [ outer; opposite ]) Nonzero)
+    Assert.Equal(Ok Outside, WindingField.pathContainment center (Path.ofSubpaths [ outer; opposite ]) EvenOdd)
+
+[<Fact>]
 let ``path winding accumulates oriented subpaths`` () =
     let outer = polygon [ point 0.0 0.0; point 4.0 0.0; point 4.0 4.0; point 0.0 4.0 ]
     let inner = polygon [ point 1.0 1.0; point 1.0 3.0; point 3.0 3.0; point 3.0 1.0 ]

@@ -16,6 +16,10 @@ type PathWinding =
     | Winding of int
     | BoundaryWinding
 
+type private ContainmentCalculation =
+    | CalculatedBoundary
+    | CalculatedWinding of winding: int * crossings: int
+
 [<RequireQualifiedAccess>]
 module WindingField =
     let defaultOptions =
@@ -48,53 +52,202 @@ module WindingField =
         if length = 0.0<length> then Point.distance point startPoint
         else abs (Point.cross chord (Point.displacement startPoint point)) / length
 
-    let private subpathBoundaryDistance (point: Point<length>) (subpath: Subpath) =
+    let private subpathBoundaryProjection
+        (point: Point<length>)
+        (subpath: Subpath)
+        (options: ContainmentOptions) =
         let segments = Subpath.segments subpath
-        let segmentDistance segment = Segment.distance segment point
         segments
-        |> List.fold (fun state segment ->
+        |> List.indexed
+        |> List.fold (fun state (index, segment) ->
             state
-            |> Result.bind (fun best -> segmentDistance segment |> Result.map (min best)))
-            (Ok(Length.fromFloat System.Double.PositiveInfinity))
-        |> Result.map (fun best ->
-            match segments with
-            | [] -> best
-            | _ -> min best (pointToLineDistance point (Subpath.finish subpath) (Subpath.start subpath)))
+            |> Result.bind (fun best ->
+                Segment.projectionWith segment point
+                    { Samples = options.Samples
+                      Tolerance = options.Tolerance
+                      MaxIterations = options.MaxIterations }
+                |> Result.map (fun (t, _, distance) ->
+                    match best with
+                    | None -> Some(distance, index, t)
+                    | Some(bestDistance, _, _) when distance < bestDistance -> Some(distance, index, t)
+                    | _ -> best))) (Ok None)
+
+    [<Struct>]
+    type private ContainmentRay =
+        { Angle: float<degree>
+          Direction: Point<1> }
+
+    let private rayForAngle angle =
+        { Angle = angle
+          Direction = Point.create (Trig.cosDegrees angle) (Trig.sinDegrees angle) }
+
+    let private projectionRay subpath projection =
+        let fallback = rayForAngle 0.0<degree>
+        match projection with
+        | None -> fallback
+        | Some(_, index, t) ->
+            match Subpath.segments subpath |> List.tryItem index with
+            | None -> fallback
+            | Some segment ->
+                match Segment.directions segment t with
+                | Error _ -> fallback
+                | Ok directions ->
+                    let direction =
+                        match directions.Incoming, directions.Outgoing with
+                        | Some incoming, Some outgoing -> Some(Point.add incoming outgoing)
+                        | Some direction, None
+                        | None, Some direction -> Some direction
+                        | None, None -> None
+                    match direction with
+                    | Some direction when abs direction.X >= abs direction.Y -> rayForAngle 90.0<degree>
+                    | Some _ -> fallback
+                    | None -> fallback
+
+    let private oppositeRay ray =
+        { Angle = ray.Angle + 180.0<degree>
+          Direction = Point.scale -1.0 ray.Direction }
+
+    let private crossingValue point candidate ray =
+        Point.cross ray.Direction (Point.displacement point candidate)
 
     // A positive crossing follows SVG's visual clockwise-positive convention.
-    let private lineWinding
+    let private lineWindingContribution
         (point: Point<length>)
         (startPoint: Point<length>)
-        (endPoint: Point<length>) =
-        let upward = startPoint.Y <= point.Y && endPoint.Y > point.Y
-        let downward = endPoint.Y <= point.Y && startPoint.Y > point.Y
-        if not upward && not downward then 0, 0
+        (endPoint: Point<length>)
+        ray =
+        let startY = crossingValue point startPoint ray
+        let endY = crossingValue point endPoint ray
+        let side = Point.cross (Point.displacement startPoint endPoint) (Point.displacement startPoint point)
+        if startY <= 0.0<length> then
+            if endY > 0.0<length> && side > 0.0<length^2> then 1 else 0
+        else if endY <= 0.0<length> && side < 0.0<length^2> then -1
+        else 0
+
+    let private crossingTransition before after =
+        if before <= 0.0<length> && after > 0.0<length> then 1
+        elif before > 0.0<length> && after <= 0.0<length> then -1
+        else 0
+
+    let private curvedCrossingContribution point segment ray t rayT =
+        if rayT <= 0.0<length> then Ok 0
         else
-            let side = Point.cross (Point.displacement startPoint endPoint) (Point.displacement startPoint point)
-            if upward && side > 0.0<length^2> then 1, 1
-            elif downward && side < 0.0<length^2> then -1, 1
-            else 0, 0
+            let t = max 0.0<parameter> (min 1.0<parameter> t)
+            let rec probe width =
+                Segment.point segment (max 0.0<parameter> (t - width))
+                |> Result.bind (fun before ->
+                    Segment.point segment (min 1.0<parameter> (t + width))
+                    |> Result.bind (fun after ->
+                        let contribution = crossingTransition (crossingValue point before ray) (crossingValue point after ray)
+                        if contribution <> 0 || width >= 0.001<parameter> then Ok contribution
+                        else probe (width * 10.0)))
+            probe 1.0e-7<parameter>
+
+    let private segmentBidirectionalContribution point segment ray (options: ContainmentOptions) =
+        match segment with
+        | Line(startPoint, endPoint) ->
+            Ok(lineWindingContribution point startPoint endPoint ray,
+               lineWindingContribution point startPoint endPoint (oppositeRay ray))
+        | _ ->
+            let crossingOptions: CrossingOptions =
+                { Samples = options.Samples
+                  SignedLineDistanceTolerance = options.Tolerance
+                  MaxIterations = options.MaxIterations }
+            Segment.rayCrossingsWith segment point ray.Direction crossingOptions
+            |> Result.bind (fun crossings ->
+                crossings
+                |> List.fold (fun state (t, rayT) ->
+                    state
+                    |> Result.bind (fun (forward, backward) ->
+                        if t < 0.0<parameter> || t > 1.0<parameter> then Ok(forward, backward)
+                        elif rayT > 0.0<length> then
+                            curvedCrossingContribution point segment ray t rayT
+                            |> Result.map (fun contribution -> forward + contribution, backward)
+                        elif rayT < 0.0<length> then
+                            curvedCrossingContribution point segment (oppositeRay ray) t (-rayT)
+                            |> Result.map (fun contribution -> forward, backward + contribution)
+                        else Ok(forward, backward))) (Ok(0, 0)))
+
+    let private crossingCount contribution = if contribution = 0 then 0 else 1
+
+    let private bidirectionalSubpathWinding point subpath ray options =
+        Subpath.segments subpath
+        |> List.fold (fun state segment ->
+            state
+            |> Result.bind (fun (forwardWinding, forwardCrossings, backwardWinding, backwardCrossings) ->
+                segmentBidirectionalContribution point segment ray options
+                |> Result.map (fun (forward, backward) ->
+                    forwardWinding + forward,
+                    forwardCrossings + crossingCount forward,
+                    backwardWinding + backward,
+                    backwardCrossings + crossingCount backward))) (Ok(0, 0, 0, 0))
+        |> Result.map (fun (forwardWinding, forwardCrossings, backwardWinding, backwardCrossings) ->
+            let forwardClosing =
+                lineWindingContribution point (Subpath.finish subpath) (Subpath.start subpath) ray
+            let backwardClosing =
+                lineWindingContribution point (Subpath.finish subpath) (Subpath.start subpath) (oppositeRay ray)
+            forwardWinding + forwardClosing,
+            forwardCrossings + crossingCount forwardClosing,
+            backwardWinding + backwardClosing,
+            backwardCrossings + crossingCount backwardClosing)
 
     let private subpathWinding
         (point: Point<length>)
         (options: ContainmentOptions)
-        (subpath: Subpath) =
+        (subpath: Subpath)
+        initialRay =
         match Subpath.segments subpath with
         | [] -> Ok(0, 0)
         | _ ->
-            let linearizeOptions: LinearizeOptions =
-                { Tolerance = max 1.0e-10<length> (options.Tolerance / 4.0)
-                  MaxDepth = options.MaxIterations }
-            Subpath.toLinesWith linearizeOptions subpath
-            |> Result.map (fun linearized ->
-                let winding, crossings =
-                    Subpath.segments linearized
-                    |> List.fold (fun (winding, crossings) segment ->
-                        let nextWinding, nextCrossings = lineWinding point (Segment.start segment) (Segment.finish segment)
-                        winding + nextWinding, crossings + nextCrossings) (0, 0)
-                let closingWinding, closingCrossings =
-                    lineWinding point (Subpath.finish subpath) (Subpath.start subpath)
-                winding + closingWinding, crossings + closingCrossings)
+            let rays = initialRay :: (options.FallbackRayAngles |> List.map rayForAngle)
+            let rec tryRays remaining =
+                match remaining with
+                | [] -> Error InconsistentContainment
+                | ray :: rest ->
+                    bidirectionalSubpathWinding point subpath ray options
+                    |> Result.bind (fun (forwardWinding, forwardCrossings, backwardWinding, backwardCrossings) ->
+                        if forwardWinding = backwardWinding
+                           && forwardCrossings % 2 = backwardCrossings % 2 then
+                            Ok(forwardWinding, forwardCrossings)
+                        else tryRays rest)
+            tryRays rays
+
+    let private subpathContainmentCalculation point subpath options =
+        match Subpath.segments subpath with
+        | [] -> Ok(CalculatedWinding(0, 0))
+        | _ ->
+            subpathBoundaryProjection point subpath options
+            |> Result.bind (fun projection ->
+                let segmentDistance =
+                    projection
+                    |> Option.map (fun (distance, _, _) -> distance)
+                    |> Option.defaultValue (Length.fromFloat System.Double.PositiveInfinity)
+                let closingDistance =
+                    pointToLineDistance point (Subpath.finish subpath) (Subpath.start subpath)
+                if min segmentDistance closingDistance <= options.Tolerance then
+                    Ok CalculatedBoundary
+                else
+                    subpathWinding point options subpath (projectionRay subpath projection)
+                    |> Result.map (fun (winding, crossings) -> CalculatedWinding(winding, crossings)))
+
+    let private containmentFromWinding winding crossings fillRule =
+        match fillRule with
+        | Nonzero -> if winding = 0 then Outside else Inside
+        | EvenOdd -> if crossings % 2 = 0 then Outside else Inside
+
+    let private containmentFromCalculation calculation fillRule =
+        match calculation with
+        | CalculatedBoundary -> Boundary
+        | CalculatedWinding(winding, crossings) -> containmentFromWinding winding crossings fillRule
+
+    let subpathContainmentWith point subpath fillRule options =
+        validateOptions options
+        |> Result.bind (fun () ->
+            subpathContainmentCalculation point subpath options
+            |> Result.map (fun calculation -> containmentFromCalculation calculation fillRule))
+
+    let subpathContainment point subpath fillRule =
+        subpathContainmentWith point subpath fillRule defaultOptions
 
     let pathWindingWith (point: Point<length>) (path: Path) (options: ContainmentOptions) =
         validateOptions options
@@ -105,10 +258,10 @@ module WindingField =
                 |> Result.bind (function
                     | BoundaryWinding -> Ok BoundaryWinding
                     | Winding winding ->
-                        subpathBoundaryDistance point subpath
-                        |> Result.bind (fun boundaryDistance ->
-                            if boundaryDistance <= options.Tolerance then Ok BoundaryWinding
-                            else subpathWinding point options subpath |> Result.map (fun (next, _) -> Winding(winding + next))))) (Ok(Winding 0)))
+                        subpathContainmentCalculation point subpath options
+                        |> Result.map (function
+                            | CalculatedBoundary -> BoundaryWinding
+                            | CalculatedWinding(next, _) -> Winding(winding + next)))) (Ok(Winding 0)))
 
     let pathWinding point path = pathWindingWith point path defaultOptions
 
@@ -119,18 +272,19 @@ module WindingField =
         (options: ContainmentOptions) =
         validateOptions options
         |> Result.bind (fun () ->
-            pathWindingWith point path options
-            |> Result.bind (function
-                | BoundaryWinding -> Ok Boundary
-                | Winding winding ->
-                    match fillRule with
-                    | Nonzero -> Ok(if winding = 0 then Outside else Inside)
-                    | EvenOdd ->
-                        Path.subpaths path
-                        |> List.fold (fun state subpath ->
-                            state
-                            |> Result.bind (fun crossings -> subpathWinding point options subpath |> Result.map (fun (_, next) -> crossings + next))) (Ok 0)
-                        |> Result.map (fun crossings -> if crossings % 2 = 0 then Outside else Inside)))
+            Path.subpaths path
+            |> List.fold (fun state subpath ->
+                state
+                |> Result.bind (function
+                    | CalculatedBoundary -> Ok CalculatedBoundary
+                    | CalculatedWinding(winding, crossings) ->
+                        subpathContainmentCalculation point subpath options
+                        |> Result.map (function
+                            | CalculatedBoundary -> CalculatedBoundary
+                            | CalculatedWinding(nextWinding, nextCrossings) ->
+                                CalculatedWinding(winding + nextWinding, crossings + nextCrossings))))
+                (Ok(CalculatedWinding(0, 0)))
+            |> Result.map (fun calculation -> containmentFromCalculation calculation fillRule))
 
     let pathContainment point path fillRule = pathContainmentWith point path fillRule defaultOptions
 

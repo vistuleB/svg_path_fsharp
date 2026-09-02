@@ -17,7 +17,7 @@ type FailureMode =
 [<Struct>]
 type RoundCornerOptions =
     { Failure: FailureMode
-      Linearization: LinearizeOptions
+      Length: LengthOptions
       DistanceTolerance: float<length>
       AngularTolerance: float<degree> }
 
@@ -41,7 +41,7 @@ module Effects =
 
     let defaultRoundCornerOptions =
         { Failure = ErrorOnFailure
-          Linearization = Segment.defaultLinearizeOptions
+          Length = Segment.defaultLengthOptions
           DistanceTolerance = 1.0e-6<length>
           AngularTolerance = 1.0e-6<degree> }
 
@@ -71,40 +71,6 @@ module Effects =
 
     let stretchToJoinEndpointPolicy () = Custom stretchToJoin
 
-    let private segmentLength options segment =
-        Segment.toLinesWith options segment
-        |> Result.map (List.sumBy Segment.chordLength)
-
-    let private parameterAtLength
-        (options: LinearizeOptions)
-        (segment: Segment)
-        (target: float<length>)
-        (total: float<length>) =
-        if target <= 0.0<length> then Ok 0.0<parameter>
-        elif target >= total then Ok 1.0<parameter>
-        else
-            let rec loop (low: float<parameter>) (high: float<parameter>) iterations =
-                if iterations = 0 then Ok((low + high) / 2.0)
-                else
-                    let middle = (low + high) / 2.0
-                    Segment.betweenInside segment 0.0<parameter> middle
-                    |> Result.bind (segmentLength options)
-                    |> Result.bind (fun measured ->
-                        if abs (measured - target) <= options.Tolerance then Ok middle
-                        elif measured < target then loop middle high (iterations - 1)
-                        else loop low middle (iterations - 1))
-            loop 0.0<parameter> 1.0<parameter> options.MaxDepth
-
-    let private pointAtLength (options: LinearizeOptions) (info: SegmentInfo) distance =
-        parameterAtLength options info.Segment distance info.Length
-        |> Result.bind (Segment.point info.Segment)
-
-    let private betweenLengths (options: LinearizeOptions) (info: SegmentInfo) fromDistance toDistance =
-        parameterAtLength options info.Segment fromDistance info.Length
-        |> Result.bind (fun fromT ->
-            parameterAtLength options info.Segment toDistance info.Length
-            |> Result.bind (fun toT -> Segment.betweenInside info.Segment fromT toT))
-
     let private validate radius options =
         if radius <= 0.0<length> || not (System.Double.IsFinite(float radius)) then Error(InvalidRadius radius)
         elif options.DistanceTolerance <= 0.0<length>
@@ -113,12 +79,7 @@ module Effects =
         elif options.AngularTolerance < 0.0<degree>
              || not (System.Double.IsFinite(float options.AngularTolerance)) then
             Error(InvalidAngularTolerance options.AngularTolerance)
-        elif options.Linearization.Tolerance <= 0.0<length>
-             || not (System.Double.IsFinite(float options.Linearization.Tolerance)) then
-            Error(EffectsPathError(InvalidLinearizeTolerance options.Linearization.Tolerance))
-        elif options.Linearization.MaxDepth <= 0 then
-            Error(EffectsPathError(InvalidLinearizeMaxDepth options.Linearization.MaxDepth))
-        else Ok()
+        else Segment.validateLengthOptions options.Length |> Result.mapError EffectsPathError
 
     let private infos (options: RoundCornerOptions) (segments: Segment list) =
         segments
@@ -126,7 +87,7 @@ module Effects =
         |> List.fold (fun state (index, segment) ->
             state
             |> Result.bind (fun accumulated ->
-                segmentLength options.Linearization segment
+                Segment.lengthWith segment options.Length
                 |> Result.mapError EffectsPathError
                 |> Result.map (fun length -> { Index = index; Segment = segment; Length = length } :: accumulated))) (Ok [])
         |> Result.map List.rev
@@ -228,10 +189,10 @@ module Effects =
                 else
                     let incoming = infos[spec.Index]
                     let outgoing = infos[(spec.Index + 1) % infos.Length]
-                    pointAtLength options.Linearization incoming (incoming.Length - trim)
+                    Segment.pointAtLengthWith incoming.Segment (incoming.Length - trim) options.Length
                     |> Result.mapError EffectsPathError
                     |> Result.bind (fun incomingCut ->
-                        pointAtLength options.Linearization outgoing trim
+                        Segment.pointAtLengthWith outgoing.Segment trim options.Length
                         |> Result.mapError EffectsPathError
                         |> Result.map (fun outgoingCut ->
                             let sweep = Point.cross spec.IncomingTangent spec.OutgoingTangent >= 0.0
@@ -280,7 +241,7 @@ module Effects =
                 let endTrim = after |> Option.map _.Trim |> Option.defaultValue 0.0<length>
                 if startTrim + endTrim >= info.Length - options.DistanceTolerance then Error(CornerTrimsOverlap info.Index)
                 else
-                    betweenLengths options.Linearization info startTrim (info.Length - endTrim)
+                    Segment.betweenLengthsWith info.Segment startTrim (info.Length - endTrim) options.Length
                     |> Result.mapError EffectsPathError
                     |> Result.map (fun shortened ->
                         let next = shortened :: (after |> Option.map (fun corner -> [ corner.Arc ]) |> Option.defaultValue [])

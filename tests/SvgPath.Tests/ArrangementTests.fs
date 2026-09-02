@@ -81,6 +81,21 @@ module ArrangementTests =
             Assert.Equal(2, build.SegmentImages[0].Edges.Length)
 
     [<Fact>]
+    let ``progressive endpoint cuts are independent of insertion order`` () =
+        let vertical = line 1.0 2.0 1.0 0.0
+        let left = line 0.0 1.0 (1.0 - 0.4e-9) 1.0
+        let right = line (1.0 + 0.4e-9) 1.0 2.0 1.0
+        let build segments =
+            Arrangement.buildWith segments 1.0e-9<length> 1.0e-12<length> 0.0<parameter>
+            |> Result.defaultWith (failwithf "%A")
+        let first = build [ vertical; left; right ]
+        let second = build [ left; right; vertical ]
+        Assert.Equal(first.Graph.Vertices.Length, second.Graph.Vertices.Length)
+        Assert.Equal(first.Graph.Edges.Length, second.Graph.Edges.Length)
+        Assert.Equal(5, first.Graph.Vertices.Length)
+        Assert.Equal(4, first.Graph.Edges.Length)
+
+    [<Fact>]
     let ``build nodes partial overlap boundaries`` () =
         match Arrangement.buildWith [ line 0.0 0.0 3.0 0.0; line 1.0 0.0 2.0 0.0 ] 1.0e-8<length> 1.0e-10<length> 0.0<parameter> with
         | Error error -> failwithf "%A" error

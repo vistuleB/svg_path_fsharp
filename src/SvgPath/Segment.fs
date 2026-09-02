@@ -960,6 +960,106 @@ module Segment =
         | MaxIterationsReached(estimate, value) -> DistanceMaxIterationsReached(estimate, value)
         | NotBracketed _ -> DistanceRootIsolationFailed
 
+    let private sameSign a b =
+        (a < 0.0<_> && b < 0.0<_>) || (a > 0.0<_> && b > 0.0<_>)
+
+    let private bestDistanceParameter sample segment (leftT: float<parameter>) (rightT: float<parameter>) =
+        let midpointT = leftT + (rightT - leftT) / 2.0
+        point segment leftT
+        |> Result.bind (fun left ->
+            point segment midpointT
+            |> Result.bind (fun midpoint ->
+                point segment rightT
+                |> Result.map (fun right ->
+                    let leftDistance = Point.squaredDistance sample left
+                    let midpointDistance = Point.squaredDistance sample midpoint
+                    let rightDistance = Point.squaredDistance sample right
+                    if leftDistance <= midpointDistance && leftDistance <= rightDistance then leftT
+                    elif midpointDistance <= rightDistance then midpointT
+                    else rightT)))
+
+    let private derivativeScaleSquared segment =
+        match segment with
+        | Line(startPoint, endPoint) -> Ok(Point.distance startPoint endPoint)
+        | QuadraticBezier(startPoint, control, endPoint) ->
+            Ok(2.0 * max (Point.distance startPoint control) (Point.distance control endPoint))
+        | CubicBezier(startPoint, control1, control2, endPoint) ->
+            Ok(3.0 * max (Point.distance startPoint control1) (max (Point.distance control1 control2) (Point.distance control2 endPoint)))
+        | Arc endpoint ->
+            Ellipse.endpointToCenter endpoint
+            |> Result.map (fun arc ->
+                abs (Degree.toRadians arc.DeltaAngle |> Radian.toFloat)
+                * max (abs arc.Radius.X) (abs arc.Radius.Y))
+            |> Result.mapError (fun _ -> DegenerateArc)
+        |> Result.map (fun scale -> scale * scale)
+
+    let private tangentialErrorIsImproving segment previousT previousValue proposalT proposalValue =
+        derivative segment previousT
+        |> Result.bind (fun previousDerivative ->
+            derivative segment proposalT
+            |> Result.bind (fun proposalDerivative ->
+                derivativeScaleSquared segment
+                |> Result.map (fun derivativeScaleSquared ->
+                    let previousSpeedSquared = Point.dot previousDerivative previousDerivative
+                    let proposalSpeedSquared = Point.dot proposalDerivative proposalDerivative
+                    let reliableSpeedSquared = derivativeScaleSquared * 1.0e-10<1/parameter^2>
+                    previousSpeedSquared >= reliableSpeedSquared
+                    && proposalSpeedSquared >= reliableSpeedSquared
+                    && proposalValue * proposalValue * previousSpeedSquared
+                       < previousValue * previousValue * proposalSpeedSquared)))
+
+    let rec private polishProjectionWindowByBisection sample segment (leftT: float<parameter>) leftValue (rightT: float<parameter>) (estimate: float<parameter>) estimateValue remaining =
+        if remaining <= 0 || estimateValue = 0.0<_> then Ok estimate
+        else
+            let midpointT = leftT + (rightT - leftT) / 2.0
+            distanceStationaryValue sample segment midpointT
+            |> Result.bind (fun midpointValue ->
+                let nextLeft, nextLeftValue, nextRight =
+                    if sameSign leftValue midpointValue then midpointT, midpointValue, rightT
+                    else leftT, leftValue, midpointT
+                bestDistanceParameter sample segment nextLeft nextRight
+                |> Result.bind (fun proposal ->
+                    distanceStationaryValue sample segment proposal
+                    |> Result.bind (fun proposalValue ->
+                        tangentialErrorIsImproving segment estimate estimateValue proposal proposalValue
+                        |> Result.bind (fun progressing ->
+                            if proposal = estimate || not progressing then Ok estimate
+                            else polishProjectionWindowByBisection sample segment nextLeft nextLeftValue nextRight proposal proposalValue (remaining - 1)))))
+
+    let rec private refineProjectionWindowByBisection sample segment tolerance (leftT: float<parameter>) leftValue (rightT: float<parameter>) remainingIterations polishIterations =
+        betweenInside segment leftT rightT
+        |> Result.bind boundingBox
+        |> Result.bind (fun box ->
+            if BoundingBox.diameter box <= tolerance then
+                bestDistanceParameter sample segment leftT rightT
+                |> Result.bind (fun estimate ->
+                    distanceStationaryValue sample segment estimate
+                    |> Result.bind (fun estimateValue ->
+                        polishProjectionWindowByBisection sample segment leftT leftValue rightT estimate estimateValue polishIterations))
+            else
+                let midpointT = leftT + (rightT - leftT) / 2.0
+                distanceStationaryValue sample segment midpointT
+                |> Result.bind (fun midpointValue ->
+                    if remainingIterations <= 1 then Error(DistanceMaxIterationsReached(midpointT, midpointValue))
+                    elif midpointValue = 0.0<_> then Ok midpointT
+                    elif sameSign leftValue midpointValue then
+                        refineProjectionWindowByBisection sample segment tolerance midpointT midpointValue rightT (remainingIterations - 1) polishIterations
+                    else
+                        refineProjectionWindowByBisection sample segment tolerance leftT leftValue midpointT (remainingIterations - 1) polishIterations))
+
+    let private refineIsolatedDistanceRootByBisection sample segment (options: DistanceOptions) (isolation: RootIsolation) =
+        if isolation.Lower = isolation.Upper then Ok isolation.Estimate
+        else
+            distanceStationaryValue sample segment isolation.Lower
+            |> Result.bind (fun lowerValue ->
+                distanceStationaryValue sample segment isolation.Upper
+                |> Result.bind (fun upperValue ->
+                    if sameSign lowerValue upperValue then Ok isolation.Estimate
+                    else
+                        refineProjectionWindowByBisection
+                            sample segment options.Tolerance isolation.Lower lowerValue isolation.Upper
+                            options.MaxIterations options.MaxIterations))
+
     let private bezierDistancePolynomial sample segment : Result<float<length^2 / parameter> list, SegmentError> =
         let coefficient value = LanguagePrimitives.FloatWithMeasure<length^2 / parameter> value
         match segment with
@@ -996,8 +1096,12 @@ module Segment =
             |> Result.mapError distanceRootError
             |> Result.bind (fun roots ->
                 roots
-                |> List.map (fun isolation -> isolation.Estimate)
-                |> fun roots -> smallestProjection sample segment (0.0<parameter> :: 1.0<parameter> :: roots)))
+                |> List.fold (fun state isolation ->
+                    state
+                    |> Result.bind (fun refined ->
+                        refineIsolatedDistanceRootByBisection sample segment options isolation
+                        |> Result.map (fun root -> root :: refined))) (Ok [])
+                |> Result.bind (fun roots -> smallestProjection sample segment (0.0<parameter> :: 1.0<parameter> :: List.rev roots))))
 
     let private arcProjectionWith sample segment (options: DistanceOptions) =
         let close value = abs value <= options.Tolerance * 1.0<length / parameter>

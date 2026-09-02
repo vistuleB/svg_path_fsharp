@@ -523,7 +523,6 @@ module Offset =
     // is dimensionless rather than a derivative magnitude.
     let private tangentAgreementEpsilon = 1.0e-6
     let private pointTolerance = 1.0e-9<length>
-    // Gleam's unmeasured `point_tolerance` is also used in parameter space.
     let private pointParameterTolerance = 1.0e-9<parameter>
     let private arrangementTolerance = 2.0e-9<length>
     let private submergedSideSamplingDistance = 5.0e-8<length>

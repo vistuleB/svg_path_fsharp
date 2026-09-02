@@ -52,21 +52,8 @@ module Point =
 
     /// Uses hypot rather than sqrt(x*x + y*y) to avoid intermediate overflow.
     let norm (point: Point<'Unit>) : float<'Unit> =
-        let absoluteX = abs (float point.X)
-        let absoluteY = abs (float point.Y)
-        let larger = max absoluteX absoluteY
-        let smaller = min absoluteX absoluteY
-
-        let magnitude =
-            if System.Double.IsInfinity larger then
-                infinity
-            elif larger = 0.0 then
-                0.0
-            else
-                let ratio = smaller / larger
-                larger * sqrt (1.0 + ratio * ratio)
-
-        LanguagePrimitives.FloatWithMeasure<'Unit> magnitude
+        InternalNumber.hypot (float point.X) (float point.Y)
+        |> LanguagePrimitives.FloatWithMeasure<'Unit>
 
     let normalize (point: Point<'Unit>) : Point<1> option =
         let magnitude = norm point

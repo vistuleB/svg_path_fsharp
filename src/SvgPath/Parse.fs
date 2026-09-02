@@ -84,9 +84,7 @@ module Parse =
             input.Substring(start, index - start), index
 
     let private parseNumber (raw: string) =
-        match Double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture) with
-        | true, value when Double.IsFinite value -> Ok value
-        | _ -> Error(InvalidNumber raw)
+        InternalNumber.parse raw |> Result.mapError (fun () -> InvalidNumber raw)
 
     let private tokenize (input: string) =
         let rec loop index reversed arcArgumentPosition =

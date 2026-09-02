@@ -28,18 +28,18 @@ let ``similar fit rejects reflection while affine fit accepts it`` () =
 let ``segment congruency requires matching constructors`` () =
     let line = Line(point 0.0 0.0, point 2.0 0.0)
     let quadratic = QuadraticBezier(point 0.0 0.0, point 1.0 0.0, point 2.0 0.0)
-    Assert.Equal(Error(), Congruency.segment line quadratic tolerance)
+    Assert.Equal(Error(), Congruency.segmentWith line quadratic tolerance)
 
 [<Fact>]
 let ``semantic congruency rejects invalid angle tolerance`` () =
     let line = Line(point 0.0 0.0, point 2.0 0.0)
-    Assert.Equal(Error(), Congruency.segment line line { tolerance with Angle = -1.0<degree> })
+    Assert.Equal(Error(), Congruency.segmentWith line line { tolerance with Angle = -1.0<degree> })
 
 [<Fact>]
 let ``subpath congruency ignores semantic closure`` () =
     let openSubpath = Subpath.empty (point 0.0 0.0)
     let closedSubpath = Subpath.setClosed true openSubpath |> Result.defaultWith (failwithf "%A")
-    Assert.True(Congruency.subpath openSubpath closedSubpath tolerance |> Result.isOk)
+    Assert.True(Congruency.subpathWith openSubpath closedSubpath tolerance |> Result.isOk)
 
 [<Fact>]
 let ``arc congruency preserves sweep semantics`` () =
@@ -51,5 +51,5 @@ let ``arc congruency preserves sweep semantics`` () =
               LargeArc = false
               Sweep = sweep
               End = point -1.0 0.0 }
-    Assert.True(Congruency.segment (arc true) (arc true) tolerance |> Result.isOk)
-    Assert.Equal(Error(), Congruency.segment (arc true) (arc false) tolerance)
+    Assert.True(Congruency.segmentWith (arc true) (arc true) tolerance |> Result.isOk)
+    Assert.Equal(Error(), Congruency.segmentWith (arc true) (arc false) tolerance)

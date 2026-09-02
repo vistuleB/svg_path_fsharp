@@ -16,6 +16,8 @@ type CongruencyFit =
 
 [<RequireQualifiedAccess>]
 module Congruency =
+    let private defaultAngleTolerance = 1.0e-9<degree>
+
     type private IndexedPoint =
         { Source: Point<length>
           Target: Point<length> }
@@ -258,7 +260,7 @@ module Congruency =
     let private segmentPairsMatch source target transform tolerance =
         List.zip source target |> List.forall (fun (a, b) -> arcFieldMatch a b transform tolerance)
 
-    let segment source target tolerance =
+    let segmentWith source target tolerance =
         if not (validTolerance tolerance) then Error()
         else segmentPointCloud source target
         |> Result.bind (fun cloud ->
@@ -266,10 +268,13 @@ module Congruency =
             |> Result.bind (fun transform ->
                 if not cloud.HasArc || arcFieldMatch source target transform tolerance then Ok transform else Error()))
 
+    let segment source target (tolerance: float<length>) =
+        segmentWith source target { Distance = tolerance; Angle = defaultAngleTolerance }
+
     let fitSegment source target family =
         segmentPointCloud source target |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)
 
-    let subpath source target tolerance =
+    let subpathWith source target tolerance =
         if not (validTolerance tolerance) then Error()
         else subpathPointCloud source target
         |> Result.bind (fun cloud ->
@@ -279,10 +284,13 @@ module Congruency =
                    || segmentPairsMatch (Subpath.segments source) (Subpath.segments target) transform tolerance then Ok transform
                 else Error()))
 
+    let subpath source target (tolerance: float<length>) =
+        subpathWith source target { Distance = tolerance; Angle = defaultAngleTolerance }
+
     let fitSubpath source target family =
         subpathPointCloud source target |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)
 
-    let path source target tolerance =
+    let pathWith source target tolerance =
         if not (validTolerance tolerance) then Error()
         else pathPointCloud source target
         |> Result.bind (fun cloud ->
@@ -292,6 +300,9 @@ module Congruency =
                     List.zip (Path.subpaths source) (Path.subpaths target)
                     |> List.forall (fun (a, b) -> segmentPairsMatch (Subpath.segments a) (Subpath.segments b) transform tolerance)
                 if not cloud.HasArc || arcsMatch then Ok transform else Error()))
+
+    let path source target (tolerance: float<length>) =
+        pathWith source target { Distance = tolerance; Angle = defaultAngleTolerance }
 
     let fitPath source target family =
         pathPointCloud source target |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)

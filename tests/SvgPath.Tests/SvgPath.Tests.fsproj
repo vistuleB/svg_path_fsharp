@@ -40,6 +40,8 @@
     <Compile Include="SvgTests.fs" />
     <Compile Include="ArrangementTests.fs" />
     <Compile Include="CsgTests.fs" />
+    <Compile Include="OffsetTests.fs" />
+    <Compile Include="OffsetParityTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

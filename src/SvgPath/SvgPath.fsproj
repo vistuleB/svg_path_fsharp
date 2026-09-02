@@ -40,5 +40,6 @@
     <Compile Include="Svg.fs" />
     <Compile Include="Arrangement.fs" />
     <Compile Include="Csg.fs" />
+    <Compile Include="Offset.fs" />
   </ItemGroup>
 </Project>

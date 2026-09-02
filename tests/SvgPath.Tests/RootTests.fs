@@ -276,6 +276,21 @@ let ``custom bisection certification preserves its bracket`` () =
     Assert.True(isolation.Upper - isolation.Lower <= parameter 0.01)
 
 [<Fact>]
+let ``custom bisection certification may use a non-parameter scale`` () =
+    let isolation =
+        Root.bisectIsolationUntil
+            (fun t -> coefficient (Parameter.ratio t - 0.3))
+            (parameter 0.0)
+            (parameter 1.0)
+            100
+            (fun left right -> Parameter.ratio (right - left) * 1000.0 <= 0.01)
+        |> unwrap
+
+    Assert.True(isolation.Lower <= parameter 0.3)
+    Assert.True(isolation.Upper >= parameter 0.3)
+    Assert.True(Parameter.ratio (isolation.Upper - isolation.Lower) * 1000.0 <= 0.01)
+
+[<Fact>]
 let ``custom bisection stops at floating-point resolution`` () =
     let isolation =
         Root.bisectIsolationUntil

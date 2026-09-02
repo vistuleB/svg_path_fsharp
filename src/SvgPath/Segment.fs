@@ -1105,24 +1105,19 @@ module Segment =
 
     let private arcProjectionWith sample segment (options: DistanceOptions) =
         let close value = abs value <= options.Tolerance * 1.0<length / parameter>
+        let insertNearUnique value candidates =
+            match candidates with
+            | previous :: _ when abs (previous - value) <= options.Tolerance * 1.0<parameter / length> -> candidates
+            | _ -> value :: candidates
+
+        let refineWindow leftT leftValue rightT =
+            refineProjectionWindowByBisection
+                sample segment options.Tolerance leftT leftValue rightT
+                options.MaxIterations options.MaxIterations
+            |> Result.map Some
+
         distanceStationaryValue sample segment 0.0<parameter>
         |> Result.bind (fun firstValue ->
-            let rec bisect
-                (left: float<parameter>)
-                (leftValue: float<length^2 / parameter>)
-                (right: float<parameter>)
-                remaining =
-                let middle = left + (right - left) / 2.0
-                distanceStationaryValue sample segment middle
-                |> Result.bind (fun middleValue ->
-                    betweenInside segment left right
-                    |> Result.bind boundingBox
-                    |> Result.bind (fun box ->
-                        if BoundingBox.diameter box <= options.Tolerance || middleValue = 0.0<length^2 / parameter> then Ok middle
-                        elif remaining <= 1 then Error(DistanceMaxIterationsReached(middle, middleValue))
-                        elif (leftValue < 0.0<_> && middleValue < 0.0<_>) || (leftValue > 0.0<_> && middleValue > 0.0<_>) then
-                            bisect middle middleValue right (remaining - 1)
-                        else bisect left leftValue middle (remaining - 1)))
             let rec scan
                 index
                 (previousT: float<parameter>)
@@ -1136,11 +1131,11 @@ module Segment =
                         let candidate =
                             if close previousValue then Ok(Some previousT)
                             elif close nextValue then Ok(Some nextT)
-                            elif (previousValue < 0.0<_> && nextValue < 0.0<_>) || (previousValue > 0.0<_> && nextValue > 0.0<_>) then Ok None
-                            else bisect previousT previousValue nextT options.MaxIterations |> Result.map Some
+                            elif sameSign previousValue nextValue then Ok None
+                            else refineWindow previousT previousValue nextT
                         candidate
                         |> Result.bind (fun candidate ->
-                            let candidates = match candidate with Some t -> t :: candidates | None -> candidates
+                            let candidates = match candidate with Some t -> insertNearUnique t candidates | None -> candidates
                             scan (index + 1) nextT nextValue candidates))
             scan 1 0.0<parameter> firstValue [ 1.0<parameter>; 0.0<parameter> ]
             |> Result.bind (smallestProjection sample segment))

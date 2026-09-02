@@ -5,6 +5,26 @@ open Xunit
 
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private near expected actual = Assert.True(abs (actual - expected) <= 1.0e-8<length>, $"expected {expected}, got {actual}")
+let private nearDegree expected actual = Assert.True(abs (actual - expected) <= 1.0e-8<degree>, $"expected {expected}, got {actual}")
+
+let private pointLoop p = [ Line(p, p); Line(p, p) ]
+
+let private bigLineLoop () =
+    let startPoint = point 1000.0 0.0
+    let endPoint = point 999.84769516 17.45240644
+    [ Line(startPoint, endPoint); Line(endPoint, startPoint) ]
+
+let private narrowArcLoop () =
+    let startPoint = point 999.94340504 7.63106966
+    let endPoint = point 999.92428935 9.82151131
+    [ Arc
+        { Start = startPoint
+          Radius = point 30.0 30.0
+          XAxisRotation = 0.0<degree>
+          LargeArc = false
+          Sweep = true
+          End = endPoint }
+      Line(endPoint, startPoint) ]
 
 [<Fact>]
 let ``point hull rejects an empty collection`` () =
@@ -119,3 +139,46 @@ let ``path hull refines transitions between distinct source curves`` () =
     hull.Segments
     |> List.pairwise
     |> List.iter (fun (previous, next) -> Assert.Equal(Segment.finish previous, Segment.start next))
+
+[<Fact>]
+let ``seeded worst direction walks to local maximum`` () =
+    let result =
+        ConvexHull.internalFindSeededWorstDirection
+            (pointLoop (point 0.0 0.0)) (pointLoop (point 1.0 0.0)) 5.0<degree> 10.0<degree>
+        |> Result.defaultWith (failwithf "%A")
+    nearDegree 0.0<degree> (fst result)
+    nearDegree 0.0<degree> (snd result)
+
+[<Fact>]
+let ``seeded worst direction stays within drift`` () =
+    let result =
+        ConvexHull.internalFindSeededWorstDirection
+            (pointLoop (point 0.0 0.0)) (pointLoop (point 1.0 0.0)) 5.0<degree> 1.0<degree>
+        |> Result.defaultWith (failwithf "%A")
+    nearDegree 4.0<degree> (fst result)
+    nearDegree 4.0<degree> (snd result)
+
+[<Fact>]
+let ``loop initial sample angles merge and normalize seeds`` () =
+    Assert.Equal<float<degree> list>(
+        [ 0.0<degree>; 45.0<degree>; 90.0<degree>; 180.0<degree>; 225.0<degree>; 270.0<degree> ],
+        ConvexHull.internalLoopInitialSampleAngles 4 [ 45.0<degree>; 225.0<degree> ])
+    Assert.Equal<float<degree> list>(
+        [ 0.0<degree>; 45.0<degree>; 90.0<degree>; 180.0<degree>; 270.0<degree> ],
+        ConvexHull.internalLoopInitialSampleAngles 4 [ -90.0<degree>; 405.0<degree> ])
+
+[<Fact>]
+let ``seeded loop union removes zero length endpoint pieces`` () =
+    let segments =
+        ConvexHull.internalLoopUnionSegmentsWithSeedAngles
+            (bigLineLoop ()) (narrowArcLoop ()) [ 0.49724434278326146<degree>; 0.5027556573338349<degree> ]
+    Assert.Equal(4, List.length segments)
+    Assert.All(segments, fun segment -> Assert.NotEqual(Segment.start segment, Segment.finish segment))
+
+[<Fact>]
+let ``ambitious repair preserves a narrow exposed arc slice`` () =
+    let segments =
+        ConvexHull.internalAmbitiousRepairLoopWithLoop (bigLineLoop ()) (narrowArcLoop ())
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(4, List.length segments)
+    Assert.Contains(segments, function Arc _ -> true | _ -> false)

@@ -4,6 +4,13 @@ type DegeneracyError =
     | DegeneracyPathError of SegmentError
     | DegeneracyConvexHullError of ConvexHullError
 
+[<Struct>]
+type ThinPrefix =
+    { Segments: Segment list
+      Remaining: Segment list
+      Hull: Subpath option
+      Strip: MinimumWidthStrip option }
+
 [<RequireQualifiedAccess>]
 module Degeneracy =
     let private uniqueAdjacent tolerance points =
@@ -64,54 +71,110 @@ module Degeneracy =
                     Some(replacement, remaining)
         | _ -> None
 
-    let private makeSubpath segments =
-        Subpath.createWith WiggleThenBridge segments
+    let private makeSubpath tolerance segments =
+        Subpath.createWith (WiggleThenBridgeWith tolerance) segments
         |> Result.mapError DegeneracyPathError
 
-    let private minimumWidth segments =
-        makeSubpath segments
-        |> Result.bind (fun subpath ->
-            ConvexHull.subpathMinimumWidth subpath |> Result.mapError DegeneracyConvexHullError)
+    let private widthDecision hull tolerance =
+        ConvexHull.internalConvexSubpathMinimumWidthDecision hull tolerance
+        |> Result.mapError DegeneracyConvexHullError
 
-    let private fits tolerance segments =
-        minimumWidth segments
-        |> Result.map (fun extremum -> extremum.Converged && extremum.Width <= tolerance)
+    let rec private longestThinPrefixLoop tolerance accepted hull strip remaining =
+        match remaining with
+        | [] ->
+            Ok { Segments = List.rev accepted
+                 Remaining = []
+                 Hull = Some hull
+                 Strip = Some strip }
+        | first :: rest ->
+            ConvexHull.internalConvexSubpathAddSegmentAndTestWidth hull first tolerance
+            |> Result.mapError DegeneracyConvexHullError
+            |> Result.bind (fun (candidateHull, decision) ->
+                match decision with
+                | MinimumWidthFits candidateStrip ->
+                    longestThinPrefixLoop tolerance (first :: accepted) candidateHull candidateStrip rest
+                | MinimumWidthExceeds _
+                | MinimumWidthUnresolved _ ->
+                    makeSubpath tolerance (List.rev (first :: accepted))
+                    |> Result.bind (fun candidate ->
+                        ConvexHull.subpathHull candidate
+                        |> Result.mapError DegeneracyConvexHullError
+                        |> Result.bind (fun rebuiltHull ->
+                            widthDecision rebuiltHull tolerance
+                            |> Result.bind (function
+                                | MinimumWidthFits rebuiltStrip ->
+                                    longestThinPrefixLoop tolerance (first :: accepted) rebuiltHull rebuiltStrip rest
+                                | MinimumWidthExceeds _
+                                | MinimumWidthUnresolved _ ->
+                                    Ok { Segments = List.rev accepted
+                                         Remaining = first :: rest
+                                         Hull = Some hull
+                                         Strip = Some strip }))))
 
-    let private longestThinPrefix tolerance segments =
-        let rec grow accepted remaining =
+    let internalLongestThinPrefix (subpath: Subpath) tolerance =
+        match subpath.Segments with
+        | [] -> Ok { Segments = []; Remaining = []; Hull = None; Strip = None }
+        | first :: rest ->
+            ConvexHull.segmentHull first
+            |> Result.mapError DegeneracyConvexHullError
+            |> Result.bind (fun hull ->
+                widthDecision hull tolerance
+                |> Result.bind (function
+                    | MinimumWidthFits strip -> longestThinPrefixLoop tolerance [ first ] hull strip rest
+                    | MinimumWidthExceeds _
+                    | MinimumWidthUnresolved _ ->
+                        Ok { Segments = []; Remaining = first :: rest; Hull = None; Strip = None }))
+
+    let private pointAlreadyPresent point points tolerance =
+        points |> List.exists (fun candidate -> Point.distance point candidate <= tolerance)
+
+    let private uniquePoints tolerance points =
+        points
+        |> List.fold (fun unique point ->
+            if pointAlreadyPresent point unique tolerance then unique else point :: unique) []
+        |> List.rev
+
+    let private pointOrderInSegments point segments tolerance =
+        let rec loop index remaining =
             match remaining with
-            | [] -> Ok(List.rev accepted, [])
-            | segment :: rest ->
-                let candidate = List.rev (segment :: accepted)
-                fits tolerance candidate
-                |> Result.bind (fun acceptedCandidate ->
-                    if acceptedCandidate then grow (segment :: accepted) rest
-                    else Ok(List.rev accepted, remaining))
-        grow [] segments
+            | [] -> float index
+            | first :: rest ->
+                match Segment.projection first point with
+                | Ok(t, _, distance) when distance <= tolerance -> float index + float t
+                | _ -> loop (index + 1) rest
+        loop 0 segments
 
-    let private segmentDegenerateLines tolerance segment =
-        match segment with
-        | Line _ -> Ok None
-        | _ ->
-            fits tolerance [ segment ]
-            |> Result.bind (fun isDegenerate ->
-                if not isDegenerate then Ok None
-                else
-                    Segment.toLinesWith
-                        { Tolerance = tolerance
-                          MaxDepth = 20 }
-                        segment
-                    |> Result.map Some
-                    |> Result.mapError DegeneracyPathError)
+    let private stripPointsInTraversalOrder segments (strip: MinimumWidthStrip) tolerance =
+        match segments with
+        | [] -> Error()
+        | first :: _ ->
+            let startPoint = Segment.start first
+            let endPoint = segments |> List.last |> Segment.finish
+            let points = [ strip.LowerPoint; strip.UpperPoint ]
+            let protrusions =
+                (match points with
+                 | [ a; b ] when pointOrderInSegments a segments tolerance > pointOrderInSegments b segments tolerance -> [ b; a ]
+                 | _ -> points)
+                |> uniquePoints tolerance
+            Ok(uniquePoints tolerance (startPoint :: (protrusions @ [ endPoint ])))
 
     let rec private degenerateTraversal tolerance segments =
         match segments with
         | [] -> Ok []
         | first :: rest ->
-            segmentDegenerateLines tolerance first
+            Segment.degenerateLines first tolerance
+            |> Result.mapError DegeneracyPathError
             |> Result.bind (fun replacement ->
                 degenerateTraversal tolerance rest
                 |> Result.map (fun remaining -> (Option.defaultValue [ first ] replacement) @ remaining))
+
+    let private degenerateWindowTraversal prefix tolerance =
+        match prefix.Strip with
+        | None -> degenerateTraversal tolerance prefix.Segments
+        | Some strip ->
+            match stripPointsInTraversalOrder prefix.Segments strip tolerance with
+            | Error _ -> degenerateTraversal tolerance prefix.Segments
+            | Ok points -> Ok(traversalLines tolerance points)
 
     let rec private normalizeSegments tolerance segments converted =
         match segments with
@@ -121,15 +184,17 @@ module Degeneracy =
             | Some(replacement, remaining) ->
                 normalizeSegments tolerance remaining (List.rev replacement @ converted)
             | None ->
-                longestThinPrefix tolerance segments
-                |> Result.bind (fun (prefix, remaining) ->
-                    match prefix with
+                makeSubpath tolerance segments
+                |> Result.bind (fun pending -> internalLongestThinPrefix pending tolerance)
+                |> Result.bind (fun prefix ->
+                    match prefix.Segments with
                     | _ :: _ :: _ ->
-                        degenerateTraversal tolerance prefix
+                        degenerateWindowTraversal prefix tolerance
                         |> Result.bind (fun lines ->
-                            normalizeSegments tolerance remaining (List.rev lines @ converted))
+                            normalizeSegments tolerance prefix.Remaining (List.rev lines @ converted))
                     | _ ->
-                        segmentDegenerateLines tolerance first
+                        Segment.degenerateLines first tolerance
+                        |> Result.mapError DegeneracyPathError
                         |> Result.bind (fun replacement ->
                             normalizeSegments tolerance rest
                                 (List.rev (Option.defaultValue [ first ] replacement) @ converted)))

@@ -4,6 +4,23 @@ type ConvexHullError =
     | ConvexHullPathError of SegmentError
     | ConvexHullConstructionFailed
 
+type ConvexHullConstructionError =
+    | ConstructionPathError of SegmentError
+    | ConsecutiveCurves
+    | DuplicateAdjacentTValues
+    | RefinementReachedMaxIterations of int
+    | PurificationReachedMaxIterations of int
+    | LoopUnionCollapsed
+    | TangentSearchDegenerateLoop
+    | TangentSearchNonConvexVertex of int
+    | TangentSearchExpectedTwoTangencies of int
+    | SeededWorstDirectionExceededThreshold of direction: float<degree> * threshold: float<degree>
+
+type PointLoopView =
+    | TangentPoint
+    | OutsidePoint
+    | InsidePoint
+
 [<Struct>]
 type DirectionalExtent =
     { LowerPoint: Point<length>
@@ -26,6 +43,22 @@ type WidthExtremum =
       UpperBound: float<length>
       Converged: bool }
 
+[<Struct>]
+type MinimumWidthStrip =
+    { Width: float<length>
+      Direction: Point<1>
+      LowerPoint: Point<length>
+      UpperPoint: Point<length>
+      LowerSupport: float<length>
+      UpperSupport: float<length> }
+
+type MinimumWidthDecision =
+    | MinimumWidthFits of MinimumWidthStrip
+    | MinimumWidthExceeds of lowerBound: float<length>
+    | MinimumWidthUnresolved of lowerBound: float<length> * bestWidth: float<length>
+
+type DirectionalSupport = DirectionalExtent
+
 [<RequireQualifiedAccess>]
 module ConvexHull =
     type private SupportSample =
@@ -43,20 +76,6 @@ module ConvexHull =
         | HullCurve of float<parameter> * float<parameter>
         | HullLine of float<parameter> * float<parameter>
 
-    type private SourceSupportSample =
-        { SegmentIndex: int
-          Sample: SupportSample }
-
-    type private EnvelopeSample =
-        { Angle: float<degree>
-          Winner: SourceSupportSample }
-
-    type private EnvelopeBoundary =
-        { FromIndex: int
-          FromT: float<parameter>
-          ToIndex: int
-          ToT: float<parameter> }
-
     type private WidthSample =
         { Angle: float<degree>
           Support: DirectionalExtent }
@@ -65,9 +84,59 @@ module ConvexHull =
         { From: WidthSample
           ``To``: WidthSample }
 
+    [<Struct>]
+    type private LoopParam =
+        { SegmentIndex: int
+          T: float<parameter> }
+
+    [<Struct>]
+    type private ConvexLoop =
+        { Segments: Segment list
+          Enclosure: Point<length> list }
+
+    [<Struct>]
+    type private LoopSupport =
+        { Param: LoopParam
+          Point: Point<length>
+          Value: float<length> }
+
+    type private LoopWinner = LoopA | LoopB
+
+    [<Struct>]
+    type private LoopSample =
+        { Angle: float<degree>
+          Winner: LoopWinner
+          A: LoopSupport
+          B: LoopSupport
+          Difference: float<length> }
+
+    [<Struct>]
+    type private LoopBoundary =
+        { Angle: float<degree>
+          A: LoopSupport
+          B: LoopSupport
+          From: LoopWinner
+          ``To``: LoopWinner }
+
+    type private UnionPiece =
+        | HullLineAB of LoopParam * LoopParam
+        | HullLineBA of LoopParam * LoopParam
+        | LoopPieceA of LoopParam * LoopParam
+        | LoopPieceB of LoopParam * LoopParam
+
     let defaultWidthSearchOptions =
         { Accuracy = 1.0e-9<length>
           MaxDepth = 20 }
+
+    let private loopUnionSampleCount = 360
+    let private loopUnionTieTolerance = 1.0e-7<length>
+    let private loopUnionAngleTolerance = 0.02<degree>
+    let private loopUnionPointTolerance = 1.0e-6<length>
+    let private sameT = 1.0e-6<parameter>
+    let private seededWorstDirectionStep = 0.1<degree>
+    let private seededWorstDirectionRefinedStep = 0.01<degree>
+    let private loopUnionSeedMaxDrift = 1.0<degree>
+    let private pointTolerance = 1.0e-9<length>
 
     let private cross origin a b =
         Point.cross (Point.displacement origin a) (Point.displacement origin b)
@@ -97,36 +166,16 @@ module ConvexHull =
             (lower |> List.take (List.length lower - 1))
             @ (upper |> List.take (List.length upper - 1))
 
-    let private closedHull vertices =
-        match vertices with
-        | [] -> Error(ConvexHullPathError EmptyPath)
-        | [ point ] -> Subpath.empty point |> Subpath.setClosed true |> Result.mapError ConvexHullPathError
-        | [ a; b ] ->
-            Subpath.create [ Line(a, b); Line(b, a) ]
-            |> Result.bind (Subpath.setClosed true)
-            |> Result.mapError ConvexHullPathError
-        | points ->
-            Subpath.polygon points |> Result.mapError ConvexHullPathError
-
-    /// Compute the exact polygonal hull of a point collection.
-    let pointsHull points = points |> hullVertices |> closedHull
-
-    let private linearizedPoints segment =
-        Segment.toLinesWith
-            { Tolerance = 1.0e-7<length>
-              MaxDepth = 24 }
-            segment
-        |> Result.map (fun lines ->
-            match lines with
-            | [] -> [ Segment.start segment ]
-            | _ -> Segment.start segment :: (lines |> List.map Segment.finish))
-        |> Result.mapError ConvexHullPathError
+    let private segmentIsPointLike segment =
+        match Segment.boundingBox segment with
+        | Error _ -> true
+        | Ok bounds -> BoundingBox.diameter bounds <= 1.0e-9<length>
 
     let private exactSimpleSegmentHull segment =
         let startPoint = Segment.start segment
         let endPoint = Segment.finish segment
         let pieces =
-            if startPoint = endPoint then [ Line(startPoint, startPoint); Line(startPoint, startPoint) ]
+            if segmentIsPointLike segment then [ Line(startPoint, startPoint); Line(startPoint, startPoint) ]
             else
                 match segment with
                 | Line _ -> [ segment; Segment.reverse segment ]
@@ -163,6 +212,11 @@ module ConvexHull =
                   Value = Point.dot point direction }))
         |> List.maxBy _.Value
 
+    let internalSegmentSupport segment angle =
+        let direction = Point.direction angle
+        let sample = supportSample segment direction
+        Ok(sample.T, sample.Point, sample.Value)
+
     let private mergeCircularRuns (runs: SupportRun list) =
         match runs with
         | [] | [ _ ] -> runs
@@ -174,7 +228,7 @@ module ConvexHull =
             | _ -> runs
 
     let private collapseSupportRuns (samples: SupportSample list) =
-        let rec loop current reversedRuns remaining =
+        let rec loop current reversedRuns (remaining: SupportSample list) =
             match remaining with
             | [] -> List.rev ({ Ts = List.rev current } :: reversedRuns) |> mergeCircularRuns
             | sample :: rest ->
@@ -311,106 +365,472 @@ module ConvexHull =
             |> Result.bind (Subpath.setClosedWith WiggleThenBridge true))
         |> Result.mapError ConvexHullPathError
 
-    let private sourceSupportSample (segments: Segment list) direction : SourceSupportSample =
-        segments
-        |> List.mapi (fun index segment ->
-            { SegmentIndex = index
-              Sample = supportSample segment direction })
-        |> List.maxBy (fun sample -> sample.Sample.Value)
-
-    let private envelopeSample (segments: Segment list) (angle: float<degree>) : EnvelopeSample =
-        { Angle = angle
-          Winner = sourceSupportSample segments (Point.direction angle) }
-
     let private normalizeAngle (angle: float<degree>) =
         let value = Degree.toFloat angle
         Degree.fromFloat (value - floor (value / 360.0) * 360.0)
 
-    let private refineEnvelopeBoundary
-        (segments: Segment list)
-        (left: EnvelopeSample)
-        (right: EnvelopeSample) =
-        let departing = left.Winner.SegmentIndex
-        let rec bisect (left: EnvelopeSample) (right: EnvelopeSample) remaining =
-            let difference (sample: EnvelopeSample) =
-                let direction = Point.direction (normalizeAngle sample.Angle)
-                let departingValue = (supportSample segments[departing] direction).Value
-                let arrivingValue = (supportSample segments[right.Winner.SegmentIndex] direction).Value
-                departingValue - arrivingValue
-            if remaining = 0 || abs (difference left) <= 1.0e-7<length> then left
+    let private loopSupport (loop: ConvexLoop) angle =
+        let direction = Point.direction angle
+        loop.Segments
+        |> List.mapi (fun index segment ->
+            let sample = supportSample segment direction
+            { Param = { SegmentIndex = index; T = sample.T }
+              Point = sample.Point
+              Value = sample.Value })
+        |> List.maxBy _.Value
+
+    let private loopSample loopA loopB angle =
+        let a = loopSupport loopA angle
+        let b = loopSupport loopB angle
+        let difference = a.Value - b.Value
+        { Angle = angle
+          Winner = if difference >= 0.0<length> then LoopA else LoopB
+          A = a
+          B = b
+          Difference = difference }
+
+    let private uniqueLoopSampleAngles angles =
+        let rec loop previous kept remaining =
+            match remaining with
+            | [] -> List.rev kept
+            | angle :: rest ->
+                match previous with
+                | Some value when angle - value < loopUnionAngleTolerance -> loop previous kept rest
+                | _ -> loop (Some angle) (angle :: kept) rest
+        let distinct = loop None [] angles
+        match distinct with
+        | [] | [ _ ] -> distinct
+        | first :: _ ->
+            let last = List.last distinct
+            if first + 360.0<degree> - last < loopUnionAngleTolerance then
+                distinct |> List.take (List.length distinct - 1)
+            else distinct
+
+    let private loopInitialSampleAngles sampleCount seedAngles =
+        let uniform =
+            [ 0 .. sampleCount ]
+            |> List.map (fun index -> Degree.fromFloat (float index * 360.0 / float sampleCount))
+        uniform @ seedAngles
+        |> List.map normalizeAngle
+        |> List.sort
+        |> uniqueLoopSampleAngles
+
+    let private circularPairs items =
+        match items with
+        | [] | [ _ ] -> []
+        | _ -> List.pairwise (items @ [ List.head items ])
+
+    let private unwrapAngleAfter left right =
+        if right < left then right + 360.0<degree> else right
+
+    let private bisectLoopBoundary loopA loopB (left: LoopSample) (right: LoopSample) =
+        let rec bisect (left: LoopSample) (right: LoopSample) remaining =
+            if remaining <= 0 || abs left.Difference <= loopUnionTieTolerance then left
             else
-                let middle = envelopeSample segments ((left.Angle + right.Angle) / 2.0)
-                if middle.Winner.SegmentIndex = departing then bisect middle right (remaining - 1)
+                let middle = loopSample loopA loopB ((left.Angle + right.Angle) / 2.0)
+                if middle.Winner = left.Winner then bisect middle right (remaining - 1)
                 else bisect left middle (remaining - 1)
-        let refined = bisect left right 32
-        let direction = Point.direction (normalizeAngle refined.Angle)
-        let arriving = right.Winner.SegmentIndex
-        { FromIndex = departing
-          FromT = (supportSample segments[departing] direction).T
-          ToIndex = arriving
-          ToT = (supportSample segments[arriving] direction).T }
+        bisect left right 32
 
-    let private envelopeBoundaries (segments: Segment list) (samples: EnvelopeSample list) =
-        let first = List.head samples
-        List.pairwise (samples @ [ { first with Angle = first.Angle + 360.0<degree> } ])
+    let private refineLoopBoundary loopA loopB leftAngle rightAngle leftWinner =
+        let left = loopSample loopA loopB leftAngle
+        let right = loopSample loopA loopB (unwrapAngleAfter leftAngle rightAngle)
+        let refined = bisectLoopBoundary loopA loopB left right
+        let angle = normalizeAngle refined.Angle
+        let boundary = loopSample loopA loopB angle
+        { Angle = angle
+          A = boundary.A
+          B = boundary.B
+          From = leftWinner
+          ``To`` = if leftWinner = LoopA then LoopB else LoopA }
+
+    let private loopTransitionBoundaries loopA loopB samples =
+        samples
+        |> circularPairs
         |> List.choose (fun (left, right) ->
-            if left.Winner.SegmentIndex = right.Winner.SegmentIndex then None
-            else Some(refineEnvelopeBoundary segments left right))
+            if left.Winner = right.Winner then None
+            else Some(refineLoopBoundary loopA loopB left.Angle right.Angle left.Winner))
 
-    let private sourceEnvelopeHull (segments: Segment list) =
-        let samples: EnvelopeSample list =
-            [ 0 .. 3599 ]
-            |> List.map (fun index -> envelopeSample segments (Degree.fromFloat (float index / 10.0)))
-        let boundaries = envelopeBoundaries segments samples
-        match boundaries with
+    let private loopPiecesFromBoundaries boundaries =
+        boundaries
+        |> circularPairs
+        |> List.collect (fun (startBoundary, endBoundary) ->
+            let loopPiece =
+                match startBoundary.``To`` with
+                | LoopA -> LoopPieceA(startBoundary.A.Param, endBoundary.A.Param)
+                | LoopB -> LoopPieceB(startBoundary.B.Param, endBoundary.B.Param)
+            let linePiece =
+                match endBoundary.From, endBoundary.``To`` with
+                | LoopA, LoopB -> HullLineAB(endBoundary.A.Param, endBoundary.B.Param)
+                | LoopB, LoopA -> HullLineBA(endBoundary.B.Param, endBoundary.A.Param)
+                | _ -> loopPiece
+            [ loopPiece; linePiece ])
+
+    let private loopPoint (loop: ConvexLoop) parameter =
+        Segment.point loop.Segments[parameter.SegmentIndex] parameter.T
+        |> Result.defaultWith (failwithf "%A")
+
+    let private loopPointsFar left right =
+        Point.squaredDistance left right > loopUnionPointTolerance * loopUnionPointTolerance
+
+    let private compactLoopPieces loopA loopB pieces =
+        pieces
+        |> List.filter (function
+            | LoopPieceA(fromParameter, toParameter) -> loopPointsFar (loopPoint loopA fromParameter) (loopPoint loopA toParameter)
+            | LoopPieceB(fromParameter, toParameter) -> loopPointsFar (loopPoint loopB fromParameter) (loopPoint loopB toParameter)
+            | HullLineAB(a, b) -> loopPointsFar (loopPoint loopA a) (loopPoint loopB b)
+            | HullLineBA(b, a) -> loopPointsFar (loopPoint loopB b) (loopPoint loopA a))
+
+    let private allOneLoop samples =
+        match samples with
+        | [] -> []
+        | first :: _ ->
+            match first.Winner with
+            | LoopA -> [ LoopPieceA(first.A.Param, first.A.Param) ]
+            | LoopB -> [ LoopPieceB(first.B.Param, first.B.Param) ]
+
+    let private loopUnion loopA loopB seedAngles =
+        let samples =
+            loopInitialSampleAngles loopUnionSampleCount seedAngles
+            |> List.map (loopSample loopA loopB)
+        match loopTransitionBoundaries loopA loopB samples with
+        | [] -> allOneLoop samples
+        | boundaries -> boundaries |> loopPiecesFromBoundaries |> compactLoopPieces loopA loopB
+
+    let private nextIndex index count = if index + 1 >= count then 0 else index + 1
+
+    let private walkSegmentIndices fromIndex toIndex count =
+        let rec loop current reversed =
+            if current = toIndex then List.rev (current :: reversed)
+            else loop (nextIndex current count) (current :: reversed)
+        loop fromIndex []
+
+    let private partialSegment segment fromT toT =
+        Segment.betweenInside segment fromT toT |> Result.defaultWith (failwithf "%A")
+
+    let private loopPieceSegments (loop: ConvexLoop) fromParameter toParameter =
+        let segments = loop.Segments
+        let fromIndex, toIndex = fromParameter.SegmentIndex, toParameter.SegmentIndex
+        let fromT, toT = fromParameter.T, toParameter.T
+        if fromIndex = toIndex && abs (fromT - toT) <= sameT then segments
+        elif fromIndex = toIndex && fromT <= toT then [ partialSegment segments[fromIndex] fromT toT ]
+        elif fromIndex = toIndex then
+            let middle =
+                walkSegmentIndices (nextIndex fromIndex segments.Length) fromIndex segments.Length
+                |> List.takeWhile ((<>) fromIndex)
+                |> List.map (fun index -> partialSegment segments[index] 0.0<parameter> 1.0<parameter>)
+            partialSegment segments[fromIndex] fromT 1.0<parameter>
+            :: (middle @ [ partialSegment segments[fromIndex] 0.0<parameter> toT ])
+        else
+            walkSegmentIndices fromIndex toIndex segments.Length
+            |> List.map (fun index ->
+                if index = fromIndex then partialSegment segments[index] fromT 1.0<parameter>
+                elif index = toIndex then partialSegment segments[index] 0.0<parameter> toT
+                else partialSegment segments[index] 0.0<parameter> 1.0<parameter>)
+
+    let private unionPieceSegments loopA loopB pieces =
+        pieces
+        |> List.collect (function
+            | LoopPieceA(fromParameter, toParameter) -> loopPieceSegments loopA fromParameter toParameter
+            | LoopPieceB(fromParameter, toParameter) -> loopPieceSegments loopB fromParameter toParameter
+            | HullLineAB(a, b) -> [ Line(loopPoint loopA a, loopPoint loopB b) ]
+            | HullLineBA(b, a) -> [ Line(loopPoint loopB b, loopPoint loopA a) ])
+        |> List.filter (segmentIsPointLike >> not)
+
+    let private loopSupportDominance loopA loopB =
+        [ 0 .. loopUnionSampleCount - 1 ]
+        |> List.fold (fun (aContainsB, bContainsA) index ->
+            let angle = Degree.fromFloat (float index * 360.0 / float loopUnionSampleCount)
+            let difference = (loopSample loopA loopB angle).Difference
+            aContainsB && difference >= -loopUnionTieTolerance,
+            bContainsA && difference <= loopUnionTieTolerance) (true, true)
+
+    let private unionLoopSegments left right =
+        let enclosure segments =
+            match segments |> List.map Segment.boundingBox |> List.fold (fun state next ->
+                state |> Result.bind (fun boxes -> next |> Result.map (fun bounds -> bounds :: boxes))) (Ok []) with
+            | Error _ -> segments |> List.collect (fun segment -> [ Segment.start segment; Segment.finish segment ]) |> hullVertices
+            | Ok [] -> []
+            | Ok boxes ->
+                let bounds = boxes |> List.reduce BoundingBox.union
+                [ bounds.Min
+                  Point.create bounds.Max.X bounds.Min.Y
+                  bounds.Max
+                  Point.create bounds.Min.X bounds.Max.Y ]
+        let loopA = { Segments = left; Enclosure = enclosure left }
+        let loopB = { Segments = right; Enclosure = enclosure right }
+        match loopUnion loopA loopB [] |> unionPieceSegments loopA loopB with
         | [] ->
-            let winner = segments[(List.head samples).Winner.SegmentIndex]
-            match winner with
-            | Line _ | QuadraticBezier _ | Arc _ -> exactSimpleSegmentHull winner
-            | CubicBezier _ -> sampledCubicHull winner
-        | _ ->
-            List.pairwise (boundaries @ [ List.head boundaries ])
-            |> List.map (fun (startBoundary, endBoundary) ->
-                let index = startBoundary.ToIndex
-                Segment.betweenInside segments[index] startBoundary.ToT endBoundary.FromT
-                |> Result.bind (fun curve ->
-                    Segment.point segments[endBoundary.FromIndex] endBoundary.FromT
-                    |> Result.bind (fun chordStart ->
-                        Segment.point segments[endBoundary.ToIndex] endBoundary.ToT
-                        |> Result.map (fun chordEnd -> [ curve; Line(chordStart, chordEnd) ]))))
-            |> List.fold
-                (fun accumulated next ->
-                    accumulated
-                    |> Result.bind (fun pieces -> next |> Result.map (fun more -> pieces @ more)))
-                (Ok [])
-            |> Result.bind (fun pieces ->
-                Subpath.createWith WiggleThenBridge pieces
-                |> Result.bind (Subpath.setClosedWith WiggleThenBridge true))
-            |> Result.mapError ConvexHullPathError
+            match loopSupportDominance loopA loopB with
+            | true, _ -> Ok left
+            | false, true -> Ok right
+            | false, false -> Error ConvexHullConstructionFailed
+        | segments -> Ok segments
 
-    /// Compute a curve-preserving representation of a segment's convex hull.
-    let segmentHull segment =
+    let private polygonSignedArea points =
+        points
+        |> circularPairs
+        |> List.sumBy (fun (a, b) -> a.X * b.Y - b.X * a.Y)
+        |> fun twiceArea -> twiceArea / 2.0
+
+    let private polygonStrictlyContains points candidate =
+        if List.length points < 3 then false
+        else
+            let orientation = polygonSignedArea points
+            if abs orientation <= 1.0e-18<length^2> then false
+            else
+                points
+                |> circularPairs
+                |> List.forall (fun (a, b) ->
+                    let edge = Point.displacement a b
+                    let offset = Point.displacement a candidate
+                    let turn = Point.cross edge offset
+                    let tolerance = 1.0e-9 * Point.norm edge * Point.norm offset
+                    if orientation > 0.0<length^2> then turn > tolerance else turn < -tolerance)
+
+    let private loopVertices segments =
+        match segments with
+        | [] -> []
+        | first :: _ ->
+            let points = Segment.start first :: List.map Segment.finish segments
+            match List.tryLast points with
+            | Some last when last = List.head points -> List.take (List.length points - 1) points
+            | _ -> points
+
+    let private closestPointOnLineSegment a b point =
+        let ab = Point.displacement a b
+        let denominator = Point.dot ab ab
+        if denominator <= 0.0<length^2> then a
+        else
+            let t = max 0.0 (min 1.0 (float (Point.dot (Point.displacement a point) ab / denominator)))
+            Point.add a (Point.scale t ab)
+
+    let private closestPointOnPolyline closed points point =
+        let edges =
+            match points with
+            | [] | [ _ ] -> []
+            | _ when closed -> circularPairs points
+            | _ -> List.pairwise points
+        edges
+        |> List.map (fun (a, b) -> closestPointOnLineSegment a b point)
+        |> function
+            | [] -> List.tryHead points |> Option.defaultValue point
+            | candidates -> List.minBy (Point.squaredDistance point) candidates
+
+    let private pointChordPolygonLoopSeparation (loop: ConvexLoop) point =
+        let vertices = loopVertices loop.Segments
+        match vertices with
+        | [] -> None
+        | [ only ] ->
+            if Point.distance only point <= pointTolerance then None
+            else Some(Point.heading (Point.displacement only point), only)
+        | [ a; b ] ->
+            let closest = closestPointOnLineSegment a b point
+            if Point.distance closest point <= pointTolerance then None
+            else Some(Point.heading (Point.displacement closest point), closest)
+        | _ ->
+            let area = polygonSignedArea vertices
+            let inside =
+                if abs area <= pointTolerance * pointTolerance then false
+                else
+                    vertices
+                    |> circularPairs
+                    |> List.forall (fun (a, b) ->
+                        let turn = Point.cross (Point.displacement a b) (Point.displacement a point)
+                        if area > 0.0<length^2> then turn >= 0.0<length^2> else turn <= 0.0<length^2>)
+            if inside then None
+            else
+                let closest = closestPointOnPolyline true vertices point
+                if Point.distance closest point <= pointTolerance then None
+                else Some(Point.heading (Point.displacement closest point), closest)
+
+    [<Struct>]
+    type private SeededWorstDirectionState =
+        { Direction: float<degree>
+          Advantage: float<length> }
+
+    let private loopBAdvantage loopA loopB angle = -(loopSample loopA loopB angle).Difference
+
+    let private seededWorstDirectionCandidate loopA loopB origin candidateDirection best maxDrift =
+        if abs (candidateDirection - origin) > maxDrift + 1.0e-9<degree> then best
+        else
+            let advantage = loopBAdvantage loopA loopB candidateDirection
+            if advantage > best.Advantage then
+                { Direction = candidateDirection; Advantage = advantage }
+            else best
+
+    let private seededWorstDirectionLocalSearch loopA loopB origin initial step maxDrift =
+        let rec search current =
+            let upper =
+                seededWorstDirectionCandidate loopA loopB origin (current.Direction + step) current maxDrift
+            let candidate =
+                seededWorstDirectionCandidate loopA loopB origin (current.Direction - step) upper maxDrift
+            if candidate.Direction = current.Direction then current else search candidate
+        search initial
+
+    let private findSeededWorstDirection loopA loopB direction threshold =
+        let initial =
+            { Direction = direction
+              Advantage = loopBAdvantage loopA loopB direction }
+        let coarse =
+            seededWorstDirectionLocalSearch loopA loopB direction initial seededWorstDirectionStep threshold
+        let refined =
+            seededWorstDirectionLocalSearch loopA loopB direction coarse seededWorstDirectionRefinedStep threshold
+        Ok(normalizeAngle refined.Direction, normalizeAngle refined.Direction)
+
+    let internalFindSeededWorstDirection loopASegments loopBSegments direction threshold =
+        let enclosure segments =
+            segments
+            |> List.map Segment.boundingBox
+            |> List.choose Result.toOption
+            |> function
+                | [] -> []
+                | boxes ->
+                    let bounds = List.reduce BoundingBox.union boxes
+                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
+        let loopA = { Segments = loopASegments; Enclosure = enclosure loopASegments }
+        let loopB = { Segments = loopBSegments; Enclosure = enclosure loopBSegments }
+        findSeededWorstDirection loopA loopB direction threshold
+
+    let internalLoopInitialSampleAngles sampleCount seedAngles =
+        loopInitialSampleAngles sampleCount seedAngles
+
+    let internalLoopUnionSegmentsWithSeedAngles loopASegments loopBSegments seedAngles =
+        let enclosure segments =
+            segments
+            |> List.map Segment.boundingBox
+            |> List.choose Result.toOption
+            |> function
+                | [] -> []
+                | boxes ->
+                    let bounds = List.reduce BoundingBox.union boxes
+                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
+        let loopA = { Segments = loopASegments; Enclosure = enclosure loopASegments }
+        let loopB = { Segments = loopBSegments; Enclosure = enclosure loopBSegments }
+        loopUnion loopA loopB seedAngles |> unionPieceSegments loopA loopB
+
+    let private loopEndpoints loop =
+        loop.Segments
+        |> List.collect (fun segment -> [ Segment.start segment; Segment.finish segment ])
+        |> List.fold (fun points point ->
+            if List.exists (fun existing -> Point.distance existing point <= pointTolerance) points then points
+            else point :: points) []
+        |> List.rev
+
+    let private ambitiousRepairSeedAngles current addition =
+        addition
+        |> loopEndpoints
+        |> List.fold (fun state point ->
+            state
+            |> Result.bind (fun angles ->
+                match pointChordPolygonLoopSeparation current point with
+                | None -> Ok angles
+                | Some(direction, _) ->
+                    findSeededWorstDirection current addition direction loopUnionSeedMaxDrift
+                    |> Result.map (fun (lower, upper) -> upper :: lower :: angles))) (Ok [])
+        |> Result.map List.rev
+
+    let private ambitiousRepairLoopWithLoop current addition =
+        ambitiousRepairSeedAngles current addition
+        |> Result.map (function
+            | [] -> current
+            | seedAngles ->
+                match loopUnion current addition seedAngles |> unionPieceSegments current addition with
+                | [] -> current
+                | segments -> { current with Segments = segments })
+
+    let internalAmbitiousRepairLoopWithLoop currentSegments additionSegments =
+        let enclosure segments =
+            segments
+            |> List.map Segment.boundingBox
+            |> List.choose Result.toOption
+            |> function
+                | [] -> []
+                | boxes ->
+                    let bounds = List.reduce BoundingBox.union boxes
+                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
+        ambitiousRepairLoopWithLoop
+            { Segments = currentSegments; Enclosure = enclosure currentSegments }
+            { Segments = additionSegments; Enclosure = enclosure additionSegments }
+        |> Result.map _.Segments
+
+    let internalPointChordPolygonLoopSeparation segments point =
+        let enclosure =
+            segments
+            |> List.map Segment.boundingBox
+            |> List.choose Result.toOption
+            |> function
+                | [] -> []
+                | boxes ->
+                    let bounds = List.reduce BoundingBox.union boxes
+                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
+        pointChordPolygonLoopSeparation { Segments = segments; Enclosure = enclosure } point
+
+    let private finalRepairLoop current sourceLoops =
+        sourceLoops
+        |> List.fold (fun state addition ->
+            state |> Result.bind (fun repaired -> ambitiousRepairLoopWithLoop repaired addition)) (Ok current)
+
+    let private prefilterLoops loops =
+        match loops with
+        | [] | [ _ ] -> loops
+        | _ ->
+            let envelope =
+                [ 0 .. 35 ]
+                |> List.map (fun index -> Degree.fromFloat (float index * 10.0))
+                |> List.map (fun angle -> loops |> List.map (fun loop -> loopSupport loop angle) |> List.maxBy _.Value |> _.Point)
+                |> hullVertices
+            let filtered =
+                loops
+                |> List.filter (fun loop ->
+                    not (loop.Enclosure |> List.forall (polygonStrictlyContains envelope)))
+            if List.isEmpty filtered then loops else filtered
+
+    let private constructSegmentHull segment =
         match segment with
         | Line _ | QuadraticBezier _ | Arc _ -> exactSimpleSegmentHull segment
+        | CubicBezier _ when segmentIsPointLike segment -> exactSimpleSegmentHull (Line(Segment.start segment, Segment.finish segment))
         | CubicBezier _ -> sampledCubicHull segment
 
-    let private subpathPoints (subpath: Subpath) =
-        match subpath.Segments with
-        | [] -> Ok [ subpath.Start ]
-        | segments ->
-            segments
-            |> List.map linearizedPoints
-            |> List.fold
-                (fun accumulated next ->
-                    accumulated
-                    |> Result.bind (fun points -> next |> Result.map (fun more -> points @ more)))
-                (Ok [])
+    let private buildClosedSubpath segments =
+        Subpath.createWith WiggleThenBridge segments
+        |> Result.bind (Subpath.setClosedWith WiggleThenBridge true)
+        |> Result.mapError ConvexHullPathError
+
+    let private segmentsHullCore segments =
+        segments
+        |> List.map constructSegmentHull
+        |> List.fold (fun state next ->
+            state
+            |> Result.bind (fun loops -> next |> Result.map (fun subpath -> subpath.Segments :: loops))) (Ok [])
+        |> Result.bind (fun reversedLoops ->
+            let enclosure segments =
+                match segments |> List.map Segment.boundingBox |> List.choose Result.toOption with
+                | [] -> []
+                | boxes ->
+                    let bounds = boxes |> List.reduce BoundingBox.union
+                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
+            let loops = List.rev reversedLoops |> List.map (fun segments -> { Segments = segments; Enclosure = enclosure segments }) |> prefilterLoops
+            match loops with
+            | [] -> Error ConvexHullConstructionFailed
+            | first :: rest ->
+                rest
+                |> List.fold (fun state addition ->
+                    state
+                    |> Result.bind (fun current ->
+                        unionLoopSegments current.Segments addition.Segments
+                        |> Result.map (fun union -> { Segments = union; Enclosure = enclosure union }))) (Ok first)
+                |> Result.bind (fun union -> finalRepairLoop union loops))
+        |> Result.bind (fun loop -> buildClosedSubpath loop.Segments)
+
+    /// Compute a curve-preserving representation of a segment's convex hull.
+    let segmentHull segment = constructSegmentHull segment
 
     let subpathHull (subpath: Subpath) =
         let segments =
             if List.isEmpty subpath.Segments then [ Line(subpath.Start, subpath.Start) ]
             else subpath.Segments
-        sourceEnvelopeHull segments
+        segmentsHullCore segments
 
     let pathHull (path: Path) =
         match path.Subpaths with
@@ -420,7 +840,16 @@ module ConvexHull =
             |> List.collect (fun subpath ->
                 if List.isEmpty subpath.Segments then [ Line(subpath.Start, subpath.Start) ]
                 else subpath.Segments)
-            |> sourceEnvelopeHull
+            |> segmentsHullCore
+
+    /// Compute a point collection's hull through the same curve-preserving
+    /// loop-union and repair path used by segment, subpath, and path hulls.
+    let pointsHull points =
+        points
+        |> List.map (fun point -> Line(point, point))
+        |> function
+            | [] -> Error(ConvexHullPathError EmptyPath)
+            | segments -> segmentsHullCore segments
 
     let private projectionExtrema points direction =
         match points with
@@ -481,6 +910,17 @@ module ConvexHull =
             |> List.minBy (fun (_, support) -> support.Width)
             |> fun (direction, support) -> extremum direction support support.Width support.Width true
 
+    let private stripFromExtremum (extremum: WidthExtremum) =
+        { Width = extremum.Width
+          Direction = extremum.Direction
+          LowerPoint = extremum.LowerPoint
+          UpperPoint = extremum.UpperPoint
+          LowerSupport = Point.dot extremum.LowerPoint extremum.Direction
+          UpperSupport = Point.dot extremum.UpperPoint extremum.Direction }
+
+    let internalConvexPolygonMinimumWidthStrip vertices =
+        vertices |> polygonMinimumWidth |> stripFromExtremum
+
     let private polygonDiameter points =
         let vertices = hullVertices points
         match vertices with
@@ -528,7 +968,7 @@ module ConvexHull =
         (max interval.From.Support.Width interval.``To``.Support.Width)
         + (diameter * directionDistance interval)
 
-    let private subdivideInterval support interval =
+    let private subdivideInterval support (interval: WidthInterval) =
         let step = (interval.``To``.Angle - interval.From.Angle) / 5.0
         let interior =
             [ 1 .. 4 ]
@@ -594,6 +1034,44 @@ module ConvexHull =
                     search (samples @ added) divided (depth + 1) retainedBound
         search initialSamples (intervalsFromSamples initialSamples) 0 None
 
+    let private minimumWidthDecision support diameter tolerance maxDepth =
+        let initialSamples =
+            [ 0.0; 36.0; 72.0; 108.0; 144.0; 180.0 ]
+            |> List.map (fun value ->
+                let angle = Degree.fromFloat value
+                { Angle = angle; Support = support (Point.direction angle) })
+        let rec search samples intervals depth =
+            let best = List.minBy (fun sample -> sample.Support.Width) samples
+            if best.Support.Width <= tolerance then
+                let direction = Point.direction best.Angle
+                MinimumWidthFits
+                    { Width = best.Support.Width
+                      Direction = direction
+                      LowerPoint = best.Support.LowerPoint
+                      UpperPoint = best.Support.UpperPoint
+                      LowerSupport = Point.dot best.Support.LowerPoint direction
+                      UpperSupport = Point.dot best.Support.UpperPoint direction }
+            else
+                let inventoryBound = inventoryLowerBound samples
+                if inventoryBound > tolerance then MinimumWidthExceeds inventoryBound
+                else
+                    let intervalBound =
+                        intervals
+                        |> List.map (intervalLowerBound diameter)
+                        |> tryMinimum
+                        |> Option.defaultValue inventoryBound
+                    let active =
+                        intervals
+                        |> List.filter (fun interval -> intervalLowerBound diameter interval <= tolerance)
+                    let certifiedBound = max inventoryBound intervalBound
+                    match active with
+                    | [] -> MinimumWidthExceeds certifiedBound
+                    | _ when depth >= maxDepth -> MinimumWidthUnresolved(certifiedBound, best.Support.Width)
+                    | _ ->
+                        let divided, added = subdivideIntervals support active
+                        search (samples @ added) divided (depth + 1)
+        search initialSamples (intervalsFromSamples initialSamples) 0
+
     let private adaptiveMaximum support diameter accuracy maxDepth initialSamples =
         let rec search samples intervals depth discardedUpperBound =
             let best = List.maxBy (fun sample -> sample.Support.Width) samples
@@ -655,8 +1133,6 @@ module ConvexHull =
     let diameter support diameterUpperBound =
         diameterWith support diameterUpperBound defaultWidthSearchOptions
 
-    let private hullPointsOfSubpath subpath = subpathPoints subpath |> Result.map hullVertices
-
     let private sourceExtremum findMinimum segments options =
         match segments with
         | [] -> Error(ConvexHullPathError EmptySubpath)
@@ -710,6 +1186,25 @@ module ConvexHull =
             else sourceOrPolygonExtremum true segments options
 
     let pathMinimumWidth path = pathMinimumWidthWith path defaultWidthSearchOptions
+
+    let internalConvexSubpathMinimumWidthDecision (hull: Subpath) tolerance =
+        let segments = hull.Segments
+        if segments |> List.forall (function Line _ -> true | _ -> false) then
+            let strip = segments |> lineOnlyExtremum true |> stripFromExtremum
+            Ok(if strip.Width <= tolerance then MinimumWidthFits strip else MinimumWidthExceeds strip.Width)
+        else
+            Subpath.boundingBox hull
+            |> Result.mapError ConvexHullPathError
+            |> Result.map (fun bounds ->
+                minimumWidthDecision (segmentsExtent segments) (BoundingBox.diameter bounds) tolerance 20)
+
+    let internalConvexSubpathAddSegmentAndTestWidth (hull: Subpath) segment tolerance =
+        constructSegmentHull segment
+        |> Result.bind (fun addition -> unionLoopSegments hull.Segments addition.Segments)
+        |> Result.bind buildClosedSubpath
+        |> Result.bind (fun combinedHull ->
+            internalConvexSubpathMinimumWidthDecision combinedHull tolerance
+            |> Result.map (fun decision -> combinedHull, decision))
 
     let segmentDiameterWith segment options = sourceOrPolygonExtremum false [ segment ] options
 

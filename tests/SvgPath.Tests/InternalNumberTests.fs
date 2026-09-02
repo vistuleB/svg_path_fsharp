@@ -21,6 +21,13 @@ let ``parse accepts finite SVG number forms`` raw expected =
 let ``parse rejects nonfinite results`` () =
     Assert.Equal(Error(), InternalNumber.parse "1e400")
 
+[<Theory>]
+[<InlineData("23.")>]
+[<InlineData("23.e2")>]
+[<InlineData("-0.E-4")>]
+let ``parse rejects SVG numbers with a trailing decimal point`` raw =
+    Assert.Equal(Error(), InternalNumber.parse raw)
+
 [<Fact>]
 let ``checked arithmetic rejects overflow`` () =
     Assert.Equal(Error(), InternalNumber.checkedProduct Double.MaxValue 2.0)

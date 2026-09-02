@@ -14,9 +14,13 @@ module InternalNumber =
             largest * sqrt (scaledX * scaledX + scaledY * scaledY)
 
     let parse (raw: string) =
-        match Double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture) with
-        | true, value when Double.IsFinite value -> Ok value
-        | _ -> Error()
+        let exponentAt = raw.IndexOfAny([| 'e'; 'E' |])
+        let mantissa = if exponentAt < 0 then raw else raw.Substring(0, exponentAt)
+        if mantissa.EndsWith(".", StringComparison.Ordinal) then Error()
+        else
+            match Double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture) with
+            | true, value when Double.IsFinite value -> Ok value
+            | _ -> Error()
 
     let checkedProduct first second =
         let absoluteSecond = abs second

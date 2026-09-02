@@ -1979,28 +1979,51 @@ module Subpath =
                 |> List.fold (fun state (fromParameter, toParameter) ->
                     state |> Result.bind (fun paths -> between subpath fromParameter toParameter |> Result.map (fun path -> path :: paths))) (Ok [])
                 |> Result.map List.rev
+            let length = List.length subpath.segmentList
+            let startParameter = { SegmentIndex = 0; T = 0.0<parameter> }
+            let endParameter = { SegmentIndex = length - 1; T = 1.0<parameter> }
+            let isBoundary parameterValue =
+                parametersCompare parameterValue startParameter = 0
+                || parametersCompare parameterValue endParameter = 0
+            let invalidParameter parameterValue =
+                Error(InvalidSubpathParameter(parameterValue.SegmentIndex, parameterValue.T, length))
+            let rec validateOpen previous = function
+                | [] -> Ok()
+                | point :: rest when isBoundary point -> invalidParameter point
+                | point :: rest when parametersCompare previous point < 0 -> validateOpen point rest
+                | point :: _ -> Error(InvalidSubpathInterval(previous, point))
+            let rec validateClosed first previous descents = function
+                | [] ->
+                    let order = parametersCompare previous first
+                    if order = 0 then Error(InvalidSubpathInterval(previous, first))
+                    else
+                        let descents = if order > 0 then descents + 1 else descents
+                        if descents = 1 then Ok()
+                        else Error(InvalidSubpathInterval(previous, first))
+                | point :: rest ->
+                    let order = parametersCompare previous point
+                    if order = 0 then Error(InvalidSubpathInterval(previous, point))
+                    else
+                        let descents = if order > 0 then descents + 1 else descents
+                        if descents > 1 then Error(InvalidSubpathInterval(previous, point))
+                        else validateClosed first point descents rest
             if not subpath.isClosed then
                 match points with
                 | [] -> Ok [ subpath ]
                 | _ ->
-                    let startParameter = { SegmentIndex = 0; T = 0.0<parameter> }
-                    let endParameter = { SegmentIndex = List.length subpath.segmentList - 1; T = 1.0<parameter> }
-                    let augmented = startParameter :: (points @ [ endParameter ])
-                    if augmented |> List.pairwise |> List.exists (fun (a, b) -> parametersCompare a b >= 0) then
-                        let a, b = augmented |> List.pairwise |> List.find (fun (a, b) -> parametersCompare a b >= 0)
-                        Error(InvalidSubpathInterval(a, b))
-                    else build (makePairs augmented)
+                    match points with
+                    | first :: rest when isBoundary first -> invalidParameter first
+                    | first :: rest ->
+                        validateOpen first rest
+                        |> Result.bind (fun () -> build (makePairs (startParameter :: (points @ [ endParameter ]))))
+                    | [] -> Ok [ subpath ]
             else
                 match points with
                 | [] -> Ok []
                 | [ point ] -> openAt subpath point |> Result.map List.singleton
-                | first :: _ ->
-                    let cyclic = makePairs points @ [ List.last points, first ]
-                    let descents = cyclic |> List.sumBy (fun (a, b) -> if parametersCompare a b > 0 then 1 else 0)
-                    if cyclic |> List.exists (fun (a, b) -> parametersCompare a b = 0) || descents <> 1 then
-                        let a, b = cyclic |> List.find (fun (a, b) -> parametersCompare a b >= 0)
-                        Error(InvalidSubpathInterval(a, b))
-                    else build cyclic)
+                | first :: second :: rest ->
+                    validateClosed first first 0 (second :: rest)
+                    |> Result.bind (fun () -> build (makePairs points @ [ List.last points, first ])))
 
     let lengthWith subpath (options: LengthOptions) =
         subpath.segmentList

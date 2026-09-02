@@ -39,6 +39,8 @@
     <Compile Include="EffectsTests.fs" />
     <Compile Include="MarkerTests.fs" />
     <Compile Include="ParseTests.fs" />
+    <Compile Include="ParseParityTests.fs" />
+    <Compile Include="ParseW3cParityTests.fs" />
     <Compile Include="SerializeTests.fs" />
     <Compile Include="SvgTests.fs" />
     <Compile Include="ArrangementTests.fs" />

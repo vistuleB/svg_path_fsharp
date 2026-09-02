@@ -18,10 +18,15 @@ let ``empty input has no enclosing circle`` () =
     Assert.Equal(Error(), SmallestEnclosingCircle.points [])
 
 [<Fact>]
-let ``one point and exact duplicates preserve the point`` () =
+let ``one point preserves exact center`` () =
     let sample = point 3.0 -7.0
     let expected = Ok { Center = sample; RadiusSquared = 0.0<length^2> }
     Assert.Equal(expected, SmallestEnclosingCircle.points [ sample ])
+
+[<Fact>]
+let ``equal points preserve exact center`` () =
+    let sample = point 3.0 -7.0
+    let expected = Ok { Center = sample; RadiusSquared = 0.0<length^2> }
     Assert.Equal(expected, SmallestEnclosingCircle.points [ sample; sample; sample ])
 
 [<Fact>]
@@ -36,8 +41,11 @@ let ``collinear points use their farthest pair`` () =
         4.0<length^2>
 
 [<Fact>]
-let ``obtuse and acute triangles select the appropriate support`` () =
+let ``obtuse triangle uses longest side`` () =
     assertCircle [ point 0.0 0.0; point 4.0 0.0; point 1.0 1.0 ] (point 2.0 0.0) 4.0<length^2>
+
+[<Fact>]
+let ``acute triangle uses circumcircle`` () =
     assertCircle [ point 0.0 0.0; point 2.0 0.0; point 1.0 2.0 ] (point 1.0 0.75) 1.5625<length^2>
 
 [<Fact>]

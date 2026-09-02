@@ -47,8 +47,11 @@ module TransformParseTests =
         Assert.Equal(point 12.0 26.0, Transform.point transform (point 4.0 -3.0))
 
     [<Fact>]
-    let ``arguments and functions require comma whitespace`` () =
+    let ``transform arguments require comma whitespace`` () =
         Assert.True(Result.isError (TransformParse.attribute "translate(10-20)"))
+
+    [<Fact>]
+    let ``transform functions require comma whitespace`` () =
         Assert.True(Result.isError (TransformParse.attribute "translate(1)rotate(2)"))
 
     [<Fact>]
@@ -69,8 +72,11 @@ module TransformParseTests =
             TransformParse.attribute "scale(1e308) scale(1e308)")
 
     [<Fact>]
-    let ``large finite and underflowing exponents parse`` () =
+    let ``exponent scaling preserves finite compensated values`` () =
         Assert.True(Result.isOk (TransformParse.attribute "scale(0.1e309)"))
+
+    [<Fact>]
+    let ``large exponents do not require linear recursion`` () =
         Assert.True(Result.isError (TransformParse.attribute "scale(1e1000000000)"))
         let underflow = parsed "scale(1e-1000000000)"
         Assert.Equal(point 0.0 0.0, Transform.point underflow (point 2.0 3.0))

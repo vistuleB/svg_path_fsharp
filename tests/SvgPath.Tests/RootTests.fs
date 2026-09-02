@@ -10,10 +10,13 @@ let private near expected actual = Assert.Equal(expected, rootFloat actual, 6)
 let private unwrap result = Result.defaultWith (fun error -> failwithf "%A" error) result
 
 [<Fact>]
-let ``linear and quadratic solvers return parameter roots`` () =
+let ``linear root`` () =
     Assert.Equal<float<parameter> list>([ parameter 0.5 ], Root.linear (coefficient 2.0) (coefficient -1.0))
     Assert.Empty(Root.linear (coefficient 0.0) (coefficient 1.0))
+    Assert.Empty(Root.linear (coefficient 0.0) (coefficient 0.0))
 
+[<Fact>]
+let ``quadratic real roots`` () =
     Assert.Equal<float<parameter> list>(
         [ parameter 1.0; parameter 2.0 ],
         Root.quadratic (coefficient 1.0) (coefficient -3.0) (coefficient 2.0)
@@ -27,19 +30,32 @@ let ``quadratic solver preserves a small root under cancellation pressure`` () =
     )
 
 [<Fact>]
-let ``quadratic degree and repeated-root policies are explicit`` () =
+let ``quadratic reduces to linear`` () =
+    Assert.Equal<float<parameter> list>(
+        [ parameter 0.5 ],
+        Root.quadratic (coefficient 0.0) (coefficient 2.0) (coefficient -1.0)
+    )
+
+[<Fact>]
+let ``quadratic repeated root policy`` () =
     let preserve =
         { CoefficientTolerance = coefficient 0.0
           RepeatedRootPolicy = PreserveRepeatedRoot }
 
-    let tolerant =
-        { CoefficientTolerance = coefficient 1.0e-6
-          RepeatedRootPolicy = ConsolidateRepeatedRoot }
-
+    Assert.Equal<float<parameter> list>(
+        [ parameter 1.0 ],
+        Root.quadratic (coefficient 1.0) (coefficient -2.0) (coefficient 1.0)
+    )
     Assert.Equal<float<parameter> list>(
         [ parameter 1.0; parameter 1.0 ],
         Root.quadraticWith preserve (coefficient 1.0) (coefficient -2.0) (coefficient 1.0)
     )
+
+[<Fact>]
+let ``quadratic coefficient tolerance`` () =
+    let tolerant =
+        { CoefficientTolerance = coefficient 1.0e-6
+          RepeatedRootPolicy = ConsolidateRepeatedRoot }
 
     Assert.Equal<float<parameter> list>(
         [ parameter 0.5 ],
@@ -70,22 +86,25 @@ let ``polynomial evaluation and differentiation preserve coefficient units`` () 
     Assert.Equal<float<length> list>([ coefficient 4.0; coefficient -3.0 ], derivative)
 
 [<Fact>]
-let ``cubic solver finds distinct and repeated real roots`` () =
+let ``cubic finds three real roots`` () =
     let three =
         Root.cubic (coefficient 1.0) (coefficient -6.0) (coefficient 11.0) (coefficient -6.0)
         |> unwrap
 
+    Assert.Equal(3, three.Length)
+    List.iter2 near [ 1.0; 2.0; 3.0 ] three
+
+[<Fact>]
+let ``cubic preserves repeated root`` () =
     let repeated =
         Root.cubic (coefficient 1.0) (coefficient 0.0) (coefficient -3.0) (coefficient 2.0)
         |> unwrap
 
-    Assert.Equal(3, three.Length)
-    List.iter2 near [ 1.0; 2.0; 3.0 ] three
     Assert.Equal(2, repeated.Length)
     List.iter2 near [ -2.0; 1.0 ] repeated
 
 [<Fact>]
-let ``polynomial isolation preserves even roots and five simple roots`` () =
+let ``polynomial roots find even multiplicity root`` () =
     let options: PolynomialOptions = Root.defaultPolynomialOptions ()
 
     let repeated =
@@ -95,6 +114,13 @@ let ``polynomial isolation preserves even roots and five simple roots`` () =
             (parameter 2.0)
             options
         |> unwrap
+
+    Assert.Single(repeated) |> ignore
+    near 1.0 repeated.Head
+
+[<Fact>]
+let ``quintic roots in unit interval`` () =
+    let options: PolynomialOptions = Root.defaultPolynomialOptions ()
 
     let quintic =
         Root.polynomialRootsWith
@@ -109,8 +135,6 @@ let ``polynomial isolation preserves even roots and five simple roots`` () =
             options
         |> unwrap
 
-    Assert.Single(repeated) |> ignore
-    near 1.0 repeated.Head
     Assert.Equal(5, quintic.Length)
     List.iter2 near [ 0.1; 0.3; 0.5; 0.7; 0.9 ] quintic
 
@@ -164,7 +188,20 @@ let ``polynomial classification is coefficient-scale independent`` () =
     Assert.Equal(PositiveToPositive, classify 1.0e18)
 
 [<Fact>]
-let ``classified roots distinguish crossings even roots and endpoints`` () =
+let ``polynomial bisection handles flat derivative region`` () =
+    let solution =
+        Root.polynomialRootsWith
+            [ coefficient 1.0; coefficient 0.0; coefficient 0.0; coefficient -0.001 ]
+            (parameter -1.0)
+            (parameter 1.0)
+            (Root.defaultPolynomialOptions ())
+        |> unwrap
+        |> List.exactlyOne
+
+    near 0.1 solution
+
+[<Fact>]
+let ``classified polynomial roots report sign changes`` () =
     let options: PolynomialOptions = Root.defaultPolynomialOptions ()
 
     let crossing =
@@ -176,6 +213,15 @@ let ``classified roots distinguish crossings even roots and endpoints`` () =
         |> unwrap
         |> List.exactlyOne
 
+    near 0.0 crossing.Isolation.Estimate
+    Assert.Equal(NegativeToPositive, crossing.Kind)
+    Assert.True(Root.isSignChangeRoot NegativeToPositive)
+    Assert.True(Root.isCrossingRoot PositiveToNegative)
+
+[<Fact>]
+let ``classified polynomial roots report even roots`` () =
+    let options: PolynomialOptions = Root.defaultPolynomialOptions ()
+
     let positiveEven =
         Root.classifiedPolynomialRootsWith
             [ coefficient 1.0; coefficient 0.0; coefficient 0.0 ]
@@ -185,31 +231,52 @@ let ``classified roots distinguish crossings even roots and endpoints`` () =
         |> unwrap
         |> List.exactlyOne
 
-    let endpoint =
-        Root.realLinear01Roots (coefficient 1.0) (coefficient 0.0) options
-        |> unwrap
-        |> List.exactlyOne
-
-    Assert.Equal(NegativeToPositive, crossing.Kind)
-    Assert.True(Root.isSignChangeRoot crossing.Kind)
-    Assert.Equal(PositiveToPositive, positiveEven.Kind)
-    Assert.False(Root.isCrossingRoot positiveEven.Kind)
-    Assert.Equal(NegativeToPositive, endpoint.Kind)
-
-    let endPoint =
-        Root.realLinear01Roots (coefficient -1.0) (coefficient 1.0) options
-        |> unwrap
-        |> List.exactlyOne
-
-    let negativeEvenEndpoint =
-        Root.realQuadratic01Roots
-            (coefficient -1.0)
-            (coefficient 0.0)
-            (coefficient 0.0)
+    let negativeEven =
+        Root.classifiedPolynomialRootsWith
+            [ coefficient -1.0; coefficient 0.0; coefficient 0.0 ]
+            (parameter -1.0)
+            (parameter 1.0)
             options
         |> unwrap
         |> List.exactlyOne
 
+    Assert.Equal(PositiveToPositive, positiveEven.Kind)
+    Assert.False(Root.isSignChangeRoot positiveEven.Kind)
+    Assert.Equal(NegativeToNegative, negativeEven.Kind)
+    Assert.False(Root.isCrossingRoot negativeEven.Kind)
+
+[<Fact>]
+let ``classified polynomial roots classify endpoint roots`` () =
+    let options: PolynomialOptions = Root.defaultPolynomialOptions ()
+
+    let startPoint =
+        Root.classifiedPolynomialRootsWith
+            [ coefficient 1.0; coefficient 0.0 ]
+            (parameter 0.0)
+            (parameter 1.0)
+            options
+        |> unwrap
+        |> List.exactlyOne
+
+    let endPoint =
+        Root.classifiedPolynomialRootsWith
+            [ coefficient -1.0; coefficient 1.0 ]
+            (parameter 0.0)
+            (parameter 1.0)
+            options
+        |> unwrap
+        |> List.exactlyOne
+
+    let negativeEvenEndpoint =
+        Root.classifiedPolynomialRootsWith
+            [ coefficient -1.0; coefficient 0.0; coefficient 0.0 ]
+            (parameter 0.0)
+            (parameter 1.0)
+            options
+        |> unwrap
+        |> List.exactlyOne
+
+    Assert.Equal(NegativeToPositive, startPoint.Kind)
     Assert.Equal(PositiveToNegative, endPoint.Kind)
     Assert.Equal(NegativeToNegative, negativeEvenEndpoint.Kind)
 

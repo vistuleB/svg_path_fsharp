@@ -186,6 +186,12 @@ module Effects =
                 let radius = radiusFor spec.Index radii
                 let trim = radius * spec.TrimPerRadius
                 if radius <= options.DistanceTolerance || trim <= options.DistanceTolerance then Ok accumulated
+                elif trim >= infos[spec.Index].Length - options.DistanceTolerance
+                     || trim >= infos[(spec.Index + 1) % infos.Length].Length - options.DistanceTolerance then
+                    match options.Failure with
+                    | ErrorOnFailure -> Error(CannotRoundCorner spec.Index)
+                    | LeaveCorner -> Ok accumulated
+                    | AdaptRadius -> Error(CornerTrimsOverlap spec.Index)
                 else
                     let incoming = infos[spec.Index]
                     let outgoing = infos[(spec.Index + 1) % infos.Length]

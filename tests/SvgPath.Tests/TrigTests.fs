@@ -15,11 +15,14 @@ let ``degree and radian conversions carry their measures`` () =
     Assert.Equal(180.0, asFloat roundTrip, 12)
 
 [<Fact>]
-let ``sine and cosine return exact quarter turns`` () =
+let ``sin degrees returns exact values at quarter turns`` () =
     Assert.Equal(0.0, Trig.sinDegrees (degrees 0.0))
     Assert.Equal(1.0, Trig.sinDegrees (degrees 90.0))
     Assert.Equal(0.0, Trig.sinDegrees (degrees 180.0))
     Assert.Equal(-1.0, Trig.sinDegrees (degrees -90.0))
+
+[<Fact>]
+let ``cos degrees returns exact values at quarter turns`` () =
     Assert.Equal(1.0, Trig.cosDegrees (degrees 360.0))
     Assert.Equal(0.0, Trig.cosDegrees (degrees -90.0))
 
@@ -32,13 +35,18 @@ let ``tangent returns exact safe eighth turns`` () =
     Assert.Equal(-1.0, Trig.tanDegrees (degrees -45.0))
 
 [<Fact>]
-let ``atan2 returns exact axis and diagonal angles for measured inputs`` () =
+let ``atan2 degrees returns exact axis angles`` () =
     let angle y x = Trig.atan2Degrees (Length.fromFloat y) (Length.fromFloat x) |> asFloat
 
     Assert.Equal(0.0, angle 0.0 1.0)
     Assert.Equal(90.0, angle 1.0 0.0)
     Assert.Equal(180.0, angle 0.0 -1.0)
     Assert.Equal(-90.0, angle -1.0 0.0)
+
+[<Fact>]
+let ``atan2 degrees returns exact diagonal angles`` () =
+    let angle y x = Trig.atan2Degrees (Length.fromFloat y) (Length.fromFloat x) |> asFloat
+
     Assert.Equal(45.0, angle 1.0 1.0)
     Assert.Equal(135.0, angle 1.0 -1.0)
     Assert.Equal(-135.0, angle -1.0 -1.0)

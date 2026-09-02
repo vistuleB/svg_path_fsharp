@@ -10,23 +10,20 @@ let ``hypot avoids representable intermediate overflow`` () =
     Assert.True(Double.IsFinite result)
     Assert.True(result > 1.4e308)
 
-[<Theory>]
-[<InlineData("1", 1.0)>]
-[<InlineData(".5", 0.5)>]
-[<InlineData("+2.5e2", 250.0)>]
-let ``parse accepts finite SVG number forms`` raw expected =
-    Assert.Equal(Ok expected, InternalNumber.parse raw)
+[<Fact>]
+let ``parse accepts finite SVG number forms`` () =
+    [ "1", 1.0; ".5", 0.5; "+2.5e2", 250.0 ]
+    |> List.iter (fun (raw, expected) ->
+        Assert.Equal(Ok expected, InternalNumber.parse raw))
 
 [<Fact>]
 let ``parse rejects nonfinite results`` () =
     Assert.Equal(Error(), InternalNumber.parse "1e400")
 
-[<Theory>]
-[<InlineData("23.")>]
-[<InlineData("23.e2")>]
-[<InlineData("-0.E-4")>]
-let ``parse rejects SVG numbers with a trailing decimal point`` raw =
-    Assert.Equal(Error(), InternalNumber.parse raw)
+[<Fact>]
+let ``parse rejects SVG numbers with a trailing decimal point`` () =
+    [ "23."; "23.e2"; "-0.E-4" ]
+    |> List.iter (fun raw -> Assert.Equal(Error(), InternalNumber.parse raw))
 
 [<Fact>]
 let ``checked arithmetic rejects overflow`` () =

@@ -34,9 +34,12 @@ let ``parameter from end converts reversed addresses`` () =
     Assert.Equal(Ok(at 1 0.75), Subpath.parameterFromEnd subpath 2 (t 0.25))
 
 [<Fact>]
-let ``parameter from end rejects empty and invalid addresses`` () =
+let ``parameter from end rejects empty subpaths`` () =
     let empty = Subpath.empty (point 0.0 0.0)
     Assert.Equal(Error EmptySubpath, Subpath.parameterFromEnd empty 0 (t 0.0))
+
+[<Fact>]
+let ``parameter from end rejects invalid reversed addresses`` () =
     let subpath = openLines 2
     Assert.Equal(Error(InvalidSubpathParameter(2, t 0.0, 2)), Subpath.parameterFromEnd subpath 2 (t 0.0))
     Assert.Equal(Error(InvalidSubpathParameter(0, t -0.1, 2)), Subpath.parameterFromEnd subpath 0 (t -0.1))
@@ -48,11 +51,17 @@ let ``canonicalization changes only exact segment boundaries`` () =
     Assert.Equal(Ok(at 0 0.9999999), Subpath.parameterCanonicalize subpath (at 0 0.9999999))
 
 [<Fact>]
-let ``parameter snapping handles internal open and closed boundaries`` () =
+let ``parameter snapping snaps internal segment end`` () =
     let openSubpath = openLines 2
     Assert.Equal(Ok(at 1 0.0), Subpath.parameterSnapToBoundary openSubpath (at 0 0.9999999) (t 1.0e-6))
+
+[<Fact>]
+let ``parameter snapping keeps open final endpoint`` () =
     let one = openLines 1
     Assert.Equal(Ok(at 0 1.0), Subpath.parameterSnapToBoundary one (at 0 0.9999999) (t 1.0e-6))
+
+[<Fact>]
+let ``parameter snapping snaps closed wrap`` () =
     let closed =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
@@ -69,19 +78,27 @@ let ``parameter snapping rejects invalid tolerance and address`` () =
         Subpath.parameterSnapToBoundary subpath (at 1 0.5) (t 1.0e-6))
 
 [<Fact>]
-let ``subpath point and derivative evaluate an addressed segment`` () =
+let ``subpath point evaluates segment address`` () =
     let subpath = openLines 2
     Assert.Equal(Ok(point 15.0 0.0), Subpath.point subpath (at 1 0.5))
+
+[<Fact>]
+let ``subpath derivative evaluates segment address`` () =
+    let subpath = openLines 2
     Assert.Equal(
         Ok(Point.create 10.0<length / parameter> 0.0<length / parameter>),
         Subpath.derivative subpath (at 1 0.5))
 
 [<Fact>]
-let ``subpath split handles interior points and internal vertices`` () =
+let ``subpath split splits inside segment`` () =
     let subpath = openLines 2
     let left, right = Subpath.split subpath (at 0 0.5) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(point 5.0 0.0, Segment.finish (List.last left.Segments))
     Assert.Equal(point 5.0 0.0, right.Start)
+
+[<Fact>]
+let ``subpath split splits at internal vertex`` () =
+    let subpath = openLines 2
     let before, after = Subpath.split subpath (at 0 1.0) |> Result.defaultWith (failwithf "%A")
     Assert.Single(before.Segments) |> ignore
     Assert.Single(after.Segments) |> ignore
@@ -97,7 +114,7 @@ let ``subpath split rejects closed endpoint and outside parameters`` () =
     Assert.True(closed |> Result.bind (fun value -> Subpath.split value (at 0 0.5)) |> Result.isError)
 
 [<Fact>]
-let ``reversed address can drive open-at and between`` () =
+let ``parameter from end can address open at`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let ab, bc, cd, da = Line(a, b), Line(b, c), Line(c, d), Line(d, a)
     let closed =
@@ -109,6 +126,8 @@ let ``reversed address can drive open-at and between`` () =
     Assert.Equal<Segment list>([ bc; cd; da; ab ], opened.Segments)
     Assert.Equal(b, opened.Start)
 
+[<Fact>]
+let ``parameter from end can address subpath between`` () =
     let straight = openLines 3
     let fromValue = Subpath.parameterFromEnd straight 2 (t 0.0) |> Result.defaultWith (failwithf "%A")
     let toValue = Subpath.parameterFromEnd straight 0 (t 1.0) |> Result.defaultWith (failwithf "%A")
@@ -123,17 +142,26 @@ let ``derivative canonicalizes an internal endpoint to the next segment`` () =
     Assert.Equal(
         Ok(Point.create 0.0<length / parameter> 20.0<length / parameter>),
         Subpath.derivative subpath (at 0 1.0))
+
+[<Fact>]
+let ``subpath point and derivative reject invalid parameters`` () =
     Assert.Equal(Error(InvalidSubpathParameter(1, t 0.0, 1)), Subpath.point (openLines 1) (at 1 0.0))
     Assert.Equal(Error(InvalidSubpathParameter(0, t -0.1, 1)), Subpath.derivative (openLines 1) (at 0 -0.1))
 
 [<Fact>]
-let ``between extracts open and wrapped closed intervals`` () =
+let ``between extracts open interval across segments`` () =
     let straight = openLines 3
     let piece = Subpath.between straight (at 0 0.5) (at 2 0.5) |> Result.defaultWith (failwithf "%A")
     Assert.Equal<Segment list>([ line 5.0 10.0; line 10.0 20.0; line 20.0 25.0 ], piece.Segments)
+
+[<Fact>]
+let ``between rejects equal and reversed open intervals`` () =
+    let straight = openLines 3
     Assert.Equal(Error(InvalidSubpathInterval(at 0 0.5, at 0 0.5)), Subpath.between straight (at 0 0.5) (at 0 0.5))
     Assert.Equal(Error(InvalidSubpathInterval(at 1 0.5, at 0 0.5)), Subpath.between straight (at 1 0.5) (at 0 0.5))
 
+[<Fact>]
+let ``between wraps closed intervals`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let closed =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
@@ -163,7 +191,7 @@ let ``open between-many rejects boundary and duplicate points exactly`` () =
         Subpath.betweenMany subpath [ at 0 1.0; at 1 0.0 ])
 
 [<Fact>]
-let ``closed between-many accepts cyclic order and one opening point`` () =
+let ``closed between-many accepts cyclic order`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let closed =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
@@ -174,6 +202,14 @@ let ``closed between-many accepts cyclic order and one opening point`` () =
     Assert.Equal(2, pieces[0].Segments.Length)
     Assert.Equal(3, pieces[1].Segments.Length)
     Assert.Equal(2, pieces[2].Segments.Length)
+
+[<Fact>]
+let ``closed between-many accepts single split point`` () =
+    let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
+    let closed =
+        Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
+        |> Result.bind (Subpath.setClosed true)
+        |> Result.defaultWith (failwithf "%A")
     let opened = Subpath.betweenMany closed [ at 1 0.5 ] |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.False(opened.Closed)
     Assert.Equal(point 10.0 5.0, opened.Start)

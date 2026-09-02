@@ -17,6 +17,7 @@ type private LinearTransform =
 [<RequireQualifiedAccess>]
 module TransformSerialize =
     let private rotationScaleEpsilon = 0.000001
+    let private identityScaleEpsilon = 0.0000000000001
 
     let defaultOptions () =
         { DecimalPlaces = Some 5
@@ -104,7 +105,8 @@ module TransformSerialize =
         else analyzeRotationScale a b c d
 
     let private scaleOptionalTransform x y options =
-        if x = 1.0 && y = 1.0 then "" else scaleTransform x y options
+        let closeToIdentity value = abs (value - 1.0) <= identityScaleEpsilon
+        if closeToIdentity x && closeToIdentity y then "" else scaleTransform x y options
 
     let private linearTransform linear options =
         match linear with

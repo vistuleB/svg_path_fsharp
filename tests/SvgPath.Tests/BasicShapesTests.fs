@@ -28,35 +28,49 @@ let ``rounded rectangle uses four elliptical quarter arcs`` () =
     Assert.True(arcs |> List.forall (fun arc -> arc.Radius = point 10.0 5.0 && arc.Sweep && not arc.LargeArc))
 
 [<Fact>]
-let ``rectangle copies and clamps omitted radii`` () =
+let ``rectangle uses single radius for both axes`` () =
     let copied = BasicShapes.rect (length 0.0) (length 0.0) (length 20.0) (length 20.0) (Some(length 5.0)) None |> Result.defaultWith (failwithf "%A")
-    let clamped = BasicShapes.rect (length 0.0) (length 0.0) (length 20.0) (length 10.0) (Some(length 50.0)) (Some(length 50.0)) |> Result.defaultWith (failwithf "%A")
     let firstArc (subpath: Subpath) = subpath.Segments |> List.pick (function Arc arc -> Some arc | _ -> None)
     Assert.Equal(point 5.0 5.0, (firstArc copied).Radius)
+
+[<Fact>]
+let ``rectangle clamps corner radii`` () =
+    let clamped = BasicShapes.rect (length 0.0) (length 0.0) (length 20.0) (length 10.0) (Some(length 50.0)) (Some(length 50.0)) |> Result.defaultWith (failwithf "%A")
+    let firstArc (subpath: Subpath) = subpath.Segments |> List.pick (function Arc arc -> Some arc | _ -> None)
     Assert.Equal(point 10.0 5.0, (firstArc clamped).Radius)
 
 [<Fact>]
-let ``circle and ellipse use four exact arcs`` () =
+let ``circle converts to SVG equivalent path`` () =
     let circle = BasicShapes.circle (length 10.0) (length 20.0) (length 5.0) |> Result.defaultWith (failwithf "%A")
-    let ellipse = BasicShapes.ellipse (length 10.0) (length 20.0) (length 7.0) (length 3.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(point 15.0 20.0, circle.Start)
-    Assert.Equal(point 17.0 20.0, ellipse.Start)
     Assert.Equal(4, List.length circle.Segments)
+
+[<Fact>]
+let ``ellipse converts to SVG equivalent path`` () =
+    let ellipse = BasicShapes.ellipse (length 10.0) (length 20.0) (length 7.0) (length 3.0) |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(point 17.0 20.0, ellipse.Start)
     Assert.Equal(4, List.length ellipse.Segments)
     let midpoint = Segment.point (List.head ellipse.Segments) (Parameter.fromFloat 0.5) |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.distance midpoint (point 14.9497474683 22.1213203436) < length 1.0e-9)
 
 [<Fact>]
-let ``line polyline and polygon preserve topology`` () =
+let ``line converts to subpath`` () =
     let line = BasicShapes.line (length 1.0) (length 2.0) (length 3.0) (length 4.0) |> Result.defaultWith (failwithf "%A")
+    Assert.False line.Closed
+    Assert.Equal(1, List.length line.Segments)
+
+[<Fact>]
+let ``polyline converts points to open subpath`` () =
     let points = [ point 1.0 2.0; point 3.0 4.0; point 5.0 4.0 ]
     let polyline = BasicShapes.polyline points |> Result.defaultWith (failwithf "%A")
-    let polygon = BasicShapes.polygon points |> Result.defaultWith (failwithf "%A")
-    Assert.False line.Closed
     Assert.False polyline.Closed
-    Assert.True polygon.Closed
-    Assert.Equal(1, List.length line.Segments)
     Assert.Equal(2, List.length polyline.Segments)
+
+[<Fact>]
+let ``polygon converts points to closed subpath`` () =
+    let points = [ point 1.0 2.0; point 3.0 4.0; point 5.0 4.0 ]
+    let polygon = BasicShapes.polygon points |> Result.defaultWith (failwithf "%A")
+    Assert.True polygon.Closed
     Assert.Equal(3, List.length polygon.Segments)
     Assert.Equal(polygon.Start, polygon.Segments |> List.last |> Segment.finish)
 

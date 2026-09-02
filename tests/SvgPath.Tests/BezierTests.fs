@@ -54,10 +54,13 @@ let ``quadratic bounding box includes its interior extremum`` () =
     Assert.Equal(point 2.0 1.0, box.Max)
 
 [<Fact>]
-let ``line and cubic bounding boxes include their exact extrema`` () =
+let ``line bounding box uses endpoint extents`` () =
     let line = LinearBezierData(point 1.0 2.0, point 5.0 -3.0) |> Bezier.boundingBox
     Assert.Equal(point 1.0 -3.0, line.Min)
     Assert.Equal(point 5.0 2.0, line.Max)
+
+[<Fact>]
+let ``cubic bounding box includes interior extrema`` () =
     let cubic = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0) |> Bezier.boundingBox
     Assert.Equal(point 0.0 0.0, cubic.Min)
     Assert.Equal(point 30.0 22.5, cubic.Max)
@@ -167,13 +170,16 @@ let ``endpoint tangent fitting clamps negative handles`` () =
     Assert.Equal(CollapsedHandle, report.StartHandle)
 
 [<Fact>]
-let ``endpoint tangent fitting rejects degenerate tangents and missing samples`` () =
+let ``endpoint tangent fitting rejects degenerate tangent`` () =
     Assert.Equal(
         Error DegenerateTangent,
         Bezier.fitCubicWithEndpointTangents
             (point 0.0 0.0) (point 10.0 0.0)
             (point 0.0 0.0) (point 1.0 0.0)
             [ parameter 0.5, point 5.0 1.0 ])
+
+[<Fact>]
+let ``endpoint tangent fitting rejects underdetermined samples`` () =
     Assert.Equal(
         Error UnderdeterminedCubicFit,
         Bezier.fitCubicWithEndpointTangents
@@ -222,7 +228,7 @@ let ``endpoint-only fitting reports noisy samples`` () =
     Assert.True(report.Max > 0.0<length>)
 
 [<Fact>]
-let ``endpoint-only fitting accepts small equations and rejects insufficient samples`` () =
+let ``endpoint-only fitting accepts small well-conditioned equations`` () =
     let original = CubicBezierData(point 0.0 0.0, point 2.0 3.0, point 7.0 -2.0, point 10.0 1.0)
     let samples =
         [ parameter 0.0001, Bezier.point original (parameter 0.0001)
@@ -237,6 +243,9 @@ let ``endpoint-only fitting accepts small equations and rejects insufficient sam
     | _ -> Assert.Fail "expected cubic curves"
     Assert.Equal(UnconstrainedHandle, report.StartHandle)
     Assert.Equal(UnconstrainedHandle, report.EndHandle)
+
+[<Fact>]
+let ``endpoint-only fitting rejects underdetermined samples`` () =
     Assert.Equal(
         Error UnderdeterminedCubicFit,
         Bezier.fitCubicWithEndpoints
@@ -335,10 +344,13 @@ let ``inflection parameters are independent of coordinate scale`` () =
     Assert.Equal(0.5, Parameter.ratio root, 12)
 
 [<Fact>]
-let ``inflection search ignores non-inflecting and non-cubic curves`` () =
+let ``inflection search ignores non-inflecting curves`` () =
     let cubic = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
-    let quadratic = QuadraticBezierData(point 0.0 0.0, point 10.0 10.0, point 20.0 0.0)
     Assert.Empty(Bezier.cubicInflectionParameters cubic)
+
+[<Fact>]
+let ``inflection search ignores non-cubic curves`` () =
+    let quadratic = QuadraticBezierData(point 0.0 0.0, point 10.0 10.0, point 20.0 0.0)
     Assert.Empty(Bezier.cubicInflectionParameters quadratic)
 
 [<Fact>]
@@ -364,11 +376,14 @@ let ``self intersection is independent of coordinate scale`` () =
     Assert.Equal(0.75, Parameter.ratio intersection.T, 10)
 
 [<Fact>]
-let ``self intersection ignores non-looping and non-cubic curves`` () =
+let ``self intersection ignores non-looping cubic`` () =
     let cubic = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
+    Assert.Empty(Bezier.cubicSelfIntersections cubic |> Result.defaultWith (failwithf "%A"))
+
+[<Fact>]
+let ``self intersection ignores non-cubic curves`` () =
     let line = LinearBezierData(point 0.0 0.0, point 10.0 0.0)
     let quadratic = QuadraticBezierData(point 0.0 0.0, point 10.0 10.0, point 20.0 0.0)
-    Assert.Empty(Bezier.cubicSelfIntersections cubic |> Result.defaultWith (failwithf "%A"))
     Assert.Empty(Bezier.cubicSelfIntersections line |> Result.defaultWith (failwithf "%A"))
     Assert.Empty(Bezier.cubicSelfIntersections quadratic |> Result.defaultWith (failwithf "%A"))
 

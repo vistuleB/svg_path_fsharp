@@ -22,13 +22,18 @@ let ``collapsed cubic endpoint recovers the next nonzero derivative`` () =
     near (Point.create 0.0 1.0) directions.Outgoing.Value
 
 [<Fact>]
-let ``stationary quadratic and cubic distinguish the two reversal sides`` () =
+let ``segment directions distinguish stationary reversal sides`` () =
     let quadratic = QuadraticBezier(point 1.0 0.0, point -1.0 0.0, point 1.0 0.0)
+    let directions = Segment.directions quadratic (t 0.5) |> Result.defaultWith (failwithf "%A")
+    near (Point.create -1.0 0.0) directions.Incoming.Value
+    near (Point.create 1.0 0.0) directions.Outgoing.Value
+
+[<Fact>]
+let ``cubic directions distinguish stationary reversal sides`` () =
     let cubic = CubicBezier(point 0.25 0.0, point -0.08333333333333333 0.0, point -0.08333333333333333 0.0, point 0.25 0.0)
-    for segment in [ quadratic; cubic ] do
-        let directions = Segment.directions segment (t 0.5) |> Result.defaultWith (failwithf "%A")
-        near (Point.create -1.0 0.0) directions.Incoming.Value
-        near (Point.create 1.0 0.0) directions.Outgoing.Value
+    let directions = Segment.directions cubic (t 0.5) |> Result.defaultWith (failwithf "%A")
+    near (Point.create -1.0 0.0) directions.Incoming.Value
+    near (Point.create 1.0 0.0) directions.Outgoing.Value
 
 [<Fact>]
 let ``third-order collapsed cubic endpoint direction is recovered`` () =

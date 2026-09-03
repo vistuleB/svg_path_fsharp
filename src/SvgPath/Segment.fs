@@ -217,6 +217,11 @@ type LinearizeOptions =
 
 [<RequireQualifiedAccess>]
 module Segment =
+    let arcFromEndpointData data = Arc data
+
+    let arcFromCenterData data =
+        data |> Ellipse.centerToEndpoint |> Arc
+
     let private curveParameterTolerance = 1.0e-9<parameter>
 
     let defaultLinearizeOptions =

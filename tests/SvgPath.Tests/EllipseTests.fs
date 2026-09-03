@@ -18,6 +18,44 @@ let private assertPointNear tolerance (expected: Point<'Unit>) (actual: Point<'U
     Assert.True(Point.distance expected actual <= tolerance, $"expected {expected}, got {actual}")
 
 [<Fact>]
+let ``endpoint to center exposes corrected center parameters`` () =
+    let endpoint =
+        { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = degrees 0.0
+          LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let arc = Ellipse.endpointToCenter endpoint |> Result.defaultWith (failwithf "%A")
+    assertPointNear 1.0e-6<length> (point 10.0 0.0) arc.Center
+    assertPointNear 1.0e-6<length> (point 10.0 10.0) arc.Radius
+    Assert.Equal(degrees 0.0, arc.XAxisRotation)
+    Assert.InRange(arc.StartAngle, degrees -180.0, degrees 180.0)
+    Assert.True(abs (arc.DeltaAngle - degrees 180.0) <= degrees 1.0e-9)
+
+[<Fact>]
+let ``arc point uses angular progress`` () =
+    let endpoint =
+        { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = degrees 0.0
+          LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let arc = Ellipse.endpointToCenter endpoint |> Result.defaultWith (failwithf "%A")
+    assertPointNear 1.0e-6<length> endpoint.Start (Ellipse.arcPoint arc (parameter 0.0))
+    assertPointNear 1.0e-6<length> (point 10.0 -10.0) (Ellipse.arcPoint arc (parameter 0.5))
+    assertPointNear 1.0e-6<length> endpoint.End (Ellipse.arcPoint arc (parameter 1.0))
+    Assert.True(abs (Ellipse.angleAt arc (parameter 0.5) - (arc.StartAngle + degrees 90.0)) <= degrees 1.0e-9)
+    Assert.True(abs (Ellipse.arcEndAngle arc - (arc.StartAngle + arc.DeltaAngle)) <= degrees 1.0e-9)
+
+[<Fact>]
+let ``arc derivative follows arc traversal direction`` () =
+    let endpoint sweep =
+        { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = degrees 0.0
+          LargeArc = false; Sweep = sweep; End = point 20.0 0.0 }
+    let swept = endpoint true |> Ellipse.endpointToCenter |> Result.defaultWith (failwithf "%A")
+    let unswept = endpoint false |> Ellipse.endpointToCenter |> Result.defaultWith (failwithf "%A")
+    let sweptDerivative = Ellipse.arcDerivative swept (parameter 0.5)
+    let unsweptDerivative = Ellipse.arcDerivative unswept (parameter 0.5)
+    Assert.True(sweptDerivative.X > 0.0<length / parameter>)
+    Assert.True(unsweptDerivative.X > 0.0<length / parameter>)
+    Assert.True(abs sweptDerivative.Y <= 1.0e-6<length / parameter>)
+    Assert.True(abs unsweptDerivative.Y <= 1.0e-6<length / parameter>)
+
+[<Fact>]
 let ``arc evaluation carries parameter powers through both derivatives`` () =
     Assert.Equal(point 4.0 0.0, Ellipse.arcPoint quarterEllipse (parameter 0.0))
     let first = Ellipse.arcDerivative quarterEllipse (parameter 0.0)
@@ -73,7 +111,7 @@ let ``zero radius endpoint arc is rejected`` () =
     Assert.Equal(Error DegenerateInputArc, Ellipse.endpointToCenter endpoint)
 
 [<Fact>]
-let ``arc splitting preserves the original angular interval`` () =
+let ``split arc divides center data at t`` () =
     let left, right = Ellipse.splitArc quarterEllipse (parameter 0.25)
     Assert.Equal(degrees 22.5, left.DeltaAngle)
     Assert.Equal(degrees 22.5, right.StartAngle)
@@ -112,7 +150,7 @@ let ``transformed axes preserve ellipse geometry under nonuniform scale`` () =
     Assert.Equal(degrees 0.0, rotation)
 
 [<Fact>]
-let ``transformed axes retain valid radii below square root of length tolerance`` () =
+let ``transformed axes accepts radii below old squared threshold`` () =
     let radius, _rotation =
         Ellipse.transformedAxes (point 1.0e-5 2.0e-5) (degrees 17.0) (Affine.identity ())
         |> Result.defaultWith (failwithf "%A")
@@ -136,7 +174,7 @@ let ``collapsed arc produces a line on its surviving transformed axis`` () =
     Assert.Equal(point 4.0 0.0, endPoint)
 
 [<Fact>]
-let ``collapsed arc collinearity is relative to the transformed scale`` () =
+let ``collapsed arc collinearity is scale relative`` () =
     let nearlyRankOne =
         Affine.matrix 1.0 0.0 1.0 1.0e-10 0.0<length> 0.0<length>
 
@@ -153,7 +191,7 @@ let ``collapsed arc collinearity is relative to the transformed scale`` () =
         |> ignore
 
 [<Fact>]
-let ``half-circle bounding boxes follow the sweep flag`` () =
+let ``arc bounding box of sweep half circle uses lower half`` () =
     let endpoint sweep =
         { Start = point 0.0 0.0
           Radius = point 10.0 10.0
@@ -163,14 +201,24 @@ let ``half-circle bounding boxes follow the sweep flag`` () =
           End = point 20.0 0.0 }
 
     let swept = endpoint true |> Ellipse.endpointToCenter |> Result.defaultWith (failwithf "%A") |> Ellipse.arcBoundingBox
-    let unswept = endpoint false |> Ellipse.endpointToCenter |> Result.defaultWith (failwithf "%A") |> Ellipse.arcBoundingBox
     assertPointNear 1.0e-10<length> (point 0.0 -10.0) swept.Min
     assertPointNear 1.0e-10<length> (point 20.0 0.0) swept.Max
+
+[<Fact>]
+let ``arc bounding box of non sweep half circle uses upper half`` () =
+    let endpoint =
+        { Start = point 0.0 0.0
+          Radius = point 10.0 10.0
+          XAxisRotation = degrees 0.0
+          LargeArc = false
+          Sweep = false
+          End = point 20.0 0.0 }
+    let unswept = endpoint |> Ellipse.endpointToCenter |> Result.defaultWith (failwithf "%A") |> Ellipse.arcBoundingBox
     assertPointNear 1.0e-10<length> (point 0.0 0.0) unswept.Min
     assertPointNear 1.0e-10<length> (point 20.0 10.0) unswept.Max
 
 [<Fact>]
-let ``rotated arc bounding box includes interior extrema`` () =
+let ``arc bounding box of rotated arc includes interior extrema`` () =
     let arc =
         { Center = point 2.0 -3.0
           Radius = point 12.0 5.0
@@ -182,7 +230,7 @@ let ``rotated arc bounding box includes interior extrema`` () =
     assertPointNear 1.0e-5<length> (point 12.688779 4.399324) box.Max
 
 [<Fact>]
-let ``arc splitting permits endpoints and extrapolates outside them`` () =
+let ``split arc allows endpoint splits`` () =
     let arc =
         { Center = point 0.0 0.0
           Radius = point 5.0 5.0
@@ -199,6 +247,14 @@ let ``arc splitting permits endpoints and extrapolates outside them`` () =
     Assert.Equal(Ellipse.arcEndAngle arc, zeroEnd.StartAngle)
     Assert.Equal(degrees 0.0, zeroEnd.DeltaAngle)
 
+[<Fact>]
+let ``split arc extrapolates outside t`` () =
+    let arc =
+        { Center = point 0.0 0.0
+          Radius = point 5.0 5.0
+          XAxisRotation = degrees 0.0
+          StartAngle = degrees 1.0
+          DeltaAngle = degrees 2.0 }
     let before, throughEnd = Ellipse.splitArc arc (parameter -0.25)
     let throughPastEnd, backToEnd = Ellipse.splitArc arc (parameter 1.25)
     Assert.Equal(degrees -0.5, before.DeltaAngle)
@@ -209,7 +265,7 @@ let ``arc splitting permits endpoints and extrapolates outside them`` () =
     Assert.Equal(degrees -0.5, backToEnd.DeltaAngle)
 
 [<Fact>]
-let ``inside arc splitting rejects parameters outside the arc`` () =
+let ``split arc inside rejects outside t`` () =
     let arc =
         { Center = point 0.0 0.0
           Radius = point 5.0 5.0
@@ -222,7 +278,7 @@ let ``inside arc splitting rejects parameters outside the arc`` () =
     Assert.True(Ellipse.splitArcInside arc (parameter 1.0) |> Result.isOk)
 
 [<Fact>]
-let ``multi-split sorts parameters and removes duplicates`` () =
+let ``split arc many sorts and removes duplicate points`` () =
     let arc =
         { Center = point 0.0 0.0
           Radius = point 5.0 5.0
@@ -239,17 +295,17 @@ let ``multi-split sorts parameters and removes duplicates`` () =
     Assert.Equal<(float<degree> * float<degree>) list>(expected, pieces |> List.map (fun piece -> piece.StartAngle, piece.DeltaAngle))
 
 [<Fact>]
-let ``empty multi-split returns the original arc`` () =
+let ``split arc many without points returns original arc`` () =
     Assert.Equal<CenterArcData list>([ quarterEllipse ], Ellipse.splitArcMany quarterEllipse [])
 
 [<Fact>]
-let ``inside multi-split rejects any outside parameter`` () =
+let ``split arc inside many rejects any outside point`` () =
     let arc = { quarterEllipse with DeltaAngle = degrees 180.0 }
     Assert.Equal(Error SplitOutsideArc, Ellipse.splitArcInsideMany arc [ parameter 0.25; parameter 1.01 ])
     Assert.Equal(Error SplitOutsideArc, Ellipse.splitArcInsideMany arc [ parameter -0.01; parameter 0.75 ])
 
 [<Fact>]
-let ``inside multi-split accepts endpoints and removes duplicates`` () =
+let ``split arc inside many accepts endpoint points`` () =
     let arc =
         { Center = point 0.0 0.0
           Radius = point 5.0 5.0
@@ -266,7 +322,7 @@ let ``inside multi-split accepts endpoints and removes duplicates`` () =
     Assert.Equal(degrees 2.0, pieces[1].DeltaAngle)
 
 [<Fact>]
-let ``unrestricted multi-split preserves boundary parameters inside a wider split range`` () =
+let ``split arc many keeps boundary points when they are interior`` () =
     let arc =
         { Center = point 0.0 0.0
           Radius = point 5.0 5.0
@@ -283,7 +339,7 @@ let ``unrestricted multi-split preserves boundary parameters inside a wider spli
     Assert.Equal<(float<degree> * float<degree>) list>(expected, pieces |> List.map (fun piece -> piece.StartAngle, piece.DeltaAngle))
 
 [<Fact>]
-let ``large-arc and sweep flags are derived from delta angle`` () =
+let ``large arc and sweep are derived from delta angle`` () =
     let endpoint largeArc sweep =
         { Start = point 0.0 0.0
           Radius = point 10.0 10.0
@@ -300,3 +356,46 @@ let ``large-arc and sweep flags are derived from delta angle`` () =
     Assert.False(Ellipse.arcSweep smallUnswept)
     Assert.True(smallUnswept.DeltaAngle < degrees 0.0)
     Assert.True(abs smallUnswept.DeltaAngle < degrees 180.0)
+
+[<Fact>]
+let ``endpoint to center scales small radii up`` () =
+    let endpoint =
+        { Start = point 0.0 0.0; Radius = point 1.0 1.0; XAxisRotation = degrees 0.0
+          LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let arc = Ellipse.endpointToCenter endpoint |> Result.defaultWith (failwithf "%A")
+    assertPointNear 1.0e-6<length> (point 10.0 10.0) arc.Radius
+
+[<Fact>]
+let ``center to endpoint round trips arc data`` () =
+    let endpoint =
+        { Start = point 0.0 0.0; Radius = point 8.0 12.0; XAxisRotation = degrees 30.0
+          LargeArc = true; Sweep = false; End = point 10.0 5.0 }
+    let center = Ellipse.endpointToCenter endpoint |> Result.defaultWith (failwithf "%A")
+    let converted = Ellipse.centerToEndpoint center
+    assertPointNear 1.0e-6<length> endpoint.Start converted.Start
+    assertPointNear 1.0e-6<length> endpoint.End converted.End
+    assertPointNear 1.0e-6<length> center.Radius converted.Radius
+    Assert.Equal(endpoint.XAxisRotation, converted.XAxisRotation)
+    Assert.Equal(Ellipse.arcLargeArc center, converted.LargeArc)
+    Assert.Equal(Ellipse.arcSweep center, converted.Sweep)
+
+[<Fact>]
+let ``arc from center data creates svg path arc`` () =
+    let center =
+        { Center = point 10.0 0.0; Radius = point 10.0 10.0; XAxisRotation = degrees 0.0
+          StartAngle = degrees 180.0; DeltaAngle = degrees 180.0 }
+    match Segment.arcFromCenterData center with
+    | Arc endpoint ->
+        assertPointNear 1.0e-6<length> (point 0.0 0.0) endpoint.Start
+        assertPointNear 1.0e-6<length> (point 10.0 10.0) endpoint.Radius
+        Assert.False(endpoint.LargeArc)
+        Assert.True(endpoint.Sweep)
+        assertPointNear 1.0e-6<length> (point 20.0 0.0) endpoint.End
+    | segment -> failwithf "expected arc, got %A" segment
+
+[<Fact>]
+let ``arc from endpoint data creates svg path arc`` () =
+    let endpoint =
+        { Start = point 0.0 1.0; Radius = point 2.0 3.0; XAxisRotation = degrees 15.0
+          LargeArc = true; Sweep = false; End = point 4.0 5.0 }
+    Assert.Equal(Arc endpoint, Segment.arcFromEndpointData endpoint)

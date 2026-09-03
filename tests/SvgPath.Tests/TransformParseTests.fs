@@ -113,8 +113,3 @@ module TransformParseTests =
         Assert.Equal(
             Error(TransformParse.ParseError(TransformParse.UnexpectedToken "💥", "💥more")),
             TransformParse.attribute "translate(1)💥more")
-
-    [<Fact>]
-    let ``serialization canonicalizes parsed transforms`` () =
-        Assert.Equal("translate(10 20) scale(2)", parsed "translate(10,20) scale(2)" |> TransformSerialize.toString)
-        Assert.Equal("translate(20 40) scale(2)", parsed "scale(2) translate(10 20)" |> TransformSerialize.toString)

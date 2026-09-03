@@ -208,7 +208,8 @@ module Serialize =
     let private commandName (value: string) = if value.Length = 0 then "" else value.Substring(0, 1)
     let private commandArguments (value: string) (options: PathSerializeOptions) =
         let arguments = value.Substring 1
-        if options.MinimizeWhitespace then arguments else arguments.TrimStart()
+        if options.MinimizeWhitespace || arguments.Length = 0 then arguments
+        else arguments.Substring 1
     let private commandNames = set [ "M"; "m"; "L"; "l"; "H"; "h"; "V"; "v"; "Q"; "q"; "C"; "c"; "S"; "s"; "T"; "t"; "A"; "a"; "Z"; "z" ]
     let private repeatable = set [ "L"; "l"; "H"; "h"; "V"; "v"; "Q"; "q"; "C"; "c"; "S"; "s"; "T"; "t"; "A"; "a" ]
 

@@ -24,6 +24,16 @@ module ArrangementTests =
             |> Result.bind (fun graph -> Arrangement.insertAtomicSegment graph segment 1.0e-9<length> 1.0e-12<length>)) (Ok Arrangement.empty)
 
     [<Fact>]
+    let ``closed_square_builds_valid_graph_test`` () =
+        let square = rectangle 0.0 0.0 10.0 10.0
+        match Arrangement.build [ Path.ofSubpaths [ square ] ] 1.0e-6<length> 1.0e-5<length> with
+        | Error error -> failwithf "%A" error
+        | Ok build ->
+            Assert.Equal(4, build.Graph.Vertices.Length)
+            Assert.Equal(4, build.Graph.Edges.Length)
+            Assert.Equal(Ok(), Arrangement.validate build.Graph 1.0e-6<length> 1.0e-5<length>)
+
+    [<Fact>]
     let ``atomic insertion clusters endpoints and consolidates reversal`` () =
         let result =
             graphWithEdges
@@ -38,19 +48,27 @@ module ArrangementTests =
             Assert.Equal(1, graph.Edges.Head.ReverseMultiplicity)
 
     [<Fact>]
-    let ``forced parity reduces the uniquely largest incident capacity`` () =
+    let ``forced_parity_reduces_unique_edge_without_mutating_graph_test`` () =
         let graph =
             graphWithEdges
-                [ line 0.0 0.0 1.0 0.0
-                  line 0.0 0.0 1.0 0.0
-                  line 0.0 0.0 0.0 1.0 ]
+                [ line 0.0 0.0 10.0 0.0
+                  line 0.0 0.0 10.0 0.0 ]
             |> Result.defaultWith (fun error -> failwithf "%A" error)
-        let result = Arrangement.forcedParityCapacities graph []
+        let originalEdge = graph.Edges.Head
+        Assert.Equal(2, originalEdge.ForwardMultiplicity)
+        let startVertex = graph.Vertices |> List.find (fun vertex -> vertex.Point = point 0.0 0.0)
+        let endVertex = graph.Vertices |> List.find (fun vertex -> vertex.Point = point 10.0 0.0)
+        let result =
+            Arrangement.forcedParityCapacities
+                graph
+                [ RequiredVertexParity(startVertex.Id, 1)
+                  RequiredVertexParity(endVertex.Id, 1) ]
         match result with
         | Error error -> failwithf "%A" error
         | Ok capacities ->
-            let horizontal = capacities |> List.find (fun assignment -> assignment.EdgeId = 0)
-            Assert.Equal(0, horizontal.Capacity)
+            let assignment = Assert.Single(capacities)
+            Assert.Equal(1, assignment.Capacity)
+            Assert.Equal(2, originalEdge.ForwardMultiplicity)
 
     [<Fact>]
     let ``build nodes a transverse crossing symmetrically`` () =
@@ -109,7 +127,7 @@ module ArrangementTests =
             Assert.Single(owners) |> ignore
 
     [<Fact>]
-    let ``required parity rejects an isolated mismatch`` () =
+    let ``forced_parity_reports_capacity_infeasibility_test`` () =
         let graph = graphWithEdges [ line 0.0 0.0 1.0 0.0 ] |> Result.defaultWith (fun error -> failwithf "%A" error)
         let capacities = graph.Edges |> List.map (fun edge -> { EdgeId = edge.Id; Capacity = 0 })
         match Arrangement.forcedParityCapacitiesWith graph capacities [ RequiredVertexParity(0, 1) ] with
@@ -117,14 +135,14 @@ module ArrangementTests =
         | other -> failwithf "unexpected result: %A" other
 
     [<Fact>]
-    let ``validation enforces closed-boundary parity`` () =
+    let ``open_chain_fails_final_even_degree_invariant_test`` () =
         let graph = graphWithEdges [ line 0.0 0.0 1.0 0.0 ] |> Result.defaultWith (fun error -> failwithf "%A" error)
         match Arrangement.validate graph 1.0e-9<length> 1.0e-12<length> with
         | Error(OddWeightedDegree(0, 1)) -> ()
         | other -> failwithf "unexpected result: %A" other
 
     [<Fact>]
-    let ``dual square has infinite and bounded faces`` () =
+    let ``dual_square_has_infinite_and_bounded_faces_test`` () =
         let path = Path.ofSubpaths [ rectangle 0.0 0.0 10.0 10.0 ]
         match Arrangement.build [ path ] 1.0e-6<length> 1.0e-5<length> |> Result.bind (fun build -> Arrangement.dual build.Graph) with
         | Error error -> failwithf "%A" error
@@ -135,7 +153,7 @@ module ArrangementTests =
             Assert.Equal(4, dual.EdgeFaces.Length)
 
     [<Fact>]
-    let ``dual bounded face collects two island walks`` () =
+    let ``dual_bounded_face_collects_two_island_walks_test`` () =
         let path =
             Path.ofSubpaths
                 [ rectangle 0.0 0.0 30.0 20.0
@@ -183,7 +201,7 @@ module ArrangementTests =
           ReverseMultiplicity = 0 }
 
     [<Fact>]
-    let ``edge annotation pose follows midpoint tangent`` () =
+    let ``edge_annotation_pose_comes_from_segment_midpoint_and_tangent_test`` () =
         let pose = ArrangementDrawing.edgeAnnotationPose (drawingEdge (line 0.0 0.0 10.0 0.0))
         Assert.Equal(Ok { Point = point 5.0 0.0; Rotation = 90.0<degree> }, pose)
 
@@ -194,12 +212,12 @@ module ArrangementTests =
         Assert.Equal(Ok { Point = point 0.0 0.0; Rotation = 270.0<degree> }, pose)
 
     [<Fact>]
-    let ``edge annotation pose rejects directionless geometry`` () =
+    let ``edge_annotation_pose_rejects_directionless_segment_test`` () =
         let p = point 1.0 2.0
         Assert.Equal(Error IndeterminateDirection, ArrangementDrawing.edgeAnnotationPose (drawingEdge (Line(p, p))))
 
     [<Fact>]
-    let ``direction arrow recovers a collapsed cubic endpoint direction`` () =
+    let ``segment_direction_arrow_recovers_collapsed_cubic_endpoint_test`` () =
         let finish = point 10.0 10.0
         let segment = CubicBezier(point 0.0 0.0, point 0.0 10.0, finish, finish)
         Assert.True(ArrangementDrawing.segmentDirectionArrow segment "red" |> Result.isOk)

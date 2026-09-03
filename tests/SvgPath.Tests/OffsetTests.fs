@@ -6,7 +6,7 @@ open Xunit
 let private point x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
 
 [<Fact>]
-let ``subpath offset map uses arc length and visual left normal`` () =
+let ``subpath_offset_map_uses_cumulative_segment_lengths_test`` () =
     let subpath =
         Subpath.create [ Line(point 0.0 0.0, point 3.0 0.0); Line(point 3.0 0.0, point 3.0 4.0) ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
@@ -17,7 +17,7 @@ let ``subpath offset map uses arc length and visual left normal`` () =
     Assert.True(Point.distance second (point 4.0 2.0) < 1.0e-12<length>)
 
 [<Fact>]
-let ``closed subpath offset map wraps traveled distance`` () =
+let ``subpath_offset_map_wraps_closed_subpath_distances_test`` () =
     let subpath =
         Subpath.polygon [ point 0.0 0.0; point 2.0 0.0; point 2.0 2.0; point 0.0 2.0 ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
@@ -26,28 +26,28 @@ let ``closed subpath offset map wraps traveled distance`` () =
     Assert.True(Point.distance wrapped (point 1.0 0.0) < 1.0e-12<length>)
 
 [<Fact>]
-let ``line offset follows the visual left normal exactly`` () =
+let ``segment_offsets_line_to_visual_left_for_positive_distance_test`` () =
     let result =
         Offset.segment (Line(point 0.0 0.0, point 10.0 0.0)) 2.0<length>
         |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Equal<Segment list>([ Line(point 0.0 -2.0, point 10.0 -2.0) ], result.Segments)
 
 [<Fact>]
-let ``quadratic offset fit satisfies parameter samples`` () =
+let ``segment_offsets_quadratic_to_cubic_pieces_within_tolerance_test`` () =
     let source = QuadraticBezier(point 0.0 0.0, point 5.0 8.0, point 10.0 0.0)
     let result = Offset.segment source 1.0<length> |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.NotEmpty(result.Segments)
     Assert.True(result.Segments |> List.forall (function CubicBezier _ -> true | _ -> false))
 
 [<Fact>]
-let ``offset rejects a negative tangent heal angle`` () =
+let ``segment_rejects_negative_tangent_heal_angle_test`` () =
     let options = { Offset.defaultOptions with TangentHealAngleDegrees = -1.0<degree> }
     match Offset.segmentWith (Line(point 0.0 0.0, point 1.0 0.0)) 1.0<length> options with
     | Error(InvalidTangentHealAngleDegrees angle) -> Assert.Equal(-1.0<degree>, angle)
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
-let ``untrimmed open offset inserts a bevel join`` () =
+let ``subpath_untrimmed_offsets_open_polyline_with_bevel_join_test`` () =
     let source =
         Subpath.create [ Line(point 0.0 0.0, point 2.0 0.0); Line(point 2.0 0.0, point 2.0 2.0) ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
@@ -59,7 +59,7 @@ let ``untrimmed open offset inserts a bevel join`` () =
     Assert.Equal(Segment.finish result.Segments[1], Segment.start result.Segments[2])
 
 [<Fact>]
-let ``untrimmed join styles match the public polyline contracts`` () =
+let ``subpath_untrimmed_offsets_open_polyline_with_miter_join_by_default_test`` () =
     let source =
         Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]
         |> Result.defaultWith (failwithf "%A")
@@ -72,7 +72,18 @@ let ``untrimmed join styles match the public polyline contracts`` () =
     Assert.Equal("M 0 -2 H 10 A 2 2 0 0 1 12 0 V 10", render Round)
 
 [<Fact>]
-let ``untrimmed closed offset preserves closure`` () =
+let ``subpath_untrimmed_offsets_open_polyline_with_round_join_test`` () =
+    let source =
+        Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]
+        |> Result.defaultWith (failwithf "%A")
+    let result =
+        Offset.subpathUntrimmedWith source 2.0<length> { Offset.defaultOptions with Join = Round }
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Contains(result.Segments, function Arc _ -> true | _ -> false)
+    Assert.Equal("M 0 -2 H 10 A 2 2 0 0 1 12 0 V 10", Serialize.subpath result)
+
+[<Fact>]
+let ``subpath_untrimmed_offsets_closed_square_and_preserves_closed_state_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 4.0 0.0; point 4.0 4.0; point 0.0 4.0 ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
@@ -83,7 +94,7 @@ let ``untrimmed closed offset preserves closure`` () =
     Assert.Contains(result.Segments, function Arc _ -> true | _ -> false)
 
 [<Fact>]
-let ``circular arc offset remains circular`` () =
+let ``segment_offsets_circular_arc_exactly_test`` () =
     let source =
         Arc
             { Start = point 10.0 0.0
@@ -100,7 +111,7 @@ let ``circular arc offset remains circular`` () =
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
-let ``circular arc offset reverses sweep after crossing its center`` () =
+let ``segment_offsets_circular_arc_across_center_test`` () =
     let source =
         Arc
             { Start = point 10.0 0.0
@@ -119,7 +130,7 @@ let ``circular arc offset reverses sweep after crossing its center`` () =
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
-let ``segment rejects a circular arc at collapsed offset radius`` () =
+let ``segment_rejects_collapsed_circular_arc_offset_test`` () =
     let source =
         Arc
             { Start = point 10.0 0.0
@@ -133,13 +144,13 @@ let ``segment rejects a circular arc at collapsed offset radius`` () =
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
-let ``segment rejects a zero-length line`` () =
+let ``segment_rejects_zero_length_line_test`` () =
     match Offset.segment (Line(point 1.0 2.0, point 1.0 2.0)) 1.0<length> with
     | Error(SvgPath.Error.DegenerateTangent parameterValue) -> Assert.Equal(0.0<parameter>, parameterValue)
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
-let ``untrimmed path offsets each subpath`` () =
+let ``path_untrimmed_offsets_every_subpath_test`` () =
     let first = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     let second = Subpath.ofSegment (Line(point 0.0 2.0, point 1.0 2.0))
     let result =
@@ -160,7 +171,7 @@ let ``trimmed path normalization drops empty source subpaths`` () =
     Assert.Single(trimmed.Subpaths) |> ignore
 
 [<Fact>]
-let ``untrimmed band shares recursive subdivision between sides`` () =
+let ``synchronized_offsets_share_nonstalled_refinement_leaves_test`` () =
     let source =
         Subpath.ofSegment (CubicBezier(point 0.0 0.0, point 1.0 0.0, point 1.0 0.0, point 1.0 1.0))
     let correspondences =
@@ -173,7 +184,7 @@ let ``untrimmed band shares recursive subdivision between sides`` () =
     Assert.All(paired, fun item -> Assert.True(spans item.InnerLeaves = spans item.OuterLeaves))
 
 [<Fact>]
-let ``untrimmed band accepts reversed offset order`` () =
+let ``synchronized_offsets_accept_reversed_distance_order_test`` () =
     let source =
         Subpath.ofSegment (Line(point 0.0 0.0, point 2.0 1.0))
     let forward =
@@ -186,7 +197,7 @@ let ``untrimmed band accepts reversed offset order`` () =
     Assert.Equal(forward.Subpaths[1], reversed.Subpaths[0])
 
 [<Fact>]
-let ``closed rectangular band produces two closed contours`` () =
+let ``subpath_band_closed_square_returns_two_closed_sides_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 8.0; point 0.0 8.0 ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
@@ -195,7 +206,7 @@ let ``closed rectangular band produces two closed contours`` () =
     Assert.All(result.Subpaths, fun subpath -> Assert.True(subpath.Closed))
 
 [<Fact>]
-let ``open line band returns two capless offset sides`` () =
+let ``subpath_band_open_line_returns_two_capless_sides_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let result = Offset.subpathBand source -1.0<length> 2.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, result.Subpaths.Length)
@@ -205,7 +216,7 @@ let ``open line band returns two capless offset sides`` () =
     Assert.Contains(Line(point 0.0 -2.0, point 10.0 -2.0), segments)
 
 [<Fact>]
-let ``closed square negative offset produces the exact inset`` () =
+let ``subpath_offsets_closed_square_inset_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
@@ -220,7 +231,7 @@ let ``closed square negative offset produces the exact inset`` () =
         result.Subpaths[0].Segments)
 
 [<Fact>]
-let ``exchanging band offsets reverses the oriented result`` () =
+let ``exchanging_band_offsets_reverses_result_orientation_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 8.0; point 0.0 8.0 ]
         |> Result.defaultWith (failwithf "%A")
@@ -234,7 +245,7 @@ let ``exchanging band offsets reverses the oriented result`` () =
             forwardArea reversedArea (Serialize.path forward) (Serialize.path reversed))
 
 [<Fact>]
-let ``open line round stroke produces one closed contour`` () =
+let ``subpath_can_use_round_join_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let options = { Offset.defaultOptions with Join = Round }
     let result = Offset.subpathStrokeWith source 2.0<length> RoundCap options |> Result.defaultWith (fun error -> failwithf "%A" error)
@@ -243,7 +254,16 @@ let ``open line round stroke produces one closed contour`` () =
     Assert.Equal(2, result.Subpaths[0].Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
 
 [<Fact>]
-let ``path stroke processes every source subpath`` () =
+let ``subpath_can_use_bevel_join_test`` () =
+    let source =
+        Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]
+        |> Result.defaultWith (failwithf "%A")
+    let options = { Offset.defaultOptions with Join = Bevel }
+    let result = Offset.subpathWith source 2.0<length> options |> Result.defaultWith (failwithf "%A")
+    Assert.NotEmpty(result.Subpaths)
+
+[<Fact>]
+let ``path_offsets_every_subpath_test`` () =
     let source =
         Path.ofSubpaths
             [ Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
@@ -252,7 +272,7 @@ let ``path stroke processes every source subpath`` () =
     Assert.Equal(2, result.Subpaths.Length)
 
 [<Fact>]
-let ``path offset trims straight subpaths in one shared pipeline`` () =
+let ``path_offsets_straight_subpaths_test`` () =
     let first =
         Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 -10.0) ]
         |> Result.defaultWith (failwithf "%A")
@@ -280,7 +300,7 @@ let ``path offset orients nested closed contours by depth`` () =
     Assert.Equal(1, areas |> List.filter (fun area -> area < 0.0<length^2>) |> List.length)
 
 [<Fact>]
-let ``path offset shares trimming across closed and open sources`` () =
+let ``path_offsets_closed_subpaths_test`` () =
     let closed =
         Subpath.polygon [ point 0.0 0.0; point 8.0 0.0; point 8.0 8.0; point 0.0 8.0 ]
         |> Result.defaultWith (failwithf "%A")
@@ -293,7 +313,7 @@ let ``path offset shares trimming across closed and open sources`` () =
     Assert.Equal(1, result.Subpaths |> List.filter (Subpath.isClosed >> not) |> List.length)
 
 [<Fact>]
-let ``no-trimming single offset returns its untrimmed walk`` () =
+let ``subpath_offsets_open_polyline_with_default_miter_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 3.0 0.0))
     let options =
         { Offset.defaultOptions with
@@ -302,7 +322,7 @@ let ``no-trimming single offset returns its untrimmed walk`` () =
     Assert.Equal<Segment list>([ Line(point 0.0 -1.0, point 3.0 -1.0) ], result.Subpaths[0].Segments)
 
 [<Fact>]
-let ``single offset final trimming policies execute their distinct pipelines`` () =
+let ``final_cusp_trimming_handles_open_side_umbrella_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 8.0 0.0; point 8.0 6.0; point 0.0 6.0 ]
         |> Result.defaultWith (failwithf "%A")
@@ -343,7 +363,7 @@ let ``band cusp switches execute side-local trimming before final trimming`` () 
         Assert.All(result.Subpaths, fun subpath -> Assert.True(subpath.Closed))
 
 [<Fact>]
-let ``closed square band matches the public contour contract`` () =
+let ``subpath_stroke_closed_square_uses_band_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
@@ -363,7 +383,7 @@ let ``closed square stroke uses the same capless band`` () =
         Serialize.path result)
 
 [<Fact>]
-let ``figure eight band reconstructs three closed contours`` () =
+let ``figure_eight_band_joins_reversed_outer_chunks_test`` () =
     let source =
         Subpath.create
             [ CubicBezier(point 0.0 0.0, point -336.0 -234.0, point -336.0 234.0, point 0.0 0.0)
@@ -377,7 +397,7 @@ let ``figure eight band reconstructs three closed contours`` () =
     Assert.All(result.Subpaths, fun subpath -> Assert.True(subpath.Closed))
 
 [<Fact>]
-let ``figure eight untrimmed band completes`` () =
+let ``subpath_band_untrimmed_returns_two_raw_sides_test`` () =
     let source =
         Subpath.create
             [ CubicBezier(point 0.0 0.0, point -336.0 -234.0, point -336.0 234.0, point 0.0 0.0)
@@ -402,7 +422,7 @@ let ``zero-length stroke follows cap semantics`` () =
     Assert.Equal(4, square.Subpaths[0].Segments.Length)
 
 [<Fact>]
-let ``open line stroke cap geometry matches public contracts`` () =
+let ``subpath_stroke_open_line_with_square_cap_extends_ends_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let render cap =
         Offset.subpathStrokeWith source 2.0<length> cap Offset.defaultOptions
@@ -410,3 +430,24 @@ let ``open line stroke cap geometry matches public contracts`` () =
         |> Serialize.path
     Assert.Equal("M 0 -1 H 10 V 1 H 0 Z", render Butt)
     Assert.Equal("M 0 -1 H 10 H 11 V 1 H 10 H 0 H -1 V -1 Z", render Square)
+
+[<Fact>]
+let ``subpath_stroke_open_line_with_butt_cap_returns_closed_outline_test`` () =
+    let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
+    let result = Offset.subpathStrokeWith source 2.0<length> Butt Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
+    Assert.Single(result.Subpaths) |> ignore
+    Assert.True(result.Subpaths[0].Closed)
+    Assert.Equal("M 0 -1 H 10 V 1 H 0 Z", Serialize.path result)
+
+[<Fact>]
+let ``subpath_stroke_rejects_invalid_width_test`` () =
+    let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
+    Assert.Equal(Error(InvalidStrokeWidth 0.0<length>), Offset.subpathStrokeWith source 0.0<length> Butt Offset.defaultOptions)
+    Assert.Equal(Error(InvalidStrokeWidth -1.0<length>), Offset.subpathStrokeWith source -1.0<length> Butt Offset.defaultOptions)
+
+[<Fact>]
+let ``path_band_untrimmed_returns_two_raw_sides_per_subpath_test`` () =
+    let first = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
+    let second = Subpath.ofSegment (Line(point 0.0 5.0, point 10.0 5.0))
+    let result = Offset.pathBandUntrimmed (Path.ofSubpaths [ first; second ]) -1.0<length> 1.0<length> |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(4, result.Subpaths.Length)

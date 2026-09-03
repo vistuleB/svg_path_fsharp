@@ -157,6 +157,7 @@ module ConvexHull =
     let private seededWorstDirectionRefinedStep = 0.01<degree>
     let private loopUnionSeedMaxDrift = 1.0<degree>
     let private pointTolerance = 1.0e-9<length>
+    let private widthLowerBoundRoundoffFactor = 1.0e-12
 
     let private cross origin a b =
         Point.cross (Point.displacement origin a) (Point.displacement origin b)
@@ -1520,7 +1521,11 @@ module ConvexHull =
     let private tryMaximum values =
         match values with [] -> None | first :: rest -> Some(List.fold max first rest)
 
+    let private widthLowerBoundRoundoff (diameter: float<length>) =
+        max 1.0<length> (abs diameter) * widthLowerBoundRoundoffFactor
+
     let private adaptiveMinimum support diameter accuracy maxDepth initialSamples =
+        let lowerBoundRoundoff = widthLowerBoundRoundoff diameter
         let rec search samples intervals depth discardedLowerBound =
             let best = List.minBy (fun sample -> sample.Support.Width) samples
             let bounds = intervals |> List.map (fun interval -> interval, intervalLowerBound diameter interval)
@@ -1531,11 +1536,12 @@ module ConvexHull =
                 |> function
                     | None -> discardedLowerBound
                     | Some value -> Some(match discardedLowerBound with None -> value | Some old -> min old value)
-            let lowerBound =
+            let rawLowerBound =
                 intervalBound
                 |> Option.defaultValue best.Support.Width
                 |> max (inventoryLowerBound samples)
                 |> max 0.0<length>
+            let lowerBound = max 0.0<length> (rawLowerBound - lowerBoundRoundoff)
             let converged = best.Support.Width - lowerBound <= accuracy
             if converged || depth >= maxDepth then
                 extremum (Point.direction best.Angle) best.Support lowerBound best.Support.Width converged
@@ -1593,6 +1599,9 @@ module ConvexHull =
                         let divided, added = subdivideIntervals support active
                         search (samples @ added) divided (depth + 1)
         search initialSamples (intervalsFromSamples initialSamples) 0
+
+    let internalConvexPolygonMinimumWidthDecision vertices tolerance maxDepth =
+        minimumWidthDecision (extent vertices) (polygonDiameter vertices).Width tolerance maxDepth
 
     let private adaptiveMaximum support diameter accuracy maxDepth initialSamples =
         let rec search samples intervals depth discardedUpperBound =
@@ -1684,9 +1693,7 @@ module ConvexHull =
         if findMinimum then polygonMinimumWidth points else polygonDiameter points
 
     let private sourceOrPolygonExtremum findMinimum segments options =
-        if segments |> List.forall (function Line _ -> true | _ -> false) then
-            Ok(lineOnlyExtremum findMinimum segments)
-        else sourceExtremum findMinimum segments options
+        sourceExtremum findMinimum segments options
 
     let segmentMinimumWidthWith segment options =
         sourceOrPolygonExtremum true [ segment ] options

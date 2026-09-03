@@ -89,26 +89,26 @@ let ``path inspects with decimal options`` () =
     Assert.Equal("Path([\n  Subpath(open, start=0,0, [\n    Line(start=0,0 end=12.2,10.2)\n  ])\n])", Inspect.pathWith path (Inspect.decimalOptions 1))
 
 [<Fact>]
-let ``point code inspects as copy pasteable F sharp`` () =
+let ``point_code_inspects_as_copy_pasteable_gleam_test`` () =
     Assert.Equal("Point.create (10.0<length>) (-2.5<length>)", Inspect.pointCode (point 10.0 -2.5))
 
 [<Fact>]
-let ``segment code inspects as copy pasteable F sharp`` () =
+let ``segment_code_inspects_as_copy_pasteable_gleam_test`` () =
     let segment = CubicBezier(point 0.0 0.0, point 2.0 4.0, point 6.0 8.0, point 10.0 12.0)
     Assert.Equal("CubicBezier(Point.create (0.0<length>) (0.0<length>), Point.create (2.0<length>) (4.0<length>), Point.create (6.0<length>) (8.0<length>), Point.create (10.0<length>) (12.0<length>))", Inspect.segmentCode segment)
 
 [<Fact>]
-let ``subpath code inspects as copy pasteable F sharp`` () =
+let ``subpath_code_inspects_as_copy_pasteable_gleam_test`` () =
     let value = subpath [ Line(point 0.0 0.0, point 12.0 10.0) ]
     Assert.Equal("Subpath.create [\n  Line(Point.create (0.0<length>) (0.0<length>), Point.create (12.0<length>) (10.0<length>))\n]\n|> Result.defaultWith (failwithf \"%A\")", Inspect.subpathCode value)
 
 [<Fact>]
-let ``closed subpath code inspects as copy pasteable F sharp`` () =
+let ``closed_subpath_code_inspects_as_copy_pasteable_gleam_test`` () =
     let value = closedSubpath [ Line(point 0.0 0.0, point 12.0 10.0) ]
     Assert.Equal("Subpath.create [\n  Line(Point.create (0.0<length>) (0.0<length>), Point.create (12.0<length>) (10.0<length>));\n  Line(Point.create (12.0<length>) (10.0<length>), Point.create (0.0<length>) (0.0<length>))\n]\n|> Result.defaultWith (failwithf \"%A\")\n|> Subpath.setClosed true\n|> Result.defaultWith (failwithf \"%A\")", Inspect.subpathCode value)
 
 [<Fact>]
-let ``path code inspects as copy pasteable F sharp`` () =
+let ``path_code_inspects_as_copy_pasteable_gleam_test`` () =
     let value = subpath [ Line(point 0.0 0.0, point 12.0 10.0) ] |> Path.singleton
     Assert.Equal("Path.ofSubpaths [\n  Subpath.create [\n    Line(Point.create (0.0<length>) (0.0<length>), Point.create (12.0<length>) (10.0<length>))\n  ]\n  |> Result.defaultWith (failwithf \"%A\")\n]", Inspect.pathCode value)
 

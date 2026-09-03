@@ -34,23 +34,25 @@ module Transform =
     let point = Affine.point
 
     let pointPairMap sourceStart sourceEnd targetStart targetEnd tolerance =
-        Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd
-        |> Result.bind (fun transform ->
-            let mappedStart = point transform sourceStart
-            let mappedEnd = point transform sourceEnd
-            if tolerance >= 0.0<length>
-               && Point.distance mappedStart targetStart <= tolerance
-               && Point.distance mappedEnd targetEnd <= tolerance then Ok transform
-            else Error())
+        if tolerance < 0.0<length> then Error()
+        else
+            Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd
+            |> Result.bind (fun transform ->
+                let mappedStart = point transform sourceStart
+                let mappedEnd = point transform sourceEnd
+                if Point.distance mappedStart targetStart <= tolerance
+                   && Point.distance mappedEnd targetEnd <= tolerance then Ok transform
+                else Error())
 
     let pointTripleMap sourceA sourceB sourceC targetA targetB targetC tolerance =
-        Affine.pointTripleMap sourceA sourceB sourceC targetA targetB targetC
-        |> Result.bind (fun transform ->
-            if tolerance >= 0.0<length>
-               && Point.distance (point transform sourceA) targetA <= tolerance
-               && Point.distance (point transform sourceB) targetB <= tolerance
-               && Point.distance (point transform sourceC) targetC <= tolerance then Ok transform
-            else Error())
+        if tolerance < 0.0<length> then Error()
+        else
+            Affine.pointTripleMap sourceA sourceB sourceC targetA targetB targetC
+            |> Result.bind (fun transform ->
+                if Point.distance (point transform sourceA) targetA <= tolerance
+                   && Point.distance (point transform sourceB) targetB <= tolerance
+                   && Point.distance (point transform sourceC) targetC <= tolerance then Ok transform
+                else Error())
 
     let translatePoint input x y = point (translate x y) input
     let scalePoint input factor = point (scale factor) input

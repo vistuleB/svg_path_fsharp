@@ -4603,21 +4603,25 @@ module Offset =
                 (List.rev candidate.IndicesReversed)
                 (List.rev current.IndicesReversed)
 
-    let rec private insertBetterOffsideClosedWalkState
+    let private insertBetterOffsideClosedWalkState
         (candidate: OffsideClosedWalkState)
         (states: OffsideClosedWalkState list) =
-        match states with
-        | [] -> [ candidate ]
-        | first :: rest ->
-            let sameState =
-                first.FirstStartVertex = candidate.FirstStartVertex
-                && first.EndVertex = candidate.EndVertex
-                && first.LastIndex = candidate.LastIndex
-            if sameState then
-                if offsideClosedWalkIsBetter candidate first then candidate :: rest
-                else states
-            else
-                first :: insertBetterOffsideClosedWalkState candidate rest
+        let rec loop prefix remaining =
+            match remaining with
+            | [] -> List.rev (candidate :: prefix)
+            | first :: rest ->
+                let sameState =
+                    first.FirstStartVertex = candidate.FirstStartVertex
+                    && first.EndVertex = candidate.EndVertex
+                    && first.LastIndex = candidate.LastIndex
+                if sameState then
+                    if offsideClosedWalkIsBetter candidate first then
+                        List.rev prefix @ (candidate :: rest)
+                    else
+                        states
+                else
+                    loop (first :: prefix) rest
+        loop [] states
 
     let rec private offsideClosedWalkLoop
         (segments: (ArrangementSplitTracedSegment * int) list)

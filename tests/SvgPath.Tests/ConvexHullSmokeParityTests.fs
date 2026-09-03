@@ -13,7 +13,7 @@ let private supportValue segments angle =
         |> fun (_, _, value) -> value)
     |> List.max
 
-let private supportValuesMatch original hull =
+let private supportValuesMatch original (hull: Subpath) =
     for angle in [ 0.0; 45.0; 90.0; 135.0; 180.0; 225.0; 270.0; 315.0 ] do
         let expected = supportValue original angle
         let actual = supportValue hull.Segments angle

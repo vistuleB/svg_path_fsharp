@@ -1299,7 +1299,7 @@ module Segment =
         let bezierResult definingPoints breaks =
             match axisFor definingPoints with
             | Some(origin, axis) when inStrip definingPoints origin axis -> pieces (0.0 :: breaks @ [ 1.0 ]) |> Result.map Some
-            | None -> Ok(Some [])
+            | None -> Ok None
             | _ -> Ok None
         if not finitePositive then Error(InvalidLinearizeTolerance tolerance)
         else

@@ -41,10 +41,16 @@
     <Compile Include="ClipTests.fs" />
     <Compile Include="ClipAdditionalTests.fs" />
     <Compile Include="TransformTests.fs" />
+    <Compile Include="TransformParityTests.fs" />
     <Compile Include="TransformSerializeTests.fs" />
     <Compile Include="TransformParseTests.fs" />
     <Compile Include="ConvexHullTests.fs" />
     <Compile Include="ConvexHullSmokeParityTests.fs" />
+    <Compile Include="ConvexHullGalleryRegressionParityTests.fs" />
+    <Compile Include="ConvexHullRepairParityTests.fs" />
+    <Compile Include="ConvexHullPointCloudParityTests.fs" />
+    <Compile Include="ConvexHullMinimumWidthParityTests.fs" />
+    <Compile Include="ConvexHullTangentParityTests.fs" />
     <Compile Include="DegeneracyTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
@@ -59,6 +65,7 @@
     <Compile Include="RoundtripTests.fs" />
     <Compile Include="SvgTests.fs" />
     <Compile Include="ArrangementTests.fs" />
+    <Compile Include="ArrangementParityTests.fs" />
     <Compile Include="CsgTests.fs" />
     <Compile Include="CsgParityTests.fs" />
     <Compile Include="OffsetTests.fs" />

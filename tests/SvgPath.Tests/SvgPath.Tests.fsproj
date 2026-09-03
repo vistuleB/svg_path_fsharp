@@ -44,6 +44,7 @@
     <Compile Include="TransformSerializeTests.fs" />
     <Compile Include="TransformParseTests.fs" />
     <Compile Include="ConvexHullTests.fs" />
+    <Compile Include="ConvexHullSmokeParityTests.fs" />
     <Compile Include="DegeneracyTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />

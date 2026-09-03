@@ -30,6 +30,16 @@ let ``subpath ignores closed field`` () =
     Assert.True(Congruency.subpathWith openSubpath closedSubpath tolerance |> Result.isOk)
 
 [<Fact>]
+let ``subpath maps move only subpaths`` () =
+    let source = Subpath.empty (point 1.0 2.0)
+    let target =
+        Subpath.empty (point 6.0 8.0)
+        |> Subpath.setClosed true
+        |> Result.defaultWith (failwithf "%A")
+    let transform = Congruency.subpath source target 1.0e-6<length> |> Result.defaultWith (failwithf "%A")
+    Assert.True(Point.near 1.0e-6<length> (Affine.point transform (point 1.0 2.0)) (point 6.0 8.0))
+
+[<Fact>]
 let ``points rejects empty lists`` () =
     Assert.Equal(Error(), Congruency.points [] [] 1.0e-6<length>)
 
@@ -301,7 +311,7 @@ let ``path recognizes transformed mixed fixture`` () =
     Assert.True(Congruency.path source target 1.0e-6<length> |> Result.isOk)
 
 [<Fact>]
-let ``path recognizes transformed multi-subpath fixture`` () =
+let ``path recognizes transformed multi subpath fixture`` () =
     let first =
         Subpath.create
             [ Line(point 0.0 0.0, point 20.0 0.0)

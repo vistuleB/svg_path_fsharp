@@ -26,7 +26,7 @@ let ``signed points implicitly closes the loop`` () =
     Assert.Equal(0.0<length^2>, Area.signedPoints [ point 0.0 0.0 ])
 
 [<Fact>]
-let ``signed area remains stable after a large translation`` () =
+let ``area is stable under large translation`` () =
     let origin = 1.0e12
     let points = square origin origin 0.25
     let subpath = polygon points
@@ -49,7 +49,7 @@ let ``signed subpath ignores the closed field`` () =
     assertAreaNear 1.0e-12<length^2> 100.0<length^2> (Area.signedSubpath (polygon points))
 
 [<Fact>]
-let ``signed Bezier segments use exact line integrals`` () =
+let ``signed bezier segments use exact line integrals`` () =
     let quadratic = Subpath.ofSegment (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0))
     let cubic = Subpath.ofSegment (CubicBezier(point 0.0 0.0, point 0.0 10.0, point 10.0 10.0, point 10.0 0.0))
     assertAreaNear 1.0e-10<length^2> 133.33333333333334<length^2> (abs (Area.signedSubpath quadratic))
@@ -68,13 +68,13 @@ let ``signed arc segment uses the ellipse integral`` () =
     assertAreaNear 1.0e-10<length^2> 157.07963267948966<length^2> (abs (Area.signedSubpath semicircle))
 
 [<Fact>]
-let ``open subpaths are implicitly closed for fill area`` () =
+let ``fill area implicitly closes open subpaths`` () =
     let openSquare = polyline (square 0.0 0.0 10.0)
     Assert.Equal(Ok 100.0<length^2>, Area.subpath openSquare Nonzero)
     Assert.Equal(Ok 100.0<length^2>, Area.subpath openSquare EvenOdd)
 
 [<Fact>]
-let ``twice traced loop distinguishes fill rules and winding area`` () =
+let ``fill rules differ for a twice traced loop`` () =
     let loop = square 0.0 0.0 10.0
     let traced = polyline (loop @ [ List.head loop ] @ loop)
     Assert.Equal(Ok 100.0<length^2>, Area.subpath traced Nonzero)
@@ -83,7 +83,7 @@ let ``twice traced loop distinguishes fill rules and winding area`` () =
     Assert.Equal(200.0<length^2>, Area.signedSubpath traced)
 
 [<Fact>]
-let ``bow tie has fill area but zero signed area`` () =
+let ``self intersecting bow tie has filled but no signed area`` () =
     let bowTie = polyline [ point 0.0 0.0; point 10.0 10.0; point 0.0 10.0; point 10.0 0.0 ]
     Assert.Equal(0.0<length^2>, Area.signedSubpath bowTie)
     Assert.Equal(Ok 50.0<length^2>, Area.subpath bowTie Nonzero)
@@ -149,7 +149,7 @@ let ``subpath clockwiseness rejects invalid linearization options`` () =
     Assert.Equal(Error(InvalidLinearizeTolerance 0.0<length>), Area.subpathClockwisenessWith subpath options)
 
 [<Fact>]
-let ``move-only paths have zero area`` () =
+let ``move only paths have zero area`` () =
     let moveOnly = Subpath.empty (point 3.0 4.0)
     let path = Path.ofSubpaths [ moveOnly ]
     Assert.Equal(0.0<length^2>, Area.signedSubpath moveOnly)

@@ -24,7 +24,7 @@ module ClipTests =
         Path.singleton (rectangleAt minX minY maxX maxY)
 
     [<Fact>]
-    let ``line is clipped to filled rectangle`` () =
+    let ``open line clips to inside piece`` () =
         match rectangle () with
         | Error error -> failwithf "%A" error
         | Ok boundary ->
@@ -47,7 +47,7 @@ module ClipTests =
             | Ok pieces -> Assert.Empty pieces
 
     [<Fact>]
-    let ``inside closed subpath remains closed`` () =
+    let ``closed subpath survives whole when fully inside`` () =
         match rectangle () with
         | Error error -> failwithf "%A" error
         | Ok boundary ->
@@ -66,7 +66,7 @@ module ClipTests =
                 | Ok pieces -> Assert.True((Assert.Single pieces).Closed)
 
     [<Fact>]
-    let ``input coincident with clipping boundary is retained`` () =
+    let ``coincident clip boundary geometry is retained`` () =
         match rectangle () with
         | Error error -> failwithf "%A" error
         | Ok boundary ->

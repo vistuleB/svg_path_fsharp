@@ -100,7 +100,7 @@ let ``side levels follow geometric left and right`` () =
         WindingField.segmentSideNonzeroLevels top (Path.singleton square) 0.001<length> WindingField.defaultOptions)
 
 [<Fact>]
-let ``midpoint cusp uses symmetric fallback`` () =
+let ``side levels fall back from a midpoint cusp`` () =
     let cusp = CubicBezier(point -1.0 0.0, point 1.0 1.0, point -1.0 1.0, point 1.0 0.0)
     let source =
         Subpath.create [ cusp; Line(point 1.0 0.0, point -1.0 0.0) ]
@@ -111,18 +111,24 @@ let ``midpoint cusp uses symmetric fallback`` () =
         WindingField.segmentSideNonzeroLevels cusp (Path.singleton source) 0.0001<length> WindingField.defaultOptions)
 
 [<Fact>]
-let ``side sampling rejects invalid distance and collapsed segment`` () =
+let ``side levels reject nonpositive sampling distance`` () =
     let line = Line(point 0.0 0.0, point 1.0 0.0)
     Assert.Equal(
         Error(InvalidContainmentTolerance 0.0<length>),
         WindingField.segmentSideNonzeroLevels line Path.empty 0.0<length> WindingField.defaultOptions)
+    Assert.Equal(
+        Error(InvalidContainmentTolerance -0.001<length>),
+        WindingField.segmentSideNonzeroLevels line Path.empty -0.001<length> WindingField.defaultOptions)
+
+[<Fact>]
+let ``side levels reject a segment without a regular sample`` () =
     let collapsed = Line(point 1.0 2.0, point 1.0 2.0)
     Assert.Equal(
         Error IndeterminateWindingSideLevels,
         WindingField.segmentSideNonzeroLevels collapsed Path.empty 0.0001<length> WindingField.defaultOptions)
 
 [<Fact>]
-let ``side sampling validates containment options before degenerate fallback`` () =
+let ``side levels validate options before degenerate fallback`` () =
     let collapsed = Line(point 1.0 2.0, point 1.0 2.0)
     let invalid = { WindingField.defaultOptions with Samples = 0 }
     Assert.Equal(

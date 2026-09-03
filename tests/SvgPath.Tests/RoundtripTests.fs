@@ -53,7 +53,7 @@ let ``comma separated input canonicalizes`` () =
     Assert.Equal(Ok "M 0 0 H 10 V 20", parseAndSerialize "M0,0 L10,0 10,20")
 
 [<Fact>]
-let ``move-only subpaths are preserved`` () =
+let ``move only subpaths are preserved`` () =
     Assert.Equal(Ok "M 0 0 M 10 10 H 20 M 30 30", parseAndSerialize "M 0 0 M 10 10 L 20 10 M 30 30")
 
 [<Fact>]

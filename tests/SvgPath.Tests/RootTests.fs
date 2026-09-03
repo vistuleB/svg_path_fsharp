@@ -23,7 +23,7 @@ let ``quadratic real roots`` () =
     )
 
 [<Fact>]
-let ``quadratic solver preserves a small root under cancellation pressure`` () =
+let ``quadratic preserves small root under large scale separation`` () =
     Assert.Equal<float<parameter> list>(
         [ parameter 1.0e-16; parameter 1.0e16 ],
         Root.quadratic (coefficient 1.0) (coefficient -1.0e16) (coefficient 1.0)
@@ -63,7 +63,7 @@ let ``quadratic coefficient tolerance`` () =
     )
 
 [<Fact>]
-let ``interval filters order nominal parameters`` () =
+let ``root interval filters and sorts`` () =
     let roots = [ parameter 1.0; parameter 0.75; parameter -0.1; parameter 0.25; parameter 0.0 ]
 
     Assert.Equal<float<parameter> list>(
@@ -77,7 +77,7 @@ let ``interval filters order nominal parameters`` () =
     )
 
 [<Fact>]
-let ``polynomial evaluation and differentiation preserve coefficient units`` () =
+let ``evaluate polynomial and derivative`` () =
     let coefficients = [ coefficient 2.0; coefficient -3.0; coefficient 4.0 ]
     let value: float<length> = Root.evaluatePolynomial coefficients (parameter 2.0)
     let derivative: float<length> list = Root.polynomialDerivative coefficients
@@ -139,7 +139,7 @@ let ``quintic roots in unit interval`` () =
     List.iter2 near [ 0.1; 0.3; 0.5; 0.7; 0.9 ] quintic
 
 [<Fact>]
-let ``root isolation retains a sign-changing bracket`` () =
+let ``polynomial isolation preserves crossing bracket`` () =
     let options: PolynomialOptions = { MaxIterations = 100 }
 
     let coefficients = [ coefficient 1.0; coefficient 0.0; coefficient 0.0; coefficient -2.0 ]
@@ -157,7 +157,7 @@ let ``root isolation retains a sign-changing bracket`` () =
     Assert.True(isolation.Upper - isolation.Lower <= parameter 1.0e-9)
 
 [<Fact>]
-let ``direct polynomial roots receive the fixed parameter window`` () =
+let ``direct polynomial root receives fixed parameter window`` () =
     let isolation =
         Root.polynomialRootIsolationsWith
             [ coefficient 1.0; coefficient -1.0; coefficient 0.25 ]
@@ -172,7 +172,7 @@ let ``direct polynomial roots receive the fixed parameter window`` () =
     Assert.Equal(parameter (0.5 + 1.0e-9 / 2.0), isolation.Upper)
 
 [<Fact>]
-let ``polynomial classification is coefficient-scale independent`` () =
+let ``polynomial classification is coefficient scale independent`` () =
     let classify scale =
         Root.classifiedPolynomialRootsWith
             [ coefficient scale; coefficient 0.0; coefficient 0.0 ]
@@ -281,7 +281,7 @@ let ``classified polynomial roots classify endpoint roots`` () =
     Assert.Equal(NegativeToNegative, negativeEvenEndpoint.Kind)
 
 [<Fact>]
-let ``classified root isolation validates maximum iterations`` () =
+let ``classified polynomial roots reject invalid iterations`` () =
     let options: PolynomialOptions =
         { Root.defaultPolynomialOptions () with
             MaxIterations = 0 }
@@ -293,7 +293,7 @@ let ``classified root isolation validates maximum iterations`` () =
     | result -> failwithf "unexpected result: %A" result
 
 [<Fact>]
-let ``degree-specific unit-interval helpers classify roots`` () =
+let ``real 01 root helpers classify by degree`` () =
     let options: PolynomialOptions = Root.defaultPolynomialOptions ()
 
     let linear =
@@ -328,7 +328,7 @@ let ``degree-specific unit-interval helpers classify roots`` () =
     Assert.Equal(NegativeToPositive, cubic.Kind)
 
 [<Fact>]
-let ``custom bisection certification preserves its bracket`` () =
+let ``bisect isolation until preserves certified bracket`` () =
     let isolation =
         Root.bisectIsolationUntil
             (fun t -> coefficient (Parameter.ratio t - 0.3))
@@ -343,7 +343,7 @@ let ``custom bisection certification preserves its bracket`` () =
     Assert.True(isolation.Upper - isolation.Lower <= parameter 0.01)
 
 [<Fact>]
-let ``custom bisection certification may use a non-parameter scale`` () =
+let ``bisect isolation until can use non parameter certification`` () =
     let isolation =
         Root.bisectIsolationUntil
             (fun t -> coefficient (Parameter.ratio t - 0.3))
@@ -358,7 +358,7 @@ let ``custom bisection certification may use a non-parameter scale`` () =
     Assert.True(Parameter.ratio (isolation.Upper - isolation.Lower) * 1000.0 <= 0.01)
 
 [<Fact>]
-let ``custom bisection stops at floating-point resolution`` () =
+let ``bisect isolation until stops at float resolution`` () =
     let isolation =
         Root.bisectIsolationUntil
             (fun t -> coefficient (Parameter.ratio t * Parameter.ratio t - 2.0))

@@ -1623,14 +1623,20 @@ module Intersections =
                     |> Result.map (fun intersections ->
                         intersections
                         |> List.fold (fun grouped (intersection: SubpathIntersection) -> insertPath intersection leftIndex rightIndex grouped) found))) (Ok([]: PathIntersection list))
-            |> Result.map (List.sortBy (fun (intersection: PathIntersection) ->
-                intersection.LeftParameters
-                |> List.tryHead
-                |> Option.map (fun parameterValue ->
-                    parameterValue.SubpathIndex,
-                    parameterValue.At.SegmentIndex,
-                    parameterValue.At.T)
-                |> Option.defaultValue (System.Int32.MaxValue, System.Int32.MaxValue, 1.0<parameter>))))
+            |> Result.map (fun intersections ->
+                intersections
+                |> List.map (fun intersection ->
+                    { intersection with
+                        LeftParameters = intersection.LeftParameters |> List.distinct |> List.sortWith Path.parametersCompare
+                        RightParameters = intersection.RightParameters |> List.distinct |> List.sortWith Path.parametersCompare })
+                |> List.sortBy (fun (intersection: PathIntersection) ->
+                    intersection.LeftParameters
+                    |> List.tryHead
+                    |> Option.map (fun parameterValue ->
+                        parameterValue.SubpathIndex,
+                        parameterValue.At.SegmentIndex,
+                        parameterValue.At.T)
+                    |> Option.defaultValue (System.Int32.MaxValue, System.Int32.MaxValue, 1.0<parameter>))))
 
     let pathWithoutOverlapPrecheckWith left right options =
         collectPathIntersections true left right options

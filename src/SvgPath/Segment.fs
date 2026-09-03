@@ -29,6 +29,18 @@ type PathParameter =
     { SubpathIndex: int
       At: SubpathParameter }
 
+[<Struct>]
+type SubpathProjection =
+    { At: SubpathParameter
+      Point: Point<length>
+      Distance: float<length> }
+
+[<Struct>]
+type PathProjection =
+    { At: PathParameter
+      Point: Point<length>
+      Distance: float<length> }
+
 type SegmentError =
     | DegenerateArc
     | EmptySubpath
@@ -926,7 +938,7 @@ module Segment =
     let subdivideToMaxLength segment maxLength =
         subdivideToMaxLengthWith segment maxLength defaultLengthOptions
 
-    let private validateDistanceOptions (options: DistanceOptions) =
+    let internal validateDistanceOptions (options: DistanceOptions) =
         if options.Samples <= 0 then Error(InvalidDistanceSamples options.Samples)
         elif options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidDistanceTolerance options.Tolerance)
@@ -2025,6 +2037,34 @@ module Subpath =
                     validateClosed first first 0 (second :: rest)
                     |> Result.bind (fun () -> build (makePairs points @ [ List.last points, first ])))
 
+    let projectionWith (subpath: Subpath) sample options =
+        Segment.validateDistanceOptions options
+        |> Result.bind (fun () ->
+            let rec loop index (best: SubpathProjection option) (segments: Segment list) =
+                match segments with
+                | [] -> best |> Option.map Ok |> Option.defaultValue (Error EmptySubpath)
+                | segment :: rest ->
+                    Segment.projectionWith segment sample options
+                    |> Result.bind (fun (t, point, distance) ->
+                        let candidate: SubpathProjection =
+                            { At = { SegmentIndex = index; T = t }
+                              Point = point
+                              Distance = distance }
+                        let best =
+                            match best with
+                            | None -> Some candidate
+                            | Some current when candidate.Distance < current.Distance -> Some candidate
+                            | _ -> best
+                        loop (index + 1) best rest)
+            loop 0 None subpath.segmentList)
+
+    let projection subpath sample = projectionWith subpath sample Segment.defaultDistanceOptions
+
+    let distanceWith subpath sample options =
+        projectionWith subpath sample options |> Result.map _.Distance
+
+    let distance subpath sample = distanceWith subpath sample Segment.defaultDistanceOptions
+
     let lengthWith subpath (options: LengthOptions) =
         subpath.segmentList
         |> List.fold (fun state segment ->
@@ -2237,7 +2277,7 @@ module Path =
                     |> List.indexed
                     |> List.filter (fun (_, subpath) -> not (List.isEmpty subpath.Segments))
                 match nonempty with
-                | [] -> Error EmptySubpath
+                | [] -> Error EmptySubpaths
                 | _ ->
                     let rec locate remaining candidates =
                         match candidates with
@@ -2266,6 +2306,38 @@ module Path =
 
     let derivativeAtLength path distance =
         derivativeAtLengthWith path distance Segment.defaultLengthOptions
+
+    let projectionWith (path: Path) sample options =
+        match path.subpathList with
+        | [] -> Error EmptyPath
+        | subpaths ->
+            Segment.validateDistanceOptions options
+            |> Result.bind (fun () ->
+                let rec loop index (best: PathProjection option) (remaining: Subpath list) =
+                    match remaining with
+                    | [] -> best |> Option.map Ok |> Option.defaultValue (Error EmptySubpaths)
+                    | subpath :: rest when List.isEmpty subpath.Segments -> loop (index + 1) best rest
+                    | subpath :: rest ->
+                        Subpath.projectionWith subpath sample options
+                        |> Result.bind (fun (projection: SubpathProjection) ->
+                            let candidate: PathProjection =
+                                { At = { SubpathIndex = index; At = projection.At }
+                                  Point = projection.Point
+                                  Distance = projection.Distance }
+                            let best =
+                                match best with
+                                | None -> Some candidate
+                                | Some current when candidate.Distance < current.Distance -> Some candidate
+                                | _ -> best
+                            loop (index + 1) best rest)
+                loop 0 None subpaths)
+
+    let projection path sample = projectionWith path sample Segment.defaultDistanceOptions
+
+    let distanceWith path sample options =
+        projectionWith path sample options |> Result.map _.Distance
+
+    let distance path sample = distanceWith path sample Segment.defaultDistanceOptions
 
     let subdivideToMaxLengthWith path maxLength options =
         path.subpathList

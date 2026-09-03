@@ -8,7 +8,7 @@ let private length value = Length.fromFloat value
 let private box minX minY maxX maxY : BoundingBox = { Min = point minX minY; Max = point maxX maxY }
 
 [<Fact>]
-let ``document renders styled paths and text`` () =
+let ``document renders a complete svg document`` () =
     let path = Path.ofSubpaths [ Subpath.ofSegment (Line(point 1.0 2.0, point 11.0 2.0)) ]
     let actual =
         Svg.document
@@ -22,29 +22,42 @@ let ``document renders styled paths and text`` () =
         + "</svg>", actual)
 
 [<Fact>]
-let ``document renders basic drawing elements`` () =
+let ``document renders rectangles circles and ellipses`` () =
     let actual =
         Svg.document
             [ Rectangle(point 1.0 2.0, length 10.0, length 5.0, "fill: white; stroke: black")
               Circle(point 8.0 9.0, length 3.0, "fill: red; stroke: none")
               Ellipse(point 12.0 13.0, point 4.0 2.0, "fill: blue; stroke: none") ]
             (box 0.0 0.0 20.0 20.0)
-    Assert.Contains("<rect x=\"1\" y=\"2\" width=\"10\" height=\"5\"", actual)
-    Assert.Contains("<circle cx=\"8\" cy=\"9\" r=\"3\"", actual)
-    Assert.Contains("<ellipse cx=\"12\" cy=\"13\" rx=\"4\" ry=\"2\"", actual)
+    Assert.Equal(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" width=\"20\" height=\"20\">\n"
+        + "  <rect x=\"1\" y=\"2\" width=\"10\" height=\"5\" style=\"fill: white; stroke: black\" />\n"
+        + "  <circle cx=\"8\" cy=\"9\" r=\"3\" style=\"fill: red; stroke: none\" />\n"
+        + "  <ellipse cx=\"12\" cy=\"13\" rx=\"4\" ry=\"2\" style=\"fill: blue; stroke: none\" />\n"
+        + "</svg>", actual)
 
 [<Fact>]
-let ``document escapes attributes and text separately`` () =
+let ``paths escapes path style and text values`` () =
+    let escapedStyle = "stroke: \"red\"; marker: url(a&b<c>d)"
     let actual =
         Svg.document
-            [ StyledPath(Path.empty, "stroke: \"red\"; marker: url(a&b<c>d)")
+            [ StyledPath(Path.empty, escapedStyle)
+              Rectangle(point 0.0 0.0, length 1.0, length 1.0, escapedStyle)
+              Circle(point 0.5 0.5, length 0.25, escapedStyle)
+              Ellipse(point 0.5 0.5, point 0.25 0.125, escapedStyle)
               Text("\"a\" & <b>", "font-family: \"serif\"; fill: a&b<c>d", point 0.5 1.0, length 12.0) ]
             (box 0.0 0.0 1.0 1.0)
-    Assert.Contains("style=\"stroke: &quot;red&quot;; marker: url(a&amp;b&lt;c&gt;d)\"", actual)
-    Assert.Contains(">\"a\" &amp; &lt;b&gt;</text>", actual)
+    Assert.Equal(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1 1\" width=\"1\" height=\"1\">\n"
+        + "  <path d=\"\" style=\"stroke: &quot;red&quot;; marker: url(a&amp;b&lt;c&gt;d)\" />\n"
+        + "  <rect x=\"0\" y=\"0\" width=\"1\" height=\"1\" style=\"stroke: &quot;red&quot;; marker: url(a&amp;b&lt;c&gt;d)\" />\n"
+        + "  <circle cx=\"0.5\" cy=\"0.5\" r=\"0.25\" style=\"stroke: &quot;red&quot;; marker: url(a&amp;b&lt;c&gt;d)\" />\n"
+        + "  <ellipse cx=\"0.5\" cy=\"0.5\" rx=\"0.25\" ry=\"0.125\" style=\"stroke: &quot;red&quot;; marker: url(a&amp;b&lt;c&gt;d)\" />\n"
+        + "  <text x=\"0.5\" y=\"1\" font-size=\"12\" style=\"font-family: &quot;serif&quot;; fill: a&amp;b&lt;c&gt;d\">\"a\" &amp; &lt;b&gt;</text>\n"
+        + "</svg>", actual)
 
 [<Fact>]
-let ``rotated elements insert transforms before the closing bracket`` () =
+let ``document renders rotated rectangles and text`` () =
     let actual =
         Svg.document
             [ RotatedRectangle(point 1.0 2.0, length 3.0, length 4.0, "fill: red", 45.0<degree>, point 5.0 6.0)

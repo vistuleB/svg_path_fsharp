@@ -183,7 +183,7 @@ let ``line intersections cover crossing endpoint disjoint and point contact`` ()
 let private subpath segments = Subpath.create segments |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
-let ``segment self intersection finds cubic crossing and full arc endpoint`` () =
+let ``segment self intersections finds cubic crossing`` () =
     let curve =
         CubicBezier(
             point 0.0 0.0,
@@ -194,6 +194,10 @@ let ``segment self intersection finds cubic crossing and full arc endpoint`` () 
     assertParameterNear 0.25<parameter> intersection.LeftT 1.0e-6
     assertParameterNear 0.75<parameter> intersection.RightT 1.0e-6
 
+    Assert.True(Point.near 1.0e-6<length> intersection.Point (Segment.point curve 0.25<parameter> |> Result.defaultWith (failwithf "%A")))
+
+[<Fact>]
+let ``segment self intersections reports same endpoint arc`` () =
     let arc =
         Arc
             { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>
@@ -203,7 +207,7 @@ let ``segment self intersection finds cubic crossing and full arc endpoint`` () 
         Intersections.segmentSelf arc)
 
 [<Fact>]
-let ``zero radius closed arc has no self intersection`` () =
+let ``segment self intersections ignores same endpoint zero radius arc`` () =
     let arc =
         Arc
             { Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>
@@ -211,7 +215,7 @@ let ``zero radius closed arc has no self intersection`` () =
     Assert.Equal(Ok [], Intersections.segmentSelf arc)
 
 [<Fact>]
-let ``subpath self intersection finds nonadjacent line crossing`` () =
+let ``subpath self intersections finds line crossing`` () =
     let value =
         subpath
             [ Line(point 0.0 0.0, point 10.0 10.0)
@@ -225,11 +229,13 @@ let ``subpath self intersection finds nonadjacent line crossing`` () =
     assertParameterNear 0.5<parameter> second.T 1.0e-6
 
 [<Fact>]
-let ``subpath self intersection ignores adjacent and closed wrap joins`` () =
+let ``subpath self intersections ignores adjacent segment join`` () =
     let openValue =
         subpath [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]
     Assert.Equal(Ok [], Intersections.subpathSelf openValue)
 
+[<Fact>]
+let ``subpath self intersections ignores closed endpoint join`` () =
     let closedValue =
         subpath
             [ Line(point 0.0 0.0, point 10.0 0.0)
@@ -240,7 +246,7 @@ let ``subpath self intersection ignores adjacent and closed wrap joins`` () =
     Assert.Equal(Ok [], Intersections.subpathSelf closedValue)
 
 [<Fact>]
-let ``subpath self intersection rejects overlapping nonadjacent segments`` () =
+let ``subpath self intersections rejects overlapping segments`` () =
     let value =
         subpath
             [ Line(point 0.0 0.0, point 10.0 0.0)
@@ -250,7 +256,7 @@ let ``subpath self intersection rejects overlapping nonadjacent segments`` () =
     Assert.Equal(Error OverlappingSegments, Intersections.subpathSelf value)
 
 [<Fact>]
-let ``subpath self intersection honors arc length separation`` () =
+let ``subpath self intersections respects minimum arc length separation`` () =
     let value =
         subpath
             [ Line(point 0.0 0.0, point 10.0 10.0)
@@ -259,6 +265,87 @@ let ``subpath self intersection honors arc length separation`` () =
     let options =
         { Intersections.defaultSelfIntersectionOptions with MinimumArcLengthSeparation = 100.0<length> }
     Assert.Equal(Ok [], Intersections.subpathSelfWith value options)
+
+[<Fact>]
+let ``subpath self intersections rejects semantic arc overlap`` () =
+    let left =
+        Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
+              LargeArc = false; Sweep = true; End = point 10.0 0.0 }
+    let sameGeometry =
+        Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
+              LargeArc = true; Sweep = true; End = point 10.0 0.0 }
+    Assert.Equal(Error OverlappingSegments, Intersections.subpathSelf (subpath [ left; Segment.reverse sameGeometry ]))
+
+[<Fact>]
+let ``subpath self intersections finds cubic self intersection`` () =
+    let curve =
+        CubicBezier(
+            point 0.0 0.0,
+            point -0.2708333333333333 -0.3333333333333333,
+            point -0.5416666666666666 -0.3333333333333333,
+            point 0.1875 0.0)
+    let intersection = Intersections.subpathSelf (subpath [ curve ]) |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    let first, second = intersection.Parameters
+    Assert.Equal(0, first.SegmentIndex)
+    Assert.Equal(0, second.SegmentIndex)
+    assertParameterNear 0.25<parameter> first.T 1.0e-6
+    assertParameterNear 0.75<parameter> second.T 1.0e-6
+    Assert.True(Point.near 1.0e-6<length> intersection.Point (Segment.point curve 0.25<parameter> |> Result.defaultWith (failwithf "%A")))
+
+[<Fact>]
+let ``subpath self intersections rejects invalid options`` () =
+    let value = subpath [ Line(point 0.0 0.0, point 1.0 0.0) ]
+    let invalidSeparation: SelfIntersectionOptions =
+        { MinimumArcLengthSeparation = 0.0<length>; DistanceTolerance = 1.0e-6<length> }
+    let invalidDistance: SelfIntersectionOptions =
+        { MinimumArcLengthSeparation = 1.0e-6<length>; DistanceTolerance = 0.0<length> }
+    Assert.Equal(Error(InvalidSelfIntersectionMinimumArcLengthSeparation 0.0<length>), Intersections.subpathSelfWith value invalidSeparation)
+    Assert.Equal(Error(InvalidSelfIntersectionDistanceTolerance 0.0<length>), Intersections.subpathSelfWith value invalidDistance)
+
+[<Fact>]
+let ``path self intersections finds crossing subpaths`` () =
+    let horizontal = subpath [ Line(point 0.0 5.0, point 10.0 5.0) ]
+    let vertical = subpath [ Line(point 5.0 0.0, point 5.0 10.0) ]
+    let intersection = Intersections.pathSelf (Path.ofSubpaths [ horizontal; vertical ]) |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    let first, second = intersection.Parameters
+    Assert.Equal((0, 0), (first.SubpathIndex, first.At.SegmentIndex))
+    Assert.Equal((1, 0), (second.SubpathIndex, second.At.SegmentIndex))
+    assertParameterNear 0.5<parameter> first.At.T 1.0e-6
+    assertParameterNear 0.5<parameter> second.At.T 1.0e-6
+    Assert.True(Point.near 1.0e-6<length> intersection.Point (point 5.0 5.0))
+
+[<Fact>]
+let ``path self intersections includes single subpath crossings`` () =
+    let value =
+        subpath
+            [ Line(point 0.0 0.0, point 10.0 10.0)
+              Line(point 10.0 10.0, point 0.0 10.0)
+              Line(point 0.0 10.0, point 10.0 0.0) ]
+    let intersection = Intersections.pathSelf (Path.singleton value) |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    let first, second = intersection.Parameters
+    Assert.Equal((0, 0), (first.SubpathIndex, first.At.SegmentIndex))
+    Assert.Equal((0, 2), (second.SubpathIndex, second.At.SegmentIndex))
+    assertParameterNear 0.5<parameter> first.At.T 1.0e-6
+    assertParameterNear 0.5<parameter> second.At.T 1.0e-6
+
+[<Fact>]
+let ``path self intersections rejects invalid options`` () =
+    let options: SelfIntersectionOptions =
+        { MinimumArcLengthSeparation = 0.0<length>; DistanceTolerance = 1.0e-6<length> }
+    Assert.Equal(
+        Error(InvalidSelfIntersectionMinimumArcLengthSeparation 0.0<length>),
+        Intersections.pathSelfWith Path.empty options)
+
+[<Fact>]
+let ``path self intersections rejects semantic arc overlap`` () =
+    let left =
+        Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
+              LargeArc = false; Sweep = true; End = point 10.0 0.0 }
+    let right =
+        Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
+              LargeArc = true; Sweep = true; End = point 10.0 0.0 }
+    let value = Path.ofSubpaths [ subpath [ left ]; subpath [ right ] ]
+    Assert.Equal(Error OverlappingSegments, Intersections.pathSelf value)
 
 let private lineSubpath startPoint endPoint = Segment.asSubpath (Line(startPoint, endPoint))
 let private at t: SubpathParameter = { SegmentIndex = 0; T = Parameter.fromFloat t }

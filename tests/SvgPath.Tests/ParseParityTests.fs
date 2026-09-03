@@ -8,6 +8,37 @@ let private succeeds source = match Parse.path source with | Ok _ -> () | Error 
 let private fails source = match Parse.path source with | Error _ -> () | Ok p -> failwithf "unexpectedly parsed: %s" (Serialize.path p)
 
 [<Fact>]
+let ``generated valid coordinate separator cases`` () =
+    let separators = [ " "; "  "; "\t"; "\n"; "\r"; "\u000c"; ","; " , " ]
+    let numbers = [ "0"; "-1"; "+2"; ".5"; "-.25"; "1e2"; "2E-1" ]
+    for separator in separators do
+        for number in numbers do
+            succeeds ("M" + number + separator + number)
+
+[<Fact>]
+let ``generated valid signed number boundaries`` () =
+    [ "M0-1"; "M0+1"; "M.5-.25"; "M1e2-2e1"; "M1e-2+3e-4"; "M0 0L1-2-3+4" ]
+    |> List.iter succeeds
+
+[<Fact>]
+let ``generated valid compact arc flag cases`` () =
+    for largeArc in [ 0; 1 ] do
+        for sweep in [ 0; 1 ] do
+            for endpoint in [ "10 20"; "-10-20"; "+10+20" ] do
+                succeeds (sprintf "M0 0A5 8 30 %d%d%s" largeArc sweep endpoint)
+
+[<Fact>]
+let ``generated invalid comma placement cases`` () =
+    [ ",M0 0"; "M,0 0"; "M0,,0"; "M0, ,0"; "M0 0,"; "M0 0,L1 1"; "M0 0 L,1 1"; "M0 0 Z," ]
+    |> List.iter fails
+
+[<Fact>]
+let ``generated invalid arc flag cases`` () =
+    for flag in [ -3; -2; -1; 2; 3; 4; 5; 6; 7; 8; 9 ] do
+        fails (sprintf "M0 0A5 5 0 %d 0 10 10" flag)
+        fails (sprintf "M0 0A5 5 0 0 %d 10 10" flag)
+
+[<Fact>]
 let ``empty_string_parses_as_empty_path_test`` () =
     Assert.Equal("", canonical "")
 

@@ -200,7 +200,7 @@ module BoundingBox =
 
     let width box = box.Max.X - box.Min.X
     let height box = box.Max.Y - box.Min.Y
-    let diameter box = Point.distance box.Min box.Max
+    let diameter box = width box + height box
 
     let unionMany boxes =
         match boxes with
@@ -395,6 +395,18 @@ module Segment =
         | CubicBezier(startPoint, control1, control2, endPoint) ->
             CubicBezierData(startPoint, control1, control2, endPoint)
         | Arc _ -> invalidArg (nameof segment) "arcs are not Bezier segments"
+
+    let arcCenterData segment =
+        match segment with
+        | Arc endpoint -> Ellipse.endpointToCenter endpoint |> Result.mapError (fun _ -> DegenerateArc)
+        | _ -> Error DegenerateArc
+
+    let arcPoint segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcPoint arc t)
+    let arcDerivative segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcDerivative arc t)
+    let arcPointAtAngle segment angle = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcPointAtAngle arc angle)
+    let arcDerivativeAtAngle segment angle = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcDerivativeAtAngle arc angle)
+    let arcAngleAt segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.angleAt arc t)
+    let arcEndAngle segment = arcCenterData segment |> Result.map Ellipse.arcEndAngle
 
     let point segment t =
         match segment with

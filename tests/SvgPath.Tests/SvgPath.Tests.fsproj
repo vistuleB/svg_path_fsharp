@@ -22,6 +22,7 @@
     <Compile Include="RootTests.fs" />
     <Compile Include="BezierTests.fs" />
     <Compile Include="SegmentTests.fs" />
+    <Compile Include="CoreSvgPathTests.fs" />
     <Compile Include="ParameterTests.fs" />
     <Compile Include="DirectionTests.fs" />
     <Compile Include="CurvatureTests.fs" />

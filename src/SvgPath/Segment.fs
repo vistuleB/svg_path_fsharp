@@ -1847,7 +1847,7 @@ module Subpath =
         if subpaths |> List.exists isClosed then Error AlreadyClosed
         else
             match subpaths with
-            | [] -> Error EmptySubpaths
+            | [] -> Error EmptySubpath
             | first :: rest ->
                 rest
                 |> List.fold (fun state next ->

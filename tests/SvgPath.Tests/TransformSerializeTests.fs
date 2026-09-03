@@ -5,7 +5,7 @@ open Xunit
 
 module TransformSerializeTests =
     [<Fact>]
-    let ``translations serialize compactly`` () =
+    let ``transform translate serializes nicely`` () =
         Assert.Equal("translate(10)", Transform.translate 10.0<length> 0.0<length> |> TransformSerialize.toString)
         Assert.Equal("translate(10 20)", Transform.translate 10.0<length> 20.0<length> |> TransformSerialize.toString)
 
@@ -19,14 +19,14 @@ module TransformSerializeTests =
         Assert.Equal("rotate(90)", Transform.rotate 90.0<degree> |> TransformSerialize.toString)
 
     [<Fact>]
-    let ``rotation and nonuniform scale retain their order`` () =
+    let ``transform scaled rotate serializes nicely`` () =
         let transform =
             Transform.scaleXY 2.0 3.0
             |> fun scale -> Transform.chain scale (Transform.rotate 90.0<degree>)
         Assert.Equal("rotate(90) scale(2 3)", TransformSerialize.toString transform)
 
     [<Fact>]
-    let ``rotation scale recognition is scale independent`` () =
+    let ``transform rotation scale recognition is scale independent`` () =
         let transform =
             Transform.scaleXY 2.0e6 3.0e6
             |> fun scale -> Transform.chain scale (Transform.rotate 30.0<degree>)
@@ -55,7 +55,7 @@ module TransformSerializeTests =
         Assert.Equal("translate(10 20) rotate(90) scale(2 3)", TransformSerialize.toString transform)
 
     [<Fact>]
-    let ``skews serialize in degrees`` () =
+    let ``transform skew serializes nicely`` () =
         Assert.Equal(
             "skewX(45)",
             Transform.skewX 45.0<degree>
@@ -73,26 +73,26 @@ module TransformSerializeTests =
         Assert.Equal("translate(10 20) skewX(45)", TransformSerialize.toStringWith transform (TransformSerialize.decimalOptions 3))
 
     [<Fact>]
-    let ``unrecognized linear transforms fall back to matrices`` () =
+    let ``transform matrix fallback serializes`` () =
         let transform = Transform.matrix 2.0 3.0 5.0 7.0 11.0<length> 13.0<length>
         Assert.Equal("matrix(2 3 5 7 11 13)", TransformSerialize.toString transform)
 
     [<Fact>]
-    let ``fixed decimal options apply to translations`` () =
+    let ``transform serialization uses decimal options`` () =
         let transform = Transform.translate 10.234<length> -20.235<length>
         Assert.Equal(
             "translate(10.23 -20.24)",
             TransformSerialize.toStringWith transform (TransformSerialize.fixedDecimalOptions 2))
 
     [<Fact>]
-    let ``fixed decimal options use scientific notation when scaling is unsafe`` () =
+    let ``transform serialization uses scientific notation when scaling is unsafe`` () =
         let transform = Transform.translate 1.0e20<length> -2.5e20<length>
         Assert.Equal(
             "translate(1.00e20 -2.50e20)",
             TransformSerialize.toStringWith transform (TransformSerialize.fixedDecimalOptions 2))
 
     [<Fact>]
-    let ``near identity rotation scales are not discarded`` () =
+    let ``transform serialization preserves near identity rotation scale`` () =
         let transform =
             Transform.scale 1.0000005
             |> fun scale -> Transform.chain scale (Transform.rotate 90.0<degree>)
@@ -108,7 +108,7 @@ module TransformSerializeTests =
         Assert.DoesNotContain("scale", TransformSerialize.toStringWith machineEpsilonScale options)
 
     [<Fact>]
-    let ``matrix output can be forced`` () =
+    let ``transform serialization can force matrix output`` () =
         let options = TransformSerialize.defaultOptions () |> TransformSerialize.forceMatrix
         Assert.Equal(
             "matrix(1 0 0 1 10 20)",
@@ -158,7 +158,7 @@ module TransformSerializeTests =
         Assert.Equal("rotate(30.000001)", TransformSerialize.toStringWith transform (TransformSerialize.decimalOptions 6))
 
     [<Fact>]
-    let ``reflections use matrix fallback`` () =
+    let ``reflected rotation matrix uses matrix fallback`` () =
         let transform = Transform.matrix 0.0 2.0 3.0 0.0 10.0<length> 20.0<length>
         Assert.Equal("matrix(0 2 3 0 10 20)", TransformSerialize.toString transform)
 

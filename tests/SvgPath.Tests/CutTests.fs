@@ -8,7 +8,7 @@ module CutTests =
     let private line x1 y1 x2 y2 = Line(point x1 y1, point x2 y2)
 
     [<Fact>]
-    let ``open subject is cut in traversal order`` () =
+    let ``subpath cut splits open subject in order`` () =
         let subject = Subpath.ofSegment (line 0.0<length> 0.0<length> 30.0<length> 0.0<length>)
         let cutter =
             Subpath.create
@@ -32,7 +32,7 @@ module CutTests =
         Assert.Equal(Ok [ subject ], Cut.subpath subject cutter)
 
     [<Fact>]
-    let ``partial overlap contributes both cut boundaries`` () =
+    let ``subpath cut splits at partial overlap boundaries`` () =
         let subject = Subpath.ofSegment (line 0.0<length> 0.0<length> 10.0<length> 0.0<length>)
         let cutter = Subpath.ofSegment (line 3.0<length> 0.0<length> 7.0<length> 0.0<length>)
         match Cut.subpath subject cutter with
@@ -45,7 +45,7 @@ module CutTests =
         Assert.Equal(Ok [ subject ], Cut.subpath subject subject)
 
     [<Fact>]
-    let ``open boundary intersection does not create an empty piece`` () =
+    let ``subpath cut ignores open subject endpoint intersections`` () =
         let subject = Subpath.ofSegment (line 0.0<length> 0.0<length> 10.0<length> 0.0<length>)
         let cutter = Subpath.ofSegment (line 0.0<length> -5.0<length> 0.0<length> 5.0<length>)
         match Cut.subpath subject cutter with
@@ -65,7 +65,7 @@ module CutTests =
         Assert.Equal("M 0 0 H 10 M 10 0 H 20", Serialize.path (Path.ofSubpaths pieces))
 
     [<Fact>]
-    let ``one cut opens a closed subject`` () =
+    let ``subpath cut opens closed subject at single cut`` () =
         let subjectResult =
             Subpath.create
                 [ line 0.0<length> 0.0<length> 10.0<length> 0.0<length>
@@ -87,7 +87,7 @@ module CutTests =
                     Assert.Equal(Subpath.start opened, Subpath.finish opened)
 
     [<Fact>]
-    let ``two cuts split a closed subject cyclically`` () =
+    let ``subpath cut splits closed subject cyclically`` () =
         let subject =
             Subpath.create
                 [ line 0.0<length> 0.0<length> 10.0<length> 0.0<length>
@@ -114,7 +114,7 @@ module CutTests =
             Cut.subpathWith subject cutter { Intersections.defaultOptions with Tolerance = 0.0<length> })
 
     [<Fact>]
-    let ``path cut gathers all cutter subpaths before slicing`` () =
+    let ``path cut cuts each subject subpath by all cutter subpaths`` () =
         let subject = Path.singleton (Subpath.ofSegment (line 0.0<length> 0.0<length> 30.0<length> 0.0<length>))
         let cutter =
             Path.ofSubpaths
@@ -133,7 +133,7 @@ module CutTests =
         Assert.Equal(Ok Path.empty, Cut.path Path.empty cutter)
 
     [<Fact>]
-    let ``path cut validates options even for empty paths`` () =
+    let ``path cut empty subject still validates options`` () =
         let options = { Intersections.defaultOptions with Tolerance = 0.0<length> }
         Assert.Equal(
             Error(InvalidIntersectionTolerance 0.0<length>),

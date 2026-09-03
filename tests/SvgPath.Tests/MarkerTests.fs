@@ -20,7 +20,7 @@ let private basicLayout =
       PreserveAspectRatio = Meet XMidYMid }
 
 [<Fact>]
-let ``open polyline has start mid and end poses`` () =
+let ``subpath poses returns start mid and end`` () =
     let subpath =
         Subpath.polyline [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
@@ -31,7 +31,7 @@ let ``open polyline has start mid and end poses`` () =
     Assert.Equal(90.0<degree>, poses[2].Angle)
 
 [<Fact>]
-let ``closed polygon start and end use the closing corner`` () =
+let ``closed subpath auto orients start and end like corner`` () =
     let subpath =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
@@ -47,7 +47,7 @@ let ``closed subpath auto start reverse flips only start corner`` () =
     Assert.Equal(-45.0<degree>, (List.last poses).Angle)
 
 [<Fact>]
-let ``auto start reverse changes only the start pose`` () =
+let ``auto start reverse flips only start pose`` () =
     let subpath = Subpath.polyline [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0 ] |> Result.defaultWith (failwithf "%A")
     let poses = Marker.subpathPoses subpath AutoStartReverse |> Result.defaultWith (failwithf "%A")
     Assert.Equal< float<degree> list>([ 180.0<degree>; 45.0<degree>; 90.0<degree> ], poses |> List.map _.Angle)
@@ -65,13 +65,13 @@ let ``opposite mid tangents fall back to incoming angle`` () =
     Assert.Equal(0.0<degree>, poses[1].Angle)
 
 [<Fact>]
-let ``singular endpoint direction uses the first noncollapsed handle`` () =
+let ``auto orientation recovers collapsed cubic endpoint direction`` () =
     let segment = CubicBezier(point 0.0 0.0, point 0.0 0.0, point 2.0 0.0, point 2.0 1.0)
     let poses = Marker.subpathPoses (Subpath.ofSegment segment) Auto |> Result.defaultWith (failwithf "%A")
     Assert.Equal(0.0<degree>, poses[0].Angle)
 
 [<Fact>]
-let ``orientation searches across collapsed segments`` () =
+let ``auto orientation searches across collapsed segments`` () =
     let join = point 10.0 0.0
     let subpath =
         Subpath.create [ Line(point 0.0 0.0, join); Line(join, join); Line(join, point 10.0 10.0) ]
@@ -85,15 +85,18 @@ let ``auto orientation rejects fully collapsed subpath`` () =
     Assert.Equal(Error DegenerateMarkerTangent, Marker.subpathPoses (Subpath.ofSegment (Line(p, p))) Auto)
 
 [<Fact>]
-let ``path poses skip move-only subpaths`` () =
+let ``path poses concatenates drawable subpaths and skips move only`` () =
     let first = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     let second = Subpath.polyline [ point 2.0 0.0; point 2.0 1.0; point 3.0 1.0 ] |> Result.defaultWith (failwithf "%A")
     let path = Path.ofSubpaths [ first; Subpath.empty (point 1.5 1.5); second ]
     let poses = Marker.pathPoses path Auto |> Result.defaultWith (failwithf "%A")
     Assert.Equal(5, poses.Length)
+    Assert.Equal<MarkerKind list>(
+        [ MarkerStart; MarkerEnd; MarkerStart; MarkerMid; MarkerEnd ],
+        poses |> List.map _.Kind)
 
 [<Fact>]
-let ``reference transform places the reference at the pose`` () =
+let ``pose transform with reference places reference at pose`` () =
     let matrix = Marker.poseTransformWithReference basicPose (point 2.0 0.0)
     Assert.Equal(basicPose.Point, Affine.point matrix (point 2.0 0.0))
 
@@ -111,7 +114,7 @@ let ``layout transform without view box matches reference transform`` () =
     Assert.Equal(point 10.0 21.0, Affine.point matrix (point 3.0 0.0))
 
 [<Fact>]
-let ``view box stretch fills marker viewport`` () =
+let ``layout transform stretches view box`` () =
     let layout =
         { basicLayout with
             MarkerWidth = 20.0<length>
@@ -137,7 +140,7 @@ let ``layout transform slice aligns view box`` () =
     Assert.Equal(point 90.0 90.0, Affine.point matrix (point 0.0 0.0))
 
 [<Fact>]
-let ``stroke-width units scale marker content about its reference`` () =
+let ``layout transform scales stroke width units`` () =
     let layout =
         { basicLayout with
             Reference = point 2.0 0.0
@@ -148,15 +151,15 @@ let ``stroke-width units scale marker content about its reference`` () =
     Assert.Equal(point 10.0 24.0, Affine.point matrix (point 3.0 0.0))
 
 [<Fact>]
-let ``invalid marker dimensions are rejected`` () =
+let ``layout transform rejects invalid dimensions`` () =
     Assert.Equal(Error(InvalidMarkerWidth 0.0<length>), Marker.poseLayoutTransform basicPose { basicLayout with MarkerWidth = 0.0<length> })
     Assert.Equal(Error(InvalidMarkerHeight 0.0<length>), Marker.poseLayoutTransform basicPose { basicLayout with MarkerHeight = 0.0<length> })
 
 [<Fact>]
-let ``empty subpath has no marker poses`` () =
+let ``subpath poses rejects empty subpath`` () =
     Assert.Equal(Error EmptyMarkerSubpath, Marker.subpathPoses (Subpath.empty (point 0.0 0.0)) Auto)
 
 [<Fact>]
-let ``path poses returns empty for empty and move-only paths`` () =
+let ``path poses returns empty for empty and move only paths`` () =
     Assert.Equal(Ok [], Marker.pathPoses Path.empty Auto)
     Assert.Equal(Ok [], Marker.pathPoses (Path.ofSubpaths [ Subpath.empty (point 1.0 2.0) ]) Auto)

@@ -97,7 +97,7 @@ let private lineSubpath points = Subpath.polyline points |> Result.defaultWith (
 let private bounds (subpath: Subpath) = subpath.Start, (subpath.Segments |> List.last |> Segment.finish)
 
 [<Fact>]
-let ``line dashes extract visible intervals`` () =
+let ``subpath dashes extracts line intervals`` () =
     let source = lineSubpath [ point 0.0 0.0; point 12.0 0.0 ]
     let dashes = Stroke.subpathDashes source [ 3.0<length>; 2.0<length> ] 0.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal<(Point<length> * Point<length>) list>(
@@ -132,7 +132,7 @@ let ``subpath dashes preserves small scale intervals`` () =
     Assert.Equal(point 0.5e-9 0.0, Segment.finish (List.last dash.Segments))
 
 [<Fact>]
-let ``odd dash patterns are duplicated`` () =
+let ``subpath dashes duplicates odd patterns`` () =
     let source = lineSubpath [ point 0.0 0.0; point 12.0 0.0 ]
     let dashes = Stroke.subpathDashes source [ 2.0<length>; 1.0<length>; 3.0<length> ] 0.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal<(Point<length> * Point<length>) list>(
@@ -159,7 +159,7 @@ let ``subpath dashes treats empty pattern as none`` () =
     Assert.Equal(source, dash)
 
 [<Fact>]
-let ``dash extraction crosses source segment boundaries`` () =
+let ``subpath dashes crosses segment boundaries`` () =
     let source = lineSubpath [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0 ]
     let dashes = Stroke.subpathDashes source [ 15.0<length>; 5.0<length> ] 0.0<length> |> Result.defaultWith (failwithf "%A")
     let dash = Assert.Single(dashes)
@@ -167,21 +167,21 @@ let ``dash extraction crosses source segment boundaries`` () =
     Assert.Equal(point 10.0 5.0, Segment.finish (List.last dash.Segments))
 
 [<Fact>]
-let ``inactive pattern preserves closed subpath`` () =
+let ``subpath dashes preserves closed none semantics`` () =
     let source = Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ] |> Result.defaultWith (failwithf "%A")
     let dash = Stroke.subpathDashes source [ 0.0<length>; 0.0<length> ] 0.0<length> |> Result.defaultWith (failwithf "%A") |> Assert.Single
     Assert.True(dash.Closed)
     Assert.Equal(source, dash)
 
 [<Fact>]
-let ``active full dash opens a closed subpath`` () =
+let ``subpath dashes opens full closed dash when pattern is active`` () =
     let source = Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ] |> Result.defaultWith (failwithf "%A")
     let dash = Stroke.subpathDashes source [ 100.0<length>; 5.0<length> ] 0.0<length> |> Result.defaultWith (failwithf "%A") |> Assert.Single
     Assert.False(dash.Closed)
     Assert.Equal(source.Segments.Length, dash.Segments.Length)
 
 [<Fact>]
-let ``path dash pattern resets for each subpath`` () =
+let ``path dashes resets pattern per subpath`` () =
     let source = Path.ofSubpaths [ lineSubpath [ point 0.0 0.0; point 10.0 0.0 ]; lineSubpath [ point 0.0 10.0; point 10.0 10.0 ] ]
     let dashes = Stroke.pathDashes source [ 3.0<length>; 100.0<length> ] 0.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, dashes.Subpaths.Length)
@@ -207,7 +207,7 @@ let ``subpath dashes rejects invalid pattern and offset`` () =
         Stroke.subpathDashes source [ -1.0<length>; 2.0<length> ] 0.0<length>)
 
 [<Fact>]
-let ``dash validation runs for an empty path`` () =
+let ``path dashes empty path still validates options`` () =
     Assert.Equal(
         Error(InvalidDashLength -1.0<length>),
         Stroke.pathDashes (Path.ofSubpaths []) [ -1.0<length>; 2.0<length> ] 0.0<length>)
@@ -215,14 +215,14 @@ let ``dash validation runs for an empty path`` () =
     Assert.Equal(Error(StrokePathError(InvalidLengthTolerance 0.0<length>)), Stroke.pathDashesWith (Path.ofSubpaths []) options)
 
 [<Fact>]
-let ``dash pattern rejects nonfinite total`` () =
+let ``subpath dashes rejects a non finite pattern total`` () =
     let source = lineSubpath [ point 0.0 0.0; point 10.0 0.0 ]
     Assert.Equal(
         Error InvalidDashPatternLength,
         Stroke.subpathDashes source [ Length.fromFloat 1.0e308; Length.fromFloat 1.0e308 ] 0.0<length>)
 
 [<Fact>]
-let ``stroke rejects nonpositive width`` () =
+let ``stroke rejects non positive width`` () =
     Assert.Equal(
         Error(InvalidStrokeOutlineWidth 0.0<length>),
         Stroke.segment (Line(point 0.0 0.0, point 10.0 0.0)) 0.0<length>)

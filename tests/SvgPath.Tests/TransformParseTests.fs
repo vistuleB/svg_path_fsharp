@@ -28,7 +28,7 @@ module TransformParseTests =
         Assert.Equal(point 8.0 -6.0, Transform.point (parsed "scale(4 -2)") (point 2.0 3.0))
 
     [<Fact>]
-    let ``rotate about a center parses`` () =
+    let ``rotate about center parses`` () =
         let transformed = Transform.point (parsed "rotate(90 1 1)") (point 2.0 1.0)
         Assert.Equal(point 1.0 2.0, transformed)
 
@@ -38,7 +38,7 @@ module TransformParseTests =
         Assert.Equal(point 7.0 5.0, Transform.point transform (point 2.0 3.0))
 
     [<Fact>]
-    let ``transform list uses SVG matrix order`` () =
+    let ``transform list uses svg matrix order`` () =
         Assert.Equal(point 12.0 22.0, Transform.point (parsed "translate(10 20) scale(2)") (point 1.0 1.0))
 
     [<Fact>]
@@ -47,11 +47,11 @@ module TransformParseTests =
         Assert.Equal(point 12.0 26.0, Transform.point transform (point 4.0 -3.0))
 
     [<Fact>]
-    let ``transform arguments require comma whitespace`` () =
+    let ``transform arguments require comma wsp`` () =
         Assert.True(Result.isError (TransformParse.attribute "translate(10-20)"))
 
     [<Fact>]
-    let ``transform functions require comma whitespace`` () =
+    let ``transform functions require comma wsp`` () =
         Assert.True(Result.isError (TransformParse.attribute "translate(1)rotate(2)"))
 
     [<Fact>]
@@ -91,19 +91,19 @@ module TransformParseTests =
         Assert.Equal(point 0.0 0.0, Transform.point transform (point 2.0 3.0))
 
     [<Fact>]
-    let ``unknown transform reports its exact remaining suffix`` () =
+    let ``unknown transform is rejected`` () =
         Assert.Equal(
             Error(TransformParse.ParseError(TransformParse.UnknownTransform "perspective", "perspective(1)")),
             TransformParse.attribute "perspective(1)")
 
     [<Fact>]
-    let ``wrong argument count reports its exact remaining suffix`` () =
+    let ``wrong argument count is rejected`` () =
         Assert.Equal(
             Error(TransformParse.ParseError(TransformParse.InvalidArgumentCount("translate", 3), "translate(1 2 3)")),
             TransformParse.attribute "translate(1 2 3)")
 
     [<Fact>]
-    let ``missing close reports end of input`` () =
+    let ``missing close is rejected`` () =
         Assert.Equal(
             Error(TransformParse.ParseError(TransformParse.ExpectedClose, "")),
             TransformParse.attribute "scale(2")

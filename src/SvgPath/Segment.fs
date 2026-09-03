@@ -1201,9 +1201,15 @@ module Segment =
 
     let private controlDistanceToChord startPoint endPoint control =
         let chord = Point.displacement startPoint endPoint
-        let length = Point.norm chord
-        if length = 0.0<length> then Point.distance startPoint control
-        else abs (Point.cross chord (Point.displacement startPoint control)) / length
+        let lengthSquared = Point.squaredNorm chord
+        if lengthSquared = 0.0<length^2> then Point.distance startPoint control
+        else
+            let progress =
+                float (Point.dot (Point.displacement startPoint control) chord / lengthSquared)
+                |> max 0.0
+                |> min 1.0
+            let projected = Point.translate (Point.scale progress chord) startPoint
+            Point.distance projected control
 
     let private bezierError curve =
         let startPoint, endPoint, controls =
@@ -1226,6 +1232,25 @@ module Segment =
             | Error error, _
             | _, Error error -> Error error
 
+    let private arcChordErrorBound (arc: CenterArcData) =
+        let radius = max (abs arc.Radius.X) (abs arc.Radius.Y)
+        let delta = abs arc.DeltaAngle
+        if delta > 180.0<degree> then 2.0 * radius
+        else radius * max 0.0 (1.0 - Trig.cosDegrees (delta / 2.0))
+
+    let rec private linearizeArc options depth arc startPoint endPoint =
+        let error = arcChordErrorBound arc
+        if error <= options.Tolerance then Ok [ Line(startPoint, endPoint) ]
+        elif depth >= options.MaxDepth then Error(LinearizeMaxDepthReached error)
+        else
+            let left, right = Ellipse.splitArc arc (Parameter.fromFloat 0.5)
+            let middle = Ellipse.arcPoint arc (Parameter.fromFloat 0.5)
+            match linearizeArc options (depth + 1) left startPoint middle,
+                  linearizeArc options (depth + 1) right middle endPoint with
+            | Ok leftLines, Ok rightLines -> Ok(leftLines @ rightLines)
+            | Error error, _
+            | _, Error error -> Error error
+
     let toLinesWith options segment =
         if options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidLinearizeTolerance options.Tolerance)
@@ -1236,15 +1261,9 @@ module Segment =
             | QuadraticBezier _
             | CubicBezier _ -> linearizeBezier options 0 (asBezier segment)
             | Arc endpoint ->
-                match Ellipse.arcToCubics endpoint.Start endpoint.Radius endpoint.XAxisRotation endpoint.LargeArc endpoint.Sweep endpoint.End with
+                match Ellipse.endpointToCenter endpoint with
                 | Error _ -> Ok [ Line(endpoint.Start, endpoint.End) ]
-                | Ok cubics ->
-                    cubics
-                    |> List.fold (fun state cubic ->
-                        state
-                        |> Result.bind (fun lines ->
-                            linearizeBezier options 0 (CubicBezierData(cubic.Start, cubic.Control1, cubic.Control2, cubic.End))
-                            |> Result.map (fun next -> lines @ next))) (Ok [])
+                | Ok arc -> linearizeArc options 0 arc endpoint.Start endpoint.End
 
     let toLines segment = toLinesWith defaultLinearizeOptions segment
 
@@ -2371,15 +2390,16 @@ module Path =
     let boundingBox path =
         match path.subpathList with
         | [] -> Error EmptyPath
-        | first :: rest ->
-            Subpath.boundingBox first
-            |> Result.bind (fun initial ->
-                rest
-                |> List.fold (fun state subpath ->
-                    state
-                    |> Result.bind (fun box ->
-                        Subpath.boundingBox subpath
-                        |> Result.map (BoundingBox.union box))) (Ok initial))
+        | subpaths ->
+            subpaths
+            |> List.fold (fun state subpath ->
+                state
+                |> Result.bind (fun accumulated ->
+                    match Subpath.boundingBox subpath with
+                    | Error EmptySubpath -> Ok accumulated
+                    | Error error -> Error error
+                    | Ok next -> Ok(Some(match accumulated with None -> next | Some box -> BoundingBox.union box next)))) (Ok None)
+            |> Result.bind (function Some box -> Ok box | None -> Error EmptySubpaths)
 
     let toLinesWith options path =
         path.subpathList

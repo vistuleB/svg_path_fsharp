@@ -11,8 +11,10 @@
     <Compile Include="PointTests.fs" />
     <Compile Include="PointAdditionalTests.fs" />
     <Compile Include="FormatTests.fs" />
+    <Compile Include="GeometryParityTests.fs" />
     <Compile Include="InspectTests.fs" />
     <Compile Include="AffineTests.fs" />
+    <Compile Include="AffineAdditionalTests.fs" />
     <Compile Include="EllipseTests.fs" />
     <Compile Include="TrigTests.fs" />
     <Compile Include="TrigAdditionalTests.fs" />
@@ -22,7 +24,9 @@
     <Compile Include="ParameterTests.fs" />
     <Compile Include="DirectionTests.fs" />
     <Compile Include="CurvatureTests.fs" />
+    <Compile Include="CurvatureAdditionalTests.fs" />
     <Compile Include="SmallestEnclosingCircleTests.fs" />
+    <Compile Include="SmallestEnclosingCircleAdditionalTests.fs" />
     <Compile Include="AreaTests.fs" />
     <Compile Include="BasicShapesTests.fs" />
     <Compile Include="OverlapDetectionTests.fs" />
@@ -40,6 +44,7 @@
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />
     <Compile Include="EffectsTests.fs" />
+    <Compile Include="EffectsAdditionalTests.fs" />
     <Compile Include="MarkerTests.fs" />
     <Compile Include="ParseTests.fs" />
     <Compile Include="ParseParityTests.fs" />
@@ -49,6 +54,7 @@
     <Compile Include="SvgTests.fs" />
     <Compile Include="ArrangementTests.fs" />
     <Compile Include="CsgTests.fs" />
+    <Compile Include="CsgParityTests.fs" />
     <Compile Include="OffsetTests.fs" />
     <Compile Include="StrokeTests.fs" />
     <Compile Include="OffsetParityTests.fs" />

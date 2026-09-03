@@ -11,43 +11,36 @@ let private arcCount (subpath: Subpath) =
     subpath.Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length
 
 [<Fact>]
-let ``stretch policy joins at midpoint`` () =
+let ``stretch to join endpoint policy meets at midpoint`` () =
     let source =
         Subpath.createWith
             (Effects.stretchToJoinEndpointPolicy ())
-            [ Line(point 0.0 0.0, point 1.0 0.0)
-              Line(point 3.0 0.0, point 4.0 0.0) ]
+            [ Line(point 0.0 0.0, point 10.0 0.0)
+              Line(point 20.0 0.0, point 30.0 0.0) ]
         |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(point 2.0 0.0, Segment.finish source.Segments[0])
-    Assert.Equal(point 2.0 0.0, Segment.start source.Segments[1])
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 15.0 0.0); Line(point 15.0 0.0, point 30.0 0.0) ], source.Segments)
 
 [<Fact>]
-let ``round open polyline inserts circular arc`` () =
+let ``round corners rounds open polyline interior join`` () =
     let source =
-        Subpath.create [ Line(point 0.0 0.0, point 4.0 0.0); Line(point 4.0 0.0, point 4.0 4.0) ]
+        Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]
         |> Result.defaultWith (failwithf "%A")
-    let rounded = Effects.roundSubpathCorners source 1.0<length> |> Result.defaultWith (failwithf "%A")
+    let rounded = Effects.roundSubpathCorners source 2.0<length> |> Result.defaultWith (failwithf "%A")
+    Assert.False rounded.Closed
     Assert.Equal(3, rounded.Segments.Length)
-    Assert.True(match rounded.Segments[1] with Arc arc -> arc.Radius = point 1.0 1.0 | _ -> false)
+    Assert.Equal(Line(point 0.0 0.0, point 8.0 0.0), rounded.Segments[0])
+    Assert.True(match rounded.Segments[1] with Arc arc -> arc.Start = point 8.0 0.0 && arc.End = point 10.0 2.0 | _ -> false)
+    Assert.Equal(Line(point 10.0 2.0, point 10.0 10.0), rounded.Segments[2])
 
 [<Fact>]
-let ``round closed square rounds four corners`` () =
-    let source = Subpath.polygon [ point 0.0 0.0; point 4.0 0.0; point 4.0 4.0; point 0.0 4.0 ] |> Result.defaultWith (failwithf "%A")
-    let rounded = Effects.roundSubpathCorners source 0.5<length> |> Result.defaultWith (failwithf "%A")
+let ``round corners rounds closed square`` () =
+    let source = Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ] |> Result.defaultWith (failwithf "%A")
+    let rounded = Effects.roundSubpathCorners source 2.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(rounded.Closed)
+    Assert.Equal(8, rounded.Segments.Length)
     Assert.Equal(4, rounded.Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
-
-[<Fact>]
-let ``invalid effect tolerances are rejected`` () =
-    let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
-    let invalid = { Effects.defaultRoundCornerOptions with AngularTolerance = -1.0<degree> }
-    Assert.Equal(Error(InvalidAngularTolerance -1.0<degree>), Effects.roundSubpathCornersWith source 1.0<length> invalid)
-
-[<Fact>]
-let ``degeneracy effect delegates to normalizer`` () =
-    let source = Subpath.ofSegment (QuadraticBezier(point 0.0 0.0, point 1.0 0.001, point 2.0 0.0))
-    let normalized = Effects.normalizeDegenerateSegments source 0.01<length> |> Result.defaultWith (failwithf "%A")
-    Assert.All(normalized.Segments, fun segment -> Assert.True(match segment with Line _ -> true | _ -> false))
+    Assert.Contains(Line(point 2.0 0.0, point 8.0 0.0), rounded.Segments)
+    Assert.Contains(Line(point 10.0 2.0, point 10.0 8.0), rounded.Segments)
 
 [<Fact>]
 let ``normalize degenerate segments rejects nonfinite tolerance`` () =
@@ -97,7 +90,7 @@ let ``round corners rounds closed one segment cusp`` () =
     Assert.Contains(rounded.Segments, function CubicBezier _ -> true | _ -> false)
 
 [<Fact>]
-let ``stretch policy closes by dragging last end`` () =
+let ``stretch to join endpoint policy closes by dragging last end`` () =
     let a, b, c, nearA = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 1.0 0.0
     let source =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, nearA) ]
@@ -109,7 +102,7 @@ let ``stretch policy closes by dragging last end`` () =
     Assert.Equal<Segment list>([ Line(a, b); Line(b, c); Line(c, a) ], closed.Segments)
 
 [<Fact>]
-let ``stretch policy closes near loop single segment`` () =
+let ``stretch to join endpoint policy closes near loop single segment`` () =
     let a, nearA = point 0.0 0.0, point 0.01 0.0
     let closed =
         Subpath.ofSegment (Line(a, nearA))
@@ -143,6 +136,12 @@ let ``round corners can adapt radius to fit short segments`` () =
     rounded.Segments
     |> List.choose (function Arc arc -> Some arc.Radius.X | _ -> None)
     |> List.iter (fun radius -> Assert.True(abs (radius - 4.999999<length>) <= 1.0e-6<length>))
+
+[<Fact>]
+let ``normalize degenerate segments replaces degenerate segments`` () =
+    let source = Subpath.ofSegment (QuadraticBezier(point 0.0 0.0, point 10.0 0.0, point 0.0 0.0))
+    let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(2, cleaned.Segments.Length)
 
 [<Fact>]
 let ``normalize degenerate segments preserves closed one line replacement`` () =

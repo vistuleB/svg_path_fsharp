@@ -3,7 +3,8 @@ namespace SvgPath.Tests
 open Xunit
 open SvgPath
 
-module CsgTests =
+// F#-specific smoke coverage; the one-to-one Gleam ports live in CsgParityTests.
+module CsgAdditionalTests =
     let point x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
     let rectangle x y width height =
         [ Line(point x y, point (x + width) y)

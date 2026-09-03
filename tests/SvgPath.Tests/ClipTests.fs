@@ -37,16 +37,6 @@ module ClipTests =
                 Assert.Equal(point 10.0<length> 5.0<length>, Subpath.finish piece)
 
     [<Fact>]
-    let ``outside line is discarded`` () =
-        match rectangle () with
-        | Error error -> failwithf "%A" error
-        | Ok boundary ->
-            let input = Subpath.ofSegment (line -5.0<length> 15.0<length> 15.0<length> 15.0<length>)
-            match Clip.subpath input (Path.singleton boundary) Nonzero with
-            | Error error -> failwithf "%A" error
-            | Ok pieces -> Assert.Empty pieces
-
-    [<Fact>]
     let ``closed subpath survives whole when fully inside`` () =
         match rectangle () with
         | Error error -> failwithf "%A" error
@@ -77,13 +67,6 @@ module ClipTests =
                 let piece = Assert.Single pieces
                 Assert.Equal(point 0.0<length> 0.0<length>, Subpath.start piece)
                 Assert.Equal(point 10.0<length> 0.0<length>, Subpath.finish piece)
-
-    [<Fact>]
-    let ``empty path still validates options`` () =
-        let options = { Clip.defaultOptions with Tolerance = 0.0<length> }
-        Assert.Equal(
-            Error(InvalidIntersectionTolerance 0.0<length>),
-            Clip.pathWith Path.empty Path.empty Nonzero options)
 
     [<Fact>]
     let ``open subpath clips to multiple open pieces without bridges`` () =

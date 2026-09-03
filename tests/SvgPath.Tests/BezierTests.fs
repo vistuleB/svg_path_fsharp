@@ -7,66 +7,63 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private parameter value = Parameter.fromFloat value
 
 [<Fact>]
-let ``cubic evaluation and derivative preserve coordinate units`` () =
-    let curve = CubicBezierData(point 0.0 0.0, point 0.0 2.0, point 2.0 2.0, point 2.0 0.0)
-    let midpoint = Bezier.point curve (parameter 0.5)
-    let derivative = Bezier.derivative curve (parameter 0.5)
-    Assert.Equal(point 1.0 1.5, midpoint)
-    Assert.Equal(Point.create 3.0<length / parameter> 0.0<length / parameter>, derivative)
-
-[<Fact>]
-let ``linear and quadratic evaluation and extrapolation match De Casteljau construction`` () =
+let ``bezier point evaluates linear quadratic and cubic`` () =
     let linear = LinearBezierData(point 0.0 0.0, point 10.0 20.0)
     let quadratic = QuadraticBezierData(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
+    let cubic = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
     Assert.Equal(point 5.0 10.0, Bezier.point linear (parameter 0.5))
     Assert.Equal(point 10.0 10.0, Bezier.point quadratic (parameter 0.5))
+    Assert.Equal(point 15.0 22.5, Bezier.point cubic (parameter 0.5))
+
+[<Fact>]
+let ``bezier point extrapolates outside t`` () =
+    let linear = LinearBezierData(point 0.0 0.0, point 10.0 20.0)
     Assert.Equal(point -5.0 -10.0, Bezier.point linear (parameter -0.5))
     Assert.Equal(point 15.0 30.0, Bezier.point linear (parameter 1.5))
 
 [<Fact>]
-let ``derivative times a parameter interval is a geometric coordinate pair`` () =
-    let curve = LinearBezierData(point 2.0 3.0, point 10.0 7.0)
-    let derivative = Bezier.derivative curve (parameter 0.25)
-    let displacement: Point<length> = Point.scale (parameter 0.5) derivative
-    Assert.Equal(point 4.0 2.0, displacement)
+let ``bezier derivative uses parameter t`` () =
+    let quadratic = QuadraticBezierData(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
+    let cubic = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
+    Assert.Equal(Point.create 20.0<length / parameter> 40.0<length / parameter>, Bezier.derivative quadratic (parameter 0.0))
+    Assert.Equal(Point.create 20.0<length / parameter> 0.0<length / parameter>, Bezier.derivative quadratic (parameter 0.5))
+    Assert.Equal(Point.create 45.0<length / parameter> 0.0<length / parameter>, Bezier.derivative cubic (parameter 0.5))
 
 [<Fact>]
-let ``split pieces meet at the evaluated point`` () =
-    let curve = QuadraticBezierData(point 0.0 0.0, point 1.0 2.0, point 2.0 0.0)
+let ``split divides quadratic at t`` () =
+    let curve = QuadraticBezierData(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
     let left, right = Bezier.split curve (parameter 0.25)
-    let expected = Bezier.point curve (parameter 0.25)
-    Assert.Equal(expected, Bezier.finish left)
-    Assert.Equal(expected, Bezier.start right)
+    Assert.Equal(QuadraticBezierData(point 0.0 0.0, point 2.5 5.0, point 5.0 7.5), left)
+    Assert.Equal(QuadraticBezierData(point 5.0 7.5, point 12.5 15.0, point 20.0 0.0), right)
 
 [<Fact>]
-let ``split many sorts deduplicates and trims boundary parameters`` () =
-    let curve = LinearBezierData(point 0.0 0.0, point 10.0 0.0)
-    let pieces =
-        Bezier.splitMany curve [ parameter 1.0; parameter 0.5; parameter 0.0; parameter 0.5 ]
-    Assert.Equal(2, List.length pieces)
-    Assert.Equal(point 5.0 0.0, pieces |> List.head |> Bezier.finish)
-
-[<Fact>]
-let ``quadratic bounding box includes its interior extremum`` () =
-    let curve = QuadraticBezierData(point 0.0 0.0, point 1.0 2.0, point 2.0 0.0)
+let ``bezier bounding box of quadratic includes interior extremum`` () =
+    let curve = QuadraticBezierData(point 0.0 0.0, point 10.0 10.0, point 20.0 0.0)
     let box = Bezier.boundingBox curve
     Assert.Equal(point 0.0 0.0, box.Min)
-    Assert.Equal(point 2.0 1.0, box.Max)
+    Assert.Equal(point 20.0 5.0, box.Max)
 
 [<Fact>]
-let ``line bounding box uses endpoint extents`` () =
+let ``bezier bounding box of line uses endpoint extents`` () =
     let line = LinearBezierData(point 1.0 2.0, point 5.0 -3.0) |> Bezier.boundingBox
     Assert.Equal(point 1.0 -3.0, line.Min)
     Assert.Equal(point 5.0 2.0, line.Max)
 
 [<Fact>]
-let ``cubic bounding box includes interior extrema`` () =
+let ``bezier bounding box of cubic includes interior extrema`` () =
     let cubic = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0) |> Bezier.boundingBox
     Assert.Equal(point 0.0 0.0, cubic.Min)
     Assert.Equal(point 30.0 22.5, cubic.Max)
 
 [<Fact>]
-let ``mapping transforms every defining point`` () =
+let ``bezier bounding box matches generated fixtures`` () =
+    for curve, expectedMin, expectedMax in BezierBoundingBoxFixtures.fixtures do
+        let actual = Bezier.boundingBox curve
+        Assert.True(Point.distance actual.Min expectedMin <= 1.0e-6<length>)
+        Assert.True(Point.distance actual.Max expectedMax <= 1.0e-6<length>)
+
+[<Fact>]
+let ``map points maps bezier defining points`` () =
     let curve = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
     let mapped = Bezier.mapPoints (fun value -> point (Length.toFloat value.X + 1.0) (Length.toFloat value.Y * 2.0)) curve
     Assert.Equal(
@@ -74,14 +71,15 @@ let ``mapping transforms every defining point`` () =
         mapped)
 
 [<Fact>]
-let ``cubic inflection parameters exclude endpoints`` () =
-    let curve = CubicBezierData(point 0.0 0.0, point 1.0 1.0, point 2.0 -1.0, point 3.0 0.0)
+let ``cubic inflection parameters finds an s curve inflection`` () =
+    let curve = CubicBezierData(point 0.0 0.0, point 0.0 100.0, point 100.0 -100.0, point 100.0 0.0)
     let roots = Bezier.cubicInflectionParameters curve
     Assert.Single roots |> ignore
     Assert.Equal(0.5, roots |> List.head |> Parameter.ratio, 12)
+    Assert.Equal(point 50.0 0.0, Bezier.point curve (roots |> List.head))
 
 [<Fact>]
-let ``endpoint tangent fitting recovers an exact cubic`` () =
+let ``fit cubic with endpoint tangents recovers exact cubic`` () =
     let original = CubicBezierData(point 0.0 0.0, point 35.0 65.0, point 90.0 -35.0, point 130.0 25.0)
     let samples =
         [ parameter 0.25, Bezier.point original (parameter 0.25)
@@ -110,7 +108,7 @@ let ``endpoint tangent fitting recovers an exact cubic`` () =
     Assert.Equal(PositiveHandle, report.EndHandle)
 
 [<Fact>]
-let ``endpoint tangent fitting uses the forward end tangent`` () =
+let ``fit cubic with endpoint tangents uses forward end tangent`` () =
     let original = CubicBezierData(point 0.0 0.0, point 10.0 20.0, point 80.0 40.0, point 100.0 0.0)
     let samples =
         [ parameter 0.2, Bezier.point original (parameter 0.2)
@@ -130,7 +128,7 @@ let ``endpoint tangent fitting uses the forward end tangent`` () =
     Assert.True(endDerivativeDistance < 1.0e-6<length / parameter>)
 
 [<Fact>]
-let ``endpoint tangent fitting accepts small well-conditioned equations`` () =
+let ``fit cubic with endpoint tangents accepts small well conditioned equations`` () =
     let original = CubicBezierData(point 0.0 0.0, point 2.0 3.0, point 7.0 -2.0, point 10.0 1.0)
     let samples =
         [ parameter 0.0001, Bezier.point original (parameter 0.0001)
@@ -152,7 +150,7 @@ let ``endpoint tangent fitting accepts small well-conditioned equations`` () =
     Assert.Equal(PositiveHandle, report.EndHandle)
 
 [<Fact>]
-let ``endpoint tangent fitting clamps negative handles`` () =
+let ``fit cubic with endpoint tangents clamps negative handles`` () =
     let startPoint, endPoint = point 0.0 0.0, point 1.0 0.0
     let fit, report =
         Bezier.fitCubicWithEndpointTangents
@@ -170,7 +168,7 @@ let ``endpoint tangent fitting clamps negative handles`` () =
     Assert.Equal(CollapsedHandle, report.StartHandle)
 
 [<Fact>]
-let ``endpoint tangent fitting rejects degenerate tangent`` () =
+let ``fit cubic with endpoint tangents rejects degenerate tangent`` () =
     Assert.Equal(
         Error DegenerateTangent,
         Bezier.fitCubicWithEndpointTangents
@@ -179,7 +177,7 @@ let ``endpoint tangent fitting rejects degenerate tangent`` () =
             [ parameter 0.5, point 5.0 1.0 ])
 
 [<Fact>]
-let ``endpoint tangent fitting rejects underdetermined samples`` () =
+let ``fit cubic with endpoint tangents rejects underdetermined samples`` () =
     Assert.Equal(
         Error UnderdeterminedCubicFit,
         Bezier.fitCubicWithEndpointTangents
@@ -188,7 +186,7 @@ let ``endpoint tangent fitting rejects underdetermined samples`` () =
             [])
 
 [<Fact>]
-let ``endpoint-only fitting recovers an exact cubic`` () =
+let ``fit cubic with endpoints recovers exact cubic`` () =
     let original = CubicBezierData(point 0.0 0.0, point 35.0 65.0, point 90.0 -35.0, point 130.0 25.0)
     let samples =
         [ parameter 0.25, Bezier.point original (parameter 0.25)
@@ -210,7 +208,7 @@ let ``endpoint-only fitting recovers an exact cubic`` () =
     Assert.True(report.Max < 1.0e-9<length>)
 
 [<Fact>]
-let ``endpoint-only fitting reports noisy samples`` () =
+let ``fit cubic with endpoints fits noisy samples`` () =
     let original = CubicBezierData(point 0.0 0.0, point 10.0 30.0, point 80.0 -10.0, point 100.0 0.0)
     let perturb dx dy value = Point.create (value.X + Length.fromFloat dx) (value.Y + Length.fromFloat dy)
     let samples =
@@ -228,7 +226,7 @@ let ``endpoint-only fitting reports noisy samples`` () =
     Assert.True(report.Max > 0.0<length>)
 
 [<Fact>]
-let ``endpoint-only fitting accepts small well-conditioned equations`` () =
+let ``fit cubic with endpoints accepts small well conditioned equations`` () =
     let original = CubicBezierData(point 0.0 0.0, point 2.0 3.0, point 7.0 -2.0, point 10.0 1.0)
     let samples =
         [ parameter 0.0001, Bezier.point original (parameter 0.0001)
@@ -245,7 +243,7 @@ let ``endpoint-only fitting accepts small well-conditioned equations`` () =
     Assert.Equal(UnconstrainedHandle, report.EndHandle)
 
 [<Fact>]
-let ``endpoint-only fitting rejects underdetermined samples`` () =
+let ``fit cubic with endpoints rejects underdetermined samples`` () =
     Assert.Equal(
         Error UnderdeterminedCubicFit,
         Bezier.fitCubicWithEndpoints
@@ -253,7 +251,7 @@ let ``endpoint-only fitting rejects underdetermined samples`` () =
             [ parameter 0.5, point 5.0 1.0 ])
 
 [<Fact>]
-let ``cubic self intersection finds an interior crossing`` () =
+let ``cubic self intersections finds interior crossing`` () =
     let curve =
         CubicBezierData(
             point 0.0 0.0,
@@ -268,7 +266,7 @@ let ``cubic self intersection finds an interior crossing`` () =
     Assert.Equal(0.75, Parameter.ratio intersection.T, 12)
 
 [<Fact>]
-let ``cubic self intersection options carry length units`` () =
+let ``cubic self intersections respects minimum arc length separation`` () =
     let curve = CubicBezierData(point 0.0 0.0, point 100.0 100.0, point -100.0 100.0, point 0.0 0.0)
     let options =
         { MinimumArcLengthSeparation = 301.0<length>
@@ -276,7 +274,7 @@ let ``cubic self intersection options carry length units`` () =
     Assert.Empty(Bezier.cubicSelfIntersectionsWith curve options |> Result.defaultWith (failwithf "%A"))
 
 [<Fact>]
-let ``split permits endpoint parameters`` () =
+let ``split allows endpoint splits`` () =
     let curve = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
     let zeroStart, wholeAfter = Bezier.split curve (parameter 0.0)
     let wholeBefore, zeroEnd = Bezier.split curve (parameter 1.0)
@@ -288,7 +286,7 @@ let ``split permits endpoint parameters`` () =
     Assert.Equal(point 30.0 0.0, Bezier.finish zeroEnd)
 
 [<Fact>]
-let ``inside split rejects parameters outside the curve`` () =
+let ``split inside rejects outside t`` () =
     let curve = LinearBezierData(point 0.0 0.0, point 10.0 20.0)
     Assert.Equal(Error SplitOutsideBezier, Bezier.splitInside curve (parameter -0.01))
     Assert.Equal(Error SplitOutsideBezier, Bezier.splitInside curve (parameter 1.01))
@@ -296,7 +294,7 @@ let ``inside split rejects parameters outside the curve`` () =
     Assert.True(Bezier.splitInside curve (parameter 1.0) |> Result.isOk)
 
 [<Fact>]
-let ``unrestricted multi-split extrapolates and retains boundary parameters`` () =
+let ``split many keeps boundary points when they are interior`` () =
     let curve = LinearBezierData(point 0.0 0.0, point 40.0 0.0)
     let pieces = Bezier.splitMany curve [ parameter 1.25; parameter 1.0; parameter 0.0; parameter -0.25 ]
     let endpoints = pieces |> List.map (fun piece -> Bezier.start piece, Bezier.finish piece)
@@ -309,13 +307,13 @@ let ``unrestricted multi-split extrapolates and retains boundary parameters`` ()
         endpoints)
 
 [<Fact>]
-let ``inside multi-split rejects any outside parameter`` () =
+let ``split inside many rejects any outside point`` () =
     let curve = LinearBezierData(point 0.0 0.0, point 40.0 0.0)
     Assert.Equal(Error SplitOutsideBezier, Bezier.splitInsideMany curve [ parameter 0.25; parameter 1.01 ])
     Assert.Equal(Error SplitOutsideBezier, Bezier.splitInsideMany curve [ parameter -0.01; parameter 0.75 ])
 
 [<Fact>]
-let ``inside multi-split trims endpoints and duplicate parameters`` () =
+let ``split inside many trims boundary points`` () =
     let curve = LinearBezierData(point 0.0 0.0, point 40.0 0.0)
     let pieces =
         Bezier.splitInsideMany curve [ parameter 1.0; parameter 0.0; parameter 0.5; parameter 0.5 ]
@@ -327,7 +325,7 @@ let ``inside multi-split trims endpoints and duplicate parameters`` () =
     Assert.Equal(point 40.0 0.0, Bezier.finish pieces[1])
 
 [<Fact>]
-let ``multi-split preserves cubic degree`` () =
+let ``split many preserves cubic degree`` () =
     let curve = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
     let pieces = Bezier.splitMany curve [ parameter 0.25; parameter 0.75 ]
     Assert.Equal(3, List.length pieces)
@@ -337,24 +335,33 @@ let ``multi-split preserves cubic degree`` () =
         | _ -> Assert.Fail "expected cubic piece")
 
 [<Fact>]
-let ``inflection parameters are independent of coordinate scale`` () =
+let ``cubic inflection parameters are independent of coordinate scale`` () =
     let scale = 1.0e-9
     let curve = CubicBezierData(point 0.0 0.0, point 0.0 (100.0 * scale), point (100.0 * scale) (-100.0 * scale), point (100.0 * scale) 0.0)
     let root = Bezier.cubicInflectionParameters curve |> List.exactlyOne
     Assert.Equal(0.5, Parameter.ratio root, 12)
 
 [<Fact>]
-let ``inflection search ignores non-inflecting curves`` () =
+let ``cubic inflection parameters ignores non inflecting curves`` () =
     let cubic = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
-    Assert.Empty(Bezier.cubicInflectionParameters cubic)
-
-[<Fact>]
-let ``inflection search ignores non-cubic curves`` () =
     let quadratic = QuadraticBezierData(point 0.0 0.0, point 10.0 10.0, point 20.0 0.0)
+    Assert.Empty(Bezier.cubicInflectionParameters cubic)
     Assert.Empty(Bezier.cubicInflectionParameters quadratic)
 
 [<Fact>]
-let ``self intersection detects a closed cubic loop`` () =
+let ``split many sorts and removes duplicate points`` () =
+    let curve = LinearBezierData(point 0.0 0.0, point 40.0 0.0)
+    let pieces = Bezier.splitMany curve [ parameter 0.75; parameter -0.25; parameter 0.25; parameter 0.25 ]
+    let endpoints = pieces |> List.map (fun piece -> Bezier.start piece, Bezier.finish piece)
+    Assert.Equal<(Point<length> * Point<length>) list>(
+        [ point 0.0 0.0, point -10.0 0.0
+          point -10.0 0.0, point 10.0 0.0
+          point 10.0 0.0, point 30.0 0.0
+          point 30.0 0.0, point 40.0 0.0 ],
+        endpoints)
+
+[<Fact>]
+let ``cubic self intersections finds loop`` () =
     let curve = CubicBezierData(point 0.0 0.0, point 100.0 100.0, point -100.0 100.0, point 0.0 0.0)
     let intersection = Bezier.cubicSelfIntersections curve |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.Equal(0.0, Parameter.ratio intersection.S, 12)
@@ -362,7 +369,7 @@ let ``self intersection detects a closed cubic loop`` () =
     Assert.Equal(point 0.0 0.0, intersection.Point)
 
 [<Fact>]
-let ``self intersection is independent of coordinate scale`` () =
+let ``cubic self intersections are independent of coordinate scale`` () =
     let scale = 1.0e-12
     let curve =
         CubicBezierData(
@@ -376,19 +383,19 @@ let ``self intersection is independent of coordinate scale`` () =
     Assert.Equal(0.75, Parameter.ratio intersection.T, 10)
 
 [<Fact>]
-let ``self intersection ignores non-looping cubic`` () =
+let ``cubic self intersections ignores non looping cubic`` () =
     let cubic = CubicBezierData(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)
     Assert.Empty(Bezier.cubicSelfIntersections cubic |> Result.defaultWith (failwithf "%A"))
 
 [<Fact>]
-let ``self intersection ignores non-cubic curves`` () =
+let ``cubic self intersections ignores non cubics`` () =
     let line = LinearBezierData(point 0.0 0.0, point 10.0 0.0)
     let quadratic = QuadraticBezierData(point 0.0 0.0, point 10.0 10.0, point 20.0 0.0)
     Assert.Empty(Bezier.cubicSelfIntersections line |> Result.defaultWith (failwithf "%A"))
     Assert.Empty(Bezier.cubicSelfIntersections quadratic |> Result.defaultWith (failwithf "%A"))
 
 [<Fact>]
-let ``self intersection rejects invalid options`` () =
+let ``cubic self intersections rejects invalid options`` () =
     let curve = CubicBezierData(point 0.0 0.0, point 100.0 100.0, point -100.0 100.0, point 0.0 0.0)
     Assert.Equal(
         Error(InvalidCubicSelfIntersectionMinimumArcLengthSeparation 0.0<length>),

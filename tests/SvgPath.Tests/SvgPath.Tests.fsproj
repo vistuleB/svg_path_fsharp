@@ -11,6 +11,7 @@
     <Compile Include="PointTests.fs" />
     <Compile Include="PointAdditionalTests.fs" />
     <Compile Include="FormatTests.fs" />
+    <Compile Include="FormatParityTests.fs" />
     <Compile Include="GeometryParityTests.fs" />
     <Compile Include="InspectTests.fs" />
     <Compile Include="AffineTests.fs" />
@@ -20,6 +21,7 @@
     <Compile Include="TrigTests.fs" />
     <Compile Include="TrigAdditionalTests.fs" />
     <Compile Include="RootTests.fs" />
+    <Compile Include="BezierBoundingBoxFixtures.fs" />
     <Compile Include="BezierTests.fs" />
     <Compile Include="SegmentTests.fs" />
     <Compile Include="CoreSvgPathTests.fs" />
@@ -37,6 +39,7 @@
     <Compile Include="EncountersTests.fs" />
     <Compile Include="CutTests.fs" />
     <Compile Include="ClipTests.fs" />
+    <Compile Include="ClipAdditionalTests.fs" />
     <Compile Include="TransformTests.fs" />
     <Compile Include="TransformSerializeTests.fs" />
     <Compile Include="TransformParseTests.fs" />

@@ -3,7 +3,7 @@ namespace SvgPath.Tests
 open SvgPath
 open Xunit
 
-module FormatTests =
+module FormatAdditionalTests =
     let private options left right =
         { LeftDecimals = left
           RightDecimals = right }
@@ -57,8 +57,3 @@ module FormatTests =
     let ``fixed formatting does not invent negative zero`` () =
         let format = NumberFormat.prepare (options Succinct (Fixed 2)) []
         Assert.Equal("0.00", NumberFormat.number -0.001 format)
-
-    [<Fact>]
-    let ``decimal places clamp to the shared target limit`` () =
-        let format = NumberFormat.prepare (options Succinct (Fixed 101)) []
-        Assert.Equal("1." + String.replicate 100 "0" + "e20", NumberFormat.number 1.0e20 format)

@@ -15,6 +15,7 @@
     <Compile Include="InspectTests.fs" />
     <Compile Include="AffineTests.fs" />
     <Compile Include="AffineAdditionalTests.fs" />
+    <Compile Include="ArcBoundingBoxFixtures.fs" />
     <Compile Include="EllipseTests.fs" />
     <Compile Include="TrigTests.fs" />
     <Compile Include="TrigAdditionalTests.fs" />

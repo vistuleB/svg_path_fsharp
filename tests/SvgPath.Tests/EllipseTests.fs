@@ -399,3 +399,11 @@ let ``arc from endpoint data creates svg path arc`` () =
         { Start = point 0.0 1.0; Radius = point 2.0 3.0; XAxisRotation = degrees 15.0
           LargeArc = true; Sweep = false; End = point 4.0 5.0 }
     Assert.Equal(Arc endpoint, Segment.arcFromEndpointData endpoint)
+
+[<Fact>]
+let ``arc bounding box matches generated fixtures`` () =
+    ArcBoundingBoxFixtures.fixtures
+    |> List.iter (fun fixture ->
+        let actual = Ellipse.arcBoundingBox fixture.Arc
+        assertPointNear 1.0e-5<length> fixture.ExpectedMin actual.Min
+        assertPointNear 1.0e-5<length> fixture.ExpectedMax actual.Max)

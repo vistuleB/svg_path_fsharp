@@ -1,17 +1,20 @@
 namespace SvgPath
 
 [<Struct>]
+/// Accuracy and fallback rays used for containment and winding calculations.
 type ContainmentOptions =
     { Tolerance: float<length>
       Samples: int
       MaxIterations: int
       FallbackRayAngles: float<degree> list }
 
+/// Classification of a point relative to filled path geometry.
 type PointContainment =
     | Inside
     | Outside
     | Boundary
 
+/// A path winding number, or an indication that the point lies on its boundary.
 type PathWinding =
     | Winding of int
     | BoundaryWinding
@@ -21,7 +24,7 @@ type private ContainmentCalculation =
     | CalculatedWinding of winding: int * crossings: int
 
 [<RequireQualifiedAccess>]
-module WindingField =
+module internal WindingField =
     let defaultOptions =
         { Tolerance = 1.0e-9<length>
           Samples = 100
@@ -348,3 +351,34 @@ module WindingField =
                             [ 0.25<parameter>, 0.75<parameter>
                               0.125<parameter>, 0.875<parameter>
                               0.375<parameter>, 0.625<parameter> ]))
+
+[<AutoOpen>]
+/// Public containment and winding operations attached to Subpath and Path.
+module PathContainmentExtensions =
+    type Subpath with
+        /// Classifies a point using an explicit fill rule and containment options.
+        static member containmentWith point subpath fillRule options =
+            WindingField.subpathContainmentWith point subpath fillRule options
+
+        /// Classifies a point using default containment options.
+        static member containment point subpath fillRule =
+            WindingField.subpathContainment point subpath fillRule
+
+    type Path with
+        /// Default containment and winding options.
+        static member defaultContainmentOptions = WindingField.defaultOptions
+
+        /// Computes path winding with explicit containment options.
+        static member windingWith point path options =
+            WindingField.pathWindingWith point path options
+
+        /// Computes path winding with default containment options.
+        static member winding point path = WindingField.pathWinding point path
+
+        /// Classifies a point against a path with explicit options.
+        static member containmentWith point path fillRule options =
+            WindingField.pathContainmentWith point path fillRule options
+
+        /// Classifies a point against a path with default options.
+        static member containment point path fillRule =
+            WindingField.pathContainment point path fillRule

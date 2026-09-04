@@ -8,6 +8,7 @@ type EdgeAnnotationPose =
 [<Struct>]
 type AnnotatedDrawingOptions = { Scale: float }
 
+/// SVG diagnostics for arrangement graphs and source images.
 [<RequireQualifiedAccess>]
 module ArrangementDrawing =
     let defaultAnnotatedDrawingOptions = { Scale = 1.0 }

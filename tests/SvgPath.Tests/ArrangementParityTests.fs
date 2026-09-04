@@ -547,10 +547,10 @@ let ``csg_union_removes_interlocking_square_internal_edges_test`` () =
     let right = Path.singleton (square 5.0 5.0 10.0)
     let union = Csg.union left right Nonzero |> Result.defaultWith (failwithf "%A")
     Assert.Single(union.Path.Subpaths) |> ignore
-    Assert.Equal(Ok Inside, WindingField.pathContainment (point 2.0 2.0) union.Path Nonzero)
-    Assert.Equal(Ok Inside, WindingField.pathContainment (point 7.0 7.0) union.Path Nonzero)
-    Assert.Equal(Ok Inside, WindingField.pathContainment (point 13.0 13.0) union.Path Nonzero)
-    Assert.Equal(Ok Outside, WindingField.pathContainment (point 2.0 13.0) union.Path Nonzero)
+    Assert.Equal(Ok Inside, Path.containment (point 2.0 2.0) union.Path Nonzero)
+    Assert.Equal(Ok Inside, Path.containment (point 7.0 7.0) union.Path Nonzero)
+    Assert.Equal(Ok Inside, Path.containment (point 13.0 13.0) union.Path Nonzero)
+    Assert.Equal(Ok Outside, Path.containment (point 2.0 13.0) union.Path Nonzero)
 
 [<Fact>]
 let ``csg_union_does_not_cancel_opposite_operands_test`` () =
@@ -558,7 +558,7 @@ let ``csg_union_does_not_cancel_opposite_operands_test`` () =
     let counterclockwise = Subpath.reverse clockwise
     let union = Csg.union (Path.singleton clockwise) (Path.singleton counterclockwise) Nonzero |> Result.defaultWith (failwithf "%A")
     Assert.Single(union.Path.Subpaths) |> ignore
-    Assert.Equal(Ok Inside, WindingField.pathContainment (point 5.0 5.0) union.Path Nonzero)
+    Assert.Equal(Ok Inside, Path.containment (point 5.0 5.0) union.Path Nonzero)
 
 [<Fact>]
 let ``csg_union_applies_requested_fill_rule_test`` () =
@@ -576,8 +576,8 @@ let ``csg_union_pairs_filled_sectors_at_corner_pinch_test`` () =
     let second = square 10.0 10.0 10.0
     let union = Csg.union (Path.singleton first) (Path.singleton second) Nonzero |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, union.Path.Subpaths.Length)
-    Assert.Equal(Ok Inside, WindingField.pathContainment (point 5.0 5.0) union.Path Nonzero)
-    Assert.Equal(Ok Inside, WindingField.pathContainment (point 15.0 15.0) union.Path Nonzero)
+    Assert.Equal(Ok Inside, Path.containment (point 5.0 5.0) union.Path Nonzero)
+    Assert.Equal(Ok Inside, Path.containment (point 15.0 15.0) union.Path Nonzero)
 
 [<Fact>]
 let ``drawing_contains_edges_vertices_and_multiplicity_labels_test`` () =

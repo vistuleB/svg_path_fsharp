@@ -1,15 +1,17 @@
 namespace SvgPath
 
-// Arrangement graph translation.  The graph representation deliberately keeps
-// source segment endpoints rather than snapping edge geometry to vertex centres.
+// The graph representation deliberately keeps source segment endpoints rather
+// than snapping edge geometry to vertex centers.
 
 [<Struct>]
+/// A topological vertex and the source endpoints represented by it.
 type ArrangementVertex =
     { Id: int
       Point: Point<length>
       EndpointSamples: Point<length> list }
 
 [<Struct>]
+/// One atomic geometric edge, including directional source multiplicities.
 type ArrangementEdge =
     { Id: int
       Segment: Segment
@@ -20,8 +22,11 @@ type ArrangementEdge =
       ReverseMultiplicity: int }
 
 [<Struct>]
+/// A reference to an arrangement edge in either stored or reversed direction.
 type OrientedArrangementEdge = { EdgeId: int; Reversed: bool }
 
+/// A noded planar graph. CyclicOrders stores clockwise groups of incident
+/// oriented edges; a group can contain edges whose local order is unresolved.
 type ArrangementGraph =
     { Vertices: ArrangementVertex list
       Edges: ArrangementEdge list
@@ -34,6 +39,7 @@ type internal VertexParityRequest =
     | RequiredVertexParity of vertex: int * parity: int
     | PreferredVertexParity of vertex: int * parity: int
 
+/// Failures from parity-capacity pruning.
 type ForcedParityError =
     | ForcedParityMissingVertex of int
     | ForcedParityDuplicateVertex of int
@@ -45,26 +51,36 @@ type ForcedParityError =
     | ForcedParityInfeasible of int
     | ForcedParityAmbiguous of int list
 
+/// One oriented edge occurrence in a face-boundary walk. Left identifies the
+/// face on the visual-left side of the stored edge direction.
 type ArrangementFaceEdge = { EdgeId: int; Left: bool }
+/// One connected boundary walk of an arrangement face.
 type ArrangementFaceWalk = { Outer: bool; Edges: ArrangementFaceEdge list }
+/// A dual face. The unbounded face and each bounded face are explicitly marked.
 type ArrangementFace = { Id: int; Outer: bool; Walks: ArrangementFaceWalk list }
+/// The faces incident to the visual-left and visual-right sides of an edge.
 type ArrangementEdgeFaces = { EdgeId: int; LeftFace: int; RightFace: int }
+/// Face decomposition and edge-to-face incidence for an arrangement graph.
 type DualArrangementGraph = { Faces: ArrangementFace list; EdgeFaces: ArrangementEdgeFaces list }
 
 [<Struct>]
+/// One atomic graph edge traversed by an input segment.
 type DirectedEdgeReference = { EdgeId: int; Reversed: bool }
 
+/// Ordered atomic graph-edge image of one source segment.
 type ArrangementSegmentImage =
     { PathIndex: int
       SubpathIndex: int
       SegmentIndex: int
       Edges: DirectedEdgeReference list }
 
+/// Arrangement graph plus the ordered images of all input segments.
 type ArrangementGraphBuild =
     { Graph: ArrangementGraph
       SegmentImages: ArrangementSegmentImage list }
 
 [<Struct>]
+/// One atomic edge in the image of a directly supplied source segment.
 type ArrangementSegmentEdgeImage =
     { From: float<parameter>
       To: float<parameter>
@@ -72,25 +88,30 @@ type ArrangementSegmentEdgeImage =
       Reversed: bool
       Own: bool }
 
+/// Ordered atomic-edge image of one directly supplied source segment.
 type ArrangementSourceSegmentImage =
     { SegmentIndex: int
       Edges: ArrangementSegmentEdgeImage list }
 
 [<Struct>]
+/// One source occurrence represented by an arrangement edge.
 type ArrangementEdgeSourceImage =
     { SegmentIndex: int
       From: float<parameter>
       To: float<parameter>
       Reversed: bool }
 
+/// All source occurrences represented by one arrangement edge.
 type ArrangementEdgeImage = { EdgeId: int; Sources: ArrangementEdgeSourceImage list }
 
+/// Detailed arrangement build for direct segment-list construction.
 type ArrangementSegmentBuild =
     { Graph: ArrangementGraph
       Segments: Segment list
       SegmentImages: ArrangementSourceSegmentImage list
       EdgeImages: ArrangementEdgeImage list }
 
+/// Errors returned while constructing, validating, or dualizing arrangements.
 type ArrangementError =
     | ArrangementSegmentError of SegmentError
     | InternalNormalizationError
@@ -123,6 +144,8 @@ type ArrangementError =
     | DualInvalidOuterFaceCount of int
 
 [<RequireQualifiedAccess>]
+/// Construction, validation, source-image lookup, and dualization of planar
+/// arrangements formed from SVG path segments.
 module Arrangement =
     let internal empty = { Vertices = []; Edges = []; CyclicOrders = [] }
 
@@ -262,6 +285,7 @@ module Arrangement =
                           CyclicOrders = [] })
                 | _ -> Ok { Vertices = vertices; Edges = edges; CyclicOrders = [] }
 
+    /// Validates graph topology, geometry, multiplicities, and cyclic orders.
     let validate (graph: ArrangementGraph) tolerance minimumChord =
         if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
         elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InvalidMinimumChord minimumChord)
@@ -1051,6 +1075,7 @@ module Arrangement =
                             { Graph = graph; Segments = segments; SegmentImages = images; EdgeImages = edgeImages }))))
 
     /// Build an arrangement and preserve each input path segment's edge image.
+    /// Nodes paths into an arrangement and records every source segment image.
     let build (paths: Path list) tolerance minimumChord =
         let indexed = indexPaths paths
         let segments = indexed |> List.map _.Segment
@@ -1065,6 +1090,7 @@ module Arrangement =
                       Edges = image.Edges |> List.map (fun edge -> { EdgeId = edge.EdgeId; Reversed = edge.Reversed }) })
             { Graph = built.Graph; SegmentImages = images })
 
+    /// Resolves a segment image to oriented arrangement-edge geometry.
     let segmentImageEdges (build: ArrangementGraphBuild) (image: ArrangementSegmentImage) =
         image.Edges
         |> List.fold (fun state reference ->
@@ -1222,6 +1248,7 @@ module Arrangement =
     /// Derive face boundary walks and the face on each side of every edge.
     /// Walks with the same containment signature are grouped into one face;
     /// the enclosing walk precedes any island walks.
+    /// Walks all faces and constructs the dual incidence representation.
     let dual (graph: ArrangementGraph) =
         if List.isEmpty graph.Edges then
             Ok { Faces = [ { Id = 0; Outer = true; Walks = [] } ]; EdgeFaces = [] }

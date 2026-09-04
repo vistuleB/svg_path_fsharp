@@ -197,6 +197,7 @@ type private ProjectionWindow =
       Right: IntersectionPiece
       RemainingDepth: int }
 
+/// Intersections, closest-point pairs, projections, and ray crossings.
 [<RequireQualifiedAccess>]
 module Intersections =
     let defaultOptions =

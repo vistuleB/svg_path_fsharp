@@ -1,5 +1,6 @@
 namespace SvgPath
 
+/// One SVG path segment in user-space coordinates.
 type Segment =
     | Line of startPoint: Point<length> * endPoint: Point<length>
     | QuadraticBezier of startPoint: Point<length> * control: Point<length> * endPoint: Point<length>
@@ -10,6 +11,10 @@ type Segment =
         endPoint: Point<length>
     | Arc of EndpointArcData
 
+/// Controls how adjacent segment endpoints are reconciled while constructing a subpath.
+/// Custom policies receive the previous segment, the next segment, and whether the
+/// pair closes the subpath. Their result replaces the pair, except that a closing
+/// result replaces only the last segment and may not move the subpath start.
 type EndpointPolicy =
     | Strict
     | Wiggle
@@ -20,27 +25,32 @@ type EndpointPolicy =
     | Custom of (Segment -> Segment -> bool -> Segment list)
 
 [<Struct>]
+/// A segment index and local parameter within a subpath.
 type SubpathParameter =
     { SegmentIndex: int
       T: float<parameter> }
 
 [<Struct>]
+/// A subpath index and local subpath parameter within a path.
 type PathParameter =
     { SubpathIndex: int
       At: SubpathParameter }
 
 [<Struct>]
+/// The closest known point on a subpath, including its address and distance.
 type SubpathProjection =
     { At: SubpathParameter
       Point: Point<length>
       Distance: float<length> }
 
 [<Struct>]
+/// The closest known point on a path, including its address and distance.
 type PathProjection =
     { At: PathParameter
       Point: Point<length>
       Distance: float<length> }
 
+/// Errors returned by core segment, subpath, and path operations.
 type SegmentError =
     | DegenerateArc
     | EmptySubpath
@@ -119,11 +129,14 @@ type SegmentError =
     | DistanceMaxIterationsReached of estimate: float<parameter> * value: float<length^2 / parameter>
     | DistanceRootIsolationFailed
 
+/// Distinguishes an error from a caller-supplied point mapping from a path error.
 type PointMapError<'error> =
     | PointMappingError of 'error
     | PointMapSegmentError of SegmentError
 
 [<Struct>]
+/// A continuous sequence of SVG segments with an explicit start and closure flag.
+/// Use the Subpath module to construct values so continuity is checked.
 type Subpath =
     private
         { startPoint: Point<length>
@@ -135,61 +148,74 @@ type Subpath =
     member this.Closed = this.isClosed
 
 [<Struct>]
+/// An ordered collection of independent subpaths.
 type Path =
     private { subpathList: Subpath list }
 
     member this.Subpaths = this.subpathList
 
+/// SVG fill-rule semantics.
 type FillRule =
     | Nonzero
     | EvenOdd
 
 [<Struct>]
+/// Traversal directions on either side of a path parameter.
 type Directions =
     { Incoming: Point<1> option
       Outgoing: Point<1> option }
 
 [<Struct>]
+/// Options for resolving directions near derivative singularities.
 type DirectionOptions =
     { RelativeTolerance: float }
 
 [<Struct>]
+/// Accuracy and recursion limits for length approximation.
 type LengthOptions =
     { Tolerance: float<length>
       MaxDepth: int }
 
 [<Struct>]
+/// Options for scalar minimization over a normalized segment parameter.
 type MinimizeOptions =
     { Samples: int
       ParameterTolerance: float<parameter>
       MaxIterations: int }
 
 [<Struct>]
-type ParametricOptions =
+/// Options for approximating an arbitrary parametric curve with cubic Béziers.
+/// The parameter measure is caller-defined. If supplied, Tangent must carry
+/// length per unit of that same parameter.
+type ParametricOptions<[<Measure>] 'Param> =
     { Tolerance: float<length>
       SamplesPerPiece: int
       InitialPieceCount: int
       MaxDepth: int
-      Tangent: (float -> Point<length>) option }
+      Tangent: (float<'Param> -> Point<length / 'Param>) option }
 
 [<Struct>]
+/// Options for closest-point and distance calculations.
 type DistanceOptions =
     { Samples: int
       Tolerance: float<length>
       MaxIterations: int }
 
 [<Struct>]
+/// Options for ray-crossing calculations.
 type CrossingOptions =
     { Samples: int
       SignedLineDistanceTolerance: float<length>
       MaxIterations: int }
 
 [<Struct>]
+/// An axis-aligned user-space bounding box.
 type BoundingBox =
     { Min: Point<length>
       Max: Point<length> }
 
 [<RequireQualifiedAccess>]
+/// Axis-aligned bounding-box construction and measurement.
 module BoundingBox =
     let fromPoint point = { Min = point; Max = point }
 
@@ -213,11 +239,13 @@ module BoundingBox =
         points |> List.map fromPoint |> unionMany
 
 [<Struct>]
+/// Accuracy and recursion limits for converting curves to line segments.
 type LinearizeOptions =
     { Tolerance: float<length>
       MaxDepth: int }
 
 [<RequireQualifiedAccess>]
+/// Operations on individual SVG segments.
 module Segment =
     let arcFromEndpointData data = Arc data
 
@@ -1362,10 +1390,11 @@ module Segment =
                     | _ -> None)
 
 [<RequireQualifiedAccess>]
+/// Construction, editing, measurement, and evaluation of continuous subpaths.
 module Subpath =
     let private defaultWiggleTolerance = 1.0e-9<length>
 
-    let defaultParametricOptions =
+    let defaultParametricOptions<[<Measure>] 'Param> : ParametricOptions<'Param> =
         { Tolerance = 0.01<length>
           SamplesPerPiece = 5
           InitialPieceCount = 1
@@ -1610,15 +1639,23 @@ module Subpath =
         | Ok subpath -> subpath
         | Error _ -> invalidArg (nameof points) "invalid polygon points"
 
-    let parametricWith startValue endValue pointFunction (options: ParametricOptions) =
-        let finitePoint (point: Point<length>) =
+    let parametricWith
+        (startValue: float<'Param>)
+        (endValue: float<'Param>)
+        (pointFunction: float<'Param> -> Point<length>)
+        (options: ParametricOptions<'Param>) =
+        let finitePoint (point: Point<'Unit>) =
             System.Double.IsFinite(float point.X) && System.Double.IsFinite(float point.Y)
         let getPoint parameterValue =
             let point = pointFunction parameterValue
-            if finitePoint point then Ok point else Error(NonFiniteParametricPoint(parameterValue, point))
+            if finitePoint point then Ok point
+            else Error(NonFiniteParametricPoint(float parameterValue, point))
         let getTangent tangentFunction parameterValue =
             let tangent = tangentFunction parameterValue
-            if finitePoint tangent then Ok tangent else Error(NonFiniteParametricTangent(parameterValue, tangent))
+            if finitePoint tangent then Ok tangent
+            else
+                let reported = Point.create (Length.fromFloat (float tangent.X)) (Length.fromFloat (float tangent.Y))
+                Error(NonFiniteParametricTangent(float parameterValue, reported))
         let interpolateValue a b t = a + (b - a) * t
         let fit intervalStart intervalEnd =
             getPoint intervalStart
@@ -1667,8 +1704,8 @@ module Subpath =
         elif options.SamplesPerPiece < 2 then Error(InvalidParametricSamplesPerPiece options.SamplesPerPiece)
         elif options.InitialPieceCount <= 0 then Error(InvalidParametricInitialPieceCount options.InitialPieceCount)
         elif options.MaxDepth < 0 then Error(InvalidParametricMaxDepth options.MaxDepth)
-        elif startValue = endValue || not (System.Double.IsFinite startValue) || not (System.Double.IsFinite endValue) then
-            Error(InvalidParametricInterval(startValue, endValue))
+        elif startValue = endValue || not (System.Double.IsFinite(float startValue)) || not (System.Double.IsFinite(float endValue)) then
+            Error(InvalidParametricInterval(float startValue, float endValue))
         else
             [ 0 .. options.InitialPieceCount - 1 ]
             |> List.fold (fun state index ->
@@ -2223,6 +2260,7 @@ module Subpath =
     let toLines subpath = toLinesWith Segment.defaultLinearizeOptions subpath
 
 [<RequireQualifiedAccess>]
+/// Construction, editing, measurement, and evaluation of SVG paths.
 module Path =
     let empty = { subpathList = [] }
     let ofSubpaths subpaths = { subpathList = subpaths }

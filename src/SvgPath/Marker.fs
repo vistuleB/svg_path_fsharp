@@ -55,6 +55,7 @@ type MarkerLayout =
       ViewBox: BoundingBox option
       PreserveAspectRatio: PreserveAspectRatio }
 
+/// Placement and transformation of SVG markers along path geometry.
 [<RequireQualifiedAccess>]
 module Marker =
     let private incomingDirection segments =

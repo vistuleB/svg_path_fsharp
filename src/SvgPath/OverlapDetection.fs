@@ -1,7 +1,7 @@
 namespace SvgPath
 
 [<Struct>]
-type RawOverlap =
+type internal RawOverlap =
     { LeftFrom: float<parameter>
       LeftTo: float<parameter>
       RightFrom: float<parameter>
@@ -21,7 +21,7 @@ type private EndpointProjection =
 type private OverlapMerge = Disjoint | Merged of RawOverlap | Contradiction
 
 [<RequireQualifiedAccess>]
-module OverlapDetection =
+module internal OverlapDetection =
     let private parameterTolerance = 1.0e-12<parameter>
 
     let private canonical overlap =

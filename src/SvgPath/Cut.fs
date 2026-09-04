@@ -1,5 +1,6 @@
 namespace SvgPath
 
+/// Subdivision of segments, subpaths, and paths at geometric intersections.
 [<RequireQualifiedAccess>]
 module Cut =
     let private compareParameters left right =

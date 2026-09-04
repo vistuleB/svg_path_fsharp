@@ -10,7 +10,7 @@ let private rectangleSubpath left top right bottom =
 let private rectangle left top right bottom = Path.singleton (rectangleSubpath left top right bottom)
 let private output result = result |> Result.defaultWith (failwithf "%A") |> _.Path
 let private area path = Area.path path Nonzero |> Result.defaultWith (failwithf "%A")
-let private containment path sample = WindingField.pathContainment sample path Nonzero |> Result.defaultWith (failwithf "%A")
+let private containment path sample = Path.containment sample path Nonzero |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
 let ``csg result retains its arrangement build`` () =
@@ -186,7 +186,7 @@ let ``intersection applies nonzero and evenodd fill rules`` () =
     Assert.Empty(Path.subpaths evenOdd)
 
 let private inside rule path sample =
-    WindingField.pathContainment sample path rule
+    Path.containment sample path rule
     |> Result.defaultWith (failwithf "%A")
     |> (=) Inside
 
@@ -315,7 +315,7 @@ let ``symmetric difference is commutative`` () =
     for sample in grid [2.5; 7.5; 12.5] [2.5; 7.5] do
         Assert.Equal(containment forward sample, containment reverse sample)
 
-let private winding path sample = WindingField.pathWinding sample path |> Result.defaultWith (failwithf "%A")
+let private winding path sample = Path.winding sample path |> Result.defaultWith (failwithf "%A")
 let private assertSameWinding input output samples =
     for sample in samples do Assert.Equal(winding input sample, winding output sample)
 

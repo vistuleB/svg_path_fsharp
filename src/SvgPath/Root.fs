@@ -1,22 +1,22 @@
 namespace SvgPath
 
-type RepeatedRootPolicy =
+type internal RepeatedRootPolicy =
     | ConsolidateRepeatedRoot
     | PreserveRepeatedRoot
 
-type QuadraticOptions<[<Measure>] 'Value> =
+type internal QuadraticOptions<[<Measure>] 'Value> =
     { CoefficientTolerance: float<'Value>
       RepeatedRootPolicy: RepeatedRootPolicy }
 
-type PolynomialOptions = { MaxIterations: int }
+type internal PolynomialOptions = { MaxIterations: int }
 
 [<Struct>]
-type RootIsolation =
+type internal RootIsolation =
     { Lower: float<parameter>
       Estimate: float<parameter>
       Upper: float<parameter> }
 
-type RootKind =
+type internal RootKind =
     | NegativeToPositive
     | PositiveToNegative
     | NegativeToNegative
@@ -24,11 +24,11 @@ type RootKind =
     | Ambiguous
 
 [<Struct>]
-type ClassifiedRoot =
+type internal ClassifiedRoot =
     { Isolation: RootIsolation
       Kind: RootKind }
 
-type RootError<[<Measure>] 'Value> =
+type internal RootError<[<Measure>] 'Value> =
     | InvalidMaxIterations of int
     | NotBracketed of
         left: float<parameter> *
@@ -38,7 +38,7 @@ type RootError<[<Measure>] 'Value> =
     | MaxIterationsReached of estimate: float<parameter> * value: float<'Value>
 
 [<RequireQualifiedAccess>]
-module Root =
+module internal Root =
     let private parameterTolerance = Parameter.fromFloat 1.0e-9
     let private relativeValueTolerance = 1.0e-12
 

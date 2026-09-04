@@ -25,6 +25,7 @@ type DashOptions =
       Offset: float<length>
       Length: LengthOptions }
 
+/// Dash-pattern application and stroke-outline construction.
 [<RequireQualifiedAccess>]
 module Stroke =
     let defaultOptions =

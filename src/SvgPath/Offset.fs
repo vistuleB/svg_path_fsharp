@@ -30,43 +30,54 @@ type Error =
     | InternalIToKMissingJPreimage of edgeId: int
     | InconsistentContainment
 
+/// Join geometry inserted between adjacent offset segments.
 type Join =
     | Bevel
     | Miter of miterLimit: float
     | Round
 
+/// End-cap geometry used when stroking an open subpath.
 type Cap =
     | Butt
     | Square
     | RoundCap
 
-type OneSubpathBand =
+type internal OneSubpathBand =
     | OpenSubpathBand of outline: Subpath
     | ClosedSubpathBand of exterior: Subpath * interior: Subpath
 
+/// Final trimming applied after optional offside trimming of a single offset.
 type SingleOffsetFinalTrimming =
     | CuspTrimming
     | InBandTrimming
     | NoTrimming
 
 [<Struct>]
+/// Trimming controls for single offsets.
+/// Offside trimming applies only to closed source subpaths. FinalTrimming
+/// selects cusp-only trimming, complete in-band trimming, or no final pass.
 type SingleOffsetTrimming =
     { Offside: bool
       FinalTrimming: SingleOffsetFinalTrimming }
 
 [<Struct>]
+/// Trimming controls for a two-sided offset band.
+/// InnerCusps and OuterCusps independently trim reversed submerged runs before
+/// the sides are assembled. InBand applies the final band-wide trimming pass.
 type BandTrimming =
     { InnerCusps: bool
       OuterCusps: bool
       InBand: bool }
 
 [<Struct>]
+/// Accuracy and recursion controls for fitting offset curves.
 type FittingOptions =
     { Tolerance: float<length>
       Samples: int
       MaxDepth: int }
 
 [<Struct>]
+/// Options shared by offset, band, and stroke construction.
 type Options =
     { Fitting: FittingOptions
       DistanceOptions: DistanceOptions
@@ -91,38 +102,38 @@ type internal CubicEndpointFitPolicy =
     | FitPositionAndDirection of direction: Point<1>
     | FitPositionAndDirectionWithCollapsedHandle of direction: Point<1>
 
-type TangentTurn =
+type internal TangentTurn =
     | Clockwise
     | CounterClockwise
     | Straight
     | CouldNotMeasure
 
 [<Struct>]
-type ReversalTangentAdjustment =
+type internal ReversalTangentAdjustment =
     { IncomingDegrees: float<degree>
       OutgoingDegrees: float<degree> }
 
-type BoundaryKind =
+type internal BoundaryKind =
     | Ordinary
     | ReversalBoundary of leftNormalCurvature: float<1 / length> option
     | Inflection
     | NonReversalBoundaryTouch
 
 [<Struct>]
-type APreparedSegment =
+type internal APreparedSegment =
     { SourceSubpathIndex: int
       SourceSegmentIndex: int
       Segment: Segment }
 
 [<Struct>]
-type CStalledSegment =
+type internal CStalledSegment =
     { Prepared: APreparedSegment
       PreparedFrom: float<parameter>
       PreparedTo: float<parameter>
       Segment: Segment }
 
 [<Struct>]
-type DRefinedSegment =
+type internal DRefinedSegment =
     { Prepared: APreparedSegment
       PreparedFrom: float<parameter>
       PreparedTo: float<parameter>
@@ -131,7 +142,7 @@ type DRefinedSegment =
       EndBoundary: BoundaryKind }
 
 [<Struct>]
-type EJoinFreeSegment =
+type internal EJoinFreeSegment =
     { PortionIndex: int
       SegmentIndex: int
       Generation: int
@@ -142,7 +153,7 @@ type EJoinFreeSegment =
       StartBoundary: BoundaryKind
       EndBoundary: BoundaryKind }
 
-type OffsetSegmentSource =
+type internal OffsetSegmentSource =
     | OffsetFromJoinFree of EJoinFreeSegment
     | OffsetFromStalledRun of CStalledSegment list
 
@@ -160,7 +171,7 @@ type internal GHealedOffsetSegment =
       NudgedStartTangentDirection: Point<1>
       NudgedEndTangentDirection: Point<1> }
 
-type OffsetSourceTracePiece =
+type internal OffsetSourceTracePiece =
     | OffsetSourceTraceDRefined of
         sourceSegmentIndex: int *
         refinedPieceIndex: int *
@@ -174,20 +185,20 @@ type OffsetSourceTracePiece =
     | OffsetSourceTraceStalled of sourceSegmentIndex: int * segment: Segment
 
 [<Struct>]
-type OffsetSourceTracePortion =
+type internal OffsetSourceTracePortion =
     { Index: int
       Subpath: Subpath
       Pieces: OffsetSourceTracePiece list }
 
 [<Struct>]
-type SynchronizedOffsetTraceLeaf =
+type internal SynchronizedOffsetTraceLeaf =
     { SourceSegmentIndex: int
       PreparedFrom: float<parameter>
       PreparedTo: float<parameter>
       Generation: int }
 
 [<Struct>]
-type SynchronizedOffsetTraceCorrespondence =
+type internal SynchronizedOffsetTraceCorrespondence =
     { PortionIndex: int
       CorrespondenceIndex: int
       InnerStalled: bool
@@ -196,7 +207,7 @@ type SynchronizedOffsetTraceCorrespondence =
       OuterLeaves: SynchronizedOffsetTraceLeaf list }
 
 [<Struct>]
-type SynchronizedOffsetTraceJoin =
+type internal SynchronizedOffsetTraceJoin =
     { AfterPortionIndex: int
       InnerSegments: Segment list
       OuterSegments: Segment list
@@ -204,14 +215,14 @@ type SynchronizedOffsetTraceJoin =
       OuterReversed: bool }
 
 [<Struct>]
-type SynchronizedOffsetTraceArea =
+type internal SynchronizedOffsetTraceArea =
     { PortionIndex: int
       CorrespondenceIndex: int
       InnerSegments: Segment list
       OuterSegments: Segment list }
 
 [<Struct>]
-type SingleOffsetContaminationTraceEdge =
+type internal SingleOffsetContaminationTraceEdge =
     { Id: int
       Segment: Segment
       StartVertex: int
@@ -222,13 +233,13 @@ type SingleOffsetContaminationTraceEdge =
       Survives: bool }
 
 [<Struct>]
-type BandArrangementTraceEdge =
+type internal BandArrangementTraceEdge =
     { Id: int
       Segment: Segment
       Submerged: bool }
 
 [<Struct>]
-type CuspTrimmingArrangementTraceEdge =
+type internal CuspTrimmingArrangementTraceEdge =
     { SideIndex: int
       Id: int
       Segment: Segment
@@ -332,17 +343,17 @@ type internal OffsetArrangementBuild =
       SegmentImages: ArrangementSourceSegmentImage list
       EdgeImages: ArrangementEdgeImage list }
 
-and OffsetArrangementSegmentGroup =
+and internal OffsetArrangementSegmentGroup =
     | UntrimmedOffsetSegment
     | ZeroOffsetSourceSegment
 
-and IndexedOffsetSegment =
+and internal IndexedOffsetSegment =
     { Group: OffsetArrangementSegmentGroup
       SubpathIndex: int
       Segment: Segment
       WindingOpinion: WindingSideOpinion option }
 
-and WindingSideOpinion =
+and internal WindingSideOpinion =
     { Left: int
       Right: int }
 
@@ -510,6 +521,9 @@ type internal OffsetCurvatureZone =
     | UnknownCurvatureZone
 
 [<RequireQualifiedAccess>]
+/// Construction of signed left-normal offsets, two-sided bands, strokes, and
+/// local offset coordinate maps. Positive offsets lie on the visual left of
+/// the source traversal; negative offsets lie on its visual right.
 module Offset =
     let private defaultTolerance = 0.01<length>
     let private maximumRefinementGeneration = 5
@@ -3718,15 +3732,18 @@ module Offset =
                     [ { Left = 0; Right = 1 }; { Left = 1; Right = 0 } ]
             opinions @ bandSubpathWindingOpinions rest
 
+    /// Constructs one untrimmed offset of a subpath with explicit options.
     let subpathUntrimmedWith subpath offset options =
         validateOptions options
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
         |> Result.bind (fun normalized -> buildSingleOffsetUntrimmed normalized offset options)
         |> Result.map (fun build -> build.Subpath)
 
+    /// Constructs one untrimmed offset of a subpath with default options.
     let subpathUntrimmed subpath offset =
         subpathUntrimmedWith subpath offset defaultOptions
 
+    /// Constructs synchronized untrimmed inner and outer offsets.
     let subpathBandUntrimmedWith subpath innerOffset outerOffset options =
         validateOptions options
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
@@ -3734,6 +3751,7 @@ module Offset =
             buildSynchronizedUntrimmed normalized innerOffset outerOffset options)
         |> Result.map (fun build -> Path.ofSubpaths [ build.Inner; build.Outer ])
 
+    /// Constructs synchronized untrimmed inner and outer offsets with default options.
     let subpathBandUntrimmed subpath innerOffset outerOffset =
         subpathBandUntrimmedWith subpath innerOffset outerOffset defaultOptions
 
@@ -3746,12 +3764,14 @@ module Offset =
                 untrimmedOffsetPathSubpaths
                     rest offset options (offsetSubpath :: converted))
 
+    /// Constructs an untrimmed offset independently for every source subpath.
     let pathUntrimmedWith path offset options =
         validateOptions options
         |> Result.bind (fun _ ->
             untrimmedOffsetPathSubpaths (Path.subpaths path) offset options [])
         |> Result.map Path.ofSubpaths
 
+    /// Constructs untrimmed offsets for a path with default options.
     let pathUntrimmed path offset =
         pathUntrimmedWith path offset defaultOptions
 
@@ -3774,6 +3794,7 @@ module Offset =
                     rest innerOffset outerOffset options
                     (List.rev (Path.subpaths band) @ converted))
 
+    /// Constructs synchronized untrimmed bands independently for every subpath.
     let pathBandUntrimmedWith path innerOffset outerOffset options =
         validateOptions options
         |> Result.bind (fun _ ->
@@ -3781,6 +3802,7 @@ module Offset =
                 (Path.subpaths path) innerOffset outerOffset options [])
         |> Result.map Path.ofSubpaths
 
+    /// Constructs untrimmed bands for a path with default options.
     let pathBandUntrimmed path innerOffset outerOffset =
         pathBandUntrimmedWith path innerOffset outerOffset defaultOptions
 
@@ -5338,6 +5360,7 @@ module Offset =
         |> Result.bind (fun build ->
             bandFromSides build.ZeroSource 0.0<length> build.Subpath offset)
 
+    /// Offsets one segment without topological trimming.
     let segmentWith segment offset options =
         Subpath.createWith Strict [ segment ]
         |> Result.mapError PathError
@@ -5346,8 +5369,10 @@ module Offset =
             | Error(PathError EmptySubpath) -> Error(DegenerateTangent 0.0<parameter>)
             | result -> result
 
+    /// Offsets one segment with default options and without topological trimming.
     let segment segment offset = segmentWith segment offset defaultOptions
 
+    /// Constructs and trims one signed offset of a subpath.
     let subpathWith subpath offset options =
         validateOptions options
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
@@ -5361,8 +5386,11 @@ module Offset =
                 trimSingleOffsetBuilds
                     [ untrimmedBuild ] offset [ band ] options))
 
+    /// Constructs and trims one signed offset with default options.
     let subpath subpath offset = subpathWith subpath offset defaultOptions
 
+    /// Constructs the trimmed region between two signed offsets of a subpath.
+    /// Either offset ordering is accepted; exchanging them reverses the result.
     let subpathBandWith
         subpath innerOffset outerOffset (options: Options) =
         validateOptions options
@@ -5400,6 +5428,7 @@ module Offset =
                 | Error error, _
                 | _, Error error -> Error error))
 
+    /// Constructs an offset band with default options.
     let subpathBand subpath innerOffset outerOffset =
         subpathBandWith subpath innerOffset outerOffset defaultOptions
 
@@ -5413,6 +5442,7 @@ module Offset =
             |> Result.bind (fun band ->
                 singleOffsetBandsFromBuilds rest offset (band :: converted))
 
+    /// Constructs and trims an offset independently for each path subpath.
     let pathWith (path: Path) offset options =
         validateOptions options
         |> Result.bind (fun _ -> normalizeSourcePath path options)
@@ -5424,6 +5454,7 @@ module Offset =
                 |> Result.bind (fun bands ->
                     trimSingleOffsetBuilds builds offset bands options)))
 
+    /// Constructs trimmed path offsets with default options.
     let path (path: Path) offset = pathWith path offset defaultOptions
 
     let rec private bandPathSubpaths
@@ -5436,6 +5467,7 @@ module Offset =
                 bandPathSubpaths rest innerOffset outerOffset options
                     (List.rev (Path.subpaths band) @ converted))
 
+    /// Constructs a trimmed offset band independently for each path subpath.
     let pathBandWith (path: Path) innerOffset outerOffset options =
         validateOptions options
         |> Result.bind (fun _ ->
@@ -5443,6 +5475,7 @@ module Offset =
                 (Path.subpaths path) innerOffset outerOffset options [])
         |> Result.map Path.ofSubpaths
 
+    /// Constructs path offset bands with default options.
     let pathBand (path: Path) innerOffset outerOffset =
         pathBandWith path innerOffset outerOffset defaultOptions
 
@@ -5458,6 +5491,7 @@ module Offset =
                     [ { Left = 1; Right = 0 }; { Left = 0; Right = 1 } ]
                     options)
 
+    /// Converts a subpath stroke to filled outline geometry.
     let subpathStrokeWith subpath width cap (options: Options) =
         match validateStrokeWidth width, validateOptions options with
         | Error error, _
@@ -5482,6 +5516,7 @@ module Offset =
                                 [ untrimmed ] [ OpenSubpathBand untrimmed ] options)
                         |> Result.bind orientOutlinePath)
 
+    /// Strokes a subpath with a butt cap and default options.
     let subpathStroke subpath width =
         subpathStrokeWith subpath width Butt defaultOptions
 
@@ -5494,6 +5529,7 @@ module Offset =
                 strokePathSubpaths rest width cap options
                     (List.rev (Path.subpaths stroke) @ converted))
 
+    /// Converts every subpath stroke to filled outline geometry.
     let pathStrokeWith (path: Path) width cap options =
         match validateStrokeWidth width, validateOptions options with
         | Error error, _
@@ -5502,6 +5538,7 @@ module Offset =
             strokePathSubpaths (Path.subpaths path) width cap options []
             |> Result.map Path.ofSubpaths
 
+    /// Strokes a path with butt caps and default options.
     let pathStroke (path: Path) width =
         pathStrokeWith path width Butt defaultOptions
 
@@ -5688,6 +5725,8 @@ module Offset =
                         | Error error, _
                         | _, Error error -> Error error)))
 
+    /// Builds a local-coordinate map whose x coordinate follows source arc
+    /// length and whose y coordinate is signed visual-left normal distance.
     let subpathOffsetMapWith subpath (options: LengthOptions) =
         lengthSpans (Subpath.segments subpath) options 0.0<length> []
         |> Result.bind (fun spans ->
@@ -5699,5 +5738,6 @@ module Offset =
                 Ok(fun local ->
                     offsetMapPoint spans totalLength closedValue options local))
 
+    /// Builds a local offset-coordinate map with default length options.
     let subpathOffsetMap subpath =
         subpathOffsetMapWith subpath Segment.defaultLengthOptions

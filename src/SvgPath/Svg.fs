@@ -14,6 +14,7 @@ type ThingToDraw =
 
 type ThingsToDraw = ThingToDraw list
 
+/// Helpers for reading and writing SVG elements that contain path geometry.
 [<RequireQualifiedAccess>]
 module Svg =
     let private numberFormat numbers =

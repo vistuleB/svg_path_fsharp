@@ -1,7 +1,9 @@
-# svg_path_fsharp experiment
+# svg_path_fsharp
 
-This private experiment tests whether an F# port can audit scalar usage in
-`svg_path` through units of measure before any public package API is designed.
+This private project is a behavior-preserving F# port of `svg_path`. It audits
+scalar usage through units of measure and provides a second implementation
+against which the Gleam package can be checked. Its public package API is still
+subject to change.
 
 The initial scalar distinctions are:
 
@@ -16,30 +18,21 @@ Curve parameters are dimensionless mathematically, but F# treats
 coefficient. This is intentional: those boundaries identify places where the
 Gleam implementation may be mixing scalar roles.
 
-The experiment also distinguishes `Point` from `Vector`. The Gleam package
-currently uses `Point` for both roles, so this distinction may prove useful or
-may prove too costly for a faithful public port.
+The port covers the full Gleam implementation: parsing and serialization,
+segments and paths, Bézier and ellipse geometry, intersections and overlaps,
+arrangements and CSG, convex hulls, transforms, clipping, effects, offsets,
+bands, and strokes. The test suite follows the Gleam suite test-for-test, with
+additional F# checks where units of measure enforce contracts at compile time.
 
-The current code translates the complete behavior of `svg_path/point.gleam`:
-SVG directions and headings, vector arithmetic, dot and cross products,
-overflow-resistant norms and distances, interpolation, normalization,
-projection, rotation, and tolerance-based point comparison. Location-only
-operations live under `Point`; vector-only operations live under the
-measure-polymorphic `Vector<'Unit>` type.
+Public geometry uses `Point<length>`. Derivatives retain powers of the nominal
+curve parameter, such as `Point<length / parameter>` and
+`Point<length / parameter^2>`. Arbitrary parametric subpath construction is
+generic in the caller's parameter measure; an optional tangent callback must
+therefore return `Point<length / 'Param>`.
 
-It also translates `svg_path/trig.gleam`. Degree-facing functions accept or
-return `float<degree>`, radian conversions use `float<radian>`, and inverse
-trigonometric inputs and ordinary trigonometric outputs remain dimensionless.
-The exact axis, diagonal, quarter-turn, and safe eighth-turn cases from the
-Gleam implementation are preserved.
-
-The root-finding translation treats polynomial coefficients as values with one
-shared unit and roots as `float<parameter>`. Polynomial evaluation explicitly
-unwraps that nominal parameter as the dimensionless polynomial variable.
-Polynomial options keep coefficient/value tolerances in the coefficient unit
-and root tolerances in parameter space. General bisection uses separate value
-and parameter tolerances; the Gleam API currently combines those two roles in
-one `Float`.
+Positive signed offsets use the visual-left normal in SVG coordinates. Visual
+clockwise rotation and winding conventions are used consistently rather than
+the vertically reflected conventions customary in Cartesian plots.
 
 Run the current tests with:
 

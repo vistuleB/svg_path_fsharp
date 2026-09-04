@@ -11,6 +11,7 @@ type Affine =
       E: float<length>
       F: float<length> }
 
+/// Generic two-dimensional affine matrices and matrix composition.
 [<RequireQualifiedAccess>]
 module Affine =
     let matrix a b c d (e: float<length>) (f: float<length>) : Affine =

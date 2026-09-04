@@ -5,6 +5,7 @@ type private Crossing = { Edge: AreaEdge; Y: float<length>; Winding: int }
 type private CrossingGroup = { Edge: AreaEdge; Y: float<length>; Winding: int; Crossings: int }
 type private AreaMode = FillRuleArea of FillRule | AbsoluteWindingArea
 
+/// Signed SVG area and clockwiseness calculations.
 [<RequireQualifiedAccess>]
 module Area =
     let private relativeTolerance = 1.0e-12

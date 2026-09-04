@@ -10,6 +10,7 @@ type private ParameterWindow =
     { From: float<parameter>
       To: float<parameter> }
 
+/// Ordered intersection and overlap encounters between path objects.
 [<RequireQualifiedAccess>]
 module Encounters =
     let private ratio (value: float<parameter>) = Parameter.ratio value

@@ -5,12 +5,13 @@ type DegeneracyError =
     | DegeneracyConvexHullError of ConvexHullError
 
 [<Struct>]
-type ThinPrefix =
+type internal ThinPrefix =
     { Segments: Segment list
       Remaining: Segment list
       Hull: Subpath option
       Strip: MinimumWidthStrip option }
 
+/// Detection and normalization of geometrically degenerate path segments.
 [<RequireQualifiedAccess>]
 module Degeneracy =
     let private uniqueAdjacent tolerance points =
@@ -111,7 +112,7 @@ module Degeneracy =
                                          Hull = Some hull
                                          Strip = Some strip }))))
 
-    let internalLongestThinPrefix (subpath: Subpath) tolerance =
+    let internal internalLongestThinPrefix (subpath: Subpath) tolerance =
         match subpath.Segments with
         | [] -> Ok { Segments = []; Remaining = []; Hull = None; Strip = None }
         | first :: rest ->

@@ -118,6 +118,24 @@ let ``parametric subpath uses optional tangents`` () =
     let sample = Segment.point segment 0.25<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> sample (point 3.0 3.0))
 
+[<Measure>]
+type private sourceParameter
+
+[<Fact>]
+let ``parametric subpath preserves caller parameter units`` () =
+    let options: ParametricOptions<sourceParameter> =
+        { Subpath.defaultParametricOptions with
+            Tolerance = 1.0e-9<length>
+            Tangent = Some(fun _ -> Point.create 1.0<length / sourceParameter> 1.0<length / sourceParameter>) }
+    let source =
+        Subpath.parametricWith
+            2.0<sourceParameter>
+            6.0<sourceParameter>
+            (fun t -> point (float t) (float t))
+            options
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Single(source.Segments) |> ignore
+
 [<Fact>]
 let ``parametric subpath adaptively subdivides`` () =
     let options = { Subpath.defaultParametricOptions with Tolerance = 1.0e-5<length>; MaxDepth = 8 }
@@ -761,48 +779,48 @@ let private polygon coordinates =
 let ``subpath containment implicitly closes open subpaths`` () =
     let source = Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 10.0; line 10.0 10.0 0.0 10.0 ] |> Result.defaultWith (failwithf "%A")
     Assert.False(Subpath.isClosed source)
-    Assert.Equal(Ok Inside, WindingField.subpathContainment (point 5.0 5.0) source Nonzero)
-    Assert.Equal(Ok Outside, WindingField.subpathContainment (point 15.0 5.0) source Nonzero)
-    Assert.Equal(Ok Boundary, WindingField.subpathContainment (point 0.0 5.0) source Nonzero)
-    Assert.Equal(Ok Boundary, WindingField.subpathContainment (point 10.0 5.0) source Nonzero)
+    Assert.Equal(Ok Inside, Subpath.containment (point 5.0 5.0) source Nonzero)
+    Assert.Equal(Ok Outside, Subpath.containment (point 15.0 5.0) source Nonzero)
+    Assert.Equal(Ok Boundary, Subpath.containment (point 0.0 5.0) source Nonzero)
+    Assert.Equal(Ok Boundary, Subpath.containment (point 10.0 5.0) source Nonzero)
 
 [<Fact>]
 let ``subpath containment supports both fill rules`` () =
     let once = [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 10.0; line 10.0 10.0 0.0 10.0; line 0.0 10.0 0.0 0.0 ]
     let source = Subpath.create (once @ once) |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok Inside, WindingField.subpathContainment (point 5.0 5.0) source Nonzero)
-    Assert.Equal(Ok Outside, WindingField.subpathContainment (point 5.0 5.0) source EvenOdd)
+    Assert.Equal(Ok Inside, Subpath.containment (point 5.0 5.0) source Nonzero)
+    Assert.Equal(Ok Outside, Subpath.containment (point 5.0 5.0) source EvenOdd)
 
 [<Fact>]
 let ``subpath containment handles ray through vertex`` () =
     let source = polygon [ 0.0, 0.0; 10.0, 5.0; 0.0, 10.0 ]
-    Assert.Equal(Ok Inside, WindingField.subpathContainment (point 2.0 5.0) source Nonzero)
-    Assert.Equal(Ok Outside, WindingField.subpathContainment (point 12.0 5.0) source Nonzero)
+    Assert.Equal(Ok Inside, Subpath.containment (point 2.0 5.0) source Nonzero)
+    Assert.Equal(Ok Outside, Subpath.containment (point 12.0 5.0) source Nonzero)
 
 [<Fact>]
 let ``subpath containment handles curved boundaries`` () =
     let source = Subpath.ofSegment (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0))
-    Assert.Equal(Ok Boundary, WindingField.subpathContainment (point 10.0 10.0) source Nonzero)
-    Assert.Equal(Ok Inside, WindingField.subpathContainment (point 10.0 5.0) source Nonzero)
+    Assert.Equal(Ok Boundary, Subpath.containment (point 10.0 10.0) source Nonzero)
+    Assert.Equal(Ok Inside, Subpath.containment (point 10.0 5.0) source Nonzero)
 
 [<Fact>]
 let ``subpath containment uses boundary tolerance`` () =
     let source = polygon [ 0.0, 0.0; 10.0, 0.0; 10.0, 10.0; 0.0, 10.0 ]
-    let options = { WindingField.defaultOptions with Tolerance = 0.001<length>; Samples = 100; MaxIterations = 100 }
-    Assert.Equal(Ok Boundary, WindingField.subpathContainmentWith (point -0.0005 5.0) source Nonzero options)
+    let options = { Path.defaultContainmentOptions with Tolerance = 0.001<length>; Samples = 100; MaxIterations = 100 }
+    Assert.Equal(Ok Boundary, Subpath.containmentWith (point -0.0005 5.0) source Nonzero options)
 
 [<Fact>]
 let ``subpath containment move only subpath is outside`` () =
     let sample = point 5.0 5.0
-    Assert.Equal(Ok Outside, WindingField.subpathContainment sample (Subpath.empty sample) Nonzero)
+    Assert.Equal(Ok Outside, Subpath.containment sample (Subpath.empty sample) Nonzero)
 
 [<Fact>]
 let ``subpath containment rejects invalid options`` () =
     let source = Subpath.empty (point 0.0 0.0)
     let sample = point 1.0 1.0
-    Assert.Equal(Error(InvalidContainmentTolerance 0.0<length>), WindingField.subpathContainmentWith sample source Nonzero { WindingField.defaultOptions with Tolerance = 0.0<length> })
-    Assert.Equal(Error(InvalidContainmentSamples 0), WindingField.subpathContainmentWith sample source Nonzero { WindingField.defaultOptions with Samples = 0 })
-    Assert.Equal(Error(InvalidContainmentMaxIterations 0), WindingField.subpathContainmentWith sample source Nonzero { WindingField.defaultOptions with MaxIterations = 0 })
+    Assert.Equal(Error(InvalidContainmentTolerance 0.0<length>), Subpath.containmentWith sample source Nonzero { Path.defaultContainmentOptions with Tolerance = 0.0<length> })
+    Assert.Equal(Error(InvalidContainmentSamples 0), Subpath.containmentWith sample source Nonzero { Path.defaultContainmentOptions with Samples = 0 })
+    Assert.Equal(Error(InvalidContainmentMaxIterations 0), Subpath.containmentWith sample source Nonzero { Path.defaultContainmentOptions with MaxIterations = 0 })
 
 [<Fact>]
 let ``path containment combines subpath winding and parity`` () =
@@ -810,26 +828,26 @@ let ``path containment combines subpath winding and parity`` () =
     let same = polygon [ 5.0, 5.0; 15.0, 5.0; 15.0, 15.0; 5.0, 15.0 ]
     let opposite = polygon [ 5.0, 5.0; 5.0, 15.0; 15.0, 15.0; 15.0, 5.0 ]
     let center = point 10.0 10.0
-    Assert.Equal(Ok Inside, WindingField.pathContainment center (Path.ofSubpaths [ outer; same ]) Nonzero)
-    Assert.Equal(Ok Outside, WindingField.pathContainment center (Path.ofSubpaths [ outer; same ]) EvenOdd)
-    Assert.Equal(Ok Outside, WindingField.pathContainment center (Path.ofSubpaths [ outer; opposite ]) Nonzero)
-    Assert.Equal(Ok Outside, WindingField.pathContainment center (Path.ofSubpaths [ outer; opposite ]) EvenOdd)
-    Assert.Equal(Ok Inside, WindingField.pathContainment (point 2.0 2.0) (Path.ofSubpaths [ outer; opposite ]) Nonzero)
+    Assert.Equal(Ok Inside, Path.containment center (Path.ofSubpaths [ outer; same ]) Nonzero)
+    Assert.Equal(Ok Outside, Path.containment center (Path.ofSubpaths [ outer; same ]) EvenOdd)
+    Assert.Equal(Ok Outside, Path.containment center (Path.ofSubpaths [ outer; opposite ]) Nonzero)
+    Assert.Equal(Ok Outside, Path.containment center (Path.ofSubpaths [ outer; opposite ]) EvenOdd)
+    Assert.Equal(Ok Inside, Path.containment (point 2.0 2.0) (Path.ofSubpaths [ outer; opposite ]) Nonzero)
 
 [<Fact>]
 let ``path containment boundary on any subpath dominates`` () =
     let outer = polygon [ 0.0, 0.0; 20.0, 0.0; 20.0, 20.0; 0.0, 20.0 ]
     let inner = polygon [ 5.0, 5.0; 15.0, 5.0; 15.0, 15.0; 5.0, 15.0 ]
-    Assert.Equal(Ok Boundary, WindingField.pathContainment (point 5.0 10.0) (Path.ofSubpaths [ outer; inner ]) Nonzero)
+    Assert.Equal(Ok Boundary, Path.containment (point 5.0 10.0) (Path.ofSubpaths [ outer; inner ]) Nonzero)
 
 [<Fact>]
 let ``path winding accumulates subpath winding`` () =
     let outer = polygon [ 0.0, 0.0; 20.0, 0.0; 20.0, 20.0; 0.0, 20.0 ]
     let same = polygon [ 5.0, 5.0; 15.0, 5.0; 15.0, 15.0; 5.0, 15.0 ]
     let opposite = polygon [ 5.0, 5.0; 5.0, 15.0; 15.0, 15.0; 15.0, 5.0 ]
-    Assert.Equal(Ok(Winding 2), WindingField.pathWinding (point 10.0 10.0) (Path.ofSubpaths [ outer; same ]))
-    Assert.Equal(Ok(Winding 0), WindingField.pathWinding (point 10.0 10.0) (Path.ofSubpaths [ outer; opposite ]))
-    Assert.Equal(Ok BoundaryWinding, WindingField.pathWinding (point 5.0 10.0) (Path.ofSubpaths [ outer; same ]))
+    Assert.Equal(Ok(Winding 2), Path.winding (point 10.0 10.0) (Path.ofSubpaths [ outer; same ]))
+    Assert.Equal(Ok(Winding 0), Path.winding (point 10.0 10.0) (Path.ofSubpaths [ outer; opposite ]))
+    Assert.Equal(Ok BoundaryWinding, Path.winding (point 5.0 10.0) (Path.ofSubpaths [ outer; same ]))
 
 [<Fact>]
 let ``clockwise svg circle has positive winding`` () =
@@ -839,18 +857,18 @@ let ``clockwise svg circle has positive winding`` () =
               Arc { Start = point -1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 1.0 0.0 } ]
         |> Result.bind (Subpath.setClosed true)
         |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok(Winding 1), WindingField.pathWinding (point 0.0 0.0) (Path.singleton source))
-    Assert.Equal(Ok(Winding 0), WindingField.pathWinding (point 2.0 0.0) (Path.singleton source))
+    Assert.Equal(Ok(Winding 1), Path.winding (point 0.0 0.0) (Path.singleton source))
+    Assert.Equal(Ok(Winding 0), Path.winding (point 2.0 0.0) (Path.singleton source))
 
 [<Fact>]
 let ``path containment empty and move only paths are outside`` () =
     let sample = point 5.0 5.0
-    Assert.Equal(Ok Outside, WindingField.pathContainment sample Path.empty Nonzero)
-    Assert.Equal(Ok Outside, WindingField.pathContainment sample (Path.singleton (Subpath.empty sample)) Nonzero)
+    Assert.Equal(Ok Outside, Path.containment sample Path.empty Nonzero)
+    Assert.Equal(Ok Outside, Path.containment sample (Path.singleton (Subpath.empty sample)) Nonzero)
 
 [<Fact>]
 let ``path containment with rejects invalid options`` () =
-    Assert.Equal(Error(InvalidContainmentTolerance 0.0<length>), WindingField.pathContainmentWith (point 0.0 0.0) Path.empty Nonzero { WindingField.defaultOptions with Tolerance = 0.0<length> })
+    Assert.Equal(Error(InvalidContainmentTolerance 0.0<length>), Path.containmentWith (point 0.0 0.0) Path.empty Nonzero { Path.defaultContainmentOptions with Tolerance = 0.0<length> })
 
 [<Fact>]
 let ``segment intersections finds line crossing`` () =

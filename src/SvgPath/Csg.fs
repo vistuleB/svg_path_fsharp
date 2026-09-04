@@ -18,6 +18,7 @@ type CsgResult =
     { Path: Path
       Build: ArrangementSegmentBuild }
 
+/// Boolean operations on filled SVG paths.
 [<RequireQualifiedAccess>]
 module Csg =
     let defaultOptions =

@@ -21,6 +21,7 @@ type RoundCornerOptions =
       DistanceTolerance: float<length>
       AngularTolerance: float<degree> }
 
+/// Reusable endpoint policies and path-editing effects.
 [<RequireQualifiedAccess>]
 module Effects =
     type private SegmentInfo =

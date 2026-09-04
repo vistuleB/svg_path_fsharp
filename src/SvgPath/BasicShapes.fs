@@ -11,6 +11,7 @@ type BasicShapeError =
     | DisabledRendering
     | PathError of SegmentError
 
+/// Conversion of SVG basic shapes to path geometry.
 [<RequireQualifiedAccess>]
 module BasicShapes =
     let private degrees value = Degree.fromFloat value

@@ -6,6 +6,7 @@ type ClipOptions =
       Containment: ContainmentOptions
       Tolerance: float<length> }
 
+/// Clipping of subpaths and paths against filled path regions.
 [<RequireQualifiedAccess>]
 module Clip =
     let defaultOptions =

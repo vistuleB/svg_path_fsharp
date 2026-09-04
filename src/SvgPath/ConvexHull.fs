@@ -16,7 +16,7 @@ type ConvexHullConstructionError =
     | TangentSearchExpectedTwoTangencies of int
     | SeededWorstDirectionExceededThreshold of direction: float<degree> * threshold: float<degree>
 
-type PointLoopView =
+type internal PointLoopView =
     | TangentPoint
     | OutsidePoint
     | InsidePoint
@@ -44,7 +44,7 @@ type WidthExtremum =
       Converged: bool }
 
 [<Struct>]
-type MinimumWidthStrip =
+type internal MinimumWidthStrip =
     { Width: float<length>
       Direction: Point<1>
       LowerPoint: Point<length>
@@ -52,13 +52,14 @@ type MinimumWidthStrip =
       LowerSupport: float<length>
       UpperSupport: float<length> }
 
-type MinimumWidthDecision =
+type internal MinimumWidthDecision =
     | MinimumWidthFits of MinimumWidthStrip
     | MinimumWidthExceeds of lowerBound: float<length>
     | MinimumWidthUnresolved of lowerBound: float<length> * bestWidth: float<length>
 
 type DirectionalSupport = DirectionalExtent
 
+/// Convex hulls, directional support, diameter, and minimum-width queries.
 [<RequireQualifiedAccess>]
 module ConvexHull =
     type private SupportSample =
@@ -783,7 +784,7 @@ module ConvexHull =
     let internalPointChordPolygonLoopSeparation segments point =
         pointChordPolygonLoopSeparation { Segments = segments; Enclosure = loopEnclosure segments } point
 
-    let internalPointLoopView point atPoint arriving leaving clockwise =
+    let internal internalPointLoopView point atPoint arriving leaving clockwise =
         let sight = Point.displacement point atPoint
         let arrivingTurn = Point.cross sight arriving
         let leavingTurn = Point.cross sight leaving
@@ -1413,7 +1414,7 @@ module ConvexHull =
           LowerSupport = Point.dot extremum.LowerPoint extremum.Direction
           UpperSupport = Point.dot extremum.UpperPoint extremum.Direction }
 
-    let internalConvexPolygonMinimumWidthStrip vertices =
+    let internal internalConvexPolygonMinimumWidthStrip vertices =
         vertices |> polygonMinimumWidth |> stripFromExtremum
 
     let private polygonDiameter points =
@@ -1572,7 +1573,7 @@ module ConvexHull =
                         search (samples @ added) divided (depth + 1)
         search initialSamples (intervalsFromSamples initialSamples) 0
 
-    let internalConvexPolygonMinimumWidthDecision vertices tolerance maxDepth =
+    let internal internalConvexPolygonMinimumWidthDecision vertices tolerance maxDepth =
         minimumWidthDecision (extent vertices) (polygonDiameter vertices).Width tolerance maxDepth
 
     let private adaptiveMaximum support diameter accuracy maxDepth initialSamples =
@@ -1688,7 +1689,7 @@ module ConvexHull =
 
     let pathMinimumWidth path = pathMinimumWidthWith path defaultWidthSearchOptions
 
-    let internalConvexSubpathMinimumWidthDecision (hull: Subpath) tolerance =
+    let internal internalConvexSubpathMinimumWidthDecision (hull: Subpath) tolerance =
         let segments = hull.Segments
         if segments |> List.forall (function Line _ -> true | _ -> false) then
             let strip = segments |> lineOnlyExtremum true |> stripFromExtremum
@@ -1699,7 +1700,7 @@ module ConvexHull =
             |> Result.map (fun bounds ->
                 minimumWidthDecision (segmentsExtent segments) (Point.distance bounds.Min bounds.Max) tolerance 20)
 
-    let internalConvexSubpathAddSegmentAndTestWidth (hull: Subpath) segment tolerance =
+    let internal internalConvexSubpathAddSegmentAndTestWidth (hull: Subpath) segment tolerance =
         constructSegmentHullInternal segment
         |> Result.bind (fun addition -> unionLoopSegments hull.Segments addition.Segments)
         |> Result.bind buildClosedSubpath

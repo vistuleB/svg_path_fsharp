@@ -38,6 +38,7 @@ type PathOverlap =
       RightSubpathIndex: int
       Correspondence: SubpathOverlap }
 
+/// Parametric overlap detection between SVG segments and paths.
 [<RequireQualifiedAccess>]
 module Overlaps =
     let defaultTolerance = 1.0e-9<length>

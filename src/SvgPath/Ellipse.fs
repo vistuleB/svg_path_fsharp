@@ -36,6 +36,7 @@ type EllipseError =
     | NotCollapsedToLine
     | SplitOutsideArc
 
+/// SVG elliptical-arc conversion, evaluation, and geometric queries.
 [<RequireQualifiedAccess>]
 module Ellipse =
     let private scalarTolerance = 1.0e-9

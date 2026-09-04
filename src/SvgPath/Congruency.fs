@@ -14,6 +14,7 @@ type CongruencyFit =
     { Transform: Affine
       Error: float<length> }
 
+/// Similarity and affine congruency tests and fitted transforms.
 [<RequireQualifiedAccess>]
 module Congruency =
     let private defaultAngleTolerance = 1.0e-9<degree>

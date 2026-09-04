@@ -47,6 +47,7 @@ type BezierError =
     | InvalidCubicSelfIntersectionMinimumArcLengthSeparation of float<length>
     | InvalidCubicSelfIntersectionDistanceTolerance of float<length>
 
+/// Evaluation, subdivision, fitting, bounds, and intersections for Bézier curves.
 [<RequireQualifiedAccess>]
 module Bezier =
     let private parameter value = Parameter.fromFloat value

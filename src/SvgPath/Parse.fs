@@ -32,6 +32,7 @@ type private ParseState =
       At: int
       EndAt: int }
 
+/// Parsing of SVG path-data strings.
 [<RequireQualifiedAccess>]
 module Parse =
     let private supportedCommand character =

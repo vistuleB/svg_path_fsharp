@@ -16,6 +16,7 @@ type TransformError =
     | InvalidMatrix
     | PathError of SegmentError
 
+/// Affine transformation of SVG segments, subpaths, paths, and bounds.
 [<RequireQualifiedAccess>]
 module Transform =
     let matrix = Affine.matrix

@@ -5,6 +5,7 @@ type EnclosingCircle =
     { Center: Point<length>
       RadiusSquared: float<length^2> }
 
+/// Smallest enclosing circles for finite point collections.
 [<RequireQualifiedAccess>]
 module SmallestEnclosingCircle =
     let private pointCircle sample =

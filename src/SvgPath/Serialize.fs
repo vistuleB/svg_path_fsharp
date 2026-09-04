@@ -41,6 +41,7 @@ type private ChordSimilarity =
     | StableChord of sourceStart: Point<length> * parserStart: Point<length> * scaleCos: float * scaleSin: float
     | UnstableChord
 
+/// Serialization and minification of SVG path data.
 [<RequireQualifiedAccess>]
 module Serialize =
     let defaultOptions =

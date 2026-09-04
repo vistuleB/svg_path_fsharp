@@ -16,6 +16,7 @@ type CurvatureBand =
     { From: float<parameter>
       To: float<parameter> }
 
+/// Derivatives, visual-left-normal curvature, and curvature-event parameters.
 [<RequireQualifiedAccess>]
 module Curvature =
     let defaultOptions =

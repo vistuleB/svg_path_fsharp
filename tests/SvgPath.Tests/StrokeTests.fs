@@ -27,6 +27,51 @@ let ``subpath stroke with round cap serializes semicircles`` () =
     Assert.Equal("M 0 -1 H 10 A 1 1 0 0 1 10 1 H 0 A 1 1 0 0 1 0 -1 Z", Serialize.subpath (List.exactlyOne path.Subpaths))
 
 [<Fact>]
+let ``round caps use normalized source endpoint directions`` () =
+    let subpath =
+        Subpath.ofSegment (
+            CubicBezier(
+                point 119.39091517239682 120.68941214016728,
+                point 119.99661582931833 120.39944456042525,
+                point 120.60455242265807 120.1171740145196,
+                point 121.21463749128954 119.84268982753466))
+    let options =
+        { Stroke.defaultOptions with
+            Width = 6.0<length>
+            Cap = StrokeRound
+            Offset = { Offset.defaultOptions with Join = Round } }
+
+    let path = stroked subpath options
+    let outline = List.exactlyOne path.Subpaths
+
+    Assert.True outline.Closed
+
+[<Fact>]
+let ``stroke accepts a directed cubic with a stationary start parameter`` () =
+    let subpath =
+        Subpath.ofSegment (
+            CubicBezier(
+                point 438.1699 -68.829,
+                point 438.1699 -68.829,
+                point 410.55765339720045 -44.345920281737655,
+                point 408.4367 -42.4248))
+
+    let path = Stroke.subpath subpath 0.5<length> |> Result.defaultWith (failwithf "%A")
+    let outline = List.exactlyOne path.Subpaths
+
+    Assert.True outline.Closed
+
+[<Fact>]
+let ``stroke accepts stationary start and steep crossing regression`` () =
+    let source =
+        "M 52.0515 277.5936 C 60.8159 269.8805 69.4564 262.0312 78.0103 254.0832 C 90.3339 242.6296 103.2476 231.8349 115.7828 220.6132 C 130.2062 207.6966 145.0563 195.2589 159.5077 182.3759 C 174.8593 168.6928 190.2079 155.0085 205.5564 141.3241 C 221.3130 127.2946 236.5355 112.9876 252.5219 98.9002 C 269.0418 84.3451 285.5518 69.4646 301.8246 54.9526 C 315.7254 42.5566 329.1876 29.6822 343.2148 17.4364 C 355.3230 6.8667 367.4950 -3.6205 379.2403 -14.5886 C 389.0271 -23.7278 399.1082 -32.5430 409.0340 -41.5293 C 411.1546 -43.4486 448.6067 -76.6113 451.7844 -79.8502 L 451.1893 -80.7477 L 438.1699 -68.8290 S 410.5574 -44.3462 408.4367 -42.4248 C 398.5096 -33.4354 388.4254 -24.6214 378.6363 -15.4802 C 366.8934 -4.5162 354.7278 5.9713 342.6241 16.5370 C 328.5969 28.7828 315.0311 41.5393 301.2383 54.0513 C 284.6189 69.1310 268.4477 83.4487 251.9223 98.0067 C 236.0946 111.9500 220.7179 126.3970 204.9624 140.4256 L 158.9147 181.4785 C 144.4612 194.3614 129.6131 206.8013 115.1878 219.7157 C 102.6522 230.9416 89.7322 241.7360 77.4054 253.1905 C 68.8548 261.1355 60.2187 268.9829 51.4564 276.6961 L 52.0505 277.5924 Z"
+    let path = Parse.path source |> Result.defaultWith (failwithf "%A")
+
+    let stroked = Stroke.path path 0.5<length> |> Result.defaultWith (failwithf "%A")
+
+    Assert.NotEmpty stroked.Subpaths
+
+[<Fact>]
 let ``zero length subpath stroke with butt cap returns empty path`` () =
     let p = point 3.0 4.0
     let path = Stroke.subpath (Subpath.ofSegment (Line(p, p))) 2.0<length> |> Result.defaultWith (failwithf "%A")

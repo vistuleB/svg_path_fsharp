@@ -1790,23 +1790,40 @@ module Offset =
             stalledEndControl1ParallelOrBisection
                 startPoint endPoint startDirection endDirection samples
 
-    let private offsetDerivative segment t offset =
-        match Segment.derivative segment t, Segment.secondDerivative segment t with
-        | Ok derivative, Ok second ->
-            let speed = Point.norm derivative
-            if speed <= smallUnitDivisionTolerance () then Error(DegenerateTangent t)
+    let private offsetDirectionFromCurvature tangent curvature offset t =
+        let speedFactor = 1.0 - offset * curvature
+        if speedFactor > 0.0 then Ok tangent
+        elif speedFactor < 0.0 then Ok(Point.negate tangent)
+        else Error(DegenerateTangent t)
+
+    let rec private offsetEndpointDirectionLimitFromInterior
+        segment tangent endpointT interiorDistance offset =
+        if interiorDistance > 0.01<parameter> then Error(DegenerateTangent endpointT)
+        else
+            let interiorT =
+                if endpointT = 0.0<parameter> then interiorDistance
+                else 1.0<parameter> - interiorDistance
+            match Curvature.segmentLeftNormalCurvature segment interiorT with
+            | Ok curvature ->
+                offsetDirectionFromCurvature tangent curvature offset endpointT
+            | Error _ ->
+                offsetEndpointDirectionLimitFromInterior
+                    segment tangent endpointT (interiorDistance * 10.0) offset
+
+    let private offsetEndpointDirectionLimit segment tangent t offset =
+        if t = 0.0<parameter> || t = 1.0<parameter> then
+            offsetEndpointDirectionLimitFromInterior
+                segment tangent t curvatureParameterTolerance offset
+        else Error(DegenerateTangent t)
+
+    let private offsetDirection segment t offset =
+        unitTangent segment t
+        |> Result.bind (fun tangent ->
+            if offset = 0.0<length> then Ok tangent
             else
-                let tangentChange =
-                    Point.subtract
-                        (Point.scale (1.0 / speed) second)
-                        (Point.scale
-                            (Point.dot derivative second / (speed * speed * speed))
-                            derivative)
-                let candidate =
-                    Point.add derivative (Point.scale offset (Point.rotateCounterclockwise tangentChange))
-                if pointIsFinite candidate then Ok candidate else Error NonFinite
-        | Error error, _
-        | _, Error error -> Error(PathError error)
+                match Curvature.segmentLeftNormalCurvature segment t with
+                | Ok curvature -> offsetDirectionFromCurvature tangent curvature offset t
+                | Error _ -> offsetEndpointDirectionLimit segment tangent t offset)
 
     let private tangentTurnFromAperture aperture =
         if aperture <= tangentTurnAngleEpsilon
@@ -1904,12 +1921,7 @@ module Offset =
             match endpoint with
             | SegmentStart -> 0.0<parameter>, curvatureParameterTolerance * 2.0
             | SegmentEnd -> 1.0<parameter>, 1.0<parameter> - curvatureParameterTolerance * 2.0
-        let directionAt t =
-            offsetDerivative source.Segment t offset
-            |> Result.bind (fun derivative ->
-                Point.normalize derivative
-                |> Option.map Ok
-                |> Option.defaultValue (Error(DegenerateTangent t)))
+        let directionAt t = offsetDirection source.Segment t offset
         if isReversal && reachesOffsetRadius then
             match directionAt interiorT with
             | Ok direction -> Ok direction
@@ -1921,12 +1933,7 @@ module Offset =
         let isReversal = boundaryIsReversal boundary
         let reachesOffsetRadius = eJoinFreeEndpointReachesOffsetRadius source offset endpoint
         let oppositeT = if endpoint = SegmentStart then 1.0<parameter> else 0.0<parameter>
-        let oppositeDirection =
-            offsetDerivative source.Segment oppositeT offset
-            |> Result.bind (fun derivative ->
-                Point.normalize derivative
-                |> Option.map Ok
-                |> Option.defaultValue (Error(DegenerateTangent oppositeT)))
+        let oppositeDirection = offsetDirection source.Segment oppositeT offset
         eJoinFreeEndpointOffsetDirection source offset endpoint isReversal reachesOffsetRadius
         |> Result.map (fun direction ->
             if not isReversal then FitPositionAndDirection direction
@@ -4204,8 +4211,9 @@ module Offset =
         if Subpath.isClosed sideA then Ok(ClosedSubpathBand(exterior, interior))
         else openButtBandOutline exterior interior |> Result.map OpenSubpathBand
 
-    let private closedUntrimmedSide source offset options =
-        subpathUntrimmedWith source offset options
+    let private closedUntrimmedSideFromNormalizedSource source offset options =
+        buildSingleOffsetUntrimmed source offset options
+        |> Result.map (fun build -> build.Subpath)
         |> Result.bind (fun side ->
             if Subpath.isClosed side then Ok side
             else
@@ -4213,9 +4221,9 @@ module Offset =
                     (WiggleWith options.Fitting.Tolerance) true side
                 |> Result.mapError PathError)
 
-    let private untrimmedStrokeOutline source radius cap options =
-        match subpathUntrimmedWith source radius options,
-              subpathUntrimmedWith source -radius options,
+    let private untrimmedStrokeOutlineFromNormalizedSource source radius cap options =
+        match buildSingleOffsetUntrimmed source radius options |> Result.map (fun build -> build.Subpath),
+              buildSingleOffsetUntrimmed source -radius options |> Result.map (fun build -> build.Subpath),
               strokeEndCap source radius cap,
               strokeStartCap source radius cap with
         | Ok positive, Ok negative, Ok endCap, Ok startCap ->
@@ -4233,18 +4241,25 @@ module Offset =
         | _, _, Error error, _
         | _, _, _, Error error -> Error error
 
+    let private untrimmedStrokeOutline source radius cap options =
+        normalizeSourceSubpath source options
+        |> Result.bind (fun normalized ->
+            untrimmedStrokeOutlineFromNormalizedSource normalized radius cap options)
+
     let private untrimmedStrokeBand
         (source: Subpath) (width: float<length>) cap (options: Options) =
         let radius = width / 2.0
-        if Subpath.isClosed source then
-            match closedUntrimmedSide source -radius options,
-                  closedUntrimmedSide source radius options with
-            | Ok interior, Ok exterior -> Ok(ClosedSubpathBand(exterior, interior))
-            | Error error, _
-            | _, Error error -> Error error
-        else
-            untrimmedStrokeOutline source radius cap options
-            |> Result.map OpenSubpathBand
+        normalizeSourceSubpath source options
+        |> Result.bind (fun normalized ->
+            if Subpath.isClosed source then
+                match closedUntrimmedSideFromNormalizedSource normalized -radius options,
+                      closedUntrimmedSideFromNormalizedSource normalized radius options with
+                | Ok interior, Ok exterior -> Ok(ClosedSubpathBand(exterior, interior))
+                | Error error, _
+                | _, Error error -> Error error
+            else
+                untrimmedStrokeOutlineFromNormalizedSource normalized radius cap options
+                |> Result.map OpenSubpathBand)
 
     let private requireClosedBandSubpath subpath =
         if Subpath.isClosed subpath then Ok()

@@ -732,6 +732,55 @@ module Segment =
     let private lineCrossingConstant startPoint point normal =
         Point.dot (Point.displacement point startPoint) normal
 
+    let private lineCrossingValue segment pointOnLine normal t =
+        point segment t
+        |> Result.map (fun sample -> Point.dot (Point.displacement pointOnLine sample) normal)
+
+    let private crossingValuesHaveSameSign (left: float<length>) (right: float<length>) =
+        (left < 0.0<length> && right < 0.0<length>)
+        || (left > 0.0<length> && right > 0.0<length>)
+
+    let rec private refineLineCrossing
+        segment pointOnLine normal tolerance
+        (leftT: float<parameter>) leftValue (rightT: float<parameter>) remaining =
+        let middle = leftT + (rightT - leftT) / 2.0
+        lineCrossingValue segment pointOnLine normal middle
+        |> Result.bind (fun middleValue ->
+            if abs middleValue <= tolerance then Ok(Some middle)
+            elif remaining <= 1 || middle = leftT || middle = rightT then Ok None
+            elif crossingValuesHaveSameSign leftValue middleValue then
+                refineLineCrossing
+                    segment pointOnLine normal tolerance middle middleValue rightT (remaining - 1)
+            else
+                refineLineCrossing
+                    segment pointOnLine normal tolerance leftT leftValue middle (remaining - 1))
+
+    let private polishLineCrossingRoots
+        segment pointOnLine normal roots (options: CrossingOptions) signedLineDistanceTolerance =
+        roots
+        |> List.fold (fun (state: Result<float<parameter> list, SegmentError>) root ->
+            state
+            |> Result.bind (fun crossings ->
+                let isolation = root.Isolation
+                lineCrossingValue segment pointOnLine normal isolation.Estimate
+                |> Result.bind (fun estimateValue ->
+                    if abs estimateValue <= signedLineDistanceTolerance then
+                        Ok(isolation.Estimate :: crossings)
+                    else
+                        match root.Kind with
+                        | NegativeToPositive
+                        | PositiveToNegative ->
+                            lineCrossingValue segment pointOnLine normal isolation.Lower
+                            |> Result.bind (fun lowerValue ->
+                                refineLineCrossing
+                                    segment pointOnLine normal signedLineDistanceTolerance
+                                    isolation.Lower lowerValue isolation.Upper options.MaxIterations
+                                |> Result.bind (function
+                                    | Some parameter -> Ok(parameter :: crossings)
+                                    | None -> Error(CrossingMaxIterationsReached(isolation.Estimate, estimateValue))))
+                        | _ -> Error(CrossingMaxIterationsReached(isolation.Estimate, estimateValue))))) (Ok [])
+        |> Result.map List.rev
+
     let private lineClassifiedRoots
         segment
         (point: Point<length>)
@@ -837,15 +886,18 @@ module Segment =
                     (options.SignedLineDistanceTolerance * sqrt directionSquared)
                     options.MaxIterations
                 |> Result.bind (fun roots ->
+                    polishLineCrossingRoots
+                        segment origin normal roots options
+                        (options.SignedLineDistanceTolerance * sqrt directionSquared))
+                |> Result.bind (fun roots ->
                     roots
                     |> List.fold (fun state root ->
                         state
                         |> Result.bind (fun crossings ->
-                            let t = root.Isolation.Estimate
-                            point segment t
+                            point segment root
                             |> Result.map (fun sample ->
                                 let rayT = Point.dot (Point.displacement origin sample) direction / directionSquared
-                                (t, rayT) :: crossings))) (Ok [])
+                                (root, rayT) :: crossings))) (Ok [])
                     |> Result.map List.rev))
 
     let rayCrossings segment origin direction =

@@ -8,6 +8,28 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private assertParameterNear expected actual tolerance =
     Assert.True(abs (actual - expected) <= Parameter.fromFloat tolerance, $"expected {expected}, got {actual}")
 
+[<Fact>]
+let ``cubic line crossing is polished to geometric tolerance`` () =
+    let cubic =
+        CubicBezier(
+            point 414.88052040592544 -47.067344225071885,
+            point 426.1136826390859 -57.05005309466557,
+            point 449.164205229028 -77.53651654700472,
+            point 451.6059453674826 -80.02528267799268)
+    let line =
+        Line(
+            point 451.57604163009046 -79.71204505188506,
+            point 450.98094163009046 -80.60954505188505)
+
+    let intersection =
+        Intersections.segment cubic line
+        |> Result.defaultWith (failwithf "%A")
+        |> List.exactlyOne
+    let cubicPoint = Segment.point cubic intersection.LeftT |> Result.defaultWith (failwithf "%A")
+    let linePoint = Segment.point line intersection.RightT |> Result.defaultWith (failwithf "%A")
+
+    Assert.True(Point.distance cubicPoint linePoint <= 1.0e-9<length>)
+
 let private arcPair () =
     let left =
         Arc

@@ -34,7 +34,37 @@ Positive signed offsets use the visual-left normal in SVG coordinates. Visual
 clockwise rotation and winding conventions are used consistently rather than
 the vertically reflected conventions customary in Cartesian plots.
 
-Run the current tests with:
+## Package
+
+The first package version is `0.1.0` and targets .NET 9:
+
+```shell
+dotnet add package SvgPath --version 0.1.0
+```
+
+The API is expected to change while the mechanically faithful port is refined
+into a more idiomatic F# library.
+
+## Example
+
+```fsharp
+open SvgPath
+
+let result =
+    Parse.path "M 0 0 L 20 0 L 20 20 Z"
+    |> Result.mapError (sprintf "parse error: %A")
+    |> Result.bind (fun path ->
+        Offset.path path 2.0<length>
+        |> Result.mapError (sprintf "offset error: %A"))
+    |> Result.map Serialize.path
+```
+
+Most operations return `Result` so invalid input geometry, numerical failures,
+and violated topology assumptions remain explicit.
+
+## Development
+
+Run the tests with:
 
 ```shell
 dotnet test tests/SvgPath.Tests/SvgPath.Tests.fsproj

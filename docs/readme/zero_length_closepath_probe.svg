@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="360" viewBox="0 0 500 360">
+  <rect x="0" y="0" width="500" height="360" fill="white"/>
+  <path d="M20 50H390" stroke="#ddd"/>
+  <circle cx="90" cy="50" r="2" fill="#dc2626"/><circle cx="260" cy="50" r="2" fill="#dc2626"/>
+  <path d="M20 120H390" stroke="#ddd"/>
+  <circle cx="90" cy="120" r="2" fill="#dc2626"/><circle cx="260" cy="120" r="2" fill="#dc2626"/>
+  <path d="M20 230H390" stroke="#ddd"/>
+  <circle cx="90" cy="230" r="2" fill="#dc2626"/><circle cx="260" cy="230" r="2" fill="#dc2626"/>
+  <path d="M20 300H390" stroke="#ddd"/>
+  <circle cx="90" cy="300" r="2" fill="#dc2626"/><circle cx="260" cy="300" r="2" fill="#dc2626"/>
+  <path d="M90 50" fill="none" stroke="#2563eb" stroke-width="24" stroke-linecap="round"/>
+  <path d="M260 50L260 50" fill="none" stroke="#2563eb" stroke-width="24" stroke-linecap="round"/>
+  <path d="M90 120" fill="none" stroke="#2563eb" stroke-width="24" stroke-linecap="square"/>
+  <path d="M260 120L260 120" fill="none" stroke="#2563eb" stroke-width="24" stroke-linecap="square"/>
+  <path d="M90 230" fill="none" stroke="#2563eb" stroke-width="24" stroke-linecap="round"/>
+  <path d="M260 230Z" fill="none" stroke="#2563eb" stroke-width="24" stroke-linecap="round"/>
+  <path d="M90 300" fill="none" stroke="#2563eb" stroke-width="24" stroke-linecap="square"/>
+  <path d="M260 300Z" fill="none" stroke="#2563eb" stroke-width="24" stroke-linecap="square"/>
+</svg>

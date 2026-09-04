@@ -757,7 +757,7 @@ module Intersections =
                 minimaFromTerminalWindows (List.rev windows) options.Tolerance
                 |> Result.map (fun terminal -> best :: boundaries @ terminal)))
 
-    let validateOptions options =
+    let internal validateOptions options =
         if options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidIntersectionTolerance options.Tolerance)
         elif options.MaxDepth <= 0 then Error(InvalidIntersectionMaxDepth options.MaxDepth)

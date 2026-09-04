@@ -88,6 +88,13 @@ let ``segment point evaluates lines quadratics cubics and arcs`` () =
         Segment.point segment 0.5<parameter> |> Result.defaultWith (failwithf "%A") |> assertPointNear expected
 
 [<Fact>]
+let ``segment point returns stored arc endpoints exactly`` () =
+    let startPoint, endPoint = point 1.23456789 -2.34567891, point 9.87654321 7.65432109
+    let arc = Arc { Start = startPoint; Radius = point 8.1 5.7; XAxisRotation = 23.0<degree>; LargeArc = false; Sweep = true; End = endPoint }
+    Assert.Equal(Ok startPoint, Segment.point arc 0.0<parameter>)
+    Assert.Equal(Ok endPoint, Segment.point arc 1.0<parameter>)
+
+[<Fact>]
 let ``segment derivative evaluates lines quadratics cubics and arcs`` () =
     let derivative segment = Segment.derivative segment 0.5<parameter> |> Result.defaultWith (failwithf "%A")
     assertPointNear (Point.create 10.0<length / parameter> 20.0<length / parameter>) (derivative (Line(point 0.0 0.0, point 10.0 20.0)))
@@ -633,6 +640,13 @@ let ``append segment with wiggle rejects start gaps beyond tolerance`` () =
     Assert.Equal(Error(Discontinuous(-1, 0, a, b, 10.0<length>)), Subpath.appendWith Wiggle (Line(b, c)) (Subpath.empty a))
 
 [<Fact>]
+let ``append segment with bridge does not insert a zero length bridge`` () =
+    let startPoint, endPoint = point 0.0 0.0, point 10.0 0.0
+    let segment = Line(startPoint, endPoint)
+    let appended = Subpath.appendWith Bridge segment (Subpath.empty startPoint) |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ segment ], appended.Segments)
+
+[<Fact>]
 let ``subpath with wiggle replaces nearby sequential endpoints`` () =
     let a, b, nearB, c = point 0.0 0.0, point 10.0 0.0, point 10.0000000001 0.0, point 20.0 0.0
     let value = Subpath.createWith Wiggle [ Line(a, b); Line(nearB, c) ] |> Result.defaultWith (failwithf "%A")
@@ -1062,6 +1076,11 @@ let ``join treats empty open subpaths as identity values`` () =
     Assert.Equal(Ok subpath, Subpath.join [ emptyStart; subpath ])
     Assert.Equal(Ok subpath, Subpath.join [ subpath; emptyEnd ])
     Assert.Equal(Ok emptyStart, Subpath.join [ emptyStart; emptyEnd ])
+
+[<Fact>]
+let ``join with validates policy for only empty subpaths`` () =
+    let empty = Subpath.empty (point 0.0 0.0)
+    Assert.Equal(Error(InvalidWiggleTolerance -1.0<length>), Subpath.joinWith (WiggleWith -1.0<length>) [ empty ])
 
 [<Fact>]
 let ``join treats interleaved empty subpaths as identity values`` () =

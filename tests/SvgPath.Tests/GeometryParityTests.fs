@@ -368,6 +368,15 @@ let ``segment length with rejects invalid options`` () =
     Assert.Equal(Error(InvalidLengthMaxDepth 0), Segment.lengthWith segment { Tolerance = 1.0e-9<length>; MaxDepth = 0 })
 
 [<Fact>]
+let ``segment length with reports exhausted refinement depth`` () =
+    let curve = CubicBezier(point 0.0 0.0, point 0.0 100.0, point 100.0 -100.0, point 100.0 0.0)
+    match Segment.lengthWith curve { Tolerance = 1.0e-30<length>; MaxDepth = 1 } with
+    | Error(LengthMaxDepthReached(estimate, error)) ->
+        Assert.True(estimate > 0.0<length>)
+        Assert.True(error > 0.0<length>)
+    | result -> failwithf "expected exhausted length refinement depth, got %A" result
+
+[<Fact>]
 let ``subpath length sums segment lengths`` () =
     let subpath = Subpath.create [ line 0.0 0.0 3.0 4.0; line 3.0 4.0 8.0 16.0 ] |> Result.defaultWith (failwithf "%A")
     Subpath.length subpath |> Result.defaultWith (failwithf "%A") |> assertLengthNear 18.0
@@ -509,6 +518,36 @@ let ``path parameter at length rejects empty paths and empty subpaths`` () =
     Assert.Equal(Error EmptyPath, Path.parameterAtLength Path.empty 0.0<length>)
     let moveOnly = Subpath.empty (point 0.0 0.0)
     Assert.Equal(Error EmptySubpaths, Path.parameterAtLength (Path.singleton moveOnly) 0.0<length>)
+
+[<Fact>]
+let ``empty aggregate lengths still validate options`` () =
+    let invalid: LengthOptions = { Tolerance = 0.0<length>; MaxDepth = 20 }
+    Assert.Equal(
+        Error(InvalidLengthTolerance 0.0<length>),
+        Subpath.lengthWith (Subpath.empty (point 0.0 0.0)) invalid)
+    Assert.Equal(
+        Error(InvalidLengthTolerance 0.0<length>),
+        Path.lengthWith Path.empty invalid)
+
+[<Fact>]
+let ``empty aggregate linearization still validates options`` () =
+    let invalid: LinearizeOptions = { Tolerance = 0.0<length>; MaxDepth = 20 }
+    Assert.Equal(
+        Error(InvalidLinearizeTolerance 0.0<length>),
+        Subpath.toLinesWith invalid (Subpath.empty (point 0.0 0.0)))
+    Assert.Equal(
+        Error(InvalidLinearizeTolerance 0.0<length>),
+        Path.toLinesWith invalid Path.empty)
+
+[<Fact>]
+let ``subpath directions validate options before the parameter`` () =
+    let invalid = { RelativeTolerance = -0.1 }
+    Assert.Equal(
+        Error(InvalidDirectionRelativeTolerance -0.1),
+        Subpath.directionsWith
+            (Subpath.empty (point 0.0 0.0))
+            { SegmentIndex = 0; T = 0.0<parameter> }
+            invalid)
 
 [<Fact>]
 let ``subpath between lengths crosses segments`` () =

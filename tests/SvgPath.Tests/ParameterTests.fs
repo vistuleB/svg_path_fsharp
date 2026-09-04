@@ -71,7 +71,7 @@ let ``snap subpath parameter snaps closed wrap`` () =
 let ``snap subpath parameter rejects invalid inputs`` () =
     let subpath = openLines 1
     Assert.Equal(
-        Error(InvalidIntersectionTolerance 0.0<length>),
+        Error(InvalidParameterSnapTolerance 0.0<parameter>),
         Subpath.parameterSnapToBoundary subpath (at 0 0.5) (t 0.0))
     Assert.Equal(
         Error(InvalidSubpathParameter(1, t 0.5, 1)),

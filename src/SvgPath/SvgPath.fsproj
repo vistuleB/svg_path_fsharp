@@ -16,7 +16,7 @@
     <Compile Include="Ellipse.fs" />
     <Compile Include="Root.fs" />
     <Compile Include="Bezier.fs" />
-    <Compile Include="Segment.fs" />
+    <Compile Include="SvgPath.fs" />
     <Compile Include="Inspect.fs" />
     <Compile Include="Curvature.fs" />
     <Compile Include="SmallestEnclosingCircle.fs" />

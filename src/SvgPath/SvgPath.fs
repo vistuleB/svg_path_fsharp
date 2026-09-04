@@ -56,6 +56,7 @@ type SegmentError =
     | InvalidOverlapSamples of int
     | NonAffineOverlapCorrespondence
     | InvalidIntersectionTolerance of float<length>
+    | InvalidParameterSnapTolerance of float<parameter>
     | InvalidIntersectionMaxDepth of int
     | InvalidIntersectionParameterSnapExponent of int
     | IntersectionTerminalWindowLimitExceeded of int
@@ -94,6 +95,7 @@ type SegmentError =
     | InvalidDirectionRelativeTolerance of float
     | InvalidLengthTolerance of float<length>
     | InvalidLengthMaxDepth of int
+    | LengthMaxDepthReached of estimate: float<length> * error: float<length>
     | InvalidLengthDistance of distance: float<length> * segmentLength: float<length>
     | InvalidZeroLengthTolerance of float<length>
     | InvalidSubdivisionMaxLength of float<length>
@@ -409,9 +411,12 @@ module Segment =
     let arcEndAngle segment = arcCenterData segment |> Result.map Ellipse.arcEndAngle
 
     let point segment t =
-        match segment with
-        | Arc endpoint -> Ellipse.endpointToCenter endpoint |> Result.map (fun arc -> Ellipse.arcPoint arc t) |> Result.mapError (fun _ -> DegenerateArc)
-        | _ -> Ok(Bezier.point (asBezier segment) t)
+        if t = 0.0<parameter> then Ok(start segment)
+        elif t = 1.0<parameter> then Ok(finish segment)
+        else
+            match segment with
+            | Arc endpoint -> Ellipse.endpointToCenter endpoint |> Result.map (fun arc -> Ellipse.arcPoint arc t) |> Result.mapError (fun _ -> DegenerateArc)
+            | _ -> Ok(Bezier.point (asBezier segment) t)
 
     let private fromBezier curve =
         match curve with
@@ -543,11 +548,15 @@ module Segment =
             | Arc _, _ -> []
         directionFromCandidates options candidates
 
-    /// Return singularity-safe unit traversal directions at a segment parameter.
-    let directionsWith options segment t =
+    let internal validateDirectionOptions options =
         if options.RelativeTolerance < 0.0 || not (System.Double.IsFinite options.RelativeTolerance) then
             Error(InvalidDirectionRelativeTolerance options.RelativeTolerance)
-        else
+        else Ok()
+
+    /// Return singularity-safe unit traversal directions at a segment parameter.
+    let directionsWith options segment t =
+        validateDirectionOptions options
+        |> Result.bind (fun () ->
             match segment with
             | Arc _ ->
                 derivative segment t
@@ -564,12 +573,12 @@ module Segment =
                 split segment t
                 |> Result.map (fun (left, right) ->
                     { Incoming = endpointDirection options true left
-                      Outgoing = endpointDirection options false right })
+                      Outgoing = endpointDirection options false right }))
 
     let directions segment t = directionsWith defaultDirectionOptions segment t
 
     let defaultLengthOptions: LengthOptions =
-        { Tolerance = 1.0e-6<length>
+        { Tolerance = 1.0e-9<length>
           MaxDepth = 20 }
 
     let defaultDistanceOptions =
@@ -814,7 +823,7 @@ module Segment =
     let rayCrossings segment origin direction =
         rayCrossingsWith segment origin direction defaultCrossingOptions
 
-    let validateLengthOptions (options: LengthOptions) =
+    let internal validateLengthOptions (options: LengthOptions) =
         if options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidLengthTolerance options.Tolerance)
         elif options.MaxDepth <= 0 then Error(InvalidLengthMaxDepth options.MaxDepth)
@@ -831,7 +840,15 @@ module Segment =
             (fm: float<length / parameter>)
             (fb: float<length / parameter>) : float<length> =
             (fa + 4.0 * fm + fb) * (b - a) / 6.0
-        let rec refine a b fa fm fb estimate depth =
+        let rec refine
+            (a: float<parameter>)
+            (b: float<parameter>)
+            (fa: float<length / parameter>)
+            (fm: float<length / parameter>)
+            (fb: float<length / parameter>)
+            (estimate: float<length>)
+            (tolerance: float<length>)
+            depth =
             let middle = Parameter.fromFloat ((Parameter.ratio a + Parameter.ratio b) / 2.0)
             let leftMiddle = Parameter.fromFloat ((Parameter.ratio a + Parameter.ratio middle) / 2.0)
             let rightMiddle = Parameter.fromFloat ((Parameter.ratio middle + Parameter.ratio b) / 2.0)
@@ -842,12 +859,15 @@ module Segment =
                     let left = simpson a middle fa flm fm
                     let right = simpson middle b fm frm fb
                     let combined = left + right
-                    if depth = 0 || abs (combined - estimate) <= 15.0 * options.Tolerance then
+                    let error = abs (combined - estimate)
+                    if error <= 15.0 * tolerance then
                         Ok(combined + (combined - estimate) / 15.0)
+                    elif depth <= 1 then
+                        Error(LengthMaxDepthReached(combined, error))
                     else
-                        refine a middle fa flm fm left (depth - 1)
+                        refine a middle fa flm fm left (tolerance / 2.0) (depth - 1)
                         |> Result.bind (fun leftLength ->
-                            refine middle b fm frm fb right (depth - 1)
+                            refine middle b fm frm fb right (tolerance / 2.0) (depth - 1)
                             |> Result.map (fun rightLength -> leftLength + rightLength))))
         let a = 0.0<parameter>
         let b = 1.0<parameter>
@@ -857,7 +877,7 @@ module Segment =
             speed segment middle
             |> Result.bind (fun fm ->
                 speed segment b
-                |> Result.bind (fun fb -> refine a b fa fm fb (simpson a b fa fm fb) options.MaxDepth)))
+                |> Result.bind (fun fb -> refine a b fa fm fb (simpson a b fa fm fb) options.Tolerance options.MaxDepth)))
 
     /// Approximate segment arc length with explicit error and depth controls.
     let lengthWith segment (options: LengthOptions) =
@@ -870,7 +890,7 @@ module Segment =
     let length segment = lengthWith segment defaultLengthOptions
 
     let private validateLengthDistance distance segmentLength =
-        if not (System.Double.IsFinite(float distance)) || distance < 0.0<length> || distance > segmentLength then
+        if distance < 0.0<length> || distance > segmentLength then
             Error(InvalidLengthDistance(distance, segmentLength))
         else Ok()
 
@@ -1251,11 +1271,15 @@ module Segment =
             | Error error, _
             | _, Error error -> Error error
 
-    let toLinesWith options segment =
+    let internal validateLinearizeOptions options =
         if options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidLinearizeTolerance options.Tolerance)
         elif options.MaxDepth <= 0 then Error(InvalidLinearizeMaxDepth options.MaxDepth)
-        else
+        else Ok()
+
+    let toLinesWith options segment =
+        validateLinearizeOptions options
+        |> Result.bind (fun () ->
             match segment with
             | Line _ -> Ok [ segment ]
             | QuadraticBezier _
@@ -1263,7 +1287,7 @@ module Segment =
             | Arc endpoint ->
                 match Ellipse.endpointToCenter endpoint with
                 | Error _ -> Ok [ Line(endpoint.Start, endpoint.End) ]
-                | Ok arc -> linearizeArc options 0 arc endpoint.Start endpoint.End
+                | Ok arc -> linearizeArc options 0 arc endpoint.Start endpoint.End)
 
     let toLines segment = toLinesWith defaultLinearizeOptions segment
 
@@ -1824,6 +1848,7 @@ module Subpath =
                     | WiggleThenBridge
                     | WiggleThenBridgeWith _ when distance <= (match policy with WiggleThenBridgeWith value -> value | _ -> defaultWiggleTolerance) ->
                         Ok [ Segment.withStart subpath.startPoint segment ]
+                    | Bridge when actual = subpath.startPoint -> Ok [ segment ]
                     | Bridge
                     | WiggleThenBridge
                     | WiggleThenBridgeWith _ -> Ok [ Line(subpath.startPoint, actual); segment ]
@@ -1845,15 +1870,17 @@ module Subpath =
     let joinWith policy subpaths =
         if subpaths |> List.exists isClosed then Error AlreadyClosed
         else
-            match subpaths with
-            | [] -> Error EmptySubpath
-            | first :: rest ->
-                rest
-                |> List.fold (fun state next ->
-                    state
-                    |> Result.bind (fun accumulated ->
-                        next.segmentList
-                        |> List.fold (fun appended segment -> appended |> Result.bind (appendWith policy segment)) (Ok accumulated))) (Ok first)
+            validatePolicy policy
+            |> Result.bind (fun _ ->
+                match subpaths with
+                | [] -> Error EmptySubpath
+                | first :: rest ->
+                    rest
+                    |> List.fold (fun state next ->
+                        state
+                        |> Result.bind (fun accumulated ->
+                            next.segmentList
+                            |> List.fold (fun appended segment -> appended |> Result.bind (appendWith policy segment)) (Ok accumulated))) (Ok first))
 
     let join subpaths = joinWith Strict subpaths
 
@@ -1892,7 +1919,7 @@ module Subpath =
 
     let parameterSnapToBoundary subpath parameter tolerance =
         if tolerance <= 0.0<parameter> || not (System.Double.IsFinite(float tolerance)) then
-            Error(InvalidIntersectionTolerance(LanguagePrimitives.FloatWithMeasure<length>(float tolerance)))
+            Error(InvalidParameterSnapTolerance tolerance)
         else
             parameterCanonicalize subpath parameter
             |> Result.bind (fun parameter ->
@@ -1925,7 +1952,8 @@ module Subpath =
         |> Result.bind (fun canonical -> Segment.secondDerivative subpath.segmentList[canonical.SegmentIndex] canonical.T)
 
     let directionsWith subpath parameterValue options =
-        parameterCanonicalize subpath parameterValue
+        Segment.validateDirectionOptions options
+        |> Result.bind (fun () -> parameterCanonicalize subpath parameterValue)
         |> Result.bind (fun canonical ->
             let count = List.length subpath.segmentList
             let rec seek index step remaining incoming =
@@ -2101,11 +2129,13 @@ module Subpath =
     let distance subpath sample = distanceWith subpath sample Segment.defaultDistanceOptions
 
     let lengthWith subpath (options: LengthOptions) =
-        subpath.segmentList
-        |> List.fold (fun state segment ->
-            state
-            |> Result.bind (fun total ->
-                Segment.lengthWith segment options |> Result.map (fun value -> total + value))) (Ok 0.0<length>)
+        Segment.validateLengthOptions options
+        |> Result.bind (fun () ->
+            subpath.segmentList
+            |> List.fold (fun state segment ->
+                state
+                |> Result.bind (fun total ->
+                    Segment.lengthWith segment options |> Result.map (fun value -> total + value))) (Ok 0.0<length>))
 
     let length subpath = lengthWith subpath Segment.defaultLengthOptions
 
@@ -2113,7 +2143,7 @@ module Subpath =
         lengthWith subpath options
         |> Result.bind (fun total ->
             if List.isEmpty subpath.segmentList then Error EmptySubpath
-            elif not (System.Double.IsFinite(float distance)) || distance < 0.0<length> || distance > total then
+            elif distance < 0.0<length> || distance > total then
                 Error(InvalidLengthDistance(distance, total))
             else
                 let rec locate index remaining segments =
@@ -2182,11 +2212,13 @@ module Subpath =
         subdivideToMaxLengthWith subpath maxLength Segment.defaultLengthOptions
 
     let toLinesWith options subpath =
-        subpath.segmentList
-        |> List.fold (fun state segment ->
-            state
-            |> Result.bind (fun lines -> Segment.toLinesWith options segment |> Result.map (fun next -> lines @ next))) (Ok [])
-        |> Result.map (fun segments -> { subpath with segmentList = segments })
+        Segment.validateLinearizeOptions options
+        |> Result.bind (fun () ->
+            subpath.segmentList
+            |> List.fold (fun state segment ->
+                state
+                |> Result.bind (fun lines -> Segment.toLinesWith options segment |> Result.map (fun next -> lines @ next))) (Ok [])
+            |> Result.map (fun segments -> { subpath with segmentList = segments }))
 
     let toLines subpath = toLinesWith Segment.defaultLinearizeOptions subpath
 
@@ -2295,11 +2327,13 @@ module Path =
     let directions path parameterValue = directionsWith path parameterValue Segment.defaultDirectionOptions
 
     let lengthWith path (options: LengthOptions) =
-        path.subpathList
-        |> List.fold (fun state subpath ->
-            state
-            |> Result.bind (fun total ->
-                Subpath.lengthWith subpath options |> Result.map (fun value -> total + value))) (Ok 0.0<length>)
+        Segment.validateLengthOptions options
+        |> Result.bind (fun () ->
+            path.subpathList
+            |> List.fold (fun state subpath ->
+                state
+                |> Result.bind (fun total ->
+                    Subpath.lengthWith subpath options |> Result.map (fun value -> total + value))) (Ok 0.0<length>))
 
     let length path = lengthWith path Segment.defaultLengthOptions
 
@@ -2307,7 +2341,7 @@ module Path =
         lengthWith path options
         |> Result.bind (fun total ->
             if List.isEmpty path.subpathList then Error EmptyPath
-            elif not (System.Double.IsFinite(float distance)) || distance < 0.0<length> || distance > total then
+            elif distance < 0.0<length> || distance > total then
                 Error(InvalidLengthDistance(distance, total))
             else
                 let nonempty =
@@ -2404,10 +2438,12 @@ module Path =
             |> Result.bind (function Some box -> Ok box | None -> Error EmptySubpaths)
 
     let toLinesWith options path =
-        path.subpathList
-        |> List.fold (fun state subpath ->
-            state
-            |> Result.bind (fun subpaths -> Subpath.toLinesWith options subpath |> Result.map (fun next -> next :: subpaths))) (Ok [])
-        |> Result.map (fun subpaths -> { subpathList = List.rev subpaths })
+        Segment.validateLinearizeOptions options
+        |> Result.bind (fun () ->
+            path.subpathList
+            |> List.fold (fun state subpath ->
+                state
+                |> Result.bind (fun subpaths -> Subpath.toLinesWith options subpath |> Result.map (fun next -> next :: subpaths))) (Ok [])
+            |> Result.map (fun subpaths -> { subpathList = List.rev subpaths }))
 
     let toLines path = toLinesWith Segment.defaultLinearizeOptions path

@@ -191,6 +191,19 @@ module ArrangementTests =
             Assert.Equal(2, contours.Length)
             Assert.All(contours, fun contour -> Assert.True(contour.Closed))
 
+    [<Fact>]
+    let ``nested contours preserve coincident positive winding layers`` () =
+        let contour = rectangle 0.0 0.0 10.0 10.0
+        let path = Path.ofSubpaths [ contour; contour ]
+        match Arrangement.build [ path ] 1.0e-6<length> 1.0e-5<length>
+              |> Result.bind (fun build -> Arrangement.nestedContoursFromGraph build.Graph path 1.0e-6<length>) with
+        | Error error -> failwithf "%A" error
+        | Ok contours ->
+            Assert.Equal(2, contours.Length)
+            Assert.All(contours, fun result ->
+                Assert.True(result.Closed)
+                Assert.Equal(4, result.Segments.Length))
+
     let private drawingEdge segment =
         { Id = 0
           Segment = segment

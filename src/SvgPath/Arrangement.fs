@@ -28,9 +28,9 @@ type ArrangementGraph =
       CyclicOrders: (int * OrientedArrangementEdge list list) list }
 
 [<Struct>]
-type EdgeCapacityAssignment = { EdgeId: int; Capacity: int }
+type internal EdgeCapacityAssignment = { EdgeId: int; Capacity: int }
 
-type VertexParityRequest =
+type internal VertexParityRequest =
     | RequiredVertexParity of vertex: int * parity: int
     | PreferredVertexParity of vertex: int * parity: int
 
@@ -124,7 +124,7 @@ type ArrangementError =
 
 [<RequireQualifiedAccess>]
 module Arrangement =
-    let empty = { Vertices = []; Edges = []; CyclicOrders = [] }
+    let internal empty = { Vertices = []; Edges = []; CyclicOrders = [] }
 
     let private requestData = function
         | RequiredVertexParity(vertex, parity) -> vertex, parity, false
@@ -160,7 +160,7 @@ module Arrangement =
             | assignment :: rest -> loop (Set.add assignment.EdgeId seen) rest
         loop Set.empty assignments
 
-    let forcedParityCapacitiesWith (graph: ArrangementGraph) (initialCapacities: EdgeCapacityAssignment list) vertexParities =
+    let internal forcedParityCapacitiesWith (graph: ArrangementGraph) (initialCapacities: EdgeCapacityAssignment list) vertexParities =
         validateParityRequests graph vertexParities
         |> Result.bind (fun () -> validateCapacities graph initialCapacities)
         |> Result.bind (fun () ->
@@ -207,7 +207,7 @@ module Arrangement =
                     | None -> Error(ForcedParityAmbiguous(mismatched |> List.map (fun (vertex, _, _, _, _) -> vertex)))
             reduce initialCapacities)
 
-    let forcedParityCapacities (graph: ArrangementGraph) vertexParities =
+    let internal forcedParityCapacities (graph: ArrangementGraph) vertexParities =
         graph.Edges
         |> List.map (fun (edge: ArrangementEdge) ->
             { EdgeId = edge.Id
@@ -234,7 +234,7 @@ module Arrangement =
             let id = vertices |> List.fold (fun maximum vertex -> max maximum vertex.Id) -1 |> (+) 1
             vertices @ [ { Id = id; Point = point; EndpointSamples = [ point ] } ], id
 
-    let insertAtomicSegment (graph: ArrangementGraph) segment tolerance minimumChord =
+    let internal insertAtomicSegment (graph: ArrangementGraph) segment tolerance minimumChord =
         if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
         elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InvalidMinimumChord minimumChord)
         elif Segment.chordLength segment < minimumChord then Error(SegmentTooShort(Segment.chordLength segment, minimumChord))
@@ -263,8 +263,8 @@ module Arrangement =
                 | _ -> Ok { Vertices = vertices; Edges = edges; CyclicOrders = [] }
 
     let validate (graph: ArrangementGraph) tolerance minimumChord =
-        if tolerance <= 0.0<length> then Error(InvalidArrangementTolerance tolerance)
-        elif minimumChord <= 0.0<length> then Error(InvalidMinimumChord minimumChord)
+        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
+        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InvalidMinimumChord minimumChord)
         else
             let vertex id = graph.Vertices |> List.tryFind (fun item -> item.Id = id)
             let edgeError =
@@ -383,9 +383,9 @@ module Arrangement =
                         |> List.sumBy (fun samples -> if clockwisePrecedes (angle samples candidate) (angle samples other) then 1 else 0))
                 -score, candidate.EdgeId, candidate.Reversed))
 
-    let vertexCyclicOrderWith (graph: ArrangementGraph) vertexId tolerance maxAttempts =
-        if maxAttempts <= 0 then Error(InvalidCyclicOrderAttempts maxAttempts)
-        elif tolerance <= 0.0<length> || not (System.Double.IsFinite(float tolerance)) then Error(InvalidArrangementTolerance tolerance)
+    let internal vertexCyclicOrderWith (graph: ArrangementGraph) vertexId tolerance maxAttempts =
+        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
+        elif maxAttempts <= 0 then Error(InvalidCyclicOrderAttempts maxAttempts)
         else
             match graph.Vertices |> List.tryFind (fun vertex -> vertex.Id = vertexId) with
             | None -> Error(CyclicOrderMissingVertex vertexId)
@@ -423,9 +423,9 @@ module Arrangement =
 
     /// Compute clockwise SVG-space incident-edge orders by sampling each edge
     /// on common shrinking circles around its vertex.
-    let cyclicOrdersWith (graph: ArrangementGraph) tolerance maxAttempts =
-        if maxAttempts <= 0 then Error(InvalidCyclicOrderAttempts maxAttempts)
-        elif tolerance <= 0.0<length> then Error(InvalidArrangementTolerance tolerance)
+    let internal cyclicOrdersWith (graph: ArrangementGraph) tolerance maxAttempts =
+        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
+        elif maxAttempts <= 0 then Error(InvalidCyclicOrderAttempts maxAttempts)
         else
             graph.Vertices
             |> List.fold (fun state vertex ->
@@ -434,7 +434,7 @@ module Arrangement =
                     vertexCyclicOrderWith graph vertex.Id tolerance maxAttempts
                     |> Result.map (fun groups -> orders @ [ vertex.Id, groups ]))) (Ok [])
 
-    let cyclicOrders graph tolerance = cyclicOrdersWith graph tolerance 3
+    let private cyclicOrders graph tolerance = cyclicOrdersWith graph tolerance 3
 
     type private IndexedSegment =
         { FlatIndex: int
@@ -529,6 +529,13 @@ module Arrangement =
                     if distance <= tolerance && t > 0.0<parameter> && t < 1.0<parameter> then Some t else None)
 
     let private distinctParameters segment tolerance parameters =
+        let taxicabDiameter segment =
+            match segment with
+            | Arc endpoint when endpoint.Start = endpoint.End -> Ok 0.0<length>
+            | _ ->
+                Segment.boundingBox segment
+                |> Result.mapError ArrangementSegmentError
+                |> Result.map BoundingBox.diameter
         let rec loop distinct = function
             | [] -> Ok(List.rev distinct)
             | first :: rest ->
@@ -538,8 +545,7 @@ module Arrangement =
                     Segment.between segment previous first
                     |> Result.mapError ArrangementSegmentError
                     |> Result.bind (fun between ->
-                        Segment.length between
-                        |> Result.mapError ArrangementSegmentError
+                        taxicabDiameter between
                         |> Result.bind (fun motion ->
                             loop (if motion <= tolerance then distinct else first :: distinct) rest))
         loop [] parameters
@@ -1018,7 +1024,7 @@ module Arrangement =
         |> Result.bind (fun () -> certifySegmentImageGeometry graph segments segmentImages tolerance)
 
     /// Build directly from a flat segment list without source normalization.
-    let buildWith segments vertexTolerance minimumChord (endpointSliverTolerance: float<parameter>) =
+    let internal buildWith segments vertexTolerance minimumChord (endpointSliverTolerance: float<parameter>) =
         if vertexTolerance <= 0.0<length> || not (finite vertexTolerance) then Error(InvalidArrangementTolerance vertexTolerance)
         elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InvalidMinimumChord minimumChord)
         elif endpointSliverTolerance < 0.0<parameter> || System.Double.IsNaN(float endpointSliverTolerance) || System.Double.IsInfinity(float endpointSliverTolerance) then
@@ -1059,7 +1065,7 @@ module Arrangement =
                       Edges = image.Edges |> List.map (fun edge -> { EdgeId = edge.EdgeId; Reversed = edge.Reversed }) })
             { Graph = built.Graph; SegmentImages = images })
 
-    let segmentImageEdges build image =
+    let segmentImageEdges (build: ArrangementGraphBuild) (image: ArrangementSegmentImage) =
         image.Edges
         |> List.fold (fun state reference ->
             state
@@ -1295,32 +1301,31 @@ module Arrangement =
                 |> Result.mapError ArrangementSegmentError
                 |> Result.map (fun (left, right) -> classified @ [ edge, left, right ]))) (Ok [])
         |> Result.map (fun classified ->
-            let maximumLayer =
-                classified
-                |> List.collect (fun (_, left, right) -> [ abs left; abs right ])
-                |> List.fold max 0
-            [ for magnitude in 1 .. maximumLayer do
-                for sign in [ 1; -1 ] do
-                    let layer = sign * magnitude
-                    for edge, left, right in classified do
+            classified
+            |> List.collect (fun (edge, left, right) ->
+                let maximumLayer = max (abs left) (abs right)
+                [ for magnitude in 1 .. maximumLayer do
+                    for sign in [ 1; -1 ] do
+                        let layer = sign * magnitude
                         let leftActive, rightActive =
                             if layer > 0 then left >= layer, right >= layer
                             else left <= layer, right <= layer
                         if leftActive <> rightActive then
                             if leftActive then
                                 yield
-                                    { Id = edge.Id
+                                    { Id = 0
                                       Layer = layer
                                       Segment = edge.Segment
                                       StartVertex = edge.StartVertex
                                       EndVertex = edge.EndVertex }
                             else
                                 yield
-                                    { Id = edge.Id
+                                    { Id = 0
                                       Layer = layer
                                       Segment = Segment.reverse edge.Segment
                                       StartVertex = edge.EndVertex
                                       EndVertex = edge.StartVertex } ])
+            |> List.mapi (fun id edge -> { edge with Id = id }))
 
     let private nestedContourSuccessors (edges: NestedContourEdge list) =
         let ray edge starts =
@@ -1391,7 +1396,7 @@ module Arrangement =
 
     /// Reconstruct every nonzero winding layer represented by an arrangement graph.
     /// A region of winding magnitude n contributes n nested closed contours.
-    let nestedContoursFromGraph
+    let internal nestedContoursFromGraph
         (graph: ArrangementGraph)
         (path: Path)
         (tolerance: float<length>) =

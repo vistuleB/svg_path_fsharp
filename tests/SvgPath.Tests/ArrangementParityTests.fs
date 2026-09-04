@@ -476,6 +476,11 @@ let ``build_with_rejects_negative_endpoint_sliver_tolerance_test`` () =
 let ``validation_rejects_invalid_numeric_options_test`` () =
     Assert.Equal(Error(InvalidArrangementTolerance 0.0<length>), Arrangement.validate Arrangement.empty 0.0<length> minimumChord)
     Assert.Equal(Error(InvalidMinimumChord 0.0<length>), Arrangement.validate Arrangement.empty tolerance 0.0<length>)
+    let infinite = LanguagePrimitives.FloatWithMeasure<length> System.Double.PositiveInfinity
+    Assert.Equal(Error(InvalidArrangementTolerance infinite), Arrangement.validate Arrangement.empty infinite minimumChord)
+    Assert.Equal(Error(InvalidMinimumChord infinite), Arrangement.validate Arrangement.empty tolerance infinite)
+    Assert.Equal(Error(InvalidArrangementTolerance infinite), Arrangement.cyclicOrdersWith Arrangement.empty infinite 3)
+    Assert.Equal(Error(InvalidArrangementTolerance 0.0<length>), Arrangement.cyclicOrdersWith Arrangement.empty 0.0<length> 0)
 
 [<Fact>]
 let ``validation_rejects_vertex_sample_outside_official_tolerance_test`` () =

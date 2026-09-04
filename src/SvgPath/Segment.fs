@@ -1729,22 +1729,21 @@ module Subpath =
                   isClosed = subpath.isClosed }))
 
     let byPointPairSimilarity subpath sourceStart sourceEnd targetStart targetEnd =
-        subpath.segmentList
-        |> List.fold (fun state segment ->
-            state
-            |> Result.bind (fun mapped ->
-                Segment.byPointPairSimilarity segment sourceStart sourceEnd targetStart targetEnd
-                |> Result.map (fun next -> next :: mapped))) (Ok [])
-        |> Result.map (fun reversed ->
-            let segments = List.rev reversed
-            let startPoint =
-                if subpath.startPoint = sourceStart then targetStart
-                elif subpath.startPoint = sourceEnd then targetEnd
-                else
-                    match Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd with
-                    | Ok transform -> Affine.point transform subpath.startPoint
-                    | Error _ -> targetStart
-            { startPoint = startPoint; segmentList = segments; isClosed = subpath.isClosed })
+        Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd
+        |> Result.mapError (fun _ -> DegeneratePointPairSimilarity)
+        |> Result.bind (fun transform ->
+            subpath.segmentList
+            |> List.fold (fun state segment ->
+                state
+                |> Result.bind (fun mapped ->
+                    Segment.byPointPairSimilarity segment sourceStart sourceEnd targetStart targetEnd
+                    |> Result.map (fun next -> next :: mapped))) (Ok [])
+            |> Result.map (fun reversed ->
+                let startPoint =
+                    if subpath.startPoint = sourceStart then targetStart
+                    elif subpath.startPoint = sourceEnd then targetEnd
+                    else Affine.point transform subpath.startPoint
+                { startPoint = startPoint; segmentList = List.rev reversed; isClosed = subpath.isClosed }))
 
     let remapEndpoints subpath newStart newEnd =
         match subpath.segmentList with
@@ -2237,13 +2236,16 @@ module Path =
         |> Result.map (fun reversed -> { subpathList = List.rev reversed })
 
     let byPointPairSimilarity path sourceStart sourceEnd targetStart targetEnd =
-        path.subpathList
-        |> List.fold (fun state subpath ->
-            state
-            |> Result.bind (fun mapped ->
-                Subpath.byPointPairSimilarity subpath sourceStart sourceEnd targetStart targetEnd
-                |> Result.map (fun next -> next :: mapped))) (Ok [])
-        |> Result.map (fun reversed -> { subpathList = List.rev reversed })
+        Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd
+        |> Result.mapError (fun _ -> DegeneratePointPairSimilarity)
+        |> Result.bind (fun _ ->
+            path.subpathList
+            |> List.fold (fun state subpath ->
+                state
+                |> Result.bind (fun mapped ->
+                    Subpath.byPointPairSimilarity subpath sourceStart sourceEnd targetStart targetEnd
+                    |> Result.map (fun next -> next :: mapped))) (Ok [])
+            |> Result.map (fun reversed -> { subpathList = List.rev reversed }))
 
     let arcsToCubicBeziers path =
         { subpathList = path.subpathList |> List.map Subpath.arcsToCubicBeziers }

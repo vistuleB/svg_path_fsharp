@@ -187,6 +187,28 @@ module ConvexHull =
             (lower |> List.take (List.length lower - 1))
             @ (upper |> List.take (List.length upper - 1))
 
+    let private loopEnclosure segments =
+        let fallback () =
+            segments
+            |> List.collect (fun segment -> [ Segment.start segment; Segment.finish segment ])
+            |> hullVertices
+        segments
+        |> List.map Segment.boundingBox
+        |> List.fold
+            (fun state next ->
+                state
+                |> Result.bind (fun boxes -> next |> Result.map (fun bounds -> bounds :: boxes)))
+            (Ok [])
+        |> function
+            | Error _ -> fallback ()
+            | Ok [] -> []
+            | Ok boxes ->
+                let bounds = boxes |> List.reduce BoundingBox.union
+                [ bounds.Min
+                  Point.create bounds.Max.X bounds.Min.Y
+                  bounds.Max
+                  Point.create bounds.Min.X bounds.Max.Y ]
+
     let private segmentIsPointLike segment =
         match Segment.boundingBox segment with
         | Error _ -> true
@@ -588,19 +610,8 @@ module ConvexHull =
             bContainsA && difference <= loopUnionTieTolerance) (true, true)
 
     let private unionLoopSegments left right =
-        let enclosure segments =
-            match segments |> List.map Segment.boundingBox |> List.fold (fun state next ->
-                state |> Result.bind (fun boxes -> next |> Result.map (fun bounds -> bounds :: boxes))) (Ok []) with
-            | Error _ -> segments |> List.collect (fun segment -> [ Segment.start segment; Segment.finish segment ]) |> hullVertices
-            | Ok [] -> []
-            | Ok boxes ->
-                let bounds = boxes |> List.reduce BoundingBox.union
-                [ bounds.Min
-                  Point.create bounds.Max.X bounds.Min.Y
-                  bounds.Max
-                  Point.create bounds.Min.X bounds.Max.Y ]
-        let loopA = { Segments = left; Enclosure = enclosure left }
-        let loopB = { Segments = right; Enclosure = enclosure right }
+        let loopA = { Segments = left; Enclosure = loopEnclosure left }
+        let loopB = { Segments = right; Enclosure = loopEnclosure right }
         match loopUnion loopA loopB [] |> unionPieceSegments loopA loopB with
         | [] ->
             match loopSupportDominance loopA loopB with
@@ -721,34 +732,16 @@ module ConvexHull =
         Ok(normalizeAngle refined.Direction, normalizeAngle refined.Direction)
 
     let internalFindSeededWorstDirection loopASegments loopBSegments direction threshold =
-        let enclosure segments =
-            segments
-            |> List.map Segment.boundingBox
-            |> List.choose Result.toOption
-            |> function
-                | [] -> []
-                | boxes ->
-                    let bounds = List.reduce BoundingBox.union boxes
-                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
-        let loopA = { Segments = loopASegments; Enclosure = enclosure loopASegments }
-        let loopB = { Segments = loopBSegments; Enclosure = enclosure loopBSegments }
+        let loopA = { Segments = loopASegments; Enclosure = loopEnclosure loopASegments }
+        let loopB = { Segments = loopBSegments; Enclosure = loopEnclosure loopBSegments }
         findSeededWorstDirection loopA loopB direction threshold
 
     let internalLoopInitialSampleAngles sampleCount seedAngles =
         loopInitialSampleAngles sampleCount seedAngles
 
     let internalLoopUnionSegmentsWithSeedAngles loopASegments loopBSegments seedAngles =
-        let enclosure segments =
-            segments
-            |> List.map Segment.boundingBox
-            |> List.choose Result.toOption
-            |> function
-                | [] -> []
-                | boxes ->
-                    let bounds = List.reduce BoundingBox.union boxes
-                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
-        let loopA = { Segments = loopASegments; Enclosure = enclosure loopASegments }
-        let loopB = { Segments = loopBSegments; Enclosure = enclosure loopBSegments }
+        let loopA = { Segments = loopASegments; Enclosure = loopEnclosure loopASegments }
+        let loopB = { Segments = loopBSegments; Enclosure = loopEnclosure loopBSegments }
         loopUnion loopA loopB seedAngles |> unionPieceSegments loopA loopB
 
     let private loopEndpoints loop =
@@ -782,31 +775,13 @@ module ConvexHull =
                 | segments -> { current with Segments = segments })
 
     let internalAmbitiousRepairLoopWithLoop currentSegments additionSegments =
-        let enclosure segments =
-            segments
-            |> List.map Segment.boundingBox
-            |> List.choose Result.toOption
-            |> function
-                | [] -> []
-                | boxes ->
-                    let bounds = List.reduce BoundingBox.union boxes
-                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
         ambitiousRepairLoopWithLoop
-            { Segments = currentSegments; Enclosure = enclosure currentSegments }
-            { Segments = additionSegments; Enclosure = enclosure additionSegments }
+            { Segments = currentSegments; Enclosure = loopEnclosure currentSegments }
+            { Segments = additionSegments; Enclosure = loopEnclosure additionSegments }
         |> Result.map _.Segments
 
     let internalPointChordPolygonLoopSeparation segments point =
-        let enclosure =
-            segments
-            |> List.map Segment.boundingBox
-            |> List.choose Result.toOption
-            |> function
-                | [] -> []
-                | boxes ->
-                    let bounds = List.reduce BoundingBox.union boxes
-                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
-        pointChordPolygonLoopSeparation { Segments = segments; Enclosure = enclosure } point
+        pointChordPolygonLoopSeparation { Segments = segments; Enclosure = loopEnclosure segments } point
 
     let internalPointLoopView point atPoint arriving leaving clockwise =
         let sight = Point.displacement point atPoint
@@ -1307,13 +1282,10 @@ module ConvexHull =
             state
             |> Result.bind (fun loops -> next |> Result.map (fun subpath -> subpath.Segments :: loops))) (Ok [])
         |> Result.bind (fun reversedLoops ->
-            let enclosure segments =
-                match segments |> List.map Segment.boundingBox |> List.choose Result.toOption with
-                | [] -> []
-                | boxes ->
-                    let bounds = boxes |> List.reduce BoundingBox.union
-                    [ bounds.Min; Point.create bounds.Max.X bounds.Min.Y; bounds.Max; Point.create bounds.Min.X bounds.Max.Y ]
-            let loops = List.rev reversedLoops |> List.map (fun segments -> { Segments = segments; Enclosure = enclosure segments }) |> prefilterLoops
+            let loops =
+                List.rev reversedLoops
+                |> List.map (fun segments -> { Segments = segments; Enclosure = loopEnclosure segments })
+                |> prefilterLoops
             match loops with
             | [] -> Error LoopUnionCollapsed
             | first :: rest ->
@@ -1322,7 +1294,7 @@ module ConvexHull =
                     state
                     |> Result.bind (fun current ->
                         unionLoopSegments current.Segments addition.Segments
-                        |> Result.map (fun union -> { Segments = union; Enclosure = enclosure union }))) (Ok first)
+                        |> Result.map (fun union -> { Segments = union; Enclosure = loopEnclosure union }))) (Ok first)
                 |> Result.bind (fun union -> finalRepairLoop union loops repairMode))
         |> Result.bind (fun loop -> buildClosedSubpath loop.Segments)
 
@@ -1678,7 +1650,7 @@ module ConvexHull =
             |> Result.mapError ConvexHullPathError
             |> Result.map (fun boxes ->
                 let box = boxes |> List.reduce BoundingBox.union
-                let bound = BoundingBox.diameter box
+                let bound = Point.distance box.Min box.Max
                 adaptiveDirectionalExtremum findMinimum (segmentsExtent segments) bound options)
 
     let private lineOnlyExtremum findMinimum segments =
@@ -1725,7 +1697,7 @@ module ConvexHull =
             Subpath.boundingBox hull
             |> Result.mapError ConvexHullPathError
             |> Result.map (fun bounds ->
-                minimumWidthDecision (segmentsExtent segments) (BoundingBox.diameter bounds) tolerance 20)
+                minimumWidthDecision (segmentsExtent segments) (Point.distance bounds.Min bounds.Max) tolerance 20)
 
     let internalConvexSubpathAddSegmentAndTestWidth (hull: Subpath) segment tolerance =
         constructSegmentHullInternal segment

@@ -61,6 +61,19 @@ let ``path point pair similarity maps arcs`` () =
         Assert.True(arc.Sweep)
     | segment -> failwithf "expected arc, got %A" segment
 
+[<Fact>]
+let ``point pair similarity rejects a degenerate source pair for empty containers`` () =
+    let source = point 1.0 2.0
+    let targetStart, targetEnd = point 10.0 20.0, point 30.0 40.0
+    let emptySubpath = Subpath.empty source
+    let emptyPath = Path.ofSubpaths []
+    Assert.Equal(
+        Error DegeneratePointPairSimilarity,
+        Subpath.byPointPairSimilarity emptySubpath source source targetStart targetEnd)
+    Assert.Equal(
+        Error DegeneratePointPairSimilarity,
+        Path.byPointPairSimilarity emptyPath source source targetStart targetEnd)
+
 let private assertPointNear (expected: Point<'u>) (actual: Point<'u>) =
     Assert.True(Point.distance expected actual < LanguagePrimitives.FloatWithMeasure<'u> 1.0e-6, $"expected {expected}, got {actual}")
 

@@ -320,39 +320,26 @@ module Arrangement =
     let private circleSample (graph: ArrangementGraph) (vertex: Point<length>) vertexId (radius: float<length>) tolerance (oriented: OrientedArrangementEdge) =
         orientedSegment graph oriented
         |> Result.bind (fun segment ->
-            let residual (t: float<parameter>) =
-                Segment.point segment t
-                |> Result.mapError ArrangementSegmentError
-                |> Result.map (fun point -> Point.squaredDistance point vertex - radius * radius)
-            let samples = 256
-            let rec bracket index (previousT: float<parameter>) previousValue =
-                if index > samples then None
-                else
-                    let t = Parameter.fromFloat (float index / float samples)
-                    match residual t with
-                    | Error _ -> None
-                    | Ok value when value >= 0.0<length^2> -> Some(previousT, t)
-                    | Ok value -> bracket (index + 1) t value
-            match residual 0.0<parameter> with
-            | Error error -> Error error
-            | Ok initial ->
-                match bracket 1 0.0<parameter> initial with
+            // `Segment.crossingsWith` is length-valued in F#, so use radial
+            // distance instead of Gleam's equivalent squared-distance residual.
+            // The roots are identical and the tolerance remains a radial error.
+            Segment.crossingsWith
+                segment
+                (fun point -> Point.distance point vertex - radius)
+                { Samples = 100
+                  SignedLineDistanceTolerance = tolerance
+                  MaxIterations = 100 }
+            |> Result.mapError ArrangementSegmentError
+            |> Result.bind (fun roots ->
+                match roots |> List.tryFind (fun t -> t > 0.0<parameter> && t <= 1.0<parameter>) with
                 | None -> Error(CyclicOrderCircleIntersectionFailed(vertexId, oriented.EdgeId, radius))
-                | Some(lower, upper) ->
-                    let rec bisect (lower: float<parameter>) (upper: float<parameter>) remaining =
-                        if remaining = 0 then upper
-                        else
-                            let middle = Parameter.fromFloat ((Parameter.ratio lower + Parameter.ratio upper) / 2.0)
-                            match residual middle with
-                            | Ok value when value >= 0.0<length^2> -> bisect lower middle (remaining - 1)
-                            | _ -> bisect middle upper (remaining - 1)
-                    let t = bisect lower upper 48
+                | Some t ->
                     Segment.point segment t
                     |> Result.mapError ArrangementSegmentError
                     |> Result.map (fun point ->
                         { OrientedEdge = oriented
                           Point = point
-                          Angle = Point.heading (Point.displacement vertex point) }))
+                          Angle = Point.heading (Point.displacement vertex point) })))
 
     let private separated tolerance (first: CyclicSample) (second: CyclicSample) =
         let rawAngle = abs (Degree.toFloat second.Angle - Degree.toFloat first.Angle)

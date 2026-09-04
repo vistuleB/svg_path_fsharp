@@ -797,15 +797,8 @@ module Offset =
         | Error _ -> false
 
     let private remapSegmentEndpoints segment targetStart targetEnd =
-        match segment with
-        | Line _ -> Line(targetStart, targetEnd)
-        | _ ->
-            match Affine.pointPairSimilarity (Segment.start segment) (Segment.finish segment) targetStart targetEnd with
-            | Ok transform ->
-                match Transform.segment segment transform with
-                | Ok transformed -> transformed |> Segment.withStart targetStart |> Segment.withFinish targetEnd
-                | Error _ -> Line(targetStart, targetEnd)
-            | Error _ -> Line(targetStart, targetEnd)
+        Segment.remapEndpoints segment targetStart targetEnd
+        |> Result.defaultValue (Line(targetStart, targetEnd))
 
     let private stretchSegmentStart segment targetStart =
         remapSegmentEndpoints segment targetStart (Segment.finish segment)

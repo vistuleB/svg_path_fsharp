@@ -13,5 +13,8 @@
 TestResults/
 *.trx
 
+# Release packages
+artifacts/
+
 # OS metadata
 .DS_Store

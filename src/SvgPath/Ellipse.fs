@@ -153,7 +153,7 @@ module Ellipse =
         : Result<CenterArcData, EllipseError> =
         let rx = abs radius.X
         let ry = abs radius.Y
-        if rx <= lengthTolerance || ry <= lengthTolerance then
+        if rx <= lengthTolerance || ry <= lengthTolerance || startPoint = endPoint then
             Error DegenerateInputArc
         else
             let cosPhi = Trig.cosDegrees xAxisRotation

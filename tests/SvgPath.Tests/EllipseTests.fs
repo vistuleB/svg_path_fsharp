@@ -111,6 +111,18 @@ let ``zero radius endpoint arc is rejected`` () =
     Assert.Equal(Error DegenerateInputArc, Ellipse.endpointToCenter endpoint)
 
 [<Fact>]
+let ``coincident endpoint arc is rejected`` () =
+    let sample = point 3.0 4.0
+    let endpoint =
+        { Start = sample
+          Radius = point 10.0 20.0
+          XAxisRotation = degrees 30.0
+          LargeArc = true
+          Sweep = false
+          End = sample }
+    Assert.Equal(Error DegenerateInputArc, Ellipse.endpointToCenter endpoint)
+
+[<Fact>]
 let ``split arc divides center data at t`` () =
     let left, right = Ellipse.splitArc quarterEllipse (parameter 0.25)
     Assert.Equal(degrees 22.5, left.DeltaAngle)

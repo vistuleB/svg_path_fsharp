@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Oriented Boolean boundary output so outer contours are traced clockwise with
+  filled space on the right of each directed boundary edge for `union`,
+  `intersection`, `difference`, and `symmetricDifference`.
+- Collapsed corner-pinch unions (two filled regions meeting at exactly one
+  point, such as squares touching at a corner) into a single self-touching loop
+  instead of two degenerate loops, following the same filled-sector pairing.
+- Added corner-pinch union regression tests covering reversed operand
+  orientations, the opposite touch diagonal, and both combined.
+
 ## 0.3.0
 
 - Hardened endpoint reconciliation across degeneracy, convex-hull, and offset

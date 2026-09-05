@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Port the complete project README with generated API figures.
+- Add the slow convex-hull stress suite as an isolated test profile
+  (`scripts/test-slow`), with `scripts/test-release` as the canonical
+  pre-release verification (fast then slow profiles).
+- Document the release and asset-tag workflow (`RELEASING.md`,
+  `COMMIT_CYCLE.md`).
+
 ## 0.1.0
 
 - Port the complete `svg_path` geometry implementation to F#.

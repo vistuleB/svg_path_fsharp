@@ -876,7 +876,7 @@ and [stroke line caps](https://www.w3.org/TR/SVG2/painting.html#LineCaps).
 There is a similar difference between `M 0,0` and `M 0,0 Z`, with the `Z`
 command supplying a zero-length line segment to the subpath:
 
-![Zero-length closepath behavior](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/zero_length_closepath_probe.svg)
+![Zero-length closepath behavior](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/zero_length_closepath_probe.svg)
 
 ```xml
 <path d="M 90,50" style="fill:none;stroke:blue;stroke-width:24;stroke-linecap:round;" />
@@ -1131,13 +1131,13 @@ The final stage is selected independently:
 The following open source has no offside stage, so the panels isolate the three
 final-trimming choices:
 
-![Single offset with no final trimming, cusp trimming, and in-band trimming](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/single_offset_final_trimming.svg)
+![Single offset with no final trimming, cusp trimming, and in-band trimming](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/single_offset_final_trimming.svg)
 
 For closed contours, `Offside` is an additional and independent operation. In
 this example the source contains oppositely oriented concentric rectangles; the
 final trimming mode is `NoTrimming` in both panels:
 
-![Single offset of concentric rectangles with offside trimming disabled and enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/single_offset_offside_trimming.svg)
+![Single offset of concentric rectangles with offside trimming disabled and enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/single_offset_offside_trimming.svg)
 
 The defaults are `Offside = true` and `FinalTrimming = InBandTrimming`.
 Adjacent reversed/non-reversed loops created locally during offset assembly are
@@ -1180,12 +1180,12 @@ let options =
 The cusp switches act before joint band trimming. The four-concave-corner
 example below holds `InBand = true` while changing the two side-local switches:
 
-![Band trimming with both, one, and neither side-local cusp pass enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/band_cusp_trimming.svg)
+![Band trimming with both, one, and neither side-local cusp pass enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/band_cusp_trimming.svg)
 
 The figure-eight below holds both cusp switches at `true` and changes only the
 final joint pass:
 
-![Figure-eight band with in-band trimming disabled and enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/band_in_band_trimming.svg)
+![Figure-eight band with in-band trimming disabled and enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/band_in_band_trimming.svg)
 
 All three band switches default to `true`. Turning a stage off is useful for
 inspection and for specialized callers that want to preserve intermediate
@@ -1234,7 +1234,7 @@ are split into atomic edges. The left panel uses one color per source subpath;
 the right panel shows the resulting vertices, directed edges, winding levels,
 and directional multiplicities.
 
-![Two overlapping square subpaths and their arrangement graph](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/arrangement_graph_overlapping_squares.svg)
+![Two overlapping square subpaths and their arrangement graph](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/arrangement_graph_overlapping_squares.svg)
 
 ```fsharp
 Arrangement.build [ left; right ] 0.000001<length> 0.00001<length>
@@ -1260,7 +1260,7 @@ circle's subdivision is shifted by 45 degrees. The graph splits the common
 circle at all four source endpoints and represents each geometric edge once,
 with one occurrence in each direction.
 
-![Oppositely directed equal circles with phase-shifted arc subdivisions and their arrangement graph](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/arrangement_graph_semantic_circle_overlap.svg)
+![Oppositely directed equal circles with phase-shifted arc subdivisions and their arrangement graph](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/arrangement_graph_semantic_circle_overlap.svg)
 
 `Arrangement.build` is the supported constructor. Direct construction remains
 possible for inspection, serialization, and tests, but callers then assume
@@ -1321,14 +1321,14 @@ Under `Nonzero`, any nonzero winding level is filled. The arrangement panel's
 black numbers are the winding levels immediately to the left and right of each
 directed edge; its red numbers are forward and reverse source multiplicities.
 
-![Eight-panel ArrangementGraph CSG example using the Nonzero fill rule](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/arrangement_csg_nonzero.svg)
+![Eight-panel ArrangementGraph CSG example using the Nonzero fill rule](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/arrangement_csg_nonzero.svg)
 
 The same inputs and arrangement produce different Boolean boundaries under
 `EvenOdd`, where winding parity determines whether a sector is filled. The final
 `nestedContours` panel is unchanged because that unary operation preserves the
 complete signed winding field and does not take a fill rule.
 
-![Eight-panel ArrangementGraph CSG example using the EvenOdd fill rule](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/markdown-assets/figures/arrangement_csg_evenodd.svg)
+![Eight-panel ArrangementGraph CSG example using the EvenOdd fill rule](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v0.2.0/figures/arrangement_csg_evenodd.svg)
 
 For points away from a boundary:
 

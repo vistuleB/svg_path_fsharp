@@ -72,8 +72,8 @@ module Degeneracy =
                     Some(replacement, remaining)
         | _ -> None
 
-    let private makeSubpath tolerance segments =
-        Subpath.createWith (WiggleThenBridgeWith tolerance) segments
+    let private makeSubpath segments =
+        Subpath.createWith Strict segments
         |> Result.mapError DegeneracyPathError
 
     let private widthDecision hull tolerance =
@@ -96,7 +96,7 @@ module Degeneracy =
                     longestThinPrefixLoop tolerance (first :: accepted) candidateHull candidateStrip rest
                 | MinimumWidthExceeds _
                 | MinimumWidthUnresolved _ ->
-                    makeSubpath tolerance (List.rev (first :: accepted))
+                    makeSubpath (List.rev (first :: accepted))
                     |> Result.bind (fun candidate ->
                         ConvexHull.subpathHull candidate
                         |> Result.mapError DegeneracyConvexHullError
@@ -185,7 +185,7 @@ module Degeneracy =
             | Some(replacement, remaining) ->
                 normalizeSegments tolerance remaining (List.rev replacement @ converted)
             | None ->
-                makeSubpath tolerance segments
+                makeSubpath segments
                 |> Result.bind (fun pending -> internalLongestThinPrefix pending tolerance)
                 |> Result.bind (fun prefix ->
                     match prefix.Segments with
@@ -211,11 +211,11 @@ module Degeneracy =
                     match segments with
                     | [] -> Ok(Subpath.empty subpath.Start)
                     | _ ->
-                        Subpath.createWith (WiggleThenBridgeWith tolerance) segments
+                        Subpath.createWith Strict segments
                         |> Result.mapError DegeneracyPathError
                 openResult
                 |> Result.bind (fun rebuilt ->
                     if not subpath.Closed then Ok rebuilt
                     else
-                        Subpath.setClosedWith (WiggleThenBridgeWith tolerance) true rebuilt
+                        Subpath.setClosedWith Strict true rebuilt
                         |> Result.mapError DegeneracyPathError))

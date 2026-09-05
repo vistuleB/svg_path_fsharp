@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1050" height="320" viewBox="0 0 1050 320">
+  <rect x="0" y="0" width="1050" height="320" fill="white"/>
+  <text x="175" y="30" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">No final trimming</text>
+  <g transform="translate(175 170) scale(90)">
+  <path d="M 0 -1 L -0.86603 -0.5 L 0.86603 0.5 V -0.5 L -0.86603 0.5 L 0 1" style="fill:none;stroke:#94a3b8;stroke-width:.055;stroke-linejoin:round"/>
+  </g>
+  <g transform="translate(175 170) scale(90)">
+  <path d="M 0.1 -0.82679 L -0.76603 -0.32679 A 0.2 0.2 0 0 0 -0.76603 -0.67321 L 0.96603 0.32679 A 0.2 0.2 0 0 0 0.66603 0.5 V -0.5 A 0.2 0.2 0 0 0 0.96603 -0.32679 L -0.76603 0.67321 A 0.2 0.2 0 0 0 -0.76603 0.32679 L 0.1 0.82679" style="fill:none;stroke:#2563eb;stroke-width:.04;stroke-linecap:round;stroke-linejoin:round"/>
+  </g>
+  <text x="525" y="30" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">Cusp trimming</text>
+  <g transform="translate(525 170) scale(90)">
+  <path d="M 0 -1 L -0.86603 -0.5 L 0.86603 0.5 V -0.5 L -0.86603 0.5 L 0 1" style="fill:none;stroke:#94a3b8;stroke-width:.055;stroke-linejoin:round"/>
+  </g>
+  <g transform="translate(525 170) scale(90)">
+  <path d="M 0.1 -0.82679 L -0.46603 -0.5 L 0.2 -0.11547 L 0.4 0 L 0.66603 0.15359 V -0.15359 L 0.4 0 L 0.2 0.11547 L -0.46603 0.5 L 0.1 0.82679" style="fill:none;stroke:#2563eb;stroke-width:.04;stroke-linecap:round;stroke-linejoin:round"/>
+  </g>
+  <text x="875" y="30" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">In-band trimming</text>
+  <g transform="translate(875 170) scale(90)">
+  <path d="M 0 -1 L -0.86603 -0.5 L 0.86603 0.5 V -0.5 L -0.86603 0.5 L 0 1" style="fill:none;stroke:#94a3b8;stroke-width:.055;stroke-linejoin:round"/>
+  </g>
+  <g transform="translate(875 170) scale(90)">
+  <path d="M 0.4 0 L 0.66603 -0.15359 V 0.15359 Z" style="fill:none;stroke:#2563eb;stroke-width:.04;stroke-linecap:round;stroke-linejoin:round"/>
+  </g>
+</svg>

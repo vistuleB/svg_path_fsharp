@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 420 320" width="420" height="320">
+  <rect x="-10" y="-10" width="420" height="320" style="fill:white" />
+  <path d="M 30 30 H 230" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="119" y="23" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="130" y="30.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 230 30 V 80" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="219" y="48" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="230" y="55.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 230 80 V 230" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="219" y="148" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="230" y="155.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 230 230 H 150" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="179" y="223" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="190" y="230.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 150 230 H 30" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="79" y="223" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="90" y="230.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 30 230 V 30" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="19" y="123" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="30" y="130.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 150 80 H 230" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="179" y="73" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="190" y="80.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 230 80 H 350" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="279" y="73" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="290" y="80.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 350 80 V 280" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="339" y="173" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="350" y="180.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 350 280 H 150" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="239" y="273" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="250" y="280.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 150 280 V 230" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="139" y="248" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="150" y="255.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 150 230 V 80" style="fill: none; stroke: #334155; stroke-width: 1.5" />
+  <rect x="139" y="148" width="22" height="14" style="fill: white; stroke: #94a3b8; stroke-width: 0.75" />
+  <text x="150" y="155.5" font-size="8" style="fill: #0f172a; font-family: monospace; text-anchor: middle; dominant-baseline: central">1/0</text>
+  <path d="M 26 26 H 34 V 34 H 26 Z M 26 26 L 34 34 M 26 34 L 34 26" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="38" y="34" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v0</text>
+  <path d="M 226 26 H 234 V 34 H 226 Z M 226 26 L 234 34 M 226 34 L 234 26" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="238" y="34" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v1</text>
+  <path d="M 226 226 H 234 V 234 H 226 Z M 226 226 L 234 234 M 226 234 L 234 226" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="238" y="234" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v2</text>
+  <path d="M 26 226 H 34 V 234 H 26 Z M 26 226 L 34 234 M 26 234 L 34 226" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="38" y="234" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v3</text>
+  <path d="M 226 76 H 234 V 84 H 226 Z M 226 76 L 234 84 M 226 84 L 234 76" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="238" y="84" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v4</text>
+  <path d="M 146 76 H 154 V 84 H 146 Z M 146 76 L 154 84 M 146 84 L 154 76" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="158" y="84" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v5</text>
+  <path d="M 346 76 H 354 V 84 H 346 Z M 346 76 L 354 84 M 346 84 L 354 76" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="358" y="84" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v6</text>
+  <path d="M 346 276 H 354 V 284 H 346 Z M 346 276 L 354 284 M 346 284 L 354 276" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="358" y="284" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v7</text>
+  <path d="M 146 276 H 154 V 284 H 146 Z M 146 276 L 154 284 M 146 284 L 154 276" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="158" y="284" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v8</text>
+  <path d="M 146 226 H 154 V 234 H 146 Z M 146 226 L 154 234 M 146 234 L 154 226" style="fill: none; stroke: #dc2626; stroke-width: 1; stroke-linecap: square; stroke-linejoin: miter" />
+  <text x="158" y="234" font-size="8" style="fill: #dc2626; font-family: system-ui, sans-serif">v9</text>
+</svg>

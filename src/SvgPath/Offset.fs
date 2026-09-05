@@ -28,6 +28,7 @@ type Error =
     | InternalIToKExpectedClosedSubpath
     | InternalIToKEndpointMismatch of expectedStart: int * actualStart: int * expectedEnd: int * actualEnd: int
     | InternalIToKMissingJPreimage of edgeId: int
+    | InternalSurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
     | InconsistentContainment
 
 /// Join geometry inserted between adjacent offset segments.
@@ -3962,6 +3963,11 @@ module Offset =
             || (List.contains chain.StartVertex protectedVertices
                 && List.contains chain.EndVertex protectedVertices))
 
+    let private survivorChainDiscontinuity = function
+        | PathError(Discontinuous(previousIndex, nextIndex, expected, actual, distance)) ->
+            InternalSurvivorChainDiscontinuous(previousIndex, nextIndex, expected, actual, distance)
+        | error -> error
+
     let rec private survivorChainsToSubpaths
         (chains: SurvivorChain list)
         (tolerance: float<length>)
@@ -3969,12 +3975,12 @@ module Offset =
         match chains with
         | [] -> Ok(List.rev subpaths)
         | first :: rest ->
-            let policy = WiggleThenBridgeWith tolerance
             let segments = first.Edges |> List.map (fun edge -> edge.Segment)
-            Subpath.createWith policy segments
+            Subpath.createWith (WiggleWith tolerance) segments
             |> Result.mapError PathError
+            |> Result.mapError survivorChainDiscontinuity
             |> Result.bind (fun subpath ->
-                Subpath.setClosedWith policy first.Closed subpath
+                Subpath.setClosedWith (WiggleThenBridgeWith tolerance) first.Closed subpath
                 |> Result.mapError PathError)
             |> Result.bind (fun subpath ->
                 survivorChainsToSubpaths rest tolerance (subpath :: subpaths))

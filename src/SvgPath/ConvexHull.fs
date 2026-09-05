@@ -6,6 +6,7 @@ type ConvexHullError =
 
 type ConvexHullConstructionError =
     | ConstructionPathError of SegmentError
+    | HullPiecesDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
     | ConsecutiveCurves
     | DuplicateAdjacentTValues
     | RefinementReachedMaxIterations of int
@@ -954,9 +955,9 @@ module ConvexHull =
         |> List.map Line
         |> function
             | [] -> Error TangentSearchDegenerateLoop
-            | segments ->
-                Subpath.createWith WiggleThenBridge segments
-                |> Result.mapError ConstructionPathError
+                | segments ->
+                    Subpath.createWith Strict segments
+                    |> Result.mapError ConstructionPathError
 
     let private orientationFromTurn turn scale =
         let tolerance = 1.0e-9 * scale
@@ -1154,8 +1155,8 @@ module ConvexHull =
             let startPoint = kept.Start
             let endPoint = kept.Segments |> List.last |> Segment.finish
             let segments = kept.Segments @ [ Line(endPoint, point); Line(point, startPoint) ]
-            Subpath.createWith WiggleThenBridge segments
-            |> Result.bind (Subpath.setClosedWith WiggleThenBridge true)
+            Subpath.createWith Strict segments
+            |> Result.bind (Subpath.setClosedWith Strict true)
             |> Result.mapError ConstructionPathError
             |> Result.map (fun subpath -> { loop with Segments = subpath.Segments }))
 
@@ -1271,10 +1272,16 @@ module ConvexHull =
         | CubicBezier _ when segmentIsPointLike segment -> exactSimpleSegmentHull (Line(Segment.start segment, Segment.finish segment))
         | CubicBezier _ -> sampledCubicHull segment
 
+    let private hullPieceDiscontinuity = function
+        | ConstructionPathError(Discontinuous(previousIndex, nextIndex, expected, actual, distance)) ->
+            HullPiecesDiscontinuous(previousIndex, nextIndex, expected, actual, distance)
+        | error -> error
+
     let private buildClosedSubpath segments =
-        Subpath.createWith WiggleThenBridge segments
-        |> Result.bind (Subpath.setClosedWith WiggleThenBridge true)
+        Subpath.createWith Wiggle segments
+        |> Result.bind (Subpath.setClosedWith Wiggle true)
         |> Result.mapError ConstructionPathError
+        |> Result.mapError hullPieceDiscontinuity
 
     let private segmentsHullWithRepairMode segments repairMode =
         segments

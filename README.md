@@ -1369,9 +1369,18 @@ inside the `.nupkg`.
 ## Development
 
 ```shell
-dotnet test tests/SvgPath.Tests/SvgPath.Tests.fsproj
+scripts/test-fast          # ordinary tests, excluding the slow convex-hull suite
+scripts/test-slow          # the slow convex-hull suite only
+scripts/test-all           # full suite (fast then slow)
+scripts/test-release       # canonical pre-release verification (full suite)
 scripts/generate-readme-figures
 scripts/generate-readme-figures --check
+```
+
+Without the scripts, the test project can be run directly:
+
+```shell
+dotnet test tests/SvgPath.Tests/SvgPath.Tests.fsproj --filter "Category!=Slow"
 ```
 
 The generated README SVGs are not part of the `SvgPath` NuGet package. The

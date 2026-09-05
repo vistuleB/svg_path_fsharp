@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+echo "Running fast test profile (all tests except the slow convex-hull suite)."
+dotnet test "$root/tests/SvgPath.Tests/SvgPath.Tests.fsproj" --filter "Category!=Slow"

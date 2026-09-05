@@ -83,7 +83,7 @@ module Csg =
                         let activeLeft = combine operation (filled leftA fillRule) (filled leftB fillRule)
                         let activeRight = combine operation (filled rightA fillRule) (filled rightB fillRule)
                         if activeLeft = activeRight then boundary
-                        elif activeLeft then
+                        elif activeRight then
                             boundary @
                                 [ { Id = edge.Id; Layer = 0; Segment = edge.Segment
                                     StartVertex = edge.StartVertex; EndVertex = edge.EndVertex } ]

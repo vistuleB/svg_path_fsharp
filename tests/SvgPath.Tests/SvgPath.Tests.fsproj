@@ -51,6 +51,8 @@
     <Compile Include="ConvexHullPointCloudParityTests.fs" />
     <Compile Include="ConvexHullMinimumWidthParityTests.fs" />
     <Compile Include="ConvexHullTangentParityTests.fs" />
+    <Compile Include="ConvexHullSlowSupport.fs" />
+    <Compile Include="ConvexHullSlowParityTests.fs" />
     <Compile Include="DegeneracyTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />

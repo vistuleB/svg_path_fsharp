@@ -124,7 +124,13 @@ Release workflow:
      metadata).
 
 8. Tag the release commit on `main` as `vX.Y.Z`.
-9. Publish to NuGet from that exact release commit.
+9. Generate the `.nupkg` in `artifacts/package/` from that exact release commit:
+
+   ```sh
+   dotnet pack src/SvgPath/SvgPath.fsproj -c Release -o artifacts/package
+   ```
+
+10. Let the user run the final NuGet upload of that package.
 
 ## Practical Notes
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+- Hardened endpoint reconciliation across degeneracy, convex-hull, and offset
+  survivor-chain rebuilds, using strict joins where replacement geometry is
+  exact and tolerant joins where evaluation noise remains.
+- Reclassified post-repair residual gaps as distinct construction failures
+  (`HullPiecesDiscontinuous`, `InternalSurvivorChainDiscontinuous`) instead of
+  surfacing ordinary `Discontinuous` subpath errors, so callers can tell
+  internal construction exhaustion from user-facing segment mistakes.
+
 ## 0.2.0
 
 - Port the complete project README with generated API figures.

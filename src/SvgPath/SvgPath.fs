@@ -306,9 +306,7 @@ module Segment =
         | Arc endpoint -> Arc { endpoint with Start = endpoint.End; End = endpoint.Start; Sweep = not endpoint.Sweep }
 
     let chordLength segment = Point.distance (start segment) (finish segment)
-    let squaredChordLength segment = Point.squaredDistance (start segment) (finish segment)
-    let ``end`` segment = finish segment
-    let chordLengthSquared segment = squaredChordLength segment
+    let chordLengthSquared segment = Point.squaredDistance (start segment) (finish segment)
 
     let withStart newStart segment =
         match segment with

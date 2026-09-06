@@ -7,6 +7,11 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private degrees value = Degree.fromFloat value
 
 [<Fact>]
+let ``zero vector supports dimensionless and measured coordinates`` () =
+    Assert.Equal<Point<1>>(Point.create 0.0 0.0, Point.zero)
+    Assert.Equal<Point<length>>(point 0.0 0.0, Point.zero)
+
+[<Fact>]
 let ``basis vectors and direction`` () =
     Assert.Equal(Point.create 1.0 0.0, Point.right)
     Assert.Equal(Point.create -1.0 0.0, Point.left)

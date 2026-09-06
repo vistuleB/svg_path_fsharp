@@ -9,6 +9,9 @@ type Point<[<Measure>] 'Unit> =
 module Point =
     let create (x: float<'Unit>) (y: float<'Unit>) : Point<'Unit> = { X = x; Y = y }
 
+    /// The zero vector, usable with any coordinate unit.
+    let zero<[<Measure>] 'Unit> : Point<'Unit> = { X = 0.0<_>; Y = 0.0<_> }
+
     let right: Point<1> = create 1.0 0.0
     let left: Point<1> = create -1.0 0.0
 

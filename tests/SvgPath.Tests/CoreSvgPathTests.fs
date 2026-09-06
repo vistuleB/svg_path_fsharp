@@ -750,6 +750,14 @@ let ``subpath is zero length requires non empty subpath`` () =
     Assert.Equal(Ok false, Subpath.isZeroLength (Subpath.empty (point 0.0 0.0)) 0.0<length>)
 
 [<Fact>]
+let ``subpath is empty distinguishes no segments from zero length`` () =
+    let p = point 2.0 3.0
+    Assert.True(Subpath.isEmpty (Subpath.empty p))
+    Assert.True(Subpath.isEmpty (Subpath.empty p |> Subpath.assertSetClosed true))
+    Assert.False(Subpath.isEmpty (Subpath.assertCreate [ Line(p, p) ]))
+    Assert.False(Subpath.isEmpty (Subpath.assertCreate [ Line(p, point 4.0 3.0) ]))
+
+[<Fact>]
 let ``subpath is zero length checks every segment`` () =
     let a, b = point 0.0 0.0, point 1.0 0.0
     let zero, nonzero = Line(a, a), Line(a, b)

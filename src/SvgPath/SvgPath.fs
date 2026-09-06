@@ -1617,6 +1617,9 @@ module Subpath =
 
     let isClosed (subpath: Subpath) = subpath.Closed
 
+    /// True when the subpath has no segments, not when its geometric length is zero.
+    let isEmpty (subpath: Subpath) = List.isEmpty subpath.Segments
+
     let private validateClosed startPoint segments =
         validateFrom startPoint segments
         |> Result.bind (fun openSubpath ->

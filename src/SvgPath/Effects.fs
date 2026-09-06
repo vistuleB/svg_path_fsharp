@@ -74,7 +74,7 @@ module Effects =
 
     let private validate radius options =
         if radius <= 0.0<length> || not (System.Double.IsFinite(float radius)) then Error(InvalidRadius radius)
-        elif options.DistanceTolerance <= 0.0<length>
+        elif options.DistanceTolerance < 0.0<length>
              || not (System.Double.IsFinite(float options.DistanceTolerance)) then
             Error(InvalidDistanceTolerance options.DistanceTolerance)
         elif options.AngularTolerance < 0.0<degree>
@@ -148,32 +148,26 @@ module Effects =
         (requested: float<length>)
         (specs: CornerSpec list) =
         let initial = specs |> List.map (fun spec -> spec.Index, requested) |> Map.ofList
-        let rec loop radii iterations =
-            if iterations = 24 then radii
-            else
-                let scales =
-                    infos
-                    |> List.fold (fun scales (info: SegmentInfo) ->
-                        let beforeIndex = previousIndex info.Index infos.Length closed
-                        let before = findSpec beforeIndex specs
-                        let after = findSpec info.Index specs
-                        let trim (candidate: CornerSpec option) = candidate |> Option.map (fun spec -> radiusFor spec.Index radii * spec.TrimPerRadius) |> Option.defaultValue 0.0<length>
-                        let total = trim before + trim after
-                        let available = max 0.0<length> (info.Length - 2.0 * options.DistanceTolerance)
-                        if total <= available || total = 0.0<length> then scales
-                        else
-                            let scale = float (available / total)
-                            [ beforeIndex; info.Index ]
-                            |> List.fold
-                                (fun state index ->
-                                    let previous = Map.tryFind index state |> Option.defaultValue 1.0
-                                    Map.add index (min scale previous) state)
-                                scales)
-                        Map.empty
-                let next = radii |> Map.map (fun index radius -> radius * (Map.tryFind index scales |> Option.defaultValue 1.0))
-                let converged = radii |> Map.forall (fun index radius -> abs (radius - radiusFor index next) <= options.DistanceTolerance)
-                if converged then next else loop next (iterations + 1)
-        loop initial 0
+        let scales =
+            infos
+            |> List.fold (fun scales (info: SegmentInfo) ->
+                let beforeIndex = previousIndex info.Index infos.Length closed
+                let before = findSpec beforeIndex specs
+                let after = findSpec info.Index specs
+                let trim (candidate: CornerSpec option) = candidate |> Option.map (fun spec -> radiusFor spec.Index initial * spec.TrimPerRadius) |> Option.defaultValue 0.0<length>
+                let total = trim before + trim after
+                let available = max 0.0<length> (info.Length - 2.0 * options.DistanceTolerance)
+                if total <= available then scales
+                else
+                    let scale = float (available / total)
+                    [ beforeIndex; info.Index ]
+                    |> List.fold
+                        (fun state index ->
+                            let previous = Map.tryFind index state |> Option.defaultValue 1.0
+                            Map.add index (min scale previous) state)
+                        scales)
+                Map.empty
+        initial |> Map.map (fun index radius -> radius * (Map.tryFind index scales |> Option.defaultValue 1.0))
 
     let private cornersFromSpecs
         (options: RoundCornerOptions)
@@ -186,7 +180,10 @@ module Effects =
             |> Result.bind (fun accumulated ->
                 let radius = radiusFor spec.Index radii
                 let trim = radius * spec.TrimPerRadius
-                if radius <= options.DistanceTolerance || trim <= options.DistanceTolerance then Ok accumulated
+                if radius <= options.DistanceTolerance || trim <= options.DistanceTolerance then
+                    match options.Failure with
+                    | ErrorOnFailure -> Error(CannotRoundCorner spec.Index)
+                    | LeaveCorner | AdaptRadius -> Ok accumulated
                 elif trim >= infos[spec.Index].Length - options.DistanceTolerance
                      || trim >= infos[(spec.Index + 1) % infos.Length].Length - options.DistanceTolerance then
                     match options.Failure with

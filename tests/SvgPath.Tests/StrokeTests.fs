@@ -256,7 +256,7 @@ let ``path dashes empty path still validates options`` () =
     Assert.Equal(
         Error(InvalidDashLength -1.0<length>),
         Stroke.pathDashes (Path.ofSubpaths []) [ -1.0<length>; 2.0<length> ] 0.0<length>)
-    let options = { Stroke.defaultDashOptions [ 1.0<length>; 1.0<length> ] 0.0<length> with Length = { Tolerance = 0.0<length>; MaxDepth = 20 } }
+    let options = { Stroke.defaultDashOptions [ 1.0<length>; 1.0<length> ] 0.0<length> with LengthOptions = { Tolerance = 0.0<length>; MaxDepth = 20 } }
     Assert.Equal(Error(StrokePathError(InvalidLengthTolerance 0.0<length>)), Stroke.pathDashesWith (Path.ofSubpaths []) options)
 
 [<Fact>]

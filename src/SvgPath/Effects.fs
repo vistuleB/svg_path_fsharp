@@ -17,7 +17,7 @@ type FailureMode =
 [<Struct>]
 type RoundCornerOptions =
     { Failure: FailureMode
-      Length: LengthOptions
+      LengthOptions: LengthOptions
       DistanceTolerance: float<length>
       AngularTolerance: float<degree> }
 
@@ -42,7 +42,7 @@ module Effects =
 
     let defaultRoundCornerOptions =
         { Failure = ErrorOnFailure
-          Length = Segment.defaultLengthOptions
+          LengthOptions = Segment.defaultLengthOptions
           DistanceTolerance = 1.0e-6<length>
           AngularTolerance = 1.0e-6<degree> }
 
@@ -80,7 +80,7 @@ module Effects =
         elif options.AngularTolerance < 0.0<degree>
              || not (System.Double.IsFinite(float options.AngularTolerance)) then
             Error(InvalidAngularTolerance options.AngularTolerance)
-        else Segment.validateLengthOptions options.Length |> Result.mapError EffectsPathError
+        else Segment.validateLengthOptions options.LengthOptions |> Result.mapError EffectsPathError
 
     let private infos (options: RoundCornerOptions) (segments: Segment list) =
         segments
@@ -88,7 +88,7 @@ module Effects =
         |> List.fold (fun state (index, segment) ->
             state
             |> Result.bind (fun accumulated ->
-                Segment.lengthWith segment options.Length
+                Segment.lengthWith segment options.LengthOptions
                 |> Result.mapError EffectsPathError
                 |> Result.map (fun length -> { Index = index; Segment = segment; Length = length } :: accumulated))) (Ok [])
         |> Result.map List.rev
@@ -193,10 +193,10 @@ module Effects =
                 else
                     let incoming = infos[spec.Index]
                     let outgoing = infos[(spec.Index + 1) % infos.Length]
-                    Segment.pointAtLengthWith incoming.Segment (incoming.Length - trim) options.Length
+                    Segment.pointAtLengthWith incoming.Segment (incoming.Length - trim) options.LengthOptions
                     |> Result.mapError EffectsPathError
                     |> Result.bind (fun incomingCut ->
-                        Segment.pointAtLengthWith outgoing.Segment trim options.Length
+                        Segment.pointAtLengthWith outgoing.Segment trim options.LengthOptions
                         |> Result.mapError EffectsPathError
                         |> Result.map (fun outgoingCut ->
                             let sweep = Point.cross spec.IncomingTangent spec.OutgoingTangent >= 0.0
@@ -245,7 +245,7 @@ module Effects =
                 let endTrim = after |> Option.map _.Trim |> Option.defaultValue 0.0<length>
                 if startTrim + endTrim >= info.Length - options.DistanceTolerance then Error(CornerTrimsOverlap info.Index)
                 else
-                    Segment.betweenLengthsWith info.Segment startTrim (info.Length - endTrim) options.Length
+                    Segment.betweenLengthsWith info.Segment startTrim (info.Length - endTrim) options.LengthOptions
                     |> Result.mapError EffectsPathError
                     |> Result.map (fun shortened ->
                         let next = shortened :: (after |> Option.map (fun corner -> [ corner.Arc ]) |> Option.defaultValue [])

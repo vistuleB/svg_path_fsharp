@@ -23,7 +23,7 @@ type StrokeOptions =
 type DashOptions =
     { Pattern: float<length> list
       Offset: float<length>
-      Length: LengthOptions }
+      LengthOptions: LengthOptions }
 
 /// Dash-pattern application and stroke-outline construction.
 [<RequireQualifiedAccess>]
@@ -36,7 +36,7 @@ module Stroke =
     let defaultDashOptions pattern offset =
         { Pattern = pattern
           Offset = offset
-          Length = Segment.defaultLengthOptions }
+          LengthOptions = Segment.defaultLengthOptions }
 
     let private validateOptions options =
         if options.Width <= 0.0<length> || not (System.Double.IsFinite(float options.Width)) then
@@ -71,7 +71,7 @@ module Stroke =
         |> Result.bind (fun () ->
             if not (System.Double.IsFinite(float options.Offset)) then Error(InvalidDashOffset options.Offset)
             else
-                Segment.validateLengthOptions options.Length
+                Segment.validateLengthOptions options.LengthOptions
                 |> Result.mapError StrokePathError)
 
     let private toOffsetCap = function
@@ -189,14 +189,14 @@ module Stroke =
         validateDashOptions dashOptions
         |> Result.bind (fun () -> normalizeDashPattern dashOptions.Pattern)
         |> Result.bind (fun pattern ->
-            Subpath.lengthWith subpath dashOptions.Length
+            Subpath.lengthWith subpath dashOptions.LengthOptions
             |> Result.mapError StrokePathError
             |> Result.bind (fun length ->
                 if length <= 0.0<length> then Ok []
                 elif List.isEmpty pattern then Ok [ subpath ]
                 else
                     dashIntervals length pattern dashOptions.Offset
-                    |> fun intervals -> dashPieces intervals subpath length dashOptions.Length
+                    |> fun intervals -> dashPieces intervals subpath length dashOptions.LengthOptions
                     |> Result.mapError StrokePathError))
 
     let subpathDashes subpath pattern offset =

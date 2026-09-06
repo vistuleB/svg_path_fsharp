@@ -201,8 +201,9 @@ module Degeneracy =
                                 (List.rev (Option.defaultValue [ first ] replacement) @ converted)))
 
     /// Replace maximal contiguous line-degenerate windows with ordered line traversals.
+    /// A 0.0 tolerance collapses a window only when its strip width is exactly zero.
     let normalizeDegenerateSegments (subpath: Subpath) (tolerance: float<length>) =
-        if tolerance <= 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
+        if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
             Error(DegeneracyPathError(InvalidLinearizeTolerance tolerance))
         else
             normalizeSegments tolerance subpath.Segments []

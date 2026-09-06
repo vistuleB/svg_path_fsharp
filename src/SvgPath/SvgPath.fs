@@ -1371,8 +1371,11 @@ module Segment =
 
     let toLines segment = toLinesWith defaultLinearizeOptions segment
 
+    /// Replace a line-degenerate segment by its ordered line traversal.
+    /// The tolerance must be finite and non-negative; a tolerance of 0.0 collapses
+    /// the segment only when it lies exactly on a line strip of width zero.
     let degenerateLines segment tolerance =
-        let finitePositive = tolerance > 0.0<length> && System.Double.IsFinite(float tolerance)
+        let finiteNonNegative = tolerance >= 0.0<length> && System.Double.IsFinite(float tolerance)
         let farthest points origin =
             points |> List.fold (fun best point -> if Point.squaredDistance point origin > Point.squaredDistance best origin then point else best) origin
         let axisFor points =
@@ -1405,7 +1408,7 @@ module Segment =
             | Some(origin, axis) when inStrip definingPoints origin axis -> pieces (0.0 :: breaks @ [ 1.0 ]) |> Result.map Some
             | None -> Ok None
             | _ -> Ok None
-        if not finitePositive then Error(InvalidLinearizeTolerance tolerance)
+        if not finiteNonNegative then Error(InvalidLinearizeTolerance tolerance)
         else
             match segment with
             | Line _ -> Ok None
@@ -1879,8 +1882,11 @@ module Subpath =
     let toCubicBeziers subpath =
         { subpath with segmentList = subpath.segmentList |> List.collect Segment.toCubicBeziers }
 
+    /// Replace line-degenerate segments in a subpath with an ordered line traversal.
+    /// The tolerance must be finite and non-negative; a tolerance of 0.0 collapses
+    /// only exactly zero-width strips.
     let degenerateLines subpath tolerance =
-        if tolerance <= 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
+        if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
             Error(InvalidLinearizeTolerance tolerance)
         else
             subpath.segmentList

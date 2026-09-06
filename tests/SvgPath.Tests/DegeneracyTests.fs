@@ -6,11 +6,103 @@ open Xunit
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
 [<Fact>]
-let ``invalid tolerance is rejected`` () =
+let ``zero tolerance is accepted`` () =
+    let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
+    let normalized =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 1.0 0.0) ], normalized.Segments)
+
+[<Fact>]
+let ``negative tolerance is rejected`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     Assert.Equal(
-        Error(DegeneracyPathError(InvalidLinearizeTolerance 0.0<length>)),
-        Degeneracy.normalizeDegenerateSegments source 0.0<length>)
+        Error(DegeneracyPathError(InvalidLinearizeTolerance -0.000001<length>)),
+        Degeneracy.normalizeDegenerateSegments source -0.000001<length>)
+
+[<Fact>]
+let ``zero tolerance collapses exactly collinear lines`` () =
+    let source =
+        Subpath.create
+            [ Line(point 0.0 0.0, point 1.0 0.0)
+              Line(point 1.0 0.0, point 2.0 0.0)
+              Line(point 2.0 0.0, point 3.0 0.0) ]
+        |> Result.defaultWith (failwithf "%A")
+    let normalized =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 3.0 0.0) ], normalized.Segments)
+
+[<Fact>]
+let ``zero tolerance keeps near-collinear lines`` () =
+    let source =
+        Subpath.create
+            [ Line(point 0.0 0.0, point 1.0 0.0)
+              Line(point 1.0 0.0, point 2.0 1.0e-9)
+              Line(point 2.0 1.0e-9, point 3.0 0.0) ]
+        |> Result.defaultWith (failwithf "%A")
+    let normalized =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>(source.Segments, normalized.Segments)
+
+[<Fact>]
+let ``zero tolerance collapses exactly collinear quadratic`` () =
+    let source = Subpath.ofSegment (QuadraticBezier(point 0.0 0.0, point 3.0 3.0, point 6.0 6.0))
+    let normalized =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 6.0 6.0) ], normalized.Segments)
+
+[<Fact>]
+let ``zero tolerance keeps near-collinear quadratic`` () =
+    let curve = QuadraticBezier(point 0.0 0.0, point 3.0 3.0000001, point 6.0 6.0)
+    let source = Subpath.ofSegment curve
+    let strict =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ curve ], strict.Segments)
+    let loose =
+        Degeneracy.normalizeDegenerateSegments source 0.000001<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 6.0 6.0) ], loose.Segments)
+
+[<Fact>]
+let ``zero tolerance collapses exactly collinear cubic`` () =
+    let source = Subpath.ofSegment (CubicBezier(point 0.0 0.0, point 1.0 1.0, point 2.0 2.0, point 3.0 3.0))
+    let normalized =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 3.0 3.0) ], normalized.Segments)
+
+[<Fact>]
+let ``zero tolerance collapses horizontal cubic`` () =
+    let source = Subpath.ofSegment (CubicBezier(point 0.0 0.0, point 1.0 0.0, point 2.0 0.0, point 3.0 0.0))
+    let normalized =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 3.0 0.0) ], normalized.Segments)
+
+[<Fact>]
+let ``zero tolerance collapses stretched diagonal cubic`` () =
+    let source = Subpath.ofSegment (CubicBezier(point 0.0 0.0, point 2.0 1.0, point 4.0 2.0, point 6.0 3.0))
+    let normalized =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 6.0 3.0) ], normalized.Segments)
+
+[<Fact>]
+let ``zero tolerance keeps near-collinear cubic`` () =
+    let curve = CubicBezier(point 0.0 0.0, point 1.0 1.0, point 2.0 2.0000001, point 3.0 3.0)
+    let source = Subpath.ofSegment curve
+    let strict =
+        Degeneracy.normalizeDegenerateSegments source 0.0<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ curve ], strict.Segments)
+    let loose =
+        Degeneracy.normalizeDegenerateSegments source 0.000001<length>
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 3.0 3.0) ], loose.Segments)
 
 [<Fact>]
 let ``near-collinear line window preserves axial backtracking`` () =

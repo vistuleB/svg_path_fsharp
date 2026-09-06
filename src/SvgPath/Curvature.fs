@@ -1,5 +1,14 @@
 namespace SvgPath
 
+/// Invalid curvature arguments and undefined geometric configurations.
+type CurvatureError =
+    | InvalidCurvatureTolerance of float<parameter>
+    | InvalidCurvatureSamples of int
+    | InvalidCurvatureMaxDepth of int
+    | InvalidCurvatureMargin of float<length>
+    | DegenerateCurvatureDerivative
+    | InfiniteRadiusOfCurvature
+
 [<Struct>]
 type CurvatureOptions =
     { Tolerance: float<parameter>
@@ -27,10 +36,11 @@ module Curvature =
     let private parameter value = Parameter.fromFloat value
 
     let private validateOptions options =
-        if options.Tolerance <= 0.0<parameter>
-           || not (System.Double.IsFinite(float options.Tolerance))
-           || options.Samples <= 0
-           || options.MaxDepth <= 0 then Error()
+        if options.Tolerance < 0.0<parameter>
+           || not (System.Double.IsFinite(float options.Tolerance)) then
+            Error(InvalidCurvatureTolerance options.Tolerance)
+        elif options.Samples <= 0 then Error(InvalidCurvatureSamples options.Samples)
+        elif options.MaxDepth <= 0 then Error(InvalidCurvatureMaxDepth options.MaxDepth)
         else Ok()
 
     let segmentDerivatives segment t =
@@ -39,47 +49,47 @@ module Curvature =
         | Error error, _
         | _, Error error -> Error error
 
-    let private leftNormalCurvatureFromDerivatives data : Result<float<1 / length>, unit> =
+    let private leftNormalCurvatureFromDerivatives data : Result<float<1 / length>, CurvatureError> =
         let speedSquared = Point.dot data.First data.First
         if speedSquared <= 0.0<length^2 / parameter^2>
-           || not (System.Double.IsFinite(float speedSquared)) then Error()
+           || not (System.Double.IsFinite(float speedSquared)) then Error DegenerateCurvatureDerivative
         else
             let speed = sqrt (float speedSquared) * 1.0<length / parameter>
             Ok(-Point.cross data.First data.Second / (speedSquared * speed))
 
     let segmentLeftNormalCurvature segment t =
         segmentDerivatives segment t
-        |> Result.mapError ignore
+        |> Result.mapError (fun _ -> DegenerateCurvatureDerivative)
         |> Result.bind leftNormalCurvatureFromDerivatives
 
-    let segmentLeftNormalRadius segment t : Result<float<length>, unit> =
+    let segmentLeftNormalRadius segment t : Result<float<length>, CurvatureError> =
         segmentLeftNormalCurvature segment t
-        |> Result.bind (fun curvature -> if curvature = 0.0<1 / length> then Error() else Ok(1.0 / curvature))
+        |> Result.bind (fun curvature -> if curvature = 0.0<1 / length> then Error InfiniteRadiusOfCurvature else Ok(1.0 / curvature))
 
     let private cuspResidualFromDerivatives data (offset: float<length>) =
         let speedSquared = Point.dot data.First data.First
         if speedSquared <= 0.0<length^2 / parameter^2>
-           || not (System.Double.IsFinite(float speedSquared)) then Error()
+           || not (System.Double.IsFinite(float speedSquared)) then Error DegenerateCurvatureDerivative
         else
             let speed = sqrt (float speedSquared) * 1.0<length / parameter>
             Ok(speedSquared * speed + offset * Point.cross data.First data.Second)
 
     let segmentLeftNormalCuspResidual segment offset t =
         segmentDerivatives segment t
-        |> Result.mapError ignore
+        |> Result.mapError (fun _ -> DegenerateCurvatureDerivative)
         |> Result.bind (fun data -> cuspResidualFromDerivatives data offset)
 
     let segmentLeftNormalRadiusCloseTo segment offset margin t =
-        if margin < 0.0<length> || not (System.Double.IsFinite(float margin)) then Error()
+        if margin < 0.0<length> || not (System.Double.IsFinite(float margin)) then Error(InvalidCurvatureMargin margin)
         else
             segmentDerivatives segment t
-            |> Result.mapError ignore
+            |> Result.mapError (fun _ -> DegenerateCurvatureDerivative)
             |> Result.bind (fun data ->
                 let speedSquared = Point.dot data.First data.First
                 let cross = Point.cross data.First data.Second
                 if speedSquared <= 0.0<length^2 / parameter^2>
-                   || cross = 0.0<length^2 / parameter^3>
-                   || not (System.Double.IsFinite(float speedSquared)) then Error()
+                   || not (System.Double.IsFinite(float speedSquared)) then Error DegenerateCurvatureDerivative
+                elif cross = 0.0<length^2 / parameter^3> then Error InfiniteRadiusOfCurvature
                 else
                     let speed = sqrt (float speedSquared) * 1.0<length / parameter>
                     Ok(abs (speedSquared * speed + offset * cross) < margin * abs cross))
@@ -87,19 +97,19 @@ module Curvature =
     let inline private signChange a b = (a < 0.0<_> && b > 0.0<_>) || (a > 0.0<_> && b < 0.0<_>)
 
     let rec private refineRoot
-        (f: float<parameter> -> Result<float<'Unit>, unit>)
+        (f: float<parameter> -> Result<float<'Unit>, CurvatureError>)
         (a: float<parameter>)
         (b: float<parameter>)
         (va: float<'Unit>)
         (vb: float<'Unit>)
         options
         depth
-        : Result<float<parameter>, unit> =
+        : Result<float<parameter>, CurvatureError> =
         if depth >= options.MaxDepth || abs (b - a) <= options.Tolerance then Ok((a + b) / 2.0)
         else
             let midpoint = (a + b) / 2.0
             match f midpoint with
-            | Error _ -> Error()
+            | Error error -> Error error
             | Ok vm when vm = 0.0<_> -> Ok midpoint
             | Ok vm when signChange va vm -> refineRoot f a midpoint va vm options (depth + 1)
             | Ok vm when signChange vm vb -> refineRoot f midpoint b vm vb options (depth + 1)
@@ -117,7 +127,7 @@ module Curvature =
 
     let private sampledRoots f options =
         match validateOptions options with
-        | Error _ -> Error()
+        | Error error -> Error error
         | Ok _ ->
             [ 0 .. options.Samples - 1 ]
             |> List.fold (fun roots index ->
@@ -139,7 +149,7 @@ module Curvature =
 
     let segmentInflectionParameters segment options =
         match validateOptions options with
-        | Error _ -> Error()
+        | Error error -> Error error
         | Ok _ ->
             match segment with
             | Line _
@@ -151,11 +161,11 @@ module Curvature =
                 |> Ok
 
     let segmentLeftNormalRadiusCloseBands segment offset margin options =
-        if margin < 0.0<length> || not (System.Double.IsFinite(float margin)) then Error()
-        else
-            match validateOptions options with
-            | Error _ -> Error()
-            | Ok _ ->
+        match validateOptions options with
+        | Error error -> Error error
+        | Ok _ ->
+            if margin < 0.0<length> || not (System.Double.IsFinite(float margin)) then Error(InvalidCurvatureMargin margin)
+            else
                 let samples =
                     [ 0 .. options.Samples ]
                     |> List.map (fun index ->

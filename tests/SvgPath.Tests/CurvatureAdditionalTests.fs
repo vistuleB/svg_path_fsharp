@@ -10,7 +10,7 @@ let private parameter value = Parameter.fromFloat value
 let ``line has zero curvature and infinite radius`` () =
     let line = Line(point 0.0 0.0, point 4.0 0.0)
     Assert.Equal(Ok 0.0<1 / length>, Curvature.segmentLeftNormalCurvature line (parameter 0.5))
-    Assert.Equal(Error(), Curvature.segmentLeftNormalRadius line (parameter 0.5))
+    Assert.Equal(Error InfiniteRadiusOfCurvature, Curvature.segmentLeftNormalRadius line (parameter 0.5))
 
 [<Fact>]
 let ``clockwise visual circle arc has negative left-normal curvature`` () =

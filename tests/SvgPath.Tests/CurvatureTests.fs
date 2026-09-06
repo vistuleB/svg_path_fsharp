@@ -54,3 +54,40 @@ let ``cusp parameters retain exact sampled root`` () =
     let parabola = QuadraticBezier(point -1.0 1.0, point 0.0 0.0, point 1.0 1.0)
     let roots = Curvature.segmentLeftNormalCuspParameters parabola -1.0<length> Curvature.defaultOptions |> Result.defaultWith (failwithf "%A")
     Assert.Contains(roots, fun root -> abs (Parameter.ratio root - 0.5) <= 1.0e-9)
+
+[<Fact>]
+let ``curvature options report offending values`` () =
+    let defaults = Curvature.defaultOptions
+    Assert.Equal(Error(InvalidCurvatureTolerance -0.5<parameter>),
+        Curvature.segmentLeftNormalCuspParameters upwardCubic 0.27<length> { defaults with Tolerance = -0.5<parameter> })
+    Assert.Equal(Error(InvalidCurvatureSamples 0),
+        Curvature.segmentInflectionParameters upwardCubic { defaults with Samples = 0 })
+    Assert.Equal(Error(InvalidCurvatureMaxDepth 0),
+        Curvature.segmentInflectionParameters upwardCubic { defaults with MaxDepth = 0 })
+
+[<Fact>]
+let ``zero curvature tolerance accepts cusp discovery`` () =
+    let options = { Curvature.defaultOptions with Tolerance = 0.0<parameter> }
+    let roots = Curvature.segmentLeftNormalCuspParameters upwardCubic 0.27<length> options |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(2, roots.Length)
+    Assert.Equal(0.4786978280544282, float roots[0], 9)
+    Assert.Equal(0.5213021719455719, float roots[1], 9)
+
+[<Fact>]
+let ``radius proximity validates options before margin`` () =
+    Assert.Equal(Error(InvalidCurvatureMargin -1.0<length>),
+        Curvature.segmentLeftNormalRadiusCloseTo upwardCubic 0.27<length> -1.0<length> (parameter 0.5))
+    Assert.Equal(Error(InvalidCurvatureMargin -1.0<length>),
+        Curvature.segmentLeftNormalRadiusCloseBands upwardCubic 0.27<length> -1.0<length> Curvature.defaultOptions)
+    Assert.Equal(Error(InvalidCurvatureSamples 0),
+        Curvature.segmentLeftNormalRadiusCloseBands upwardCubic 0.27<length> -1.0<length> { Curvature.defaultOptions with Samples = 0 })
+
+[<Fact>]
+let ``collapsed derivative differs from infinite radius`` () =
+    let p = point 1.0 1.0
+    let collapsed = CubicBezier(p, p, p, p)
+    Assert.Equal(Error DegenerateCurvatureDerivative, Curvature.segmentLeftNormalRadius collapsed (parameter 0.5))
+    Assert.Equal(Error DegenerateCurvatureDerivative, Curvature.segmentLeftNormalCurvature collapsed (parameter 0.5))
+    Assert.Equal(Error DegenerateCurvatureDerivative, Curvature.segmentLeftNormalCuspResidual collapsed 1.0<length> (parameter 0.5))
+    Assert.Equal(Error DegenerateCurvatureDerivative, Curvature.segmentLeftNormalRadiusCloseTo collapsed 1.0<length> 0.1<length> (parameter 0.5))
+    Assert.Equal(Error InfiniteRadiusOfCurvature, Curvature.segmentLeftNormalRadiusCloseTo (Line(p, point 2.0 1.0)) 1.0<length> 0.1<length> (parameter 0.5))

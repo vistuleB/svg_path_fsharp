@@ -141,6 +141,8 @@ let d = Point.distance p q
 
 Use `Point` for vector-style helpers such as `Point.dot`, `Point.norm`,
 `Point.project`, `Point.right`, and `Point.direction`.
+`Point.zero` is the zero vector and supports any coordinate unit, including
+`Point<1>` and `Point<length>`.
 
 ### Segments
 
@@ -185,6 +187,8 @@ collapsed.
 
 A `Subpath` is opaque. It internally consists of a start point, a list of
 end-to-end segments, and a flag indicating topological closure.
+`Subpath.isEmpty` checks for no segments; a subpath containing a zero-length
+line is not empty.
 
 ```fsharp
 type Subpath =
@@ -1079,29 +1083,37 @@ negative offsets point along the visual right normal. For example, a positive
 offset of a horizontal line directed from left to right appears above that line.
 
 ```fsharp
-Offset.segment segment 12.0<length>
-// Result<Subpath, Offset.Error>
+Offset.segment segment 12.0<length> (Miter Offset.defaultMiterLimit)
+// Result<Subpath, SvgPath.Error>
 
-Offset.subpath subpath 12.0<length>
-Offset.path path 12.0<length>
-// Result<Path, Offset.Error>
+Offset.subpath subpath 12.0<length> (Miter Offset.defaultMiterLimit) Butt
+Offset.path path 12.0<length> (Miter Offset.defaultMiterLimit) Butt
+// Result<Path, SvgPath.Error>
 ```
 
 A segment offset returns a `Subpath` because one source curve may require
 several fitted pieces. Subpath and path offsets return a `Path`: trimming may
 split one offset walk into multiple subpaths or remove it entirely.
 
-The `With` variants accept `Offset.Options`. The join can be `Bevel`,
-`Miter miterLimit`, or `Round`. `Options.Fitting` controls fitted-curve accuracy
-and maximum subdivision depth. `Options.DistanceOptions` controls the projection
-and root-finding tolerances used during trimming; it is not a trimming-policy
-switch.
+Join and cap styles are explicit arguments, including on forms without `With`.
+The `Join` cases are `Bevel`, `Miter miterLimit`, and `Round`; the `Cap` cases
+are `Butt`, `Square`, and `RoundCap`. Segment offsets take only a join, used
+when degenerate normalization produces multiple traversals. Trimmed single
+offsets take a cap for their internal source-to-offset winding bands, not to
+add caps to the returned one-sided walk.
+
+The `With` variants additionally accept `SvgPath.Options` as the last argument.
+This record contains only technical controls, not styles. `Options.Fitting`
+controls fitted-curve accuracy and maximum subdivision depth.
+`Options.DistanceOptions` controls the projection and root-finding tolerances
+used during trimming; it is not a trimming-policy switch.
 
 Use `Offset.subpathUntrimmed`, `Offset.pathUntrimmed`, or their `With` variants
 to obtain the connected offset walks before topological trimming. These are
 useful for inspection or for callers implementing a different trimming policy,
 but they may retain self-intersections, reversal folds, and regions lying on the
-wrong side of a closed source contour.
+wrong side of a closed source contour. These untrimmed operations take a join
+but no cap. The offset-map helpers take neither style.
 
 ### Single-Offset Trimming
 
@@ -1150,15 +1162,17 @@ cleanup is intentionally not a public switch.
 offsets:
 
 ```fsharp
-Offset.subpathBand subpath 18.0<length> 34.0<length>
-Offset.pathBand path 18.0<length> 34.0<length>
+Offset.subpathBand subpath 18.0<length> 34.0<length> Round Butt
+Offset.pathBand path 18.0<length> 34.0<length> Round Butt
 ```
 
 `inner` and `outer` are caller-assigned roles, not a numeric-order restriction.
 Either ordering is accepted. Exchanging the values reverses the orientation of
-the resulting band. Bands do not add endpoint caps; use `Offset.subpathStroke`
-or `Stroke.subpath` when an open source needs `Butt`, `Square`, or `RoundCap`
-endpoints.
+the resulting band. The cap closes open-source endpoints in the internal
+winding band. With `BandTrimming.InBand = false`, the returned outline exposes
+these caps: `Butt` connects the sides directly, `Square` extends the ends, and
+`RoundCap` adds semicircles. Default in-band trimming can return capless offset
+sides. Use `Offset.subpathStroke` or `Stroke.subpath` for a stroke outline.
 
 Band trimming has three independent Boolean controls:
 
@@ -1195,30 +1209,43 @@ disconnected loops that the default pipeline removes.
 `Offset.subpathBandUntrimmed`, `Offset.pathBandUntrimmed`, and their `With`
 variants return the two synchronized offset sides without side-local or joint
 trimming. They preserve inner-then-outer ordering and add no caps or bridges.
+They take a join argument but no cap.
 
 ## Stroke Outlines and Dashes
 
 `Stroke` is a small public wrapper over the offset stroke-outline machinery. It
-uses `StrokeOptions`, `StrokeCap`, and dash options rather than exposing every
-offset-specific detail at the top level.
+uses `StrokeOptions`, `StrokeJoin`, `StrokeCap`, and dash options rather than
+exposing every offset-specific detail at the top level. `StrokeJoin` and
+`StrokeCap` are distinct, parallel versions of the offset style types.
 
 ```fsharp
-Stroke.segment (Line(a, b)) 2.0<length>
-Stroke.subpath subpath 2.0<length>
-Stroke.path path 2.0<length>
+Stroke.segment (Line(a, b)) 2.0<length> StrokeJoin.Round StrokeCap.Butt
+Stroke.subpath subpath 2.0<length> StrokeJoin.Round StrokeCap.RoundCap
+Stroke.path path 2.0<length> (StrokeJoin.Miter 4.0) StrokeCap.Square
 
-let roundStroke =
-    { Stroke.defaultOptions with
-        Width = 2.0<length>
-        Cap = StrokeRound
-        Offset = { Offset.defaultOptions with Join = Round } }
+let options = { Stroke.defaultOptions with Width = 2.0<length> }
 
-Stroke.subpathWith subpath roundStroke
+Stroke.subpathWith subpath StrokeJoin.Round StrokeCap.RoundCap options
 ```
+
+`StrokeOptions` contains `Width` and technical `Offset` settings only.
+All outline operations require explicit join/cap arguments, including dashed
+strokes and forms without `With`. Pure dash extraction takes neither style.
+`DashOptions.LengthOptions` controls arc-length measurement; the corresponding
+corner-rounding field is `RoundCornerOptions.LengthOptions`.
 
 Dash extraction uses SVG dash semantics: odd-length dash arrays are duplicated,
 zero patterns produce no dashes, negative dash lengths are rejected, and the dash
 offset is normalized around the total pattern length.
+
+## Curvature Errors
+
+Curvature helpers return `CurvatureError`, distinguishing invalid tolerance,
+sample count, maximum depth, and margin (with their offending values) from
+`DegenerateCurvatureDerivative` and `InfiniteRadiusOfCurvature`.
+`CurvatureOptions.Tolerance` accepts zero for exact-only parameter comparisons;
+negative and non-finite tolerances remain invalid. `Curvature.segmentDerivatives`
+continues to return `SegmentError` for underlying path errors.
 
 ## Arrangement Graphs
 

@@ -16,8 +16,8 @@ let private figureEightBand () =
     Offset.subpathBandWith
         (figureEight ())
         18.0<length>
-        34.0<length>
-        { Offset.defaultOptions with Join = Round }
+        34.0<length> Round Butt
+        Offset.defaultOptions
     |> Result.defaultWith (failwithf "%A")
 
 let private supportValue segments angle =

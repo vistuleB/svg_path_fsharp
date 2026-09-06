@@ -8,15 +8,24 @@ type StrokeError =
     | InvalidDashOffset of float<length>
     | InvalidDashPatternLength
 
+/// Join styles parallel to the offset Join type.
+[<RequireQualifiedAccess>]
+type StrokeJoin =
+    | Bevel
+    | Miter of miterLimit: float
+    | Round
+
+/// Cap styles parallel to the offset Cap type.
+[<RequireQualifiedAccess>]
 type StrokeCap =
-    | StrokeButt
-    | StrokeRound
-    | StrokeSquare
+    | Butt
+    | RoundCap
+    | Square
 
 [<Struct>]
+/// Stroke width and technical offset settings; join and cap are operation arguments.
 type StrokeOptions =
     { Width: float<length>
-      Cap: StrokeCap
       Offset: Options }
 
 [<Struct>]
@@ -26,11 +35,11 @@ type DashOptions =
       LengthOptions: LengthOptions }
 
 /// Dash-pattern application and stroke-outline construction.
+/// Outline operations require explicit styles; pure dash extraction does not.
 [<RequireQualifiedAccess>]
 module Stroke =
     let defaultOptions =
         { Width = 1.0<length>
-          Cap = StrokeButt
           Offset = Offset.defaultOptions }
 
     let defaultDashOptions pattern offset =
@@ -74,42 +83,49 @@ module Stroke =
                 Segment.validateLengthOptions options.LengthOptions
                 |> Result.mapError StrokePathError)
 
-    let private toOffsetCap = function
-        | StrokeButt -> Butt
-        | StrokeRound -> RoundCap
-        | StrokeSquare -> Square
+    let private toOffsetJoin = function
+        | StrokeJoin.Bevel -> Join.Bevel
+        | StrokeJoin.Miter limit -> Join.Miter limit
+        | StrokeJoin.Round -> Join.Round
 
-    let rec private strokeSubpaths subpaths options reversedStroked =
+    let private toOffsetCap = function
+        | StrokeCap.Butt -> Cap.Butt
+        | StrokeCap.RoundCap -> Cap.RoundCap
+        | StrokeCap.Square -> Cap.Square
+
+    let private toOffsetOptions (options: StrokeOptions) = options.Offset
+
+    let rec private strokeSubpaths subpaths join cap options reversedStroked =
         match subpaths with
         | [] -> Ok(List.rev reversedStroked)
         | first :: rest ->
-            Offset.subpathStrokeWith first options.Width (toOffsetCap options.Cap) options.Offset
+            Offset.subpathStrokeWith first options.Width (toOffsetJoin join) (toOffsetCap cap) (toOffsetOptions options)
             |> Result.mapError StrokeOffsetError
             |> Result.bind (fun path ->
-                strokeSubpaths rest options (List.rev path.Subpaths @ reversedStroked))
+                strokeSubpaths rest join cap options (List.rev path.Subpaths @ reversedStroked))
 
-    let subpathWith subpath options =
+    let subpathWith subpath join cap options =
         validateOptions options
         |> Result.bind (fun () ->
-            Offset.subpathStrokeWith subpath options.Width (toOffsetCap options.Cap) options.Offset
+            Offset.subpathStrokeWith subpath options.Width (toOffsetJoin join) (toOffsetCap cap) (toOffsetOptions options)
             |> Result.mapError StrokeOffsetError)
 
-    let subpath subpath width = subpathWith subpath { defaultOptions with Width = width }
+    let subpath subpath width join cap = subpathWith subpath join cap { defaultOptions with Width = width }
 
-    let segmentWith segment options =
+    let segmentWith segment join cap options =
         validateOptions options
         |> Result.bind (fun () ->
             Subpath.create [ segment ]
             |> Result.mapError StrokePathError
-            |> Result.bind (fun subpath -> subpathWith subpath options))
+            |> Result.bind (fun subpath -> subpathWith subpath join cap options))
 
-    let segment segment width = segmentWith segment { defaultOptions with Width = width }
+    let segment segment width join cap = segmentWith segment join cap { defaultOptions with Width = width }
 
-    let pathWith (path: Path) options =
+    let pathWith (path: Path) join cap options =
         validateOptions options
-        |> Result.bind (fun () -> strokeSubpaths path.Subpaths options [] |> Result.map Path.ofSubpaths)
+        |> Result.bind (fun () -> strokeSubpaths path.Subpaths join cap options [] |> Result.map Path.ofSubpaths)
 
-    let path path width = pathWith path { defaultOptions with Width = width }
+    let path path width join cap = pathWith path join cap { defaultOptions with Width = width }
 
     let private positiveRemainder (value: float<length>) (modulus: float<length>) =
         let turns = floor (value / modulus)
@@ -215,18 +231,18 @@ module Stroke =
 
     let pathDashes path pattern offset = pathDashesWith path (defaultDashOptions pattern offset)
 
-    let subpathDashedWith subpath options dashOptions =
+    let subpathDashedWith subpath join cap options dashOptions =
         validateOptions options
         |> Result.bind (fun () -> subpathDashesWith subpath dashOptions)
-        |> Result.bind (fun dashes -> strokeSubpaths dashes options [] |> Result.map Path.ofSubpaths)
+        |> Result.bind (fun dashes -> strokeSubpaths dashes join cap options [] |> Result.map Path.ofSubpaths)
 
-    let subpathDashed subpath width pattern offset =
-        subpathDashedWith subpath { defaultOptions with Width = width } (defaultDashOptions pattern offset)
+    let subpathDashed subpath width pattern offset join cap =
+        subpathDashedWith subpath join cap { defaultOptions with Width = width } (defaultDashOptions pattern offset)
 
-    let pathDashedWith path options dashOptions =
+    let pathDashedWith path join cap options dashOptions =
         validateOptions options
         |> Result.bind (fun () -> pathDashesWith path dashOptions)
-        |> Result.bind (fun dashes -> pathWith dashes options)
+        |> Result.bind (fun dashes -> pathWith dashes join cap options)
 
-    let pathDashed path width pattern offset =
-        pathDashedWith path { defaultOptions with Width = width } (defaultDashOptions pattern offset)
+    let pathDashed path width pattern offset join cap =
+        pathDashedWith path join cap { defaultOptions with Width = width } (defaultDashOptions pattern offset)

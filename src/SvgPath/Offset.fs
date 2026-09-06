@@ -37,7 +37,7 @@ type Join =
     | Miter of miterLimit: float
     | Round
 
-/// End-cap geometry used when stroking an open subpath.
+/// End-cap geometry for open strokes and internal open-source winding bands.
 type Cap =
     | Butt
     | Square
@@ -78,13 +78,13 @@ type FittingOptions =
       MaxDepth: int }
 
 [<Struct>]
-/// Options shared by offset, band, and stroke construction.
+/// Technical options shared by offset, band, and stroke construction.
+/// Join and cap styles are explicit operation arguments.
 type Options =
     { Fitting: FittingOptions
       DistanceOptions: DistanceOptions
       StalledOffsetDiameter: float<length>
       TangentHealAngleDegrees: float<degree>
-      Join: Join
       SingleOffsetTrimming: SingleOffsetTrimming
       BandTrimming: BandTrimming }
 
@@ -531,7 +531,7 @@ module Offset =
     let private defaultMaxDepth = maximumRefinementGeneration
     let private defaultSamples = 10
     let private defaultTrimmingSamples = 5
-    let private defaultMiterLimit = 4.0
+    let defaultMiterLimit = 4.0
     let inline private smallUnitDivisionTolerance<[<Measure>] 'Unit> () : float<'Unit> =
         LanguagePrimitives.FloatWithMeasure<'Unit> 1.0e-6
     let private pointTolerance = 1.0e-9<length>
@@ -570,7 +570,6 @@ module Offset =
             { Segment.defaultDistanceOptions with Samples = defaultTrimmingSamples }
           StalledOffsetDiameter = defaultStalledOffsetDiameter
           TangentHealAngleDegrees = defaultTangentHealAngleDegrees
-          Join = Miter defaultMiterLimit
           SingleOffsetTrimming =
             { Offside = true
               FinalTrimming = InBandTrimming }
@@ -602,7 +601,7 @@ module Offset =
              || not (System.Double.IsFinite(float options.TangentHealAngleDegrees)) then
             Error(InvalidTangentHealAngleDegrees options.TangentHealAngleDegrees)
         else
-            validateJoin options.Join
+            Ok()
 
     let private validateStrokeWidth width =
         if width <= 0.0<length> || not (System.Double.IsFinite(float width)) then
@@ -3539,6 +3538,7 @@ module Offset =
     let private buildSynchronizedUntrimmed
         (subpath: Subpath)
         (innerOffset: float<length>) (outerOffset: float<length>)
+        (join: Join)
         (options: Options)
         : Result<SynchronizedUntrimmedBuild, Error> =
         let distances: OffsetDistances = { Inner = innerOffset; Outer = outerOffset }
@@ -3558,7 +3558,7 @@ module Offset =
             buildSynchronizedOffsetSegments subpath distances options
             |> Result.bind (fun (build: SynchronizedOffsetSegmentsBuild) ->
                 synchronizedJoinCorrespondences
-                    build.Portions distances options.Join closedValue
+                    build.Portions distances join closedValue
                 |> Result.bind (fun (joinCorrespondences: OffsetJoinCorrespondence list) ->
                     let innerPreimage =
                         assemblePreimageSubpath
@@ -3589,8 +3589,8 @@ module Offset =
                     | Error error, _
                     | _, Error error -> Error error))
 
-    let private buildSingleOffsetUntrimmed subpath offset options =
-        buildSynchronizedUntrimmed subpath 0.0<length> offset options
+    let private buildSingleOffsetUntrimmed subpath offset join options =
+        buildSynchronizedUntrimmed subpath 0.0<length> offset join options
         |> Result.map (fun (build: SynchronizedUntrimmedBuild) ->
             { Subpath = build.Outer
               ZeroSource = build.Inner
@@ -3599,11 +3599,12 @@ module Offset =
               Portions = build.Portions
               JoinCorrespondences = build.JoinCorrespondences })
 
-    let internal internalSynchronizedJoinTrace subpath innerOffset outerOffset options =
+    let internal internalSynchronizedJoinTrace subpath innerOffset outerOffset join options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
         |> Result.bind (fun normalized ->
-            buildSynchronizedUntrimmed normalized innerOffset outerOffset options)
+            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options)
         |> Result.map (fun (build: SynchronizedUntrimmedBuild) ->
             build.JoinCorrespondences
             |> List.map (fun (correspondence: OffsetJoinCorrespondence) ->
@@ -3741,78 +3742,82 @@ module Offset =
             opinions @ bandSubpathWindingOpinions rest
 
     /// Constructs one untrimmed offset of a subpath with explicit options.
-    let subpathUntrimmedWith subpath offset options =
+    let subpathUntrimmedWith subpath offset join options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
-        |> Result.bind (fun normalized -> buildSingleOffsetUntrimmed normalized offset options)
+        |> Result.bind (fun normalized -> buildSingleOffsetUntrimmed normalized offset join options)
         |> Result.map (fun build -> build.Subpath)
 
     /// Constructs one untrimmed offset of a subpath with default options.
-    let subpathUntrimmed subpath offset =
-        subpathUntrimmedWith subpath offset defaultOptions
+    let subpathUntrimmed subpath offset join =
+        subpathUntrimmedWith subpath offset join defaultOptions
 
     /// Constructs synchronized untrimmed inner and outer offsets.
-    let subpathBandUntrimmedWith subpath innerOffset outerOffset options =
+    let subpathBandUntrimmedWith subpath innerOffset outerOffset join options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
         |> Result.bind (fun normalized ->
-            buildSynchronizedUntrimmed normalized innerOffset outerOffset options)
+            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options)
         |> Result.map (fun build -> Path.ofSubpaths [ build.Inner; build.Outer ])
 
     /// Constructs synchronized untrimmed inner and outer offsets with default options.
-    let subpathBandUntrimmed subpath innerOffset outerOffset =
-        subpathBandUntrimmedWith subpath innerOffset outerOffset defaultOptions
+    let subpathBandUntrimmed subpath innerOffset outerOffset join =
+        subpathBandUntrimmedWith subpath innerOffset outerOffset join defaultOptions
 
-    let rec private untrimmedOffsetPathSubpaths subpaths offset options converted =
+    let rec private untrimmedOffsetPathSubpaths subpaths offset join options converted =
         match subpaths with
         | [] -> Ok(List.rev converted)
         | first :: rest ->
-            subpathUntrimmedWith first offset options
+            subpathUntrimmedWith first offset join options
             |> Result.bind (fun offsetSubpath ->
                 untrimmedOffsetPathSubpaths
-                    rest offset options (offsetSubpath :: converted))
+                    rest offset join options (offsetSubpath :: converted))
 
     /// Constructs an untrimmed offset independently for every source subpath.
-    let pathUntrimmedWith path offset options =
+    let pathUntrimmedWith path offset join options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ ->
-            untrimmedOffsetPathSubpaths (Path.subpaths path) offset options [])
+            untrimmedOffsetPathSubpaths (Path.subpaths path) offset join options [])
         |> Result.map Path.ofSubpaths
 
     /// Constructs untrimmed offsets for a path with default options.
-    let pathUntrimmed path offset =
-        pathUntrimmedWith path offset defaultOptions
+    let pathUntrimmed path offset join =
+        pathUntrimmedWith path offset join defaultOptions
 
-    let rec private singleOffsetUntrimmedPathBuilds subpaths offset options converted =
+    let rec private singleOffsetUntrimmedPathBuilds subpaths offset join options converted =
         match subpaths with
         | [] -> Ok(List.rev converted)
         | first :: rest ->
-            buildSingleOffsetUntrimmed first offset options
+            buildSingleOffsetUntrimmed first offset join options
             |> Result.bind (fun build ->
-                singleOffsetUntrimmedPathBuilds rest offset options (build :: converted))
+                singleOffsetUntrimmedPathBuilds rest offset join options (build :: converted))
 
     let rec private untrimmedBandPathSubpaths
-        subpaths innerOffset outerOffset options converted =
+        subpaths innerOffset outerOffset join options converted =
         match subpaths with
         | [] -> Ok(List.rev converted)
         | first :: rest ->
-            subpathBandUntrimmedWith first innerOffset outerOffset options
+            subpathBandUntrimmedWith first innerOffset outerOffset join options
             |> Result.bind (fun band ->
                 untrimmedBandPathSubpaths
-                    rest innerOffset outerOffset options
+                    rest innerOffset outerOffset join options
                     (List.rev (Path.subpaths band) @ converted))
 
     /// Constructs synchronized untrimmed bands independently for every subpath.
-    let pathBandUntrimmedWith path innerOffset outerOffset options =
+    let pathBandUntrimmedWith path innerOffset outerOffset join options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ ->
             untrimmedBandPathSubpaths
-                (Path.subpaths path) innerOffset outerOffset options [])
+                (Path.subpaths path) innerOffset outerOffset join options [])
         |> Result.map Path.ofSubpaths
 
     /// Constructs untrimmed bands for a path with default options.
-    let pathBandUntrimmed path innerOffset outerOffset =
-        pathBandUntrimmedWith path innerOffset outerOffset defaultOptions
+    let pathBandUntrimmed path innerOffset outerOffset join =
+        pathBandUntrimmedWith path innerOffset outerOffset join defaultOptions
 
     let private arrangementEdgeCapacities
         (graph: OffsetTrimGraph)
@@ -4194,31 +4199,53 @@ module Offset =
             | Error error, _
             | _, Error error -> Error error)
 
-    let private openButtBandEndCap sideA sideB =
-        lineSegmentsBetween [ Subpath.finish sideA; Subpath.finish sideB ]
+    let private bandCapSegments fromPoint toPoint (outward: Point<1>) radius cap =
+        match cap with
+        | Butt -> lineSegmentsBetween [ fromPoint; toPoint ]
+        | Square ->
+            let extension = Point.scale radius outward
+            lineSegmentsBetween [ fromPoint; Point.add fromPoint extension; Point.add toPoint extension; toPoint ]
+        | RoundCap ->
+            [ Arc { Start = fromPoint; Radius = Point.create radius radius
+                    XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = toPoint } ]
 
-    let private openButtBandStartCap sideA sideB =
-        lineSegmentsBetween [ Subpath.start sideB; Subpath.start sideA ]
+    let private openBandEndCap sideA sideB cap =
+        let fromPoint, toPoint = Subpath.finish sideA, Subpath.finish sideB
+        match cap, List.tryLast (Subpath.segments sideA) with
+        | Butt, _ | _, None -> Ok(lineSegmentsBetween [ fromPoint; toPoint ])
+        | _, Some last ->
+            unitTangent last 1.0<parameter>
+            |> Result.map (fun tangent -> bandCapSegments fromPoint toPoint tangent (Point.distance fromPoint toPoint / 2.0) cap)
 
-    let private openButtBandOutline sideA sideB =
-        let segments =
-            Subpath.segments sideA
-            @ openButtBandEndCap sideA sideB
-            @ reverseSegments (Subpath.segments sideB)
-            @ openButtBandStartCap sideA sideB
-        Subpath.createWith Wiggle segments
-        |> Result.mapError PathError
-        |> Result.bind (fun outline ->
-            Subpath.setClosedWith Wiggle true outline |> Result.mapError PathError)
+    let private openBandStartCap sideA sideB cap =
+        let fromPoint, toPoint = Subpath.start sideB, Subpath.start sideA
+        match cap, List.tryHead (Subpath.segments sideB) with
+        | Butt, _ | _, None -> Ok(lineSegmentsBetween [ fromPoint; toPoint ])
+        | _, Some first ->
+            unitTangent first 0.0<parameter>
+            |> Result.map (fun tangent -> bandCapSegments fromPoint toPoint (Point.negate tangent) (Point.distance fromPoint toPoint / 2.0) cap)
 
-    let private bandFromSides sideA innerOffset sideB outerOffset =
+    let private openBandOutline sideA sideB cap =
+        openBandEndCap sideA sideB cap
+        |> Result.bind (fun endCap ->
+            openBandStartCap sideA sideB cap
+            |> Result.bind (fun startCap ->
+                let segments =
+                    Subpath.segments sideA @ endCap
+                    @ reverseSegments (Subpath.segments sideB) @ startCap
+                Subpath.createWith Wiggle segments
+                |> Result.mapError PathError
+                |> Result.bind (fun outline ->
+                    Subpath.setClosedWith Wiggle true outline |> Result.mapError PathError)))
+
+    let private bandFromSides sideA innerOffset sideB outerOffset cap =
         let exterior, interior =
             if innerOffset >= outerOffset then sideA, sideB else sideB, sideA
         if Subpath.isClosed sideA then Ok(ClosedSubpathBand(exterior, interior))
-        else openButtBandOutline exterior interior |> Result.map OpenSubpathBand
+        else openBandOutline exterior interior cap |> Result.map OpenSubpathBand
 
-    let private closedUntrimmedSideFromNormalizedSource source offset options =
-        buildSingleOffsetUntrimmed source offset options
+    let private closedUntrimmedSideFromNormalizedSource source offset join options =
+        buildSingleOffsetUntrimmed source offset join options
         |> Result.map (fun build -> build.Subpath)
         |> Result.bind (fun side ->
             if Subpath.isClosed side then Ok side
@@ -4227,9 +4254,9 @@ module Offset =
                     (WiggleWith options.Fitting.Tolerance) true side
                 |> Result.mapError PathError)
 
-    let private untrimmedStrokeOutlineFromNormalizedSource source radius cap options =
-        match buildSingleOffsetUntrimmed source radius options |> Result.map (fun build -> build.Subpath),
-              buildSingleOffsetUntrimmed source -radius options |> Result.map (fun build -> build.Subpath),
+    let private untrimmedStrokeOutlineFromNormalizedSource source radius join cap options =
+        match buildSingleOffsetUntrimmed source radius join options |> Result.map (fun build -> build.Subpath),
+              buildSingleOffsetUntrimmed source -radius join options |> Result.map (fun build -> build.Subpath),
               strokeEndCap source radius cap,
               strokeStartCap source radius cap with
         | Ok positive, Ok negative, Ok endCap, Ok startCap ->
@@ -4247,24 +4274,24 @@ module Offset =
         | _, _, Error error, _
         | _, _, _, Error error -> Error error
 
-    let private untrimmedStrokeOutline source radius cap options =
+    let private untrimmedStrokeOutline source radius join cap options =
         normalizeSourceSubpath source options
         |> Result.bind (fun normalized ->
-            untrimmedStrokeOutlineFromNormalizedSource normalized radius cap options)
+            untrimmedStrokeOutlineFromNormalizedSource normalized radius join cap options)
 
     let private untrimmedStrokeBand
-        (source: Subpath) (width: float<length>) cap (options: Options) =
+        (source: Subpath) (width: float<length>) join cap (options: Options) =
         let radius = width / 2.0
         normalizeSourceSubpath source options
         |> Result.bind (fun normalized ->
             if Subpath.isClosed source then
-                match closedUntrimmedSideFromNormalizedSource normalized -radius options,
-                      closedUntrimmedSideFromNormalizedSource normalized radius options with
+                match closedUntrimmedSideFromNormalizedSource normalized -radius join options,
+                      closedUntrimmedSideFromNormalizedSource normalized radius join options with
                 | Ok interior, Ok exterior -> Ok(ClosedSubpathBand(exterior, interior))
                 | Error error, _
                 | _, Error error -> Error error
             else
-                untrimmedStrokeOutlineFromNormalizedSource normalized radius cap options
+                untrimmedStrokeOutlineFromNormalizedSource normalized radius join cap options
                 |> Result.map OpenSubpathBand)
 
     let private requireClosedBandSubpath subpath =
@@ -4570,6 +4597,7 @@ module Offset =
         (subpath: ICulledOffsetSubpath)
         (zeroSource: Subpath)
         (offset: float<length>)
+        (cap: Cap)
         (options: Options) =
         match subpath.Segments with
         | [] -> Ok None
@@ -4578,7 +4606,7 @@ module Offset =
                 (subpath.Segments |> List.map (fun segment -> segment.Segment))
                 subpath.Closed options.Fitting.Tolerance
             |> Result.bind (fun geometry ->
-                bandFromSides zeroSource 0.0<length> geometry offset
+                bandFromSides zeroSource 0.0<length> geometry offset cap
                 |> Result.bind (fun band ->
                     internalBandWindingFunction [ band ]
                     |> Result.bind (fun winding ->
@@ -4817,11 +4845,11 @@ module Offset =
 
     let private trimBandSideCusps
         (subpath: ICulledOffsetSubpath)
-        zeroSource offset
+        zeroSource offset cap
         (options: Options)
         enabled =
         if enabled then
-            cuspTrimISubpath subpath zeroSource offset options
+            cuspTrimISubpath subpath zeroSource offset cap options
             |> Result.bind (function
                 | None -> Ok None
                 | Some trimmed ->
@@ -4851,23 +4879,24 @@ module Offset =
                        Submerged = not matches } :: traced))
 
     let internal internalSubpathBandArrangementTrace
-        subpath innerOffset outerOffset (options: Options) =
+        subpath innerOffset outerOffset join cap (options: Options) =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
         |> Result.bind (fun normalized ->
-            buildSynchronizedUntrimmed normalized innerOffset outerOffset options
+            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options
             |> Result.bind (fun synchronized ->
                 match cuspTrimISubpath
-                          synchronized.InnerCulled normalized innerOffset options,
+                          synchronized.InnerCulled normalized innerOffset cap options,
                       cuspTrimISubpath
-                          synchronized.OuterCulled normalized outerOffset options with
+                          synchronized.OuterCulled normalized outerOffset cap options with
                 | Ok(Some innerTrimmed), Ok(Some outerTrimmed) ->
                     match cuspTrimmedSubpathGeometry
                               innerTrimmed options.Fitting.Tolerance,
                           cuspTrimmedSubpathGeometry
                               outerTrimmed options.Fitting.Tolerance with
                     | Ok inner, Ok outer ->
-                        bandFromSides inner innerOffset outer outerOffset
+                        bandFromSides inner innerOffset outer outerOffset cap
                         |> Result.bind (fun band ->
                             let opinions =
                                 if innerOffset >= outerOffset then
@@ -4912,13 +4941,13 @@ module Offset =
 
     let private cuspTrimmingArrangementTraceForSide
         (subpath: ICulledOffsetSubpath)
-        zeroSource offset sideIndex
+        zeroSource offset sideIndex cap
         (options: Options) =
         subpathFromSynchronizedSegments
             (subpath.Segments |> List.map (fun segment -> segment.Segment))
             subpath.Closed options.Fitting.Tolerance
         |> Result.bind (fun geometry ->
-            bandFromSides zeroSource 0.0<length> geometry offset
+            bandFromSides zeroSource 0.0<length> geometry offset cap
             |> Result.bind (fun band ->
                 internalBandWindingFunction [ band ]
                 |> Result.bind (fun winding ->
@@ -4929,16 +4958,17 @@ module Offset =
                             arrangement.Graph.Edges arrangement winding sideIndex []))))
 
     let internal internalSubpathBandCuspTrimmingArrangementTrace
-        subpath innerOffset outerOffset (options: Options) =
+        subpath innerOffset outerOffset join cap (options: Options) =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
         |> Result.bind (fun normalized ->
-            buildSynchronizedUntrimmed normalized innerOffset outerOffset options
+            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options
             |> Result.bind (fun build ->
                 match cuspTrimmingArrangementTraceForSide
-                          build.InnerCulled normalized innerOffset 0 options,
+                          build.InnerCulled normalized innerOffset 0 cap options,
                       cuspTrimmingArrangementTraceForSide
-                          build.OuterCulled normalized outerOffset 1 options with
+                          build.OuterCulled normalized outerOffset 1 cap options with
                 | Ok first, Ok second -> Ok(first @ second)
                 | Error error, _
                 | _, Error error -> Error error))
@@ -5203,8 +5233,8 @@ module Offset =
 
     let private cuspTrimTracedSubpath
         (traced: TracedOffsetSubpath)
-        zeroSource offset options =
-        cuspTrimISubpath (iSubpathFromTraced traced) zeroSource offset options
+        zeroSource offset cap options =
+        cuspTrimISubpath (iSubpathFromTraced traced) zeroSource offset cap options
         |> Result.map (Option.map (fun subpath ->
             tracedSubpathFromCuspTrimmed
                 subpath traced.SourceSubpathIndex traced.Side))
@@ -5212,7 +5242,7 @@ module Offset =
     let rec private cuspTrimmedSingleOffsetSubpaths
         (subpaths: TracedOffsetSubpath list)
         (builds: SingleOffsetUntrimmedBuild list)
-        offset options
+        offset cap options
         (trimmed: TracedOffsetSubpath list) =
         match subpaths with
         | [] -> Ok(List.rev trimmed)
@@ -5220,18 +5250,18 @@ module Offset =
             match List.tryItem traced.SourceSubpathIndex builds with
             | None -> Error InternalSegmentImageCountMismatch
             | Some build ->
-                cuspTrimTracedSubpath traced build.ZeroSource offset options
+                cuspTrimTracedSubpath traced build.ZeroSource offset cap options
                 |> Result.bind (fun result ->
                     cuspTrimmedSingleOffsetSubpaths
-                        rest builds offset options
+                        rest builds offset cap options
                         (match result with
                          | Some subpath -> subpath :: trimmed
                          | None -> trimmed))
 
     let private cuspTrimmedSingleOffsetSubpathsResult
-        offsideTrimmed builds offset (options: Options) =
+        offsideTrimmed builds offset cap (options: Options) =
         cuspTrimmedSingleOffsetSubpaths
-            offsideTrimmed builds offset options []
+            offsideTrimmed builds offset cap options []
         |> Result.bind (fun traced ->
             traced
             |> List.fold (fun state subpath ->
@@ -5269,7 +5299,7 @@ module Offset =
 
     let private finalSingleOffsetSubpaths
         (builds: SingleOffsetUntrimmedBuild list)
-        offset bands (options: Options) offside finalTrimming =
+        offset bands cap (options: Options) offside finalTrimming =
         let originalUntrimmed = builds |> List.map (fun build -> build.Subpath)
         let zeroSourceSegments =
             builds |> List.collect (fun build -> Subpath.segments build.ZeroSource)
@@ -5281,7 +5311,7 @@ module Offset =
                 match finalTrimming with
                 | CuspTrimming ->
                     cuspTrimmedSingleOffsetSubpathsResult
-                        offsideTrimmed builds offset options
+                        offsideTrimmed builds offset cap options
                 | InBandTrimming ->
                     submergedTrimmedSingleOffsetSubpaths
                         offsideTrimmed builds originalArrangement
@@ -5365,68 +5395,73 @@ module Offset =
         |> Result.map Path.ofSubpaths
 
     let private trimSingleOffsetBuilds
-        builds offset bands (options: Options) =
+        builds offset bands cap (options: Options) =
         finalSingleOffsetSubpaths
-            builds offset bands options
+            builds offset bands cap options
             options.SingleOffsetTrimming.Offside
             options.SingleOffsetTrimming.FinalTrimming
         |> Result.map (List.filter (fun subpath -> not (List.isEmpty (Subpath.segments subpath))))
         |> Result.bind (Path.ofSubpaths >> orientOutlinePath)
 
-    let internal internalSingleOffsetBandCandidate source offset options =
+    let internal internalSingleOffsetBandCandidate source offset join cap options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath source options)
         |> Result.bind (fun normalized ->
-            buildSingleOffsetUntrimmed normalized offset options)
+            buildSingleOffsetUntrimmed normalized offset join options)
         |> Result.bind (fun build ->
-            bandFromSides build.ZeroSource 0.0<length> build.Subpath offset)
+            bandFromSides build.ZeroSource 0.0<length> build.Subpath offset cap)
 
     /// Offsets one segment without topological trimming.
-    let segmentWith segment offset options =
+    let segmentWith segment offset join options =
         Subpath.createWith Strict [ segment ]
         |> Result.mapError PathError
-        |> Result.bind (fun source -> subpathUntrimmedWith source offset options)
+        |> Result.bind (fun source -> subpathUntrimmedWith source offset join options)
         |> function
             | Error(PathError EmptySubpath) -> Error(DegenerateTangent 0.0<parameter>)
             | result -> result
 
     /// Offsets one segment with default options and without topological trimming.
-    let segment segment offset = segmentWith segment offset defaultOptions
+    let segment segment offset join = segmentWith segment offset join defaultOptions
 
     /// Constructs and trims one signed offset of a subpath.
-    let subpathWith subpath offset options =
+    /// The cap closes the internal source-to-offset winding band.
+    let subpathWith subpath offset join cap options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
         |> Result.bind (fun normalized ->
-            buildSingleOffsetUntrimmed normalized offset options)
+            buildSingleOffsetUntrimmed normalized offset join options)
         |> Result.bind (fun untrimmedBuild ->
             bandFromSides
                 untrimmedBuild.ZeroSource 0.0<length>
-                untrimmedBuild.Subpath offset
+                untrimmedBuild.Subpath offset cap
             |> Result.bind (fun band ->
                 trimSingleOffsetBuilds
-                    [ untrimmedBuild ] offset [ band ] options))
+                    [ untrimmedBuild ] offset [ band ] cap options))
 
     /// Constructs and trims one signed offset with default options.
-    let subpath subpath offset = subpathWith subpath offset defaultOptions
+    let subpath subpath offset join cap = subpathWith subpath offset join cap defaultOptions
 
     /// Constructs the trimmed region between two signed offsets of a subpath.
     /// Either offset ordering is accepted; exchanging them reverses the result.
+    /// Caps close internal winding bands; disabling InBand exposes the capped outline.
     let subpathBandWith
-        subpath innerOffset outerOffset (options: Options) =
+        subpath innerOffset outerOffset join cap (options: Options) =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
         |> Result.bind (fun normalized ->
-            buildSynchronizedUntrimmed normalized innerOffset outerOffset options
+            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options
             |> Result.bind (fun build ->
                 match trimBandSideCusps
-                          build.InnerCulled normalized innerOffset options
+                          build.InnerCulled normalized innerOffset cap options
                           options.BandTrimming.InnerCusps,
                       trimBandSideCusps
-                          build.OuterCulled normalized outerOffset options
+                          build.OuterCulled normalized outerOffset cap options
                           options.BandTrimming.OuterCusps with
                 | Ok(Some inner), Ok(Some outer) ->
-                    bandFromSides inner innerOffset outer outerOffset
+                    bandFromSides inner innerOffset outer outerOffset cap
                     |> Result.bind (fun band ->
                         let opinions =
                             if innerOffset >= outerOffset then
@@ -5450,59 +5485,61 @@ module Offset =
                 | _, Error error -> Error error))
 
     /// Constructs an offset band with default options.
-    let subpathBand subpath innerOffset outerOffset =
-        subpathBandWith subpath innerOffset outerOffset defaultOptions
+    let subpathBand subpath innerOffset outerOffset join cap =
+        subpathBandWith subpath innerOffset outerOffset join cap defaultOptions
 
     let rec private singleOffsetBandsFromBuilds
         (builds: SingleOffsetUntrimmedBuild list)
-        offset converted =
+        offset cap converted =
         match builds with
         | [] -> Ok(List.rev converted)
         | first :: rest ->
-            bandFromSides first.ZeroSource 0.0<length> first.Subpath offset
+            bandFromSides first.ZeroSource 0.0<length> first.Subpath offset cap
             |> Result.bind (fun band ->
-                singleOffsetBandsFromBuilds rest offset (band :: converted))
+                singleOffsetBandsFromBuilds rest offset cap (band :: converted))
 
     /// Constructs and trims an offset independently for each path subpath.
-    let pathWith (path: Path) offset options =
+    let pathWith (path: Path) offset join cap options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourcePath path options)
         |> Result.bind (fun normalized ->
             singleOffsetUntrimmedPathBuilds
-                (Path.subpaths normalized) offset options []
+                (Path.subpaths normalized) offset join options []
             |> Result.bind (fun builds ->
-                singleOffsetBandsFromBuilds builds offset []
+                singleOffsetBandsFromBuilds builds offset cap []
                 |> Result.bind (fun bands ->
-                    trimSingleOffsetBuilds builds offset bands options)))
+                    trimSingleOffsetBuilds builds offset bands cap options)))
 
     /// Constructs trimmed path offsets with default options.
-    let path (path: Path) offset = pathWith path offset defaultOptions
+    let path (path: Path) offset join cap = pathWith path offset join cap defaultOptions
 
     let rec private bandPathSubpaths
-        subpaths innerOffset outerOffset options converted =
+        subpaths innerOffset outerOffset join cap options converted =
         match subpaths with
         | [] -> Ok(List.rev converted)
         | first :: rest ->
-            subpathBandWith first innerOffset outerOffset options
+            subpathBandWith first innerOffset outerOffset join cap options
             |> Result.bind (fun band ->
-                bandPathSubpaths rest innerOffset outerOffset options
+                bandPathSubpaths rest innerOffset outerOffset join cap options
                     (List.rev (Path.subpaths band) @ converted))
 
     /// Constructs a trimmed offset band independently for each path subpath.
-    let pathBandWith (path: Path) innerOffset outerOffset options =
+    let pathBandWith (path: Path) innerOffset outerOffset join cap options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ ->
             bandPathSubpaths
-                (Path.subpaths path) innerOffset outerOffset options [])
+                (Path.subpaths path) innerOffset outerOffset join cap options [])
         |> Result.map Path.ofSubpaths
 
     /// Constructs path offset bands with default options.
-    let pathBand (path: Path) innerOffset outerOffset =
-        pathBandWith path innerOffset outerOffset defaultOptions
+    let pathBand (path: Path) innerOffset outerOffset join cap =
+        pathBandWith path innerOffset outerOffset join cap defaultOptions
 
     let private closedStrokePath
-        source (radius: float<length>) (options: Options) =
-        untrimmedStrokeBand source (radius * 2.0) Butt options
+        source (radius: float<length>) join cap (options: Options) =
+        untrimmedStrokeBand source (radius * 2.0) join cap options
         |> Result.bind (function
             | OpenSubpathBand _ -> Error BandSubpathNotClosed
             | ClosedSubpathBand(exterior, interior) ->
@@ -5513,8 +5550,8 @@ module Offset =
                     options)
 
     /// Converts a subpath stroke to filled outline geometry.
-    let subpathStrokeWith subpath width cap (options: Options) =
-        match validateStrokeWidth width, validateOptions options with
+    let subpathStrokeWith subpath width join cap (options: Options) =
+        match validateStrokeWidth width, validateOptions options |> Result.bind (fun _ -> validateJoin join) with
         | Error error, _
         | _, Error error -> Error error
         | Ok _, Ok _ ->
@@ -5528,44 +5565,44 @@ module Offset =
                     if sourceLength <= pointTolerance then
                         zeroLengthStrokePath subpath radius cap
                     elif Subpath.isClosed subpath then
-                        closedStrokePath subpath radius options
+                        closedStrokePath subpath radius join cap options
                         |> Result.bind orientOutlinePath
                     else
-                        untrimmedStrokeOutline subpath radius cap options
+                        untrimmedStrokeOutline subpath radius join cap options
                         |> Result.bind (fun untrimmed ->
                             topologicalBandPath
                                 [ untrimmed ] [ OpenSubpathBand untrimmed ] options)
                         |> Result.bind orientOutlinePath)
 
-    /// Strokes a subpath with a butt cap and default options.
-    let subpathStroke subpath width =
-        subpathStrokeWith subpath width Butt defaultOptions
+    /// Strokes a subpath with explicit styles and default technical options.
+    let subpathStroke subpath width join cap =
+        subpathStrokeWith subpath width join cap defaultOptions
 
-    let rec private strokePathSubpaths subpaths width cap options converted =
+    let rec private strokePathSubpaths subpaths width join cap options converted =
         match subpaths with
         | [] -> Ok(List.rev converted)
         | first :: rest ->
-            subpathStrokeWith first width cap options
+            subpathStrokeWith first width join cap options
             |> Result.bind (fun stroke ->
-                strokePathSubpaths rest width cap options
+                strokePathSubpaths rest width join cap options
                     (List.rev (Path.subpaths stroke) @ converted))
 
     /// Converts every subpath stroke to filled outline geometry.
-    let pathStrokeWith (path: Path) width cap options =
-        match validateStrokeWidth width, validateOptions options with
+    let pathStrokeWith (path: Path) width join cap options =
+        match validateStrokeWidth width, validateOptions options |> Result.bind (fun _ -> validateJoin join) with
         | Error error, _
         | _, Error error -> Error error
         | Ok _, Ok _ ->
-            strokePathSubpaths (Path.subpaths path) width cap options []
+            strokePathSubpaths (Path.subpaths path) width join cap options []
             |> Result.map Path.ofSubpaths
 
-    /// Strokes a path with butt caps and default options.
-    let pathStroke (path: Path) width =
-        pathStrokeWith path width Butt defaultOptions
+    /// Strokes a path with explicit styles and default technical options.
+    let pathStroke (path: Path) width join cap =
+        pathStrokeWith path width join cap defaultOptions
 
-    let internal internalUntrimmedStrokeBand source width cap options =
+    let internal internalUntrimmedStrokeBand source width join cap options =
         validateStrokeWidth width
-        |> Result.bind (fun _ -> untrimmedStrokeBand source width cap options)
+        |> Result.bind (fun _ -> untrimmedStrokeBand source width join cap options)
 
     let rec private contaminationArrangementTraceBuilds
         (builds: SingleOffsetUntrimmedBuild list)
@@ -5612,12 +5649,13 @@ module Offset =
             | _, Error error -> Error error
 
     let internal internalPathSingleOffsetContaminationArrangementTrace
-        (source: Path) offset options =
+        (source: Path) offset join options =
         validateOptions options
+        |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourcePath source options)
         |> Result.bind (fun normalized ->
             singleOffsetUntrimmedPathBuilds
-                (Path.subpaths normalized) offset options []
+                (Path.subpaths normalized) offset join options []
             |> Result.bind (fun builds ->
                 let offsetCount =
                     builds

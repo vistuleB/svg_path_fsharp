@@ -28,21 +28,21 @@ let ``subpath_offset_map_wraps_closed_subpath_distances_test`` () =
 [<Fact>]
 let ``segment_offsets_line_to_visual_left_for_positive_distance_test`` () =
     let result =
-        Offset.segment (Line(point 0.0 0.0, point 10.0 0.0)) 2.0<length>
+        Offset.segment (Line(point 0.0 0.0, point 10.0 0.0)) 2.0<length> (Miter Offset.defaultMiterLimit)
         |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Equal<Segment list>([ Line(point 0.0 -2.0, point 10.0 -2.0) ], result.Segments)
 
 [<Fact>]
 let ``segment_offsets_quadratic_to_cubic_pieces_within_tolerance_test`` () =
     let source = QuadraticBezier(point 0.0 0.0, point 5.0 8.0, point 10.0 0.0)
-    let result = Offset.segment source 1.0<length> |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let result = Offset.segment source 1.0<length> (Miter Offset.defaultMiterLimit) |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.NotEmpty(result.Segments)
     Assert.True(result.Segments |> List.forall (function CubicBezier _ -> true | _ -> false))
 
 [<Fact>]
 let ``segment_rejects_negative_tangent_heal_angle_test`` () =
     let options = { Offset.defaultOptions with TangentHealAngleDegrees = -1.0<degree> }
-    match Offset.segmentWith (Line(point 0.0 0.0, point 1.0 0.0)) 1.0<length> options with
+    match Offset.segmentWith (Line(point 0.0 0.0, point 1.0 0.0)) 1.0<length> (Miter Offset.defaultMiterLimit) options with
     | Error(InvalidTangentHealAngleDegrees angle) -> Assert.Equal(-1.0<degree>, angle)
     | other -> failwithf "unexpected result: %A" other
 
@@ -51,20 +51,20 @@ let ``subpath_untrimmed_offsets_open_polyline_with_bevel_join_test`` () =
     let source =
         Subpath.create [ Line(point 0.0 0.0, point 2.0 0.0); Line(point 2.0 0.0, point 2.0 2.0) ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
-    let options = { Offset.defaultOptions with Join = Bevel }
-    let result = Offset.subpathUntrimmedWith source 0.5<length> options |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let options = Offset.defaultOptions
+    let result = Offset.subpathUntrimmedWith source 0.5<length> Bevel options |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Equal(3, List.length result.Segments)
     Assert.False(result.Closed)
     Assert.Equal(Segment.finish result.Segments[0], Segment.start result.Segments[1])
     Assert.Equal(Segment.finish result.Segments[1], Segment.start result.Segments[2])
 
 [<Fact>]
-let ``subpath_untrimmed_offsets_open_polyline_with_miter_join_by_default_test`` () =
+let ``subpath_untrimmed_offsets_open_polyline_with_explicit_join_styles_test`` () =
     let source =
         Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]
         |> Result.defaultWith (failwithf "%A")
     let render join =
-        Offset.subpathUntrimmedWith source 2.0<length> { Offset.defaultOptions with Join = join }
+        Offset.subpathUntrimmedWith source 2.0<length> join Offset.defaultOptions
         |> Result.defaultWith (failwithf "%A")
         |> Serialize.subpath
     Assert.Equal("M 0 -2 H 10 L 12 0 V 10", render Bevel)
@@ -77,7 +77,7 @@ let ``subpath_untrimmed_offsets_open_polyline_with_round_join_test`` () =
         Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]
         |> Result.defaultWith (failwithf "%A")
     let result =
-        Offset.subpathUntrimmedWith source 2.0<length> { Offset.defaultOptions with Join = Round }
+        Offset.subpathUntrimmedWith source 2.0<length> Round Offset.defaultOptions
         |> Result.defaultWith (failwithf "%A")
     Assert.Contains(result.Segments, function Arc _ -> true | _ -> false)
     Assert.Equal("M 0 -2 H 10 A 2 2 0 0 1 12 0 V 10", Serialize.subpath result)
@@ -87,8 +87,8 @@ let ``subpath_untrimmed_offsets_closed_square_and_preserves_closed_state_test`` 
     let source =
         Subpath.polygon [ point 0.0 0.0; point 4.0 0.0; point 4.0 4.0; point 0.0 4.0 ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
-    let options = { Offset.defaultOptions with Join = Round }
-    let result = Offset.subpathUntrimmedWith source 0.5<length> options |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let options = Offset.defaultOptions
+    let result = Offset.subpathUntrimmedWith source 0.5<length> Round options |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.True(result.Closed)
     Assert.Equal(result.Start, result.Segments |> List.last |> Segment.finish)
     Assert.Contains(result.Segments, function Arc _ -> true | _ -> false)
@@ -103,7 +103,7 @@ let ``segment_offsets_circular_arc_exactly_test`` () =
               LargeArc = false
               Sweep = true
               End = point 0.0 10.0 }
-    let result = Offset.segment source 2.0<length> |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let result = Offset.segment source 2.0<length> (Miter Offset.defaultMiterLimit) |> Result.defaultWith (fun error -> failwithf "%A" error)
     match result.Segments with
     | [ Arc offsetArc ] ->
         Assert.Equal(12.0<length>, offsetArc.Radius.X)
@@ -120,7 +120,7 @@ let ``segment_offsets_circular_arc_across_center_test`` () =
               LargeArc = false
               Sweep = false
               End = point 0.0 -10.0 }
-    let result = Offset.segment source 12.0<length> |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let result = Offset.segment source 12.0<length> (Miter Offset.defaultMiterLimit) |> Result.defaultWith (fun error -> failwithf "%A" error)
     match result.Segments with
     | [ Arc offsetArc ] ->
         Assert.Equal(point -2.0 0.0, offsetArc.Start)
@@ -139,13 +139,13 @@ let ``segment_rejects_collapsed_circular_arc_offset_test`` () =
               LargeArc = false
               Sweep = true
               End = point 0.0 10.0 }
-    match Offset.segment source -10.0<length> with
+    match Offset.segment source -10.0<length> (Miter Offset.defaultMiterLimit) with
     | Error(SvgPath.Error.DegenerateTangent parameterValue) -> Assert.Equal(0.0<parameter>, parameterValue)
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
 let ``segment_rejects_zero_length_line_test`` () =
-    match Offset.segment (Line(point 1.0 2.0, point 1.0 2.0)) 1.0<length> with
+    match Offset.segment (Line(point 1.0 2.0, point 1.0 2.0)) 1.0<length> (Miter Offset.defaultMiterLimit) with
     | Error(SvgPath.Error.DegenerateTangent parameterValue) -> Assert.Equal(0.0<parameter>, parameterValue)
     | other -> failwithf "unexpected result: %A" other
 
@@ -154,7 +154,7 @@ let ``path_untrimmed_offsets_every_subpath_test`` () =
     let first = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     let second = Subpath.ofSegment (Line(point 0.0 2.0, point 1.0 2.0))
     let result =
-        Offset.pathUntrimmed (Path.ofSubpaths [ first; second ]) 0.5<length>
+        Offset.pathUntrimmed (Path.ofSubpaths [ first; second ]) 0.5<length> (Miter Offset.defaultMiterLimit)
         |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Equal(2, result.Subpaths.Length)
 
@@ -164,8 +164,8 @@ let ``trimmed path normalization drops empty source subpaths`` () =
         Path.ofSubpaths
             [ Subpath.empty (point 0.0 0.0)
               Subpath.ofSegment (Line(point 0.0 2.0, point 3.0 2.0)) ]
-    let untrimmed = Offset.pathUntrimmed source 0.5<length> |> Result.defaultWith (failwithf "%A")
-    let trimmed = Offset.path source 0.5<length> |> Result.defaultWith (failwithf "%A")
+    let untrimmed = Offset.pathUntrimmed source 0.5<length> (Miter Offset.defaultMiterLimit) |> Result.defaultWith (failwithf "%A")
+    let trimmed = Offset.path source 0.5<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, untrimmed.Subpaths.Length)
     Assert.Empty(untrimmed.Subpaths[0].Segments)
     Assert.Single(trimmed.Subpaths) |> ignore
@@ -188,10 +188,10 @@ let ``synchronized_offsets_accept_reversed_distance_order_test`` () =
     let source =
         Subpath.ofSegment (Line(point 0.0 0.0, point 2.0 1.0))
     let forward =
-        Offset.subpathBandUntrimmed source -0.5<length> 1.0<length>
+        Offset.subpathBandUntrimmed source -0.5<length> 1.0<length> (Miter Offset.defaultMiterLimit)
         |> Result.defaultWith (failwithf "%A")
     let reversed =
-        Offset.subpathBandUntrimmed source 1.0<length> -0.5<length>
+        Offset.subpathBandUntrimmed source 1.0<length> -0.5<length> (Miter Offset.defaultMiterLimit)
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(forward.Subpaths[0], reversed.Subpaths[1])
     Assert.Equal(forward.Subpaths[1], reversed.Subpaths[0])
@@ -201,14 +201,14 @@ let ``subpath_band_closed_square_returns_two_closed_sides_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 8.0; point 0.0 8.0 ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
-    let result = Offset.subpathBand source -1.0<length> 1.0<length> |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let result = Offset.subpathBand source -1.0<length> 1.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Equal(2, result.Subpaths.Length)
     Assert.All(result.Subpaths, fun subpath -> Assert.True(subpath.Closed))
 
 [<Fact>]
 let ``subpath_band_open_line_returns_two_capless_sides_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    let result = Offset.subpathBand source -1.0<length> 2.0<length> |> Result.defaultWith (failwithf "%A")
+    let result = Offset.subpathBand source -1.0<length> 2.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, result.Subpaths.Length)
     Assert.All(result.Subpaths, fun subpath -> Assert.False(subpath.Closed))
     let segments = result.Subpaths |> List.collect Subpath.segments
@@ -220,7 +220,7 @@ let ``subpath_offsets_closed_square_inset_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let result = Offset.subpath source -2.0<length> |> Result.defaultWith (failwithf "%A")
+    let result = Offset.subpath source -2.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
     Assert.Single(result.Subpaths) |> ignore
     Assert.True(result.Subpaths[0].Closed)
     Assert.Equal<Segment list>(
@@ -235,8 +235,8 @@ let ``exchanging_band_offsets_reverses_result_orientation_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 8.0; point 0.0 8.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let forward = Offset.subpathBand source -1.0<length> 1.0<length> |> Result.defaultWith (failwithf "%A")
-    let reversed = Offset.subpathBand source 1.0<length> -1.0<length> |> Result.defaultWith (failwithf "%A")
+    let forward = Offset.subpathBand source -1.0<length> 1.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
+    let reversed = Offset.subpathBand source 1.0<length> -1.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
     let forwardArea = Area.signedPath forward
     let reversedArea = Area.signedPath reversed
     Assert.True(
@@ -247,8 +247,8 @@ let ``exchanging_band_offsets_reverses_result_orientation_test`` () =
 [<Fact>]
 let ``subpath_can_use_round_join_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    let options = { Offset.defaultOptions with Join = Round }
-    let result = Offset.subpathStrokeWith source 2.0<length> RoundCap options |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let options = Offset.defaultOptions
+    let result = Offset.subpathStrokeWith source 2.0<length> Round RoundCap options |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Single(result.Subpaths) |> ignore
     Assert.True(result.Subpaths[0].Closed)
     Assert.Equal(2, result.Subpaths[0].Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
@@ -258,8 +258,8 @@ let ``subpath_can_use_bevel_join_test`` () =
     let source =
         Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]
         |> Result.defaultWith (failwithf "%A")
-    let options = { Offset.defaultOptions with Join = Bevel }
-    let result = Offset.subpathWith source 2.0<length> options |> Result.defaultWith (failwithf "%A")
+    let options = Offset.defaultOptions
+    let result = Offset.subpathWith source 2.0<length> Bevel Butt options |> Result.defaultWith (failwithf "%A")
     Assert.NotEmpty(result.Subpaths)
 
 [<Fact>]
@@ -268,7 +268,7 @@ let ``path_offsets_every_subpath_test`` () =
         Path.ofSubpaths
             [ Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
               Subpath.ofSegment (Line(point 0.0 5.0, point 10.0 5.0)) ]
-    let result = Offset.pathStroke source 1.0<length> |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let result = Offset.pathStroke source 1.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Equal(2, result.Subpaths.Length)
 
 [<Fact>]
@@ -279,7 +279,7 @@ let ``path_offsets_straight_subpaths_test`` () =
     let second =
         Subpath.create [ Line(point 0.0 20.0, point 10.0 20.0); Line(point 10.0 20.0, point 10.0 10.0) ]
         |> Result.defaultWith (failwithf "%A")
-    let result = Offset.path (Path.ofSubpaths [ first; second ]) 2.0<length> |> Result.defaultWith (failwithf "%A")
+    let result = Offset.path (Path.ofSubpaths [ first; second ]) 2.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 -2 H 8 V -10 M 0 18 H 8 V 10", Serialize.path result)
 
 [<Fact>]
@@ -292,7 +292,7 @@ let ``path offset orients nested closed contours by depth`` () =
               point inset (inset + size) ]
         |> Result.defaultWith (failwithf "%A")
     let result =
-        Offset.path (Path.ofSubpaths [ square 20.0 0.0; square 6.0 7.0 ]) 0.5<length>
+        Offset.path (Path.ofSubpaths [ square 20.0 0.0; square 6.0 7.0 ]) 0.5<length> (Miter Offset.defaultMiterLimit) Butt
         |> Result.defaultWith (failwithf "%A")
     let areas = result.Subpaths |> List.map Area.signedSubpath
     Assert.Equal(2, areas.Length)
@@ -306,7 +306,7 @@ let ``path_offsets_closed_subpaths_test`` () =
         |> Result.defaultWith (failwithf "%A")
     let openSource = Subpath.ofSegment (Line(point 20.0 0.0, point 28.0 0.0))
     let result =
-        Offset.path (Path.ofSubpaths [ closed; openSource ]) 0.5<length>
+        Offset.path (Path.ofSubpaths [ closed; openSource ]) 0.5<length> (Miter Offset.defaultMiterLimit) Butt
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, result.Subpaths.Length)
     Assert.Equal(1, result.Subpaths |> List.filter Subpath.isClosed |> List.length)
@@ -318,7 +318,7 @@ let ``subpath_offsets_open_polyline_with_default_miter_test`` () =
     let options =
         { Offset.defaultOptions with
             SingleOffsetTrimming = { Offside = false; FinalTrimming = NoTrimming } }
-    let result = Offset.subpathWith source 1.0<length> options |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let result = Offset.subpathWith source 1.0<length> (Miter Offset.defaultMiterLimit) Butt options |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Equal<Segment list>([ Line(point 0.0 -1.0, point 3.0 -1.0) ], result.Subpaths[0].Segments)
 
 [<Fact>]
@@ -332,7 +332,7 @@ let ``final_cusp_trimming_handles_open_side_umbrella_test`` () =
                 SingleOffsetTrimming =
                     { Offside = false
                       FinalTrimming = finalTrimming } }
-        Offset.subpathWith source 0.5<length> options
+        Offset.subpathWith source 0.5<length> (Miter Offset.defaultMiterLimit) Butt options
         |> Result.defaultWith (failwithf "%A")
     let untrimmed = run NoTrimming
     let cuspTrimmed = run CuspTrimming
@@ -355,7 +355,7 @@ let ``band cusp switches execute side-local trimming before final trimming`` () 
                     { InnerCusps = innerCusps
                       OuterCusps = outerCusps
                       InBand = false } }
-        Offset.subpathBandWith source -1.0<length> 1.0<length> options
+        Offset.subpathBandWith source -1.0<length> 1.0<length> (Miter Offset.defaultMiterLimit) Butt options
         |> Result.defaultWith (failwithf "%A")
     for innerCusps, outerCusps in [ false, false; true, false; false, true; true, true ] do
         let result = run innerCusps outerCusps
@@ -367,7 +367,7 @@ let ``subpath_stroke_closed_square_uses_band_test`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let result = Offset.subpathBand source -2.0<length> 2.0<length> |> Result.defaultWith (failwithf "%A")
+    let result = Offset.subpathBand source -2.0<length> 2.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
     Assert.Equal(
         "M 2 2 V 8 H 8 V 2 Z M 0 -2 H 10 H 12 V 0 V 10 V 12 H 10 H 0 H -2 V 10 V 0 V -2 Z",
         Serialize.path result)
@@ -377,7 +377,7 @@ let ``closed square stroke uses the same capless band`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let result = Offset.subpathStroke source 4.0<length> |> Result.defaultWith (failwithf "%A")
+    let result = Offset.subpathStroke source 4.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
     Assert.Equal(
         "M 2 2 V 8 H 8 V 2 Z M 0 -2 H 10 H 12 V 0 V 10 V 12 H 10 H 0 H -2 V 10 V 0 V -2 Z",
         Serialize.path result)
@@ -391,7 +391,7 @@ let ``figure_eight_band_joins_reversed_outer_chunks_test`` () =
         |> Result.bind (Subpath.setClosed true)
         |> Result.defaultWith (failwithf "%A")
     let result =
-        Offset.subpathBandWith source 18.0<length> 34.0<length> { Offset.defaultOptions with Join = Round }
+        Offset.subpathBandWith source 18.0<length> 34.0<length> Round Butt Offset.defaultOptions
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, result.Subpaths.Length)
     Assert.All(result.Subpaths, fun subpath -> Assert.True(subpath.Closed))
@@ -406,17 +406,17 @@ let ``subpath_band_untrimmed_returns_two_raw_sides_test`` () =
         |> Result.defaultWith (failwithf "%A")
     let result =
         Offset.subpathBandUntrimmedWith
-            source 18.0<length> 34.0<length>
-            { Offset.defaultOptions with Join = Round }
+            source 18.0<length> 34.0<length> Round
+            Offset.defaultOptions
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, result.Subpaths.Length)
 
 [<Fact>]
 let ``zero-length stroke follows cap semantics`` () =
     let source = Subpath.ofSegment (Line(point 2.0 3.0, point 2.0 3.0))
-    let butt = Offset.subpathStrokeWith source 4.0<length> Butt Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
-    let round = Offset.subpathStrokeWith source 4.0<length> RoundCap Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
-    let square = Offset.subpathStrokeWith source 4.0<length> Square Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let butt = Offset.subpathStrokeWith source 4.0<length> (Miter Offset.defaultMiterLimit) Butt Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let round = Offset.subpathStrokeWith source 4.0<length> (Miter Offset.defaultMiterLimit) RoundCap Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let square = Offset.subpathStrokeWith source 4.0<length> (Miter Offset.defaultMiterLimit) Square Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
     Assert.Empty(butt.Subpaths)
     Assert.Equal(2, round.Subpaths[0].Segments.Length)
     Assert.Equal(4, square.Subpaths[0].Segments.Length)
@@ -425,7 +425,7 @@ let ``zero-length stroke follows cap semantics`` () =
 let ``subpath_stroke_open_line_with_square_cap_extends_ends_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let render cap =
-        Offset.subpathStrokeWith source 2.0<length> cap Offset.defaultOptions
+        Offset.subpathStrokeWith source 2.0<length> (Miter Offset.defaultMiterLimit) cap Offset.defaultOptions
         |> Result.defaultWith (failwithf "%A")
         |> Serialize.path
     Assert.Equal("M 0 -1 H 10 V 1 H 0 Z", render Butt)
@@ -434,7 +434,7 @@ let ``subpath_stroke_open_line_with_square_cap_extends_ends_test`` () =
 [<Fact>]
 let ``subpath_stroke_open_line_with_butt_cap_returns_closed_outline_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    let result = Offset.subpathStrokeWith source 2.0<length> Butt Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let result = Offset.subpathStrokeWith source 2.0<length> (Miter Offset.defaultMiterLimit) Butt Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
     Assert.Single(result.Subpaths) |> ignore
     Assert.True(result.Subpaths[0].Closed)
     Assert.Equal("M 0 -1 H 10 V 1 H 0 Z", Serialize.path result)
@@ -442,12 +442,31 @@ let ``subpath_stroke_open_line_with_butt_cap_returns_closed_outline_test`` () =
 [<Fact>]
 let ``subpath_stroke_rejects_invalid_width_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    Assert.Equal(Error(InvalidStrokeWidth 0.0<length>), Offset.subpathStrokeWith source 0.0<length> Butt Offset.defaultOptions)
-    Assert.Equal(Error(InvalidStrokeWidth -1.0<length>), Offset.subpathStrokeWith source -1.0<length> Butt Offset.defaultOptions)
+    Assert.Equal(Error(InvalidStrokeWidth 0.0<length>), Offset.subpathStrokeWith source 0.0<length> (Miter Offset.defaultMiterLimit) Butt Offset.defaultOptions)
+    Assert.Equal(Error(InvalidStrokeWidth -1.0<length>), Offset.subpathStrokeWith source -1.0<length> (Miter Offset.defaultMiterLimit) Butt Offset.defaultOptions)
 
 [<Fact>]
 let ``path_band_untrimmed_returns_two_raw_sides_per_subpath_test`` () =
     let first = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let second = Subpath.ofSegment (Line(point 0.0 5.0, point 10.0 5.0))
-    let result = Offset.pathBandUntrimmed (Path.ofSubpaths [ first; second ]) -1.0<length> 1.0<length> |> Result.defaultWith (failwithf "%A")
+    let result = Offset.pathBandUntrimmed (Path.ofSubpaths [ first; second ]) -1.0<length> 1.0<length> (Miter Offset.defaultMiterLimit) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(4, result.Subpaths.Length)
+
+[<Fact>]
+let ``open band outlines use explicit cap geometry`` () =
+    let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
+    let options = { Offset.defaultOptions with BandTrimming = { InnerCusps = true; OuterCusps = true; InBand = false } }
+    for cap, expected in
+        [ Butt, "M 0 -1 H 10 V 1 H 0 Z"
+          Square, "M 0 -1 H 10 H 11 V 1 H 10 H 0 H -1 V -1 Z"
+          RoundCap, "M 0 -1 H 10 A 1 1 0 0 1 10 1 H 0 A 1 1 0 0 1 0 -1 Z" ] do
+        let band = Offset.subpathBandWith source -1.0<length> 1.0<length> (Miter Offset.defaultMiterLimit) cap options |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(expected, Serialize.path band)
+
+[<Fact>]
+let ``explicit miter validation precedes empty path handling`` () =
+    let invalid = Miter 0.0
+    Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.path Path.empty 1.0<length> invalid Butt)
+    Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.pathUntrimmed Path.empty 1.0<length> invalid)
+    Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.pathBand Path.empty -1.0<length> 1.0<length> invalid Butt)
+    Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.pathStroke Path.empty 2.0<length> invalid Butt)

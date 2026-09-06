@@ -1214,18 +1214,18 @@ They take a join argument but no cap.
 ## Stroke Outlines and Dashes
 
 `Stroke` is a small public wrapper over the offset stroke-outline machinery. It
-uses `StrokeOptions`, `StrokeJoin`, `StrokeCap`, and dash options rather than
-exposing every offset-specific detail at the top level. `StrokeJoin` and
-`StrokeCap` are distinct, parallel versions of the offset style types.
+uses `StrokeOptions` and dash options rather than exposing every
+offset-specific detail at the top level. The join and cap styles use the same
+`Join` and `Cap` types as `Offset`.
 
 ```fsharp
-Stroke.segment (Line(a, b)) 2.0<length> StrokeJoin.Round StrokeCap.Butt
-Stroke.subpath subpath 2.0<length> StrokeJoin.Round StrokeCap.RoundCap
-Stroke.path path 2.0<length> (StrokeJoin.Miter 4.0) StrokeCap.Square
+Stroke.segment (Line(a, b)) 2.0<length> Round Butt
+Stroke.subpath subpath 2.0<length> Round RoundCap
+Stroke.path path 2.0<length> (Miter 4.0) Square
 
 let options = { Stroke.defaultOptions with Width = 2.0<length> }
 
-Stroke.subpathWith subpath StrokeJoin.Round StrokeCap.RoundCap options
+Stroke.subpathWith subpath Round RoundCap options
 ```
 
 `StrokeOptions` contains `Width` and technical `Offset` settings only.

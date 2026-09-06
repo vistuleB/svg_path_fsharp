@@ -8,20 +8,6 @@ type StrokeError =
     | InvalidDashOffset of float<length>
     | InvalidDashPatternLength
 
-/// Join styles parallel to the offset Join type.
-[<RequireQualifiedAccess>]
-type StrokeJoin =
-    | Bevel
-    | Miter of miterLimit: float
-    | Round
-
-/// Cap styles parallel to the offset Cap type.
-[<RequireQualifiedAccess>]
-type StrokeCap =
-    | Butt
-    | RoundCap
-    | Square
-
 [<Struct>]
 /// Stroke width and technical offset settings; join and cap are operation arguments.
 type StrokeOptions =
@@ -38,6 +24,9 @@ type DashOptions =
 /// Outline operations require explicit styles; pure dash extraction does not.
 [<RequireQualifiedAccess>]
 module Stroke =
+    type Join = SvgPath.Join
+    type Cap = SvgPath.Cap
+
     let defaultOptions =
         { Width = 1.0<length>
           Offset = Offset.defaultOptions }
@@ -83,23 +72,11 @@ module Stroke =
                 Segment.validateLengthOptions options.LengthOptions
                 |> Result.mapError StrokePathError)
 
-    let private toOffsetJoin = function
-        | StrokeJoin.Bevel -> Join.Bevel
-        | StrokeJoin.Miter limit -> Join.Miter limit
-        | StrokeJoin.Round -> Join.Round
-
-    let private toOffsetCap = function
-        | StrokeCap.Butt -> Cap.Butt
-        | StrokeCap.RoundCap -> Cap.RoundCap
-        | StrokeCap.Square -> Cap.Square
-
-    let private toOffsetOptions (options: StrokeOptions) = options.Offset
-
     let rec private strokeSubpaths subpaths join cap options reversedStroked =
         match subpaths with
         | [] -> Ok(List.rev reversedStroked)
         | first :: rest ->
-            Offset.subpathStrokeWith first options.Width (toOffsetJoin join) (toOffsetCap cap) (toOffsetOptions options)
+            Offset.subpathStrokeWith first options.Width join cap options.Offset
             |> Result.mapError StrokeOffsetError
             |> Result.bind (fun path ->
                 strokeSubpaths rest join cap options (List.rev path.Subpaths @ reversedStroked))
@@ -107,7 +84,7 @@ module Stroke =
     let subpathWith subpath join cap options =
         validateOptions options
         |> Result.bind (fun () ->
-            Offset.subpathStrokeWith subpath options.Width (toOffsetJoin join) (toOffsetCap cap) (toOffsetOptions options)
+            Offset.subpathStrokeWith subpath options.Width join cap options.Offset
             |> Result.mapError StrokeOffsetError)
 
     let subpath subpath width join cap = subpathWith subpath join cap { defaultOptions with Width = width }

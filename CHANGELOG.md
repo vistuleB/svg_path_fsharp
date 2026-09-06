@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.0
+
+- Allowed `0.0` tolerance for degenerate-line normalization, collapsing only
+  exactly-collinear windows; negative and non-finite tolerances remain
+  rejected.
+- Allowed `0.0` for `RoundCornerOptions.DistanceTolerance`, so a zero
+  tolerance rounds corners exactly and drops only corners whose radius or trim
+  is exactly zero; negative and non-finite tolerances remain rejected.
+- Rebased `AdaptRadius` corner rounding onto a single feasibility-bounded
+  scale pass instead of a convergence check, removing the epsilon comparison
+  and iteration limit.
+- Aligned too-small corner trims with the Gleam implementation: under
+  `ErrorOnFailure`, a corner whose radius or trim is at or below the distance
+  tolerance now fails with `CannotRoundCorner` instead of being silently
+  skipped.
+- Added regression tests for exact zero-tolerance normalization, zero-
+  tolerance corner rounding, exact trim-consume overlap failures, and an
+  inward square-spiral adapt-radius collapse.
+
 ## 0.4.0
 
 - Oriented Boolean boundary output so outer contours are traced clockwise with

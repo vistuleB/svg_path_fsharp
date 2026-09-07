@@ -3844,10 +3844,14 @@ module Offset =
     /// Constructs synchronized untrimmed inner and outer offsets.
     let subpathBandUntrimmedWith subpath innerOffset outerOffset join options =
         validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
-        |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
+        |> Result.mapError publicError
+        |> Result.bind (fun _ ->
+            validateJoin join |> Result.mapError publicError)
+        |> Result.bind (fun _ ->
+            normalizeSourceSubpath subpath options |> Result.mapError publicError)
         |> Result.bind (fun normalized ->
-            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options)
+            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options
+            |> Result.mapError publicError)
         |> Result.map (fun build -> Path.ofSubpaths [ build.Inner; build.Outer ])
 
     /// Constructs synchronized untrimmed inner and outer offsets with default options.
@@ -3897,7 +3901,9 @@ module Offset =
     /// Constructs synchronized untrimmed bands independently for every subpath.
     let pathBandUntrimmedWith path innerOffset outerOffset join options =
         validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
+        |> Result.mapError publicError
+        |> Result.bind (fun _ ->
+            validateJoin join |> Result.mapError publicError)
         |> Result.bind (fun _ ->
             untrimmedBandPathSubpaths
                 (Path.subpaths path) innerOffset outerOffset join options [])

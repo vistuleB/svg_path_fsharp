@@ -108,11 +108,11 @@ Gleam commit `be276c6`, `map untrimmed band errors at public boundaries`:
 
 F# functions:
 
-- `subpathBandUntrimmedWith`
+- `subpathBandUntrimmedWith` (maps `validateOptions`, `validateJoin`, `normalizeSourceSubpath`, and `buildSynchronizedUntrimmed` through `publicError`)
 - `subpathBandUntrimmed`
-- `pathBandUntrimmedWith`
+- `pathBandUntrimmedWith` (maps `validateOptions` and `validateJoin` through `publicError`)
 - `pathBandUntrimmed`
-- `untrimmedBandPathSubpaths`
+- `untrimmedBandPathSubpaths` (delegates to the now-public `subpathBandUntrimmedWith`, so no mapping changes are needed in the helper itself)
 
 ### 6. Trimmed Band APIs
 

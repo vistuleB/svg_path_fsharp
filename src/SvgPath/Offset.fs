@@ -34,7 +34,7 @@ type InternalError =
     | InternalInvalidTangentHealAngleDegrees of angle: float<degree>
     | InternalBandSubpathNotClosed
     | InternalDegenerateTangent of t: float<parameter>
-    | InternalMaxDepthReached of error: float<length>
+    | InternalMaxDepthReached of divergence: float<length>
     | InternalNonFinite
     | InternalSegmentImageCountMismatch
     | InternalEmptySegmentImage of segmentIndex: int
@@ -62,7 +62,7 @@ type Error =
     | InvalidStalledOffsetDiameter of diameter: float<length>
     | InvalidTangentHealAngleDegrees of angle: float<degree>
     | DegenerateTangent of t: float<parameter>
-    | MaxDepthReached of error: float<length>
+    | MaxDepthReached of divergence: float<length>
     | NonFinite
     | ConstructionFailed
 
@@ -541,7 +541,7 @@ module Offset =
         | InternalInvalidStalledOffsetDiameter diameter -> InvalidStalledOffsetDiameter diameter
         | InternalInvalidTangentHealAngleDegrees angle -> InvalidTangentHealAngleDegrees angle
         | InternalDegenerateTangent t -> DegenerateTangent t
-        | InternalMaxDepthReached error -> MaxDepthReached error
+        | InternalMaxDepthReached divergence -> MaxDepthReached divergence
         | InternalNonFinite -> NonFinite
         | _ -> ConstructionFailed
 

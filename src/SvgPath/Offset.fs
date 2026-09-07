@@ -688,13 +688,13 @@ module Offset =
 
     let private refinementDepth options = min options.Fitting.MaxDepth maximumRefinementGeneration
 
-    let private validateJoin join =
+    let internal validateJoin join =
         match join with
         | Miter miterLimit when miterLimit <= 0.0 || not (System.Double.IsFinite miterLimit) ->
             Error(InternalInvalidMiterLimit miterLimit)
         | _ -> Ok()
 
-    let private validateOptions options =
+    let internal validateOptions options =
         if options.Fitting.Tolerance <= 0.0<length>
            || not (System.Double.IsFinite(float options.Fitting.Tolerance)) then
             Error(InternalInvalidTolerance options.Fitting.Tolerance)
@@ -735,7 +735,7 @@ module Offset =
                     Error(InternalDegenerateTangent t)
         | _ -> Error(InternalDegenerateTangent t)
 
-    let private unitTangent segment t =
+    let internal unitTangent segment t =
         Segment.directions segment t
         |> Result.mapError InternalPathError
         |> Result.bind (fun directions ->
@@ -957,7 +957,7 @@ module Offset =
                 Subpath.setClosedWith (WiggleThenBridgeWith tolerance) subpath.Closed normalizedSubpath)
             |> Result.mapError InternalPathError
 
-    let private normalizeSourceSubpath subpath options =
+    let internal normalizeSourceSubpath subpath options =
         eliminateSmallOffsetSourceSegments subpath 0.001<length>
         |> Result.bind (fun subpath ->
             Degeneracy.normalizeDegenerateSegments subpath options.Fitting.Tolerance
@@ -3547,7 +3547,7 @@ module Offset =
                     | Error error, _
                     | _, Error error -> Error error))
 
-    let private buildSingleOffsetUntrimmed subpath offset join options =
+    let internal buildSingleOffsetUntrimmed subpath offset join options =
         buildSynchronizedUntrimmed subpath 0.0<length> offset join options
         |> Result.map (fun (build: SynchronizedUntrimmedBuild) ->
             { Subpath = build.Outer
@@ -4757,7 +4757,7 @@ module Offset =
             trimBandArrangement
                 untrimmed winding (bandSubpathWindingOpinions bands) options)
 
-    let private topologicalBandPathWithOpinions
+    let internal topologicalBandPathWithOpinions
         untrimmed bands windingOpinions options =
         internalBandWindingFunction bands
         |> Result.bind (fun winding ->
@@ -4765,7 +4765,7 @@ module Offset =
             |> Result.bind (fun loops ->
                 orientBandPath (Path.ofSubpaths loops) winding))
 
-    let private topologicalBandPath untrimmed bands options =
+    let internal topologicalBandPath untrimmed bands options =
         internalTopologicalBandLoops untrimmed bands options
         |> Result.bind (fun loops ->
             internalBandWindingFunction bands
@@ -5210,7 +5210,7 @@ module Offset =
             |> Result.bind (fun orientedFirst ->
                 orientOutlineSubpaths rest all (orientedFirst :: oriented))
 
-    let private orientOutlinePath path =
+    let internal orientOutlinePath path =
         let subpaths = Path.subpaths path
         orientOutlineSubpaths subpaths subpaths []
         |> Result.map Path.ofSubpaths

@@ -3,6 +3,21 @@ module SvgPath.Tests.StrokeTests
 open SvgPath
 open Xunit
 
+[<Fact>]
+let ``stroke preserves gallery hairpin dash`` () =
+    let p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
+    let source = Subpath.ofSegment (CubicBezier(
+        p 720.8878345566945 136.73890607319447,
+        p 725.5345471691022 152.13173280113733,
+        p 724.2017606479264 168.46101515319256,
+        p 714.3795973596922 163.26995325089777))
+    let path = Stroke.subpath source 16.0<length> Round RoundCap |> Result.defaultWith (failwithf "%A")
+    let outline = List.exactlyOne (Path.subpaths path)
+    Assert.True(Subpath.isClosed outline)
+    Assert.True(outline.Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length >= 2)
+    Assert.Equal(Ok Inside, Path.containment (Subpath.start source) path Nonzero)
+    Assert.Equal(Ok Inside, Path.containment (Subpath.finish source) path Nonzero)
+
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private simpleLineSubpath a b = Subpath.polyline [ a; b ] |> Result.defaultWith (failwithf "%A")
 let private rightAngle () = Subpath.polyline [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0 ] |> Result.defaultWith (failwithf "%A")

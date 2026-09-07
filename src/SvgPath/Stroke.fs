@@ -77,58 +77,179 @@ module Stroke =
                 Segment.validateLengthOptions options.LengthOptions
                 |> Result.mapError StrokePathError)
 
-    let private zeroLengthStrokePath (subpath: Subpath) radius cap =
+    let rec private lineSegmentsBetween points =
+        match points with
+        | []
+        | [ _ ] -> []
+        | first :: second :: rest ->
+            let tail = lineSegmentsBetween (second :: rest)
+            if Point.near 1.0e-9<length> first second then tail
+            else Line(first, second) :: tail
+
+    let private reverseSegments segments =
+        segments |> List.rev |> List.map Segment.reverse
+
+    let private strokeCapSegments center (tangent: Point<1>) radius cap atEnd =
+        let normal = Point.rotateCounterclockwise tangent
+        let positive = Point.translate (Point.scale radius normal) center
+        let negative = Point.translate (Point.scale -radius normal) center
+        match cap with
+        | Butt ->
+            if atEnd then Ok(lineSegmentsBetween [ positive; negative ])
+            else Ok(lineSegmentsBetween [ negative; positive ])
+        | Square ->
+            let extension = Point.scale (if atEnd then radius else -radius) tangent
+            let positiveExtended = Point.translate extension positive
+            let negativeExtended = Point.translate extension negative
+            if atEnd then
+                Ok(lineSegmentsBetween [ positive; positiveExtended; negativeExtended; negative ])
+            else
+                Ok(lineSegmentsBetween [ negative; negativeExtended; positiveExtended; positive ])
+        | RoundCap ->
+            let startPoint, finish = if atEnd then positive, negative else negative, positive
+            Ok [ Arc
+                { Start = startPoint
+                  Radius = Point.create radius radius
+                  XAxisRotation = 0.0<degree>
+                  LargeArc = false
+                  Sweep = true
+                  End = finish } ]
+
+    let private strokeEndCap source radius cap =
+        match List.tryLast (Subpath.segments source) with
+        | None -> Error(InternalPathError EmptySubpath)
+        | Some last ->
+            Offset.unitTangent last 1.0<parameter>
+            |> Result.bind (fun tangent ->
+                strokeCapSegments (Subpath.finish source) tangent radius cap true)
+
+    let private strokeStartCap source radius cap =
+        match Subpath.segments source with
+        | [] -> Error(InternalPathError EmptySubpath)
+        | first :: _ ->
+            Offset.unitTangent first 0.0<parameter>
+            |> Result.bind (fun tangent ->
+                strokeCapSegments (Subpath.start source) tangent radius cap false)
+
+    let private zeroLengthRoundStrokePath center radius =
+        let right = Point.translate (Point.create radius 0.0<length>) center
+        let left = Point.translate (Point.create -radius 0.0<length>) center
+        let radial = Point.create radius radius
+        let segments =
+            [ Arc { Start = right; Radius = radial; XAxisRotation = 0.0<degree>
+                    LargeArc = false; Sweep = true; End = left }
+              Arc { Start = left; Radius = radial; XAxisRotation = 0.0<degree>
+                    LargeArc = false; Sweep = true; End = right } ]
+        Subpath.create segments
+        |> Result.mapError InternalPathError
+        |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError InternalPathError)
+        |> Result.map Path.singleton
+
+    let private zeroLengthSquareStrokePath center radius =
+        let topLeft = Point.translate (Point.create -radius -radius) center
+        let topRight = Point.translate (Point.create radius -radius) center
+        let bottomRight = Point.translate (Point.create radius radius) center
+        let bottomLeft = Point.translate (Point.create -radius radius) center
+        lineSegmentsBetween [ topLeft; topRight; bottomRight; bottomLeft; topLeft ]
+        |> Subpath.create
+        |> Result.mapError InternalPathError
+        |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError InternalPathError)
+        |> Result.map Path.singleton
+
+    let private zeroLengthStrokePath subpath radius cap =
         let center = Subpath.start subpath
         match cap with
         | Butt -> Ok Path.empty
-        | RoundCap ->
-            let right = Point.translate (Point.create radius 0.0<length>) center
-            let left = Point.translate (Point.create -radius 0.0<length>) center
-            [ Arc { Start = right; Radius = Point.create radius radius
-                    XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = left }
-              Arc { Start = left; Radius = Point.create radius radius
-                    XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = right } ]
-            |> Subpath.create
-            |> Result.mapError StrokePathError
-            |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError StrokePathError)
-            |> Result.map Path.singleton
-        | Square ->
-            let topLeft = Point.translate (Point.create -radius -radius) center
-            let topRight = Point.translate (Point.create radius -radius) center
-            let bottomRight = Point.translate (Point.create radius radius) center
-            let bottomLeft = Point.translate (Point.create -radius radius) center
-            [ Line(topLeft, topRight); Line(topRight, bottomRight)
-              Line(bottomRight, bottomLeft); Line(bottomLeft, topLeft) ]
-            |> Subpath.create
-            |> Result.mapError StrokePathError
-            |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError StrokePathError)
-            |> Result.map Path.singleton
+        | RoundCap -> zeroLengthRoundStrokePath center radius
+        | Square -> zeroLengthSquareStrokePath center radius
 
-    let subpathWith subpath join cap options =
+    let private closedUntrimmedSideFromNormalizedSource source offset join options =
+        Offset.buildSingleOffsetUntrimmed source offset join options
+        |> Result.map (fun build -> build.Subpath)
+        |> Result.bind (fun side ->
+            if Subpath.isClosed side then Ok side
+            else
+                Subpath.setClosedWith
+                    (WiggleWith options.Fitting.Tolerance) true side
+                |> Result.mapError InternalPathError)
+
+    let private untrimmedStrokeOutlineFromNormalizedSource source radius join cap options =
+        match Offset.buildSingleOffsetUntrimmed source radius join options |> Result.map (fun build -> build.Subpath),
+              Offset.buildSingleOffsetUntrimmed source -radius join options |> Result.map (fun build -> build.Subpath),
+              strokeEndCap source radius cap,
+              strokeStartCap source radius cap with
+        | Ok positive, Ok negative, Ok endCap, Ok startCap ->
+            let segments =
+                Subpath.segments positive
+                @ endCap
+                @ reverseSegments (Subpath.segments negative)
+                @ startCap
+            Subpath.createWith Wiggle segments
+            |> Result.mapError InternalPathError
+            |> Result.bind (fun candidate ->
+                Subpath.setClosedWith Wiggle true candidate |> Result.mapError InternalPathError)
+        | Error error, _, _, _
+        | _, Error error, _, _
+        | _, _, Error error, _
+        | _, _, _, Error error -> Error error
+
+    let private untrimmedStrokeOutline source radius join cap options =
+        Offset.normalizeSourceSubpath source options
+        |> Result.bind (fun normalized ->
+            untrimmedStrokeOutlineFromNormalizedSource normalized radius join cap options)
+
+    let private untrimmedStrokeBand
+        (source: Subpath) (width: float<length>) join cap (options: Options) =
+        let radius = width / 2.0
+        Offset.normalizeSourceSubpath source options
+        |> Result.bind (fun normalized ->
+            if Subpath.isClosed source then
+                match closedUntrimmedSideFromNormalizedSource normalized -radius join options,
+                      closedUntrimmedSideFromNormalizedSource normalized radius join options with
+                | Ok interior, Ok exterior -> Ok(ClosedSubpathBand(exterior, interior))
+                | Error error, _
+                | _, Error error -> Error error
+            else
+                untrimmedStrokeOutlineFromNormalizedSource normalized radius join cap options
+                |> Result.map OpenSubpathBand)
+
+    let private closedStrokePath
+        source (radius: float<length>) join cap (options: Options) =
+        untrimmedStrokeBand source (radius * 2.0) join cap options
+        |> Result.bind (function
+            | OpenSubpathBand _ -> Error InternalBandSubpathNotClosed
+            | ClosedSubpathBand(exterior, interior) ->
+                Offset.topologicalBandPathWithOpinions
+                    [ interior; exterior ]
+                    [ ClosedSubpathBand(exterior, interior) ]
+                    [ { Left = 1; Right = 0 }; { Left = 0; Right = 1 } ]
+                    options)
+
+    /// Build and trim the complete outline; band-side cusp settings do not apply.
+    let subpathWith subpath join cap (options: StrokeOptions) =
         validateOptions options
-        |> Result.bind (fun () -> validateJoin join)
         |> Result.bind (fun () ->
-            let bandTrimming =
-                if Subpath.isClosed subpath then options.Offset.BandTrimming
-                else { options.Offset.BandTrimming with InBand = false }
-            let offsetOptions = { options.Offset with BandTrimming = bandTrimming }
-            match Subpath.segments subpath with
-            | [] -> Ok Path.empty
-            | _ ->
-                Subpath.length subpath
-                |> Result.mapError StrokePathError
-                |> Result.bind (fun length ->
-                    if length <= 0.0<length> then
-                        zeroLengthStrokePath subpath (options.Width / 2.0) cap
-                    else
-                        Offset.subpathBandWith
-                            subpath
-                            (0.0<length> - options.Width / 2.0)
-                            (options.Width / 2.0)
-                            join
-                            cap
-                            offsetOptions
-                        |> Result.mapError StrokeOffsetError))
+            Offset.validateOptions options.Offset
+            |> Result.bind (fun () -> Offset.validateJoin join)
+            |> Result.bind (fun () ->
+                let radius = options.Width / 2.0
+                match Subpath.segments subpath with
+                | [] -> Ok Path.empty
+                | _ ->
+                    Subpath.isZeroLength subpath 1.0e-9<length>
+                    |> Result.mapError InternalPathError
+                    |> Result.bind (fun zeroLength ->
+                        if zeroLength then zeroLengthStrokePath subpath radius cap
+                        elif Subpath.isClosed subpath then
+                            closedStrokePath subpath radius join cap options.Offset
+                            |> Result.bind Offset.orientOutlinePath
+                        else
+                            untrimmedStrokeOutline subpath radius join cap options.Offset
+                            |> Result.bind (fun untrimmed ->
+                                Offset.topologicalBandPath
+                                    [ untrimmed ] [ OpenSubpathBand untrimmed ] options.Offset)
+                            |> Result.bind Offset.orientOutlinePath))
+            |> Result.mapError (Offset.publicError >> StrokeOffsetError))
 
     let rec private strokeSubpaths subpaths join cap options reversedStroked =
         match subpaths with

@@ -93,41 +93,59 @@ type ArrangementSegmentBuild =
       EdgeImages: ArrangementEdgeImage list }
 
 /// Errors returned while constructing, validating, or dualizing arrangements.
+type internal ArrangementInternalError =
+    | InternalArrangementSegmentError of SegmentError
+    | InternalNormalizationError
+    | InternalInvalidArrangementTolerance of float<length>
+    | InternalInvalidMinimumChord of float<length>
+    | InternalInvalidEndpointSliverTolerance of float<parameter>
+    | InternalSegmentTooShort of chord: float<length> * minimum: float<length>
+    | InternalSegmentCollapsedToVertex of int
+    | InternalLoopEdge of int
+    | InternalMissingArrangementVertex of int
+    | InternalMissingArrangementEdge of int
+    | InternalIsolatedVertex of int
+    | InternalInvalidMultiplicity of int
+    | InternalOddWeightedDegree of vertex: int * degree: int
+    | InternalEdgeEndpointMismatch of edge: int * vertex: int * distance: float<length>
+    | InternalVertexWithoutEndpointSamples of int
+    | InternalVertexCenterMismatch of vertex: int * distanceSquared: float<length^2>
+    | InternalVertexSampleOutsideTolerance of vertex: int * distanceSquared: float<length^2> * toleranceSquared: float<length^2>
+    | InternalContourTraceFailed of int
+    | InternalCyclicOrderMissingVertex of int
+    | InternalCyclicOrderRadiusUnavailable of int
+    | InternalInvalidCyclicOrderAttempts of int
+    | InternalCyclicOrderCircleIntersectionFailed of vertex: int * edge: int * radius: float<length>
+    | InternalDualMissingCyclicOrder of int
+    | InternalDualMissingIncidentEdge of vertex: int * edge: int
+    | InternalDualWalkDidNotClose of edge: int * left: bool
+    | InternalDualFaceSampleUnavailable of edge: int * left: bool
+    | InternalDualInvalidOuterWalkCount of int
+    | InternalDualMissingEdgeFace of edge: int * left: bool
+    | InternalDualInvalidOuterFaceCount of int
+
+
+/// Stable errors returned by arrangement construction and validation.
 type ArrangementError =
     | ArrangementSegmentError of SegmentError
-    | InternalNormalizationError
     | InvalidArrangementTolerance of float<length>
     | InvalidMinimumChord of float<length>
     | InvalidEndpointSliverTolerance of float<parameter>
     | SegmentTooShort of chord: float<length> * minimum: float<length>
-    | SegmentCollapsedToVertex of int
-    | LoopEdge of int
-    | MissingArrangementVertex of int
-    | MissingArrangementEdge of int
-    | IsolatedVertex of int
-    | InvalidMultiplicity of int
-    | OddWeightedDegree of vertex: int * degree: int
-    | EdgeEndpointMismatch of edge: int * vertex: int * distance: float<length>
-    | VertexWithoutEndpointSamples of int
-    | VertexCenterMismatch of vertex: int * distanceSquared: float<length^2>
-    | VertexSampleOutsideTolerance of vertex: int * distanceSquared: float<length^2> * toleranceSquared: float<length^2>
-    | ContourTraceFailed of int
-    | CyclicOrderMissingVertex of int
-    | CyclicOrderRadiusUnavailable of int
-    | InvalidCyclicOrderAttempts of int
-    | CyclicOrderCircleIntersectionFailed of vertex: int * edge: int * radius: float<length>
-    | DualMissingCyclicOrder of int
-    | DualMissingIncidentEdge of vertex: int * edge: int
-    | DualWalkDidNotClose of edge: int * left: bool
-    | DualFaceSampleUnavailable of edge: int * left: bool
-    | DualInvalidOuterWalkCount of int
-    | DualMissingEdgeFace of edge: int * left: bool
-    | DualInvalidOuterFaceCount of int
+    | ConstructionFailed
 
 [<RequireQualifiedAccess>]
 /// Construction, validation, source-image lookup, and dualization of planar
 /// arrangements formed from SVG path segments.
 module Arrangement =
+    let internal publicError = function
+        | InternalArrangementSegmentError error -> ArrangementSegmentError error
+        | InternalInvalidArrangementTolerance value -> InvalidArrangementTolerance value
+        | InternalInvalidMinimumChord value -> InvalidMinimumChord value
+        | InternalInvalidEndpointSliverTolerance value -> InvalidEndpointSliverTolerance value
+        | InternalSegmentTooShort(chord, minimum) -> SegmentTooShort(chord, minimum)
+        | _ -> ConstructionFailed
+
     let internal empty = { Vertices = []; Edges = []; CyclicOrders = [] }
 
     let private finite (value: float<length>) = not (System.Double.IsNaN(float value) || System.Double.IsInfinity(float value))
@@ -151,13 +169,13 @@ module Arrangement =
             vertices @ [ { Id = id; Point = point; EndpointSamples = [ point ] } ], id
 
     let internal insertAtomicSegment (graph: ArrangementGraph) segment tolerance minimumChord =
-        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
-        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InvalidMinimumChord minimumChord)
-        elif Segment.chordLength segment < minimumChord then Error(SegmentTooShort(Segment.chordLength segment, minimumChord))
+        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
+        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
+        elif Segment.chordLength segment < minimumChord then Error(InternalSegmentTooShort(Segment.chordLength segment, minimumChord))
         else
             let vertices, startVertex = attachVertex tolerance (Segment.start segment) graph.Vertices
             let vertices, endVertex = attachVertex tolerance (Segment.finish segment) vertices
-            if startVertex = endVertex then Error(SegmentCollapsedToVertex startVertex)
+            if startVertex = endVertex then Error(InternalSegmentCollapsedToVertex startVertex)
             else
                 let forward = graph.Edges |> List.tryFind (fun edge -> edge.StartVertex = startVertex && edge.EndVertex = endVertex && edge.Segment = segment)
                 let reverseSegment = Segment.reverse segment
@@ -170,7 +188,7 @@ module Arrangement =
                 match forward, reverse with
                 | None, None ->
                     Segment.boundingBox segment
-                    |> Result.mapError ArrangementSegmentError
+                    |> Result.mapError InternalArrangementSegmentError
                     |> Result.map (fun bounds ->
                         let id = graph.Edges |> List.fold (fun maximum edge -> max maximum edge.Id) -1 |> (+) 1
                         { Vertices = vertices
@@ -179,40 +197,40 @@ module Arrangement =
                 | _ -> Ok { Vertices = vertices; Edges = edges; CyclicOrders = [] }
 
     /// Validates graph topology, geometry, multiplicities, and cyclic orders.
-    let validate (graph: ArrangementGraph) tolerance minimumChord =
-        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
-        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InvalidMinimumChord minimumChord)
+    let private validateInternal (graph: ArrangementGraph) tolerance minimumChord =
+        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
+        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
         else
             let vertex id = graph.Vertices |> List.tryFind (fun item -> item.Id = id)
             let edgeError =
                 graph.Edges
                 |> List.tryPick (fun edge ->
-                    if edge.ForwardMultiplicity + edge.ReverseMultiplicity <= 0 then Some(InvalidMultiplicity edge.Id)
-                    elif edge.StartVertex = edge.EndVertex then Some(LoopEdge edge.StartVertex)
-                    elif vertex edge.StartVertex |> Option.isNone then Some(MissingArrangementVertex edge.StartVertex)
-                    elif vertex edge.EndVertex |> Option.isNone then Some(MissingArrangementVertex edge.EndVertex)
-                    elif Segment.chordLength edge.Segment < minimumChord then Some(SegmentTooShort(Segment.chordLength edge.Segment, minimumChord))
+                    if edge.ForwardMultiplicity + edge.ReverseMultiplicity <= 0 then Some(InternalInvalidMultiplicity edge.Id)
+                    elif edge.StartVertex = edge.EndVertex then Some(InternalLoopEdge edge.StartVertex)
+                    elif vertex edge.StartVertex |> Option.isNone then Some(InternalMissingArrangementVertex edge.StartVertex)
+                    elif vertex edge.EndVertex |> Option.isNone then Some(InternalMissingArrangementVertex edge.EndVertex)
+                    elif Segment.chordLength edge.Segment < minimumChord then Some(InternalSegmentTooShort(Segment.chordLength edge.Segment, minimumChord))
                     else
                         let startDistance = Point.distance (Segment.start edge.Segment) (vertex edge.StartVertex).Value.Point
                         let endDistance = Point.distance (Segment.finish edge.Segment) (vertex edge.EndVertex).Value.Point
-                        if startDistance > tolerance then Some(EdgeEndpointMismatch(edge.Id, edge.StartVertex, startDistance))
-                        elif endDistance > tolerance then Some(EdgeEndpointMismatch(edge.Id, edge.EndVertex, endDistance))
+                        if startDistance > tolerance then Some(InternalEdgeEndpointMismatch(edge.Id, edge.StartVertex, startDistance))
+                        elif endDistance > tolerance then Some(InternalEdgeEndpointMismatch(edge.Id, edge.EndVertex, endDistance))
                         else None)
             match edgeError with
             | Some error -> Error error
             | None ->
                 graph.Vertices
                 |> List.tryPick (fun vertex ->
-                    if List.isEmpty vertex.EndpointSamples then Some(VertexWithoutEndpointSamples vertex.Id)
+                    if List.isEmpty vertex.EndpointSamples then Some(InternalVertexWithoutEndpointSamples vertex.Id)
                     else
                         let degree = graph.Edges |> List.filter (fun edge -> edge.StartVertex = vertex.Id || edge.EndVertex = vertex.Id) |> List.sumBy (fun edge -> edge.ForwardMultiplicity + edge.ReverseMultiplicity)
-                        if degree = 0 then Some(IsolatedVertex vertex.Id)
-                        elif degree % 2 <> 0 then Some(OddWeightedDegree(vertex.Id, degree))
+                        if degree = 0 then Some(InternalIsolatedVertex vertex.Id)
+                        elif degree % 2 <> 0 then Some(InternalOddWeightedDegree(vertex.Id, degree))
                         else
                             match SmallestEnclosingCircle.points vertex.EndpointSamples with
-                            | Error _ -> Some(VertexWithoutEndpointSamples vertex.Id)
-                            | Ok circle when circle.Center <> vertex.Point -> Some(VertexCenterMismatch(vertex.Id, Point.squaredDistance circle.Center vertex.Point))
-                            | Ok circle when circle.RadiusSquared > tolerance * tolerance -> Some(VertexSampleOutsideTolerance(vertex.Id, circle.RadiusSquared, tolerance * tolerance))
+                            | Error _ -> Some(InternalVertexWithoutEndpointSamples vertex.Id)
+                            | Ok circle when circle.Center <> vertex.Point -> Some(InternalVertexCenterMismatch(vertex.Id, Point.squaredDistance circle.Center vertex.Point))
+                            | Ok circle when circle.RadiusSquared > tolerance * tolerance -> Some(InternalVertexSampleOutsideTolerance(vertex.Id, circle.RadiusSquared, tolerance * tolerance))
                             | _ -> None)
                 |> function Some error -> Error error | None -> Ok ()
 
@@ -221,11 +239,15 @@ module Arrangement =
           Point: Point<length>
           Angle: float<degree> }
 
+    let validate graph tolerance minimumChord =
+        validateInternal graph tolerance minimumChord
+        |> Result.mapError publicError
+
     let private orientedSegment (graph: ArrangementGraph) (oriented: OrientedArrangementEdge) =
         graph.Edges
         |> List.tryFind (fun (edge: ArrangementEdge) -> edge.Id = oriented.EdgeId)
         |> function
-            | None -> Error(MissingArrangementEdge oriented.EdgeId)
+            | None -> Error(InternalMissingArrangementEdge oriented.EdgeId)
             | Some edge -> Ok(if oriented.Reversed then Segment.reverse edge.Segment else edge.Segment)
 
     let private incidentEdges (graph: ArrangementGraph) vertex : OrientedArrangementEdge list =
@@ -246,13 +268,13 @@ module Arrangement =
                 { Samples = 100
                   SignedLineDistanceTolerance = tolerance
                   MaxIterations = 100 }
-            |> Result.mapError ArrangementSegmentError
+            |> Result.mapError InternalArrangementSegmentError
             |> Result.bind (fun roots ->
                 match roots |> List.tryFind (fun t -> t > 0.0<parameter> && t <= 1.0<parameter>) with
-                | None -> Error(CyclicOrderCircleIntersectionFailed(vertexId, oriented.EdgeId, radius))
+                | None -> Error(InternalCyclicOrderCircleIntersectionFailed(vertexId, oriented.EdgeId, radius))
                 | Some t ->
                     Segment.point segment t
-                    |> Result.mapError ArrangementSegmentError
+                    |> Result.mapError InternalArrangementSegmentError
                     |> Result.map (fun point ->
                         { OrientedEdge = oriented
                           Point = point
@@ -301,15 +323,15 @@ module Arrangement =
                 -score, candidate.EdgeId, candidate.Reversed))
 
     let internal vertexCyclicOrderWith (graph: ArrangementGraph) vertexId tolerance maxAttempts =
-        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
-        elif maxAttempts <= 0 then Error(InvalidCyclicOrderAttempts maxAttempts)
+        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
+        elif maxAttempts <= 0 then Error(InternalInvalidCyclicOrderAttempts maxAttempts)
         else
             match graph.Vertices |> List.tryFind (fun vertex -> vertex.Id = vertexId) with
-            | None -> Error(CyclicOrderMissingVertex vertexId)
+            | None -> Error(InternalCyclicOrderMissingVertex vertexId)
             | Some vertex ->
                 let incident: OrientedArrangementEdge list = incidentEdges graph vertexId
                 match incident with
-                | [] -> Error(IsolatedVertex vertexId)
+                | [] -> Error(InternalIsolatedVertex vertexId)
                 | [ only ] -> Ok [ [ only ] ]
                 | _ ->
                     incident
@@ -320,12 +342,12 @@ module Arrangement =
                             |> Result.map (fun segment -> Point.distance vertex.Point (Segment.finish segment) :: distances))) (Ok [])
                     |> Result.bind (fun distances ->
                         let radius = 0.8 * List.min distances
-                        if radius <= 0.0<length> || not (System.Double.IsFinite(float radius)) then Error(CyclicOrderRadiusUnavailable vertexId)
+                        if radius <= 0.0<length> || not (System.Double.IsFinite(float radius)) then Error(InternalCyclicOrderRadiusUnavailable vertexId)
                         else
-                            let rec attempts (radius: float<length>) remaining (successes: CyclicSample list list) (previousError: ArrangementError option) =
+                            let rec attempts (radius: float<length>) remaining (successes: CyclicSample list list) (previousError: ArrangementInternalError option) =
                                 if remaining <= 0 || radius <= tolerance / 2.0 then
                                     match List.rev successes with
-                                    | [] -> Error(defaultArg previousError (CyclicOrderRadiusUnavailable vertexId))
+                                    | [] -> Error(defaultArg previousError (InternalCyclicOrderRadiusUnavailable vertexId))
                                     | reference :: _ as byRadius ->
                                         reference |> groupSamples tolerance |> fun groups -> Ok(orderAmbiguousGroups groups byRadius)
                                 else
@@ -341,8 +363,8 @@ module Arrangement =
     /// Compute clockwise SVG-space incident-edge orders by sampling each edge
     /// on common shrinking circles around its vertex.
     let internal cyclicOrdersWith (graph: ArrangementGraph) tolerance maxAttempts =
-        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InvalidArrangementTolerance tolerance)
-        elif maxAttempts <= 0 then Error(InvalidCyclicOrderAttempts maxAttempts)
+        if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
+        elif maxAttempts <= 0 then Error(InternalInvalidCyclicOrderAttempts maxAttempts)
         else
             graph.Vertices
             |> List.fold (fun state vertex ->
@@ -426,7 +448,7 @@ module Arrangement =
     let private vertexProjectsToLineInterior vertex startPoint finishPoint tolerance =
         let line = Point.displacement startPoint finishPoint
         let lengthSquared = Point.dot line line
-        if lengthSquared <= 0.0<length^2> then Error(SegmentTooShort(0.0<length>, tolerance))
+        if lengthSquared <= 0.0<length^2> then Error(InternalSegmentTooShort(0.0<length>, tolerance))
         else
             let rawT = Parameter.fromFloat(float (Point.dot (Point.displacement startPoint vertex) line / lengthSquared))
             let projected = Point.translate (Point.scale (Parameter.ratio rawT) line) startPoint
@@ -441,7 +463,7 @@ module Arrangement =
             | Line(startPoint, finishPoint) -> vertexProjectsToLineInterior vertex startPoint finishPoint tolerance
             | _ ->
                 Segment.projection segment vertex
-                |> Result.mapError ArrangementSegmentError
+                |> Result.mapError InternalArrangementSegmentError
                 |> Result.map (fun (t, _, distance) ->
                     if distance <= tolerance && t > 0.0<parameter> && t < 1.0<parameter> then Some t else None)
 
@@ -451,7 +473,7 @@ module Arrangement =
             | Arc endpoint when endpoint.Start = endpoint.End -> Ok 0.0<length>
             | _ ->
                 Segment.boundingBox segment
-                |> Result.mapError ArrangementSegmentError
+                |> Result.mapError InternalArrangementSegmentError
                 |> Result.map BoundingBox.diameter
         let rec loop distinct = function
             | [] -> Ok(List.rev distinct)
@@ -460,7 +482,7 @@ module Arrangement =
                 | [] -> loop [ first ] rest
                 | previous :: _ ->
                     Segment.between segment previous first
-                    |> Result.mapError ArrangementSegmentError
+                    |> Result.mapError InternalArrangementSegmentError
                     |> Result.bind (fun between ->
                         taxicabDiameter between
                         |> Result.bind (fun motion ->
@@ -469,10 +491,10 @@ module Arrangement =
 
     let private parameterChordLongEnough segment fromParameter toParameter minimumChord =
         Segment.point segment fromParameter
-        |> Result.mapError ArrangementSegmentError
+        |> Result.mapError InternalArrangementSegmentError
         |> Result.bind (fun startPoint ->
             Segment.point segment toParameter
-            |> Result.mapError ArrangementSegmentError
+            |> Result.mapError InternalArrangementSegmentError
             |> Result.map (fun finishPoint -> Point.distance startPoint finishPoint >= minimumChord))
 
     let private retainMinimumChordCuts segment parameters minimumChord =
@@ -508,7 +530,7 @@ module Arrangement =
             | [] -> Ok []
             | _ ->
                 Segment.betweenManyInside segment (List.sort (0.0<parameter> :: 1.0<parameter> :: interior))
-                |> Result.mapError ArrangementSegmentError
+                |> Result.mapError InternalArrangementSegmentError
                 |> Result.map (retainedSplitSegments minimumChord)
                 |> Result.map (fun retained -> if retained.Length >= 2 then interior else []))
 
@@ -516,7 +538,7 @@ module Arrangement =
         distinctParameters piece.Segment tolerance (List.sort (0.0<parameter> :: 1.0<parameter> :: cuts))
         |> Result.bind (fun parameters ->
             Segment.betweenManyInside piece.Segment parameters
-            |> Result.mapError ArrangementSegmentError
+            |> Result.mapError InternalArrangementSegmentError
             |> Result.map (fun segments ->
                 List.zip segments (List.pairwise parameters)
                 |> List.choose (fun (segment, (fromParameter, toParameter)) ->
@@ -553,20 +575,20 @@ module Arrangement =
 
     let private splitProgressiveGraphEdge (graph: ArrangementGraph) (images: DirectedEdgeReference list list) edgeId cuts tolerance minimumChord =
         match graph.Edges |> List.tryFind (fun edge -> edge.Id = edgeId) with
-        | None -> Error(MissingArrangementEdge edgeId)
+        | None -> Error(InternalMissingArrangementEdge edgeId)
         | Some edge ->
             distinctParameters edge.Segment tolerance (List.sort (0.0<parameter> :: 1.0<parameter> :: cuts))
             |> Result.bind (fun parameters ->
                 Segment.betweenManyInside edge.Segment parameters
-                |> Result.mapError ArrangementSegmentError)
+                |> Result.mapError InternalArrangementSegmentError)
             |> Result.bind (fun segments ->
                 let retained = retainedSplitSegments minimumChord segments
                 match retained with
-                | [] -> Error(SegmentTooShort(0.0<length>, minimumChord))
+                | [] -> Error(InternalSegmentTooShort(0.0<length>, minimumChord))
                 | _ ->
                     let firstId = edge.Id
                     let followingId = nextEdgeId graph.Edges
-                    let folder (state: Result<ArrangementVertex list * ArrangementEdge list * DirectedEdgeReference list, ArrangementError>) segment =
+                    let folder (state: Result<ArrangementVertex list * ArrangementEdge list * DirectedEdgeReference list, ArrangementInternalError>) segment =
                         state
                         |> Result.bind (fun (vertices, replacements, references) ->
                             let id = if List.isEmpty replacements then firstId else followingId + replacements.Length - 1
@@ -575,7 +597,7 @@ module Arrangement =
                             if startVertex = endVertex then Ok(vertices, replacements, references)
                             else
                                 Segment.boundingBox segment
-                                |> Result.mapError ArrangementSegmentError
+                                |> Result.mapError InternalArrangementSegmentError
                                 |> Result.map (fun bounds ->
                                     let replacement: ArrangementEdge =
                                         { Id = id; Segment = segment; Bounds = bounds
@@ -591,7 +613,7 @@ module Arrangement =
 
     let private incomingContext (piece: AtomicPiece) (graph: ArrangementGraph) tolerance =
         Segment.boundingBox piece.Segment
-        |> Result.mapError ArrangementSegmentError
+        |> Result.mapError InternalArrangementSegmentError
         |> Result.bind (fun bounds ->
             uniqueVertexForEndpoint graph.Vertices (Segment.start piece.Segment) tolerance
             |> Result.bind (fun startMatch ->
@@ -600,7 +622,7 @@ module Arrangement =
 
     let private splitPieceAtExistingVertex (piece: AtomicPiece) (graph: ArrangementGraph) tolerance minimumChord =
         Segment.boundingBox piece.Segment
-        |> Result.mapError ArrangementSegmentError
+        |> Result.mapError InternalArrangementSegmentError
         |> Result.bind (fun bounds ->
             let rec find (vertices: ArrangementVertex list) =
                 match vertices with
@@ -651,7 +673,7 @@ module Arrangement =
         let options = { Intersections.defaultOptions with Tolerance = halfTolerance }
         match Intersections.segmentWith edge.Segment context.Piece.Segment options with
         | Error OverlappingSegments when sharesIncomingEndpoint edge context.StartMatch context.EndMatch -> Ok([], [])
-        | Error error -> Error(ArrangementSegmentError error)
+        | Error error -> Error(InternalArrangementSegmentError error)
         | Ok hits ->
             hits
             |> List.filter (fun hit ->
@@ -675,7 +697,7 @@ module Arrangement =
                     | Some sameDirection ->
                         let rightFrom, rightTo = if sameDirection then 0.0<parameter>, 1.0<parameter> else 1.0<parameter>, 0.0<parameter>
                         Overlaps.checkParameterCorrespondence edge.Segment context.Piece.Segment 0.0<parameter> 1.0<parameter> rightFrom rightTo tolerance 7
-                        |> Result.mapError ArrangementSegmentError
+                        |> Result.mapError InternalArrangementSegmentError
                         |> Result.bind (function Some _ -> Ok(Some(edge.Id, sameDirection)) | None -> find rest)
             find edges
         | _ -> Ok None
@@ -747,7 +769,7 @@ module Arrangement =
                     let reference: DirectedEdgeReference = { EdgeId = edgeId; Reversed = reversed }
                     ProgressivePieceInserted(graph, appendImageReference context.Piece.SourceIndex reference images))
                 |> function
-                    | Error(SegmentCollapsedToVertex _) | Error(SegmentTooShort _) -> Ok(ProgressivePieceInserted(graph, images))
+                    | Error(InternalSegmentCollapsedToVertex _) | Error(InternalSegmentTooShort _) -> Ok(ProgressivePieceInserted(graph, images))
                     | result -> result
             | edge :: rest when edgeIsImageOfSource context.Piece.SourceIndex edge.Id images -> compare graph images rest
             | edge :: rest when not (boundingBoxesOverlap context.Bounds edge.Bounds tolerance) -> compare graph images rest
@@ -802,13 +824,13 @@ module Arrangement =
 
     let private sourceSegmentEdgeImage source (graph: ArrangementGraph) (reference: DirectedEdgeReference) =
         match graph.Edges |> List.tryFind (fun edge -> edge.Id = reference.EdgeId) with
-        | None -> Error(MissingArrangementEdge reference.EdgeId)
+        | None -> Error(InternalMissingArrangementEdge reference.EdgeId)
         | Some edge ->
             Segment.projection source (Segment.start edge.Segment)
-            |> Result.mapError ArrangementSegmentError
+            |> Result.mapError InternalArrangementSegmentError
             |> Result.bind (fun (startT, _, startDistance) ->
                 Segment.projection source (Segment.finish edge.Segment)
-                |> Result.mapError ArrangementSegmentError
+                |> Result.mapError InternalArrangementSegmentError
                 |> Result.map (fun (finishT, _, finishDistance) -> startT, finishT, startDistance, finishDistance))
             |> Result.map (fun (startT, finishT, startDistance, finishDistance) ->
                 startT, finishT, startDistance, finishDistance, edge)
@@ -865,7 +887,7 @@ module Arrangement =
             state
             |> Result.bind (fun () ->
                 if graph.Edges |> List.exists (fun edge -> edge.Id = image.EdgeId) then Ok()
-                else Error(MissingArrangementEdge image.EdgeId))) (Ok())
+                else Error(InternalMissingArrangementEdge image.EdgeId))) (Ok())
 
     let private edgeImagesContainSource (edgeImages: ArrangementEdgeImage list) edgeId segmentIndex fromParameter toParameter reversed =
         edgeImages
@@ -921,13 +943,13 @@ module Arrangement =
                         state
                         |> Result.bind (fun () ->
                             match graph.Edges |> List.tryFind (fun edge -> edge.Id = imageEdge.EdgeId) with
-                            | None -> Error(MissingArrangementEdge imageEdge.EdgeId)
+                            | None -> Error(InternalMissingArrangementEdge imageEdge.EdgeId)
                             | Some edge ->
                                 Segment.point source imageEdge.From
-                                |> Result.mapError ArrangementSegmentError
+                                |> Result.mapError InternalArrangementSegmentError
                                 |> Result.bind (fun sourceA ->
                                     Segment.point source imageEdge.To
-                                    |> Result.mapError ArrangementSegmentError
+                                    |> Result.mapError InternalArrangementSegmentError
                                     |> Result.bind (fun sourceB ->
                                         let edgeA, edgeB =
                                             if imageEdge.Reversed then Segment.finish edge.Segment, Segment.start edge.Segment
@@ -942,10 +964,10 @@ module Arrangement =
 
     /// Build directly from a flat segment list without source normalization.
     let internal buildWith segments vertexTolerance minimumChord (endpointSliverTolerance: float<parameter>) =
-        if vertexTolerance <= 0.0<length> || not (finite vertexTolerance) then Error(InvalidArrangementTolerance vertexTolerance)
-        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InvalidMinimumChord minimumChord)
+        if vertexTolerance <= 0.0<length> || not (finite vertexTolerance) then Error(InternalInvalidArrangementTolerance vertexTolerance)
+        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
         elif endpointSliverTolerance < 0.0<parameter> || System.Double.IsNaN(float endpointSliverTolerance) || System.Double.IsInfinity(float endpointSliverTolerance) then
-            Error(InvalidEndpointSliverTolerance endpointSliverTolerance)
+            Error(InternalInvalidEndpointSliverTolerance endpointSliverTolerance)
         else
             let indexed =
                 segments
@@ -969,7 +991,7 @@ module Arrangement =
 
     /// Build an arrangement and preserve each input path segment's edge image.
     /// Nodes paths into an arrangement and records every source segment image.
-    let build (paths: Path list) tolerance minimumChord =
+    let private buildInternal (paths: Path list) tolerance minimumChord =
         let indexed = indexPaths paths
         let segments = indexed |> List.map _.Segment
         buildWith segments tolerance minimumChord 0.0<parameter>
@@ -984,29 +1006,37 @@ module Arrangement =
             { Graph = built.Graph; SegmentImages = images })
 
     /// Resolves a segment image to oriented arrangement-edge geometry.
-    let segmentImageEdges (build: ArrangementGraphBuild) (image: ArrangementSegmentImage) =
+    let build paths tolerance minimumChord =
+        buildInternal paths tolerance minimumChord
+        |> Result.mapError publicError
+
+    let private segmentImageEdgesInternal (build: ArrangementGraphBuild) (image: ArrangementSegmentImage) =
         image.Edges
         |> List.fold (fun state reference ->
             state
             |> Result.bind (fun edges ->
                 match build.Graph.Edges |> List.tryFind (fun edge -> edge.Id = reference.EdgeId) with
                 | Some edge -> Ok(edges @ [ edge, reference.Reversed ])
-                | None -> Error(MissingArrangementEdge reference.EdgeId))) (Ok [])
+                | None -> Error(InternalMissingArrangementEdge reference.EdgeId))) (Ok [])
+
+    let segmentImageEdges build image =
+        segmentImageEdgesInternal build image
+        |> Result.mapError publicError
 
     let private faceEdgeEqual (left: ArrangementFaceEdge) (right: ArrangementFaceEdge) = left.EdgeId = right.EdgeId && left.Left = right.Left
 
     let private faceSuccessor (graph: ArrangementGraph) (current: ArrangementFaceEdge) =
         match graph.Edges |> List.tryFind (fun edge -> edge.Id = current.EdgeId) with
-        | None -> Error(MissingArrangementEdge current.EdgeId)
+        | None -> Error(InternalMissingArrangementEdge current.EdgeId)
         | Some edge ->
             let arrival = if current.Left then edge.EndVertex else edge.StartVertex
             let incomingReversed = current.Left
             match graph.CyclicOrders |> List.tryFind (fst >> (=) arrival) with
-            | None -> Error(DualMissingCyclicOrder arrival)
+            | None -> Error(InternalDualMissingCyclicOrder arrival)
             | Some(_, groups) ->
                 let order = List.concat groups
                 match order |> List.tryFindIndex (fun item -> item.EdgeId = current.EdgeId && item.Reversed = incomingReversed) with
-                | None -> Error(DualMissingIncidentEdge(arrival, current.EdgeId))
+                | None -> Error(InternalDualMissingIncidentEdge(arrival, current.EdgeId))
                 | Some index ->
                     let next = order[(index + 1) % order.Length]
                     let result: ArrangementFaceEdge = { EdgeId = next.EdgeId; Left = not next.Reversed }
@@ -1014,13 +1044,13 @@ module Arrangement =
 
     let private faceWalk (graph: ArrangementGraph) (start: ArrangementFaceEdge) =
         let rec loop (current: ArrangementFaceEdge) (visited: ArrangementFaceEdge list) remaining =
-            if remaining <= 0 then Error(DualWalkDidNotClose(start.EdgeId, start.Left))
+            if remaining <= 0 then Error(InternalDualWalkDidNotClose(start.EdgeId, start.Left))
             else
                 faceSuccessor graph current
                 |> Result.bind (fun next ->
                     let visited = current :: visited
                     if faceEdgeEqual next start then Ok(List.rev visited)
-                    elif visited |> List.exists (faceEdgeEqual next) then Error(DualWalkDidNotClose(start.EdgeId, start.Left))
+                    elif visited |> List.exists (faceEdgeEqual next) then Error(InternalDualWalkDidNotClose(start.EdgeId, start.Left))
                     else loop next visited (remaining - 1))
         loop start [] (graph.Edges.Length * 2 + 1)
 
@@ -1036,23 +1066,23 @@ module Arrangement =
         | Line _ -> Ok(Line(newStart, newFinish))
         | _ ->
             Affine.pointPairSimilarity (Segment.start segment) (Segment.finish segment) newStart newFinish
-            |> Result.mapError (fun _ -> ArrangementSegmentError SplitOutsideSegment)
+            |> Result.mapError (fun _ -> InternalArrangementSegmentError SplitOutsideSegment)
             |> Result.bind (fun transform ->
                 Transform.segment segment transform
-                |> Result.mapError (fun _ -> ArrangementSegmentError CannotMapArcNonlinearly))
+                |> Result.mapError (fun _ -> InternalArrangementSegmentError CannotMapArcNonlinearly))
             |> Result.map (Segment.withStart newStart >> Segment.withFinish newFinish)
 
     let private faceEdgeSegment (graph: ArrangementGraph) (reference: ArrangementFaceEdge) =
         match graph.Edges |> List.tryFind (fun edge -> edge.Id = reference.EdgeId) with
-        | None -> Error(MissingArrangementEdge reference.EdgeId)
+        | None -> Error(InternalMissingArrangementEdge reference.EdgeId)
         | Some edge ->
             let segment, startVertex, endVertex =
                 if reference.Left then edge.Segment, edge.StartVertex, edge.EndVertex
                 else Segment.reverse edge.Segment, edge.EndVertex, edge.StartVertex
             match graph.Vertices |> List.tryFind (fun vertex -> vertex.Id = startVertex),
                   graph.Vertices |> List.tryFind (fun vertex -> vertex.Id = endVertex) with
-            | None, _ -> Error(MissingArrangementVertex startVertex)
-            | _, None -> Error(MissingArrangementVertex endVertex)
+            | None, _ -> Error(InternalMissingArrangementVertex startVertex)
+            | _, None -> Error(InternalMissingArrangementVertex endVertex)
             | Some startPoint, Some endPoint -> remapSegmentEndpoints segment startPoint.Point endPoint.Point
 
     let private faceWalkSubpath graph edges =
@@ -1062,8 +1092,8 @@ module Arrangement =
             |> Result.bind (fun segments -> faceEdgeSegment graph edge |> Result.map (fun segment -> segments @ [ segment ]))) (Ok [])
         |> Result.bind (fun segments ->
             Subpath.create segments
-            |> Result.mapError ArrangementSegmentError
-            |> Result.bind (fun subpath -> Subpath.setClosed true subpath |> Result.mapError ArrangementSegmentError))
+            |> Result.mapError InternalArrangementSegmentError
+            |> Result.bind (fun subpath -> Subpath.setClosed true subpath |> Result.mapError InternalArrangementSegmentError))
 
     let private containmentSignature sample subpaths options =
         subpaths
@@ -1073,7 +1103,7 @@ module Arrangement =
                 | None -> Ok None
                 | Some signature ->
                     WindingField.pathContainmentWith sample (Path.ofSubpaths [ subpath ]) Nonzero options
-                    |> Result.mapError ArrangementSegmentError
+                    |> Result.mapError InternalArrangementSegmentError
                     |> Result.map (function
                         | Boundary -> None
                         | Inside -> Some(signature @ [ true ])
@@ -1081,15 +1111,15 @@ module Arrangement =
 
     let private faceWalkSignature graph allSubpaths edges subpath =
         match edges with
-        | [] -> Error(DualFaceSampleUnavailable(-1, true))
+        | [] -> Error(InternalDualFaceSampleUnavailable(-1, true))
         | first :: _ ->
             faceEdgeSegment graph first
             |> Result.bind (fun segment ->
                 Segment.point segment 0.5<parameter>
-                |> Result.mapError ArrangementSegmentError
+                |> Result.mapError InternalArrangementSegmentError
                 |> Result.bind (fun midpoint ->
                     Segment.derivative segment 0.5<parameter>
-                    |> Result.mapError ArrangementSegmentError
+                    |> Result.mapError InternalArrangementSegmentError
                     |> Result.bind (fun derivative ->
                         let direction =
                             Point.normalize derivative
@@ -1097,12 +1127,12 @@ module Arrangement =
                             |> Option.defaultValue (Point.create 1.0 0.0)
                         let normal = Point.rotateCounterclockwise direction
                         let rec sample distance remaining =
-                            if remaining <= 0 || distance <= 0.0<length> then Error(DualFaceSampleUnavailable(first.EdgeId, first.Left))
+                            if remaining <= 0 || distance <= 0.0<length> then Error(InternalDualFaceSampleUnavailable(first.EdgeId, first.Left))
                             else
                                 let point = Point.translate (Point.scale distance normal) midpoint
                                 let options = { WindingField.defaultOptions with Tolerance = distance * 0.01 }
                                 WindingField.pathContainmentWith point (Path.ofSubpaths [ subpath ]) Nonzero options
-                                |> Result.mapError ArrangementSegmentError
+                                |> Result.mapError InternalArrangementSegmentError
                                 |> Result.bind (function
                                     | Boundary -> sample (distance * 0.5) (remaining - 1)
                                     | _ ->
@@ -1135,14 +1165,14 @@ module Arrangement =
                     match isOuter, enclosing with
                     | true, [] -> Ok(faces @ [ { Id = id; Outer = true; Walks = islands } ])
                     | false, [ enclosing ] -> Ok(faces @ [ { Id = id; Outer = false; Walks = enclosing :: islands } ])
-                    | _, walks -> Error(DualInvalidOuterWalkCount walks.Length))) (Ok [])
-        | groups -> Error(DualInvalidOuterFaceCount groups.Length)
+                    | _, walks -> Error(InternalDualInvalidOuterWalkCount walks.Length))) (Ok [])
+        | groups -> Error(InternalDualInvalidOuterFaceCount groups.Length)
 
     /// Derive face boundary walks and the face on each side of every edge.
     /// Walks with the same containment signature are grouped into one face;
     /// the enclosing walk precedes any island walks.
     /// Walks all faces and constructs the dual incidence representation.
-    let dual (graph: ArrangementGraph) =
+    let private dualInternal (graph: ArrangementGraph) =
         if List.isEmpty graph.Edges then
             Ok { Faces = [ { Id = 0; Outer = true; Walks = [] } ]; EdgeFaces = [] }
         else
@@ -1189,8 +1219,8 @@ module Arrangement =
                     |> Result.bind (fun edgeFaces ->
                         match findFace edge.Id true, findFace edge.Id false with
                         | Some left, Some right -> Ok(edgeFaces @ [ { EdgeId = edge.Id; LeftFace = left; RightFace = right } ])
-                        | None, _ -> Error(DualMissingEdgeFace(edge.Id, true))
-                        | _, None -> Error(DualMissingEdgeFace(edge.Id, false)))) (Ok [])
+                        | None, _ -> Error(InternalDualMissingEdgeFace(edge.Id, true))
+                        | _, None -> Error(InternalDualMissingEdgeFace(edge.Id, false)))) (Ok [])
                 |> Result.map (fun edgeFaces -> { Faces = faces; EdgeFaces = edgeFaces }))
 
     type private NestedContourEdge =
@@ -1205,6 +1235,10 @@ module Arrangement =
           Starts: bool
           Angle: float<degree> }
 
+    let dual graph =
+        dualInternal graph
+        |> Result.mapError publicError
+
     let private nestedContourEdges
         (graph: ArrangementGraph)
         (path: Path)
@@ -1218,7 +1252,7 @@ module Arrangement =
                     path
                     sideSamplingDistance
                     WindingField.defaultOptions
-                |> Result.mapError ArrangementSegmentError
+                |> Result.mapError InternalArrangementSegmentError
                 |> Result.map (fun (left, right) -> classified @ [ edge, left, right ]))) (Ok [])
         |> Result.map (fun classified ->
             classified
@@ -1251,11 +1285,11 @@ module Arrangement =
         let ray edge starts =
             let parameter = if starts then 0.0<parameter> else 1.0<parameter>
             Segment.directions edge.Segment parameter
-            |> Result.mapError ArrangementSegmentError
+            |> Result.mapError InternalArrangementSegmentError
             |> Result.bind (fun directions ->
                 let direction = if starts then directions.Outgoing else directions.Incoming
                 match direction with
-                | None -> Error(ContourTraceFailed edge.Id)
+                | None -> Error(InternalContourTraceFailed edge.Id)
                 | Some direction ->
                     let outward = if starts then direction else Point.scale -1.0 direction
                     Ok { EdgeId = edge.Id; Starts = starts; Angle = Point.heading outward })
@@ -1288,18 +1322,18 @@ module Arrangement =
                             else
                                 let successor = ordered[(index + 1) % count]
                                 if successor.Starts then Ok(Map.add incoming.EdgeId successor.EdgeId pairs)
-                                else Error(ContourTraceFailed incoming.EdgeId))) (Ok successors)))) (Ok Map.empty)
+                                else Error(InternalContourTraceFailed incoming.EdgeId))) (Ok successors)))) (Ok Map.empty)
 
     let private traceNestedContours edges successors tolerance =
         let byId = edges |> List.map (fun edge -> edge.Id, edge) |> Map.ofList
         let rec trace start current visited segments =
             if Set.contains current visited then
                 if current = start then Ok(List.rev segments, visited)
-                else Error(ContourTraceFailed current)
+                else Error(InternalContourTraceFailed current)
             else
                 match Map.tryFind current byId, Map.tryFind current successors with
                 | Some edge, Some next -> trace start next (Set.add current visited) (edge.Segment :: segments)
-                | _ -> Error(ContourTraceFailed current)
+                | _ -> Error(InternalContourTraceFailed current)
         let rec gather remaining visited contours =
             match remaining |> List.tryFind (fun edge -> not (Set.contains edge.Id visited)) with
             | None -> Ok(List.rev contours)
@@ -1308,7 +1342,7 @@ module Arrangement =
                 |> Result.bind (fun (segments, visited) ->
                     Subpath.createWith (WiggleWith tolerance) segments
                     |> Result.bind (Subpath.setClosedWith (WiggleWith tolerance) true)
-                    |> Result.mapError ArrangementSegmentError
+                    |> Result.mapError InternalArrangementSegmentError
                     |> Result.bind (fun contour ->
                         let contour = if edge.Layer > 0 then Subpath.reverse contour else contour
                         gather remaining visited (contour :: contours)))
@@ -1321,7 +1355,7 @@ module Arrangement =
         (path: Path)
         (tolerance: float<length>) =
         if tolerance <= 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
-            Error(InvalidArrangementTolerance tolerance)
+            Error(InternalInvalidArrangementTolerance tolerance)
         else
             nestedContourEdges graph path (tolerance * 16.0)
             |> Result.bind (fun edges ->

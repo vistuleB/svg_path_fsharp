@@ -329,13 +329,13 @@ let ``builder_consolidates_near_equal_circles_inside_tolerance_test`` () =
 [<Fact>]
 let ``build_rejects_invalid_tolerance_before_inspecting_sources_test`` () =
     let badSegment = line 0.0 0.0 0.0 0.0
-    Assert.Equal(Error(InvalidArrangementTolerance 0.0<length>), Arrangement.buildWith [ badSegment ] 0.0<length> minimumChord 0.0<parameter>)
+    Assert.Equal(Error(InternalInvalidArrangementTolerance 0.0<length>), Arrangement.buildWith [ badSegment ] 0.0<length> minimumChord 0.0<parameter>)
     Assert.Equal(Error(InvalidArrangementTolerance -1.0<length>), Arrangement.build [ Path.singleton (Subpath.ofSegment badSegment) ] -1.0<length> minimumChord)
 
 [<Fact>]
 let ``build_rejects_invalid_minimum_chord_before_inspecting_sources_test`` () =
     let badSegment = line 0.0 0.0 0.0 0.0
-    Assert.Equal(Error(InvalidMinimumChord 0.0<length>), Arrangement.buildWith [ badSegment ] tolerance 0.0<length> 0.0<parameter>)
+    Assert.Equal(Error(InternalInvalidMinimumChord 0.0<length>), Arrangement.buildWith [ badSegment ] tolerance 0.0<length> 0.0<parameter>)
     Assert.Equal(Error(InvalidMinimumChord -1.0<length>), Arrangement.build [ Path.singleton (Subpath.ofSegment badSegment) ] tolerance -1.0<length>)
 
 [<Fact>]
@@ -343,14 +343,14 @@ let ``build_rejects_nonfinite_numeric_options_test`` () =
     let segment = line 0.0 0.0 10.0 0.0
     let infiniteLength = LanguagePrimitives.FloatWithMeasure<length> System.Double.PositiveInfinity
     let infiniteParameter = LanguagePrimitives.FloatWithMeasure<parameter> System.Double.PositiveInfinity
-    Assert.Equal(Error(InvalidArrangementTolerance infiniteLength), Arrangement.buildWith [ segment ] infiniteLength minimumChord 0.0<parameter>)
-    Assert.Equal(Error(InvalidMinimumChord infiniteLength), Arrangement.buildWith [ segment ] tolerance infiniteLength 0.0<parameter>)
-    Assert.Equal(Error(InvalidEndpointSliverTolerance infiniteParameter), Arrangement.buildWith [ segment ] tolerance minimumChord infiniteParameter)
+    Assert.Equal(Error(InternalInvalidArrangementTolerance infiniteLength), Arrangement.buildWith [ segment ] infiniteLength minimumChord 0.0<parameter>)
+    Assert.Equal(Error(InternalInvalidMinimumChord infiniteLength), Arrangement.buildWith [ segment ] tolerance infiniteLength 0.0<parameter>)
+    Assert.Equal(Error(InternalInvalidEndpointSliverTolerance infiniteParameter), Arrangement.buildWith [ segment ] tolerance minimumChord infiniteParameter)
 
 [<Fact>]
 let ``insertion_reports_tolerance_cluster_collapse_test`` () =
     Assert.Equal(
-        Error(SegmentCollapsedToVertex 0),
+        Error(InternalSegmentCollapsedToVertex 0),
         Arrangement.insertAtomicSegment Arrangement.empty (line 0.0 0.0 0.5 0.0) 1.0<length> 0.1<length>)
 
 [<Fact>]
@@ -392,7 +392,7 @@ let ``exactly_equal_endpoint_samples_preserve_exact_vertex_test`` () =
 [<Fact>]
 let ``build_with_rejects_negative_endpoint_sliver_tolerance_test`` () =
     let segment = line 0.0 0.0 10.0 0.0
-    Assert.Equal(Error(InvalidEndpointSliverTolerance -0.001<parameter>), Arrangement.buildWith [ segment ] tolerance minimumChord -0.001<parameter>)
+    Assert.Equal(Error(InternalInvalidEndpointSliverTolerance -0.001<parameter>), Arrangement.buildWith [ segment ] tolerance minimumChord -0.001<parameter>)
 
 [<Fact>]
 let ``validation_rejects_invalid_numeric_options_test`` () =
@@ -401,8 +401,8 @@ let ``validation_rejects_invalid_numeric_options_test`` () =
     let infinite = LanguagePrimitives.FloatWithMeasure<length> System.Double.PositiveInfinity
     Assert.Equal(Error(InvalidArrangementTolerance infinite), Arrangement.validate Arrangement.empty infinite minimumChord)
     Assert.Equal(Error(InvalidMinimumChord infinite), Arrangement.validate Arrangement.empty tolerance infinite)
-    Assert.Equal(Error(InvalidArrangementTolerance infinite), Arrangement.cyclicOrdersWith Arrangement.empty infinite 3)
-    Assert.Equal(Error(InvalidArrangementTolerance 0.0<length>), Arrangement.cyclicOrdersWith Arrangement.empty 0.0<length> 0)
+    Assert.Equal(Error(InternalInvalidArrangementTolerance infinite), Arrangement.cyclicOrdersWith Arrangement.empty infinite 3)
+    Assert.Equal(Error(InternalInvalidArrangementTolerance 0.0<length>), Arrangement.cyclicOrdersWith Arrangement.empty 0.0<length> 0)
 
 [<Fact>]
 let ``validation_rejects_vertex_sample_outside_official_tolerance_test`` () =
@@ -418,7 +418,7 @@ let ``validation_rejects_vertex_sample_outside_official_tolerance_test`` () =
                     EndpointSamples = [ point 10.0 0.0 ] } ]
             Edges = [ edge 0 segment 0 1 ] }
     Assert.Equal(
-        Error(VertexSampleOutsideTolerance(0, 4.0<length^2>, 1.0<length^2>)),
+        Error(ConstructionFailed),
         Arrangement.validate graph 1.0<length> minimumChord)
 
 [<Fact>]
@@ -435,8 +435,7 @@ let ``validation_rejects_noncanonical_vertex_center_test`` () =
                     EndpointSamples = [ point 10.0 0.0 ] } ]
             Edges = [ edge 0 segment 0 1 ] }
     match Arrangement.validate graph 1.0<length> minimumChord with
-    | Error(VertexCenterMismatch(0, distanceSquared)) ->
-        Assert.True(abs (float distanceSquared - 0.01) < 0.000001)
+    | Error ConstructionFailed -> ()
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
@@ -448,7 +447,7 @@ let ``validation_rejects_vertex_without_endpoint_samples_test`` () =
                 [ { Id = 0; Point = point 0.0 0.0; EndpointSamples = [] }
                   { Id = 1; Point = point 10.0 0.0; EndpointSamples = [ point 10.0 0.0 ] } ]
             Edges = [ edge 0 segment 0 1 ] }
-    Assert.Equal(Error(VertexWithoutEndpointSamples 0), Arrangement.validate graph tolerance minimumChord)
+    Assert.Equal(Error ConstructionFailed, Arrangement.validate graph tolerance minimumChord)
 
 [<Fact>]
 let ``reversed_duplicate_increments_reverse_multiplicity_test`` () =
@@ -460,7 +459,7 @@ let ``reversed_duplicate_increments_reverse_multiplicity_test`` () =
 [<Fact>]
 let ``short_chord_is_rejected_test`` () =
     Assert.Equal(
-        Error(SegmentTooShort(0.000001<length>, minimumChord)),
+        Error(InternalSegmentTooShort(0.000001<length>, minimumChord)),
         Arrangement.insertAtomicSegment Arrangement.empty (line 0.0 0.0 0.000001 0.0) tolerance minimumChord)
 
 [<Fact>]

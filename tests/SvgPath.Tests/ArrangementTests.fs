@@ -107,7 +107,7 @@ module ArrangementTests =
     let ``open_chain_fails_final_even_degree_invariant_test`` () =
         let graph = graphWithEdges [ line 0.0 0.0 1.0 0.0 ] |> Result.defaultWith (fun error -> failwithf "%A" error)
         match Arrangement.validate graph 1.0e-9<length> 1.0e-12<length> with
-        | Error(OddWeightedDegree(0, 1)) -> ()
+        | Error ConstructionFailed -> ()
         | other -> failwithf "unexpected result: %A" other
 
     [<Fact>]
@@ -141,7 +141,9 @@ module ArrangementTests =
         let square = rectangle 0.0 0.0 10.0 10.0
         let path = Path.ofSubpaths [ square ]
         match Arrangement.build [ path ] 1.0e-6<length> 1.0e-5<length>
-              |> Result.bind (fun build -> Arrangement.nestedContoursFromGraph build.Graph path 1.0e-6<length>) with
+              |> Result.bind (fun build ->
+                  Arrangement.nestedContoursFromGraph build.Graph path 1.0e-6<length>
+                  |> Result.mapError Arrangement.publicError) with
         | Error error -> failwithf "%A" error
         | Ok contours ->
             Assert.Single(contours) |> ignore
@@ -154,7 +156,9 @@ module ArrangementTests =
         let inner = rectangle 2.0 2.0 6.0 6.0
         let path = Path.ofSubpaths [ outer; inner ]
         match Arrangement.build [ path ] 1.0e-6<length> 1.0e-5<length>
-              |> Result.bind (fun build -> Arrangement.nestedContoursFromGraph build.Graph path 1.0e-6<length>) with
+              |> Result.bind (fun build ->
+                  Arrangement.nestedContoursFromGraph build.Graph path 1.0e-6<length>
+                  |> Result.mapError Arrangement.publicError) with
         | Error error -> failwithf "%A" error
         | Ok contours ->
             Assert.Equal(2, contours.Length)
@@ -165,7 +169,9 @@ module ArrangementTests =
         let contour = rectangle 0.0 0.0 10.0 10.0
         let path = Path.ofSubpaths [ contour; contour ]
         match Arrangement.build [ path ] 1.0e-6<length> 1.0e-5<length>
-              |> Result.bind (fun build -> Arrangement.nestedContoursFromGraph build.Graph path 1.0e-6<length>) with
+              |> Result.bind (fun build ->
+                  Arrangement.nestedContoursFromGraph build.Graph path 1.0e-6<length>
+                  |> Result.mapError Arrangement.publicError) with
         | Error error -> failwithf "%A" error
         | Ok contours ->
             Assert.Equal(2, contours.Length)

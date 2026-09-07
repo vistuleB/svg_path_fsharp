@@ -3747,7 +3747,7 @@ module Offset =
         let segments = indexed |> List.map (fun item -> item.Segment)
         Arrangement.buildWith
             segments arrangementTolerance arrangementTolerance 0.0001<parameter>
-        |> Result.mapError ArrangementGraphError
+        |> Result.mapError (Arrangement.publicError >> ArrangementGraphError)
         |> Result.map (fun build ->
             { Graph = build.Graph
               IndexedSegments = indexed
@@ -3780,9 +3780,9 @@ module Offset =
 
     let rec private arrangementEdgeById
         (edges: ArrangementEdge list) id
-        : Result<ArrangementEdge, ArrangementError> =
+        : Result<ArrangementEdge, ArrangementInternalError> =
         match edges with
-        | [] -> Error(MissingArrangementEdge id)
+        | [] -> Error(InternalMissingArrangementEdge id)
         | first :: rest ->
             if first.Id = id then Ok first
             else arrangementEdgeById rest id
@@ -3795,7 +3795,7 @@ module Offset =
             state
             |> Result.bind (fun found ->
                 arrangementEdgeById build.Graph.Edges reference.EdgeId
-                |> Result.mapError ArrangementGraphError
+                |> Result.mapError (Arrangement.publicError >> ArrangementGraphError)
                 |> Result.map (fun edge -> (edge, reference.Reversed) :: found))) (Ok [])
         |> Result.map List.rev
 
@@ -4582,7 +4582,7 @@ module Offset =
         | [] -> Ok(List.rev split)
         | image :: rest ->
             arrangementEdgeById build.Graph.Edges image.EdgeId
-            |> Result.mapError ArrangementGraphError
+            |> Result.mapError (Arrangement.publicError >> ArrangementGraphError)
             |> Result.bind (fun edge ->
                 arrangementEdgeWindingMatchesOpinion
                     build edge winding submergedSideSamplingDistance
@@ -5111,7 +5111,7 @@ module Offset =
         |> List.tryFind (fun edge -> edge.EdgeId = edgeId)
         |> function
             | Some edge -> Ok edge
-            | None -> Error(ArrangementGraphError(MissingArrangementEdge edgeId))
+            | None -> Error(ArrangementGraphError(Arrangement.publicError (InternalMissingArrangementEdge edgeId)))
 
     let rec private contaminationSeedFaces
         (images: ArrangementSourceSegmentImage list)
@@ -5185,7 +5185,7 @@ module Offset =
                       DeletionCandidate = offside }
                 arrangementSplitSegmentsFromIContaminationEdges
                     source rest build dual contaminated (item :: split)
-            | Error error, _ -> Error(ArrangementGraphError error)
+            | Error error, _ -> Error(ArrangementGraphError(Arrangement.publicError error))
             | _, Error error -> Error error
 
     let private arrangementSplitSegmentsFromIContaminationImage

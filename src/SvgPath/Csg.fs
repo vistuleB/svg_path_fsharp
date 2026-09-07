@@ -10,7 +10,7 @@ type BoundaryTopologyFailure =
     | TraceFailed
 
 type CsgError =
-    | CsgArrangementError of ArrangementError
+    | CsgArrangementError
     | CsgPathError of SegmentError
     | InternalBoundaryTopologyError of vertex: int * reason: BoundaryTopologyFailure
 
@@ -49,7 +49,7 @@ module Csg =
             |> List.collect Path.subpaths
             |> List.collect Subpath.segments
         Arrangement.buildWith segments options.Tolerance options.MinimumChord 0.0<parameter>
-        |> Result.mapError CsgArrangementError
+        |> Result.mapError (fun _ -> CsgArrangementError)
 
     let private filled winding fillRule =
         match fillRule with
@@ -190,7 +190,7 @@ module Csg =
         build [ path ] options
         |> Result.bind (fun build ->
             Arrangement.nestedContoursFromGraph build.Graph path options.Tolerance
-            |> Result.mapError CsgArrangementError
+            |> Result.mapError (fun _ -> CsgArrangementError)
             |> Result.map (fun contours -> { Path = Path.ofSubpaths contours; Build = build }))
 
     let nestedContours path = nestedContoursWith path defaultOptions

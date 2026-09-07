@@ -250,38 +250,6 @@ type internal SynchronizedOffsetTraceJoin =
       InnerReversed: bool
       OuterReversed: bool }
 
-[<Struct>]
-type internal SynchronizedOffsetTraceArea =
-    { PortionIndex: int
-      CorrespondenceIndex: int
-      InnerSegments: Segment list
-      OuterSegments: Segment list }
-
-[<Struct>]
-type internal SingleOffsetContaminationTraceEdge =
-    { Id: int
-      Segment: Segment
-      StartVertex: int
-      EndVertex: int
-      PreimageFrom: float<parameter>
-      PreimageTo: float<parameter>
-      Offside: bool
-      Survives: bool }
-
-[<Struct>]
-type internal BandArrangementTraceEdge =
-    { Id: int
-      Segment: Segment
-      Submerged: bool }
-
-[<Struct>]
-type internal CuspTrimmingArrangementTraceEdge =
-    { SideIndex: int
-      Id: int
-      Segment: Segment
-      OffsetImage: bool
-      Submerged: bool }
-
 type internal BandSide =
     | Inner
     | Outer
@@ -1393,17 +1361,7 @@ module Offset =
 
     let private rawFittingTolerance options = options.Fitting.Tolerance * 0.5
 
-    let private offsetReversalParameters segment offset =
-        Curvature.segmentLeftNormalCuspParameters segment offset Curvature.defaultOptions
-        |> Result.mapError (fun _ -> InternalNonFinite)
-
-    let private offsetInflectionParameters segment =
-        let options: CurvatureOptions =
-            { Tolerance = curvatureParameterTolerance
-              Samples = 100
-              MaxDepth = 32 }
-        Curvature.segmentInflectionParameters segment options
-        |> Result.mapError (fun _ -> InternalNonFinite)
+    
 
     let private sourceSegmentOffsetIsStalled
         segment
@@ -3216,56 +3174,6 @@ module Offset =
         shortCircuitAdjacentOffsetSegmentLoopWithParameters left right
         |> Result.map (fun (left, _, right, _) -> left, right)
 
-    let rec private synchronizedSideSourceOffsetCount source =
-        match source with
-        | RefinableSideSource _
-        | StalledSideSource _ -> 1
-        | SplitSideSource(left, right) ->
-            synchronizedSideSourceOffsetCount left + synchronizedSideSourceOffsetCount right
-
-    let rec private synchronizedMaxGranularityTraceAreas
-        portionIndex correspondenceIndex innerSource outerSource
-        innerSegments outerSegments =
-        match innerSource, outerSource with
-        | SplitSideSource(innerLeft, innerRight), SplitSideSource(outerLeft, outerRight) ->
-            let innerLeftCount = synchronizedSideSourceOffsetCount innerLeft
-            let outerLeftCount = synchronizedSideSourceOffsetCount outerLeft
-            synchronizedMaxGranularityTraceAreas
-                portionIndex correspondenceIndex innerLeft outerLeft
-                (List.take innerLeftCount innerSegments)
-                (List.take outerLeftCount outerSegments)
-            @ synchronizedMaxGranularityTraceAreas
-                portionIndex correspondenceIndex innerRight outerRight
-                (List.skip innerLeftCount innerSegments)
-                (List.skip outerLeftCount outerSegments)
-        | _ ->
-            [ { PortionIndex = portionIndex
-                CorrespondenceIndex = correspondenceIndex
-                InnerSegments = innerSegments
-                OuterSegments = outerSegments } ]
-
-    let rec private synchronizedOffsetTraceAreas
-        (correspondences: OffsetCorrespondence list)
-        (innerOffsets: GHealedOffsetSegment list)
-        (outerOffsets: GHealedOffsetSegment list)
-        (traced: SynchronizedOffsetTraceArea list) =
-        match correspondences with
-        | [] -> List.rev traced
-        | first :: rest ->
-            let inner = List.take first.InnerOffsetCount innerOffsets
-            let outer = List.take first.OuterOffsetCount outerOffsets
-            let areas =
-                synchronizedMaxGranularityTraceAreas
-                    first.PortionIndex first.CorrespondenceIndex
-                    first.Inner first.Outer
-                    (inner |> List.map (fun offset -> offset.Segment))
-                    (outer |> List.map (fun offset -> offset.Segment))
-            synchronizedOffsetTraceAreas
-                rest
-                (List.skip first.InnerOffsetCount innerOffsets)
-                (List.skip first.OuterOffsetCount outerOffsets)
-                (List.rev areas @ traced)
-
     let private synchronizedSideSourceIsStalled source =
         match source with
         | StalledSideSource _ -> true
@@ -3311,16 +3219,6 @@ module Offset =
                 normalized { Inner = innerOffset; Outer = outerOffset } options)
         |> Result.map (fun (build: SynchronizedOffsetSegmentsBuild) ->
             build.Correspondences |> List.map synchronizedOffsetTraceCorrespondence)
-
-    let internal internalSynchronizedOffsetAreaTrace subpath innerOffset outerOffset options =
-        validateOptions options
-        |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
-        |> Result.bind (fun normalized ->
-            buildSynchronizedOffsetSegments
-                normalized { Inner = innerOffset; Outer = outerOffset } options)
-        |> Result.map (fun (build: SynchronizedOffsetSegmentsBuild) ->
-            synchronizedOffsetTraceAreas
-                build.Correspondences build.InnerOffsets build.OuterOffsets [])
 
     let private reverseSegments segments =
         segments |> List.rev |> List.map Segment.reverse
@@ -4885,116 +4783,6 @@ module Offset =
                     traced.Closed options.Fitting.Tolerance
             |> Result.map Some
 
-    let rec private bandArrangementTraceEdges
-        (edges: ArrangementEdge list)
-        build winding
-        (traced: BandArrangementTraceEdge list) =
-        match edges with
-        | [] -> Ok(List.rev traced)
-        | edge :: rest ->
-            arrangementEdgeWindingMatchesOpinion
-                build edge winding submergedSideSamplingDistance
-            |> Result.bind (fun matches ->
-                bandArrangementTraceEdges rest build winding
-                    ({ Id = edge.Id
-                       Segment = edge.Segment
-                       Submerged = not matches } :: traced))
-
-    let internal internalSubpathBandArrangementTrace
-        subpath innerOffset outerOffset join cap (options: Options) =
-        validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
-        |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
-        |> Result.bind (fun normalized ->
-            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options
-            |> Result.bind (fun synchronized ->
-                match cuspTrimISubpath
-                          synchronized.InnerCulled normalized innerOffset cap options,
-                      cuspTrimISubpath
-                          synchronized.OuterCulled normalized outerOffset cap options with
-                | Ok(Some innerTrimmed), Ok(Some outerTrimmed) ->
-                    match cuspTrimmedSubpathGeometry
-                              innerTrimmed options.Fitting.Tolerance,
-                          cuspTrimmedSubpathGeometry
-                              outerTrimmed options.Fitting.Tolerance with
-                    | Ok inner, Ok outer ->
-                        bandFromSides inner innerOffset outer outerOffset cap
-                        |> Result.bind (fun band ->
-                            let opinions =
-                                if innerOffset >= outerOffset then
-                                    [ { Left = 0; Right = 1 }
-                                      { Left = 1; Right = 0 } ]
-                                else
-                                    [ { Left = 1; Right = 0 }
-                                      { Left = 0; Right = 1 } ]
-                            internalBandWindingFunction [ band ]
-                            |> Result.bind (fun winding ->
-                                bandSegmentArrangement [ inner; outer ] opinions
-                                |> Result.bind (fun arrangement ->
-                                    bandArrangementTraceEdges
-                                        arrangement.Graph.Edges
-                                        arrangement winding [])))
-                    | Error error, _
-                    | _, Error error -> Error error
-                | Ok None, _
-                | _, Ok None -> Ok []
-                | Error error, _
-                | _, Error error -> Error error))
-
-    let rec private cuspTrimmingArrangementTraceEdges
-        (edges: ArrangementEdge list)
-        build winding sideIndex
-        (traced: CuspTrimmingArrangementTraceEdge list) =
-        match edges with
-        | [] -> Ok(List.rev traced)
-        | edge :: rest ->
-            arrangementEdgeWindingMatchesOpinion
-                build edge winding submergedSideSamplingDistance
-            |> Result.bind (fun matches ->
-                cuspTrimmingArrangementTraceEdges
-                    rest build winding sideIndex
-                    ({ SideIndex = sideIndex
-                       Id = edge.Id
-                       Segment = edge.Segment
-                       OffsetImage =
-                           arrangementEdgeHasGroup
-                               build edge.Id UntrimmedOffsetSegment
-                       Submerged = not matches } :: traced))
-
-    let private cuspTrimmingArrangementTraceForSide
-        (subpath: ICulledOffsetSubpath)
-        zeroSource offset sideIndex cap
-        (options: Options) =
-        subpathFromSynchronizedSegments
-            (subpath.Segments |> List.map (fun segment -> segment.Segment))
-            subpath.Closed options.Fitting.Tolerance
-        |> Result.bind (fun geometry ->
-            bandFromSides zeroSource 0.0<length> geometry offset cap
-            |> Result.bind (fun band ->
-                internalBandWindingFunction [ band ]
-                |> Result.bind (fun winding ->
-                    singleOffsetSegmentArrangement
-                        [ geometry ] (Subpath.segments zeroSource) offset
-                    |> Result.bind (fun arrangement ->
-                        cuspTrimmingArrangementTraceEdges
-                            arrangement.Graph.Edges arrangement winding sideIndex []))))
-
-    let internal internalSubpathBandCuspTrimmingArrangementTrace
-        subpath innerOffset outerOffset join cap (options: Options) =
-        validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
-        |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
-        |> Result.bind (fun normalized ->
-            buildSynchronizedUntrimmed normalized innerOffset outerOffset join options
-            |> Result.bind (fun build ->
-                match cuspTrimmingArrangementTraceForSide
-                          build.InnerCulled normalized innerOffset 0 cap options,
-                      cuspTrimmingArrangementTraceForSide
-                          build.OuterCulled normalized outerOffset 1 cap options with
-                | Ok first, Ok second -> Ok(first @ second)
-                | Error error, _
-                | _, Error error -> Error error))
-
     let private tracedSubpathGeometry
         (traced: TracedOffsetSubpath)
         tolerance =
@@ -5573,76 +5361,6 @@ module Offset =
     /// Constructs path offset bands with default options.
     let pathBand (path: Path) innerOffset outerOffset join cap =
         pathBandWith path innerOffset outerOffset join cap defaultOptions
-
-    let rec private contaminationArrangementTraceBuilds
-        (builds: SingleOffsetUntrimmedBuild list)
-        offsetImages zeroImages arrangement dual offset
-        (traced: SingleOffsetContaminationTraceEdge list) =
-        match builds with
-        | [] -> Ok(List.rev traced)
-        | build :: rest ->
-            match takeSegmentImages offsetImages (List.length (Subpath.segments build.Subpath)),
-                  takeSegmentImages zeroImages (List.length (Subpath.segments build.ZeroSource)) with
-            | Ok(buildOffsetImages, remainingOffsetImages),
-              Ok(buildZeroImages, remainingZeroImages) ->
-                let barriers = segmentImageEdgeIds buildZeroImages []
-                contaminationSeedFaces buildZeroImages dual offset []
-                |> Result.bind (fun seeds ->
-                    let contaminated = propagateContaminatedFaces dual barriers seeds
-                    arrangementSplitSubpathFromIContamination
-                        build.Culled buildOffsetImages arrangement dual contaminated
-                    |> Result.bind (fun split ->
-                        let survivors =
-                            if Subpath.isClosed build.Subpath then
-                                offsideSurvivorChains split.Segments
-                                |> List.collect (fun chain ->
-                                    chain.Edges
-                                    |> List.choose (fun edge -> edge.ArrangementPreimage))
-                            else split.Segments
-                        let survivorIds = survivors |> List.map (fun item -> item.EdgeId)
-                        let traced =
-                            split.Segments
-                            |> List.fold (fun traced segment ->
-                                { Id = segment.EdgeId
-                                  Segment = segment.Segment
-                                  StartVertex = segment.StartVertex
-                                  EndVertex = segment.EndVertex
-                                  PreimageFrom = segment.PreimageFrom
-                                  PreimageTo = segment.PreimageTo
-                                  Offside = segment.DeletionCandidate
-                                  Survives = List.contains segment.EdgeId survivorIds }
-                                :: traced) traced
-                        contaminationArrangementTraceBuilds
-                            rest remainingOffsetImages remainingZeroImages
-                            arrangement dual offset traced))
-            | Error error, _
-            | _, Error error -> Error error
-
-    let internal internalPathSingleOffsetContaminationArrangementTrace
-        (source: Path) offset join options =
-        validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
-        |> Result.bind (fun _ -> normalizeSourcePath source options)
-        |> Result.bind (fun normalized ->
-            singleOffsetUntrimmedPathBuilds
-                (Path.subpaths normalized) offset join options []
-            |> Result.bind (fun builds ->
-                let offsetCount =
-                    builds
-                    |> List.sumBy (fun build -> List.length (Subpath.segments build.Subpath))
-                let untrimmed = builds |> List.map (fun build -> build.Subpath)
-                let zeroSegments =
-                    builds |> List.collect (fun build -> Subpath.segments build.ZeroSource)
-                singleOffsetSegmentArrangement untrimmed zeroSegments offset
-                |> Result.bind (fun arrangement ->
-                    takeSegmentImages arrangement.SegmentImages offsetCount
-                    |> Result.bind (fun (offsetImages, zeroImages) ->
-                        Arrangement.dual arrangement.Graph
-                        |> Result.mapError InternalArrangementGraphError
-                        |> Result.bind (fun dual ->
-                            contaminationArrangementTraceBuilds
-                                builds offsetImages zeroImages
-                                arrangement dual offset [])))))
 
     let rec private pointInsideAnySemanticBand point paths =
         match paths with

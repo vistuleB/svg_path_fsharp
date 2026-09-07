@@ -3832,9 +3832,14 @@ module Offset =
     /// Constructs one untrimmed offset of a subpath with explicit options.
     let subpathUntrimmedWith subpath offset join options =
         validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
-        |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
-        |> Result.bind (fun normalized -> buildSingleOffsetUntrimmed normalized offset join options)
+        |> Result.mapError publicError
+        |> Result.bind (fun _ ->
+            validateJoin join |> Result.mapError publicError)
+        |> Result.bind (fun _ ->
+            normalizeSourceSubpath subpath options |> Result.mapError publicError)
+        |> Result.bind (fun normalized ->
+            buildSingleOffsetUntrimmed normalized offset join options
+            |> Result.mapError publicError)
         |> Result.map (fun build -> build.Subpath)
 
     /// Constructs one untrimmed offset of a subpath with default options.
@@ -3870,7 +3875,9 @@ module Offset =
     /// Constructs an untrimmed offset independently for every source subpath.
     let pathUntrimmedWith path offset join options =
         validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
+        |> Result.mapError publicError
+        |> Result.bind (fun _ ->
+            validateJoin join |> Result.mapError publicError)
         |> Result.bind (fun _ ->
             untrimmedOffsetPathSubpaths (Path.subpaths path) offset join options [])
         |> Result.map Path.ofSubpaths
@@ -5462,8 +5469,8 @@ module Offset =
         |> Result.mapError (InternalPathError >> publicError)
         |> Result.bind (fun source ->
             match subpathUntrimmedWith source offset join options with
-            | Error(InternalPathError EmptySubpath) -> Error(DegenerateTangent 0.0<parameter>)
-            | result -> result |> Result.mapError publicError)
+            | Error(PathError EmptySubpath) -> Error(DegenerateTangent 0.0<parameter>)
+            | result -> result)
 
     /// Offsets one segment with default options and without topological trimming.
     let segment segment offset join = segmentWith segment offset join defaultOptions

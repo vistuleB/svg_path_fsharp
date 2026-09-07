@@ -180,9 +180,16 @@ Gleam commit `c2c1578`, `map untrimmed offset errors at public boundaries`:
 
 F# functions:
 
-- `subpathUntrimmedWith`
+- `subpathUntrimmedWith` (maps `validateOptions`, `validateJoin`, `normalizeSourceSubpath`, and `buildSingleOffsetUntrimmed` through `publicError`)
 - `subpathUntrimmed`
-- `untrimmedOffsetPathSubpaths`
+- `pathUntrimmedWith` (maps `validateOptions` and `validateJoin` through `publicError`)
+- `pathUntrimmed`
+- `untrimmedOffsetPathSubpaths` (delegates to the now-public `subpathUntrimmedWith`, no mapping changes)
+
+Because `subpathUntrimmedWith` now returns public `Error`, `segmentWith` (from
+batch 3) must drop its internal `EmptySubpath` pattern in favor of `PathError
+EmptySubpath` and no longer re-map its `subpathUntrimmedWith` result. Mirror
+Gleam's corresponding `segment_with` change in this commit.
 
 ### 10. Path APIs
 

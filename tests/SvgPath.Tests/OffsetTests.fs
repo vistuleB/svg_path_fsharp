@@ -467,6 +467,6 @@ let ``open band outlines use explicit cap geometry`` () =
 let ``explicit miter validation precedes empty path handling`` () =
     let invalid = Miter 0.0
     Assert.Equal(Error(InternalInvalidMiterLimit 0.0), Offset.path Path.empty 1.0<length> invalid Butt)
-    Assert.Equal(Error(InternalInvalidMiterLimit 0.0), Offset.pathUntrimmed Path.empty 1.0<length> invalid)
+    Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.pathUntrimmed Path.empty 1.0<length> invalid)
     Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.pathBand Path.empty -1.0<length> 1.0<length> invalid Butt)
     Assert.Equal(Error(StrokeOffsetError(InvalidMiterLimit 0.0)), Stroke.path Path.empty 2.0<length> invalid Butt)

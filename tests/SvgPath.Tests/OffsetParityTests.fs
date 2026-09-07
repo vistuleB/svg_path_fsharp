@@ -807,9 +807,15 @@ let ``single_offset_band_candidate_keeps_closed_source_as_two_sides_test`` () =
 [<Fact>]
 let ``untrimmed_stroke_band_closes_open_source_test`` () =
     let openSubpath = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    match Subject.internalUntrimmedStrokeBand openSubpath 4.0<length> (Miter Offset.defaultMiterLimit) Butt Subject.defaultOptions with
-    | Ok(OpenSubpathBand outline) -> Assert.True(outline.Closed)
-    | other -> failwithf "unexpected result: %A" other
+    let result =
+        Stroke.subpathWith
+            openSubpath
+            (Miter Offset.defaultMiterLimit)
+            Butt
+            { Stroke.defaultOptions with Width = 4.0<length>; Offset = Subject.defaultOptions }
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Single(result.Subpaths) |> ignore
+    Assert.True(result.Subpaths.Head.Closed)
 
 [<Fact>]
 let ``closed rectangular band matches Gleam contour topology`` () =
@@ -828,9 +834,9 @@ let ``closed rectangular band matches Gleam contour topology`` () =
 let ``open line round stroke matches Gleam contour topology`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let result =
-        Subject.subpathStrokeWith
-            source 2.0<length> Round RoundCap
-            Subject.defaultOptions
+        Stroke.subpathWith
+            source Round RoundCap
+            { Stroke.defaultOptions with Width = 2.0<length>; Offset = Subject.defaultOptions }
         |> Result.defaultWith (failwithf "%A")
     let contours = Path.subpaths result
     Assert.Single(contours) |> ignore

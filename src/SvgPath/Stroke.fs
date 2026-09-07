@@ -41,6 +41,11 @@ module Stroke =
             Error(InvalidStrokeOutlineWidth options.Width)
         else Ok()
 
+    let private validateJoin = function
+        | Miter limit when limit <= 0.0 || not (System.Double.IsFinite limit) ->
+            Error(StrokeOffsetError(InvalidMiterLimit limit))
+        | _ -> Ok()
+
     let rec private validateDashPattern = function
         | [] -> Ok()
         | first :: rest ->
@@ -72,20 +77,66 @@ module Stroke =
                 Segment.validateLengthOptions options.LengthOptions
                 |> Result.mapError StrokePathError)
 
+    let private zeroLengthStrokePath (subpath: Subpath) radius cap =
+        let center = Subpath.start subpath
+        match cap with
+        | Butt -> Ok Path.empty
+        | RoundCap ->
+            let right = Point.translate (Point.create radius 0.0<length>) center
+            let left = Point.translate (Point.create -radius 0.0<length>) center
+            [ Arc { Start = right; Radius = Point.create radius radius
+                    XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = left }
+              Arc { Start = left; Radius = Point.create radius radius
+                    XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = right } ]
+            |> Subpath.create
+            |> Result.mapError StrokePathError
+            |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError StrokePathError)
+            |> Result.map Path.singleton
+        | Square ->
+            let topLeft = Point.translate (Point.create -radius -radius) center
+            let topRight = Point.translate (Point.create radius -radius) center
+            let bottomRight = Point.translate (Point.create radius radius) center
+            let bottomLeft = Point.translate (Point.create -radius radius) center
+            [ Line(topLeft, topRight); Line(topRight, bottomRight)
+              Line(bottomRight, bottomLeft); Line(bottomLeft, topLeft) ]
+            |> Subpath.create
+            |> Result.mapError StrokePathError
+            |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError StrokePathError)
+            |> Result.map Path.singleton
+
+    let subpathWith subpath join cap options =
+        validateOptions options
+        |> Result.bind (fun () -> validateJoin join)
+        |> Result.bind (fun () ->
+            let bandTrimming =
+                if Subpath.isClosed subpath then options.Offset.BandTrimming
+                else { options.Offset.BandTrimming with InBand = false }
+            let offsetOptions = { options.Offset with BandTrimming = bandTrimming }
+            match Subpath.segments subpath with
+            | [] -> Ok Path.empty
+            | _ ->
+                Subpath.length subpath
+                |> Result.mapError StrokePathError
+                |> Result.bind (fun length ->
+                    if length <= 0.0<length> then
+                        zeroLengthStrokePath subpath (options.Width / 2.0) cap
+                    else
+                        Offset.subpathBandWith
+                            subpath
+                            (0.0<length> - options.Width / 2.0)
+                            (options.Width / 2.0)
+                            join
+                            cap
+                            offsetOptions
+                        |> Result.mapError StrokeOffsetError))
+
     let rec private strokeSubpaths subpaths join cap options reversedStroked =
         match subpaths with
         | [] -> Ok(List.rev reversedStroked)
         | first :: rest ->
-            Offset.subpathStrokeWith first options.Width join cap options.Offset
-            |> Result.mapError StrokeOffsetError
+            subpathWith first join cap options
             |> Result.bind (fun path ->
                 strokeSubpaths rest join cap options (List.rev path.Subpaths @ reversedStroked))
-
-    let subpathWith subpath join cap options =
-        validateOptions options
-        |> Result.bind (fun () ->
-            Offset.subpathStrokeWith subpath options.Width join cap options.Offset
-            |> Result.mapError StrokeOffsetError)
 
     let subpath subpath width join cap = subpathWith subpath join cap { defaultOptions with Width = width }
 
@@ -100,6 +151,7 @@ module Stroke =
 
     let pathWith (path: Path) join cap options =
         validateOptions options
+        |> Result.bind (fun () -> validateJoin join)
         |> Result.bind (fun () -> strokeSubpaths path.Subpaths join cap options [] |> Result.map Path.ofSubpaths)
 
     let path path width join cap = pathWith path join cap { defaultOptions with Width = width }

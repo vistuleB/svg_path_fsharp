@@ -5483,6 +5483,7 @@ module Offset =
             |> Result.bind (fun band ->
                 trimSingleOffsetBuilds
                     [ untrimmedBuild ] offset [ band ] cap options))
+        |> Result.mapError publicError
 
     /// Constructs and trims one signed offset with default options.
     let subpath subpath offset join cap = subpathWith subpath offset join cap defaultOptions

@@ -165,8 +165,11 @@ Gleam commit `dcf5215`, `map trimmed subpath errors at public boundary`:
 
 F# functions:
 
-- `subpathWith`
+- `subpathWith` (wraps the full pipeline and maps the final result through `publicError`)
 - `subpath`
+
+`subpathWith` has no internal downstream callers (only the `subpath` wrapper
+and tests consume it), so no adapters are needed.
 
 ### 9. Untrimmed Offset APIs
 

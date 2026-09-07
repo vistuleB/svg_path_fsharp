@@ -32,25 +32,6 @@ type ArrangementGraph =
       Edges: ArrangementEdge list
       CyclicOrders: (int * OrientedArrangementEdge list list) list }
 
-[<Struct>]
-type internal EdgeCapacityAssignment = { EdgeId: int; Capacity: int }
-
-type internal VertexParityRequest =
-    | RequiredVertexParity of vertex: int * parity: int
-    | PreferredVertexParity of vertex: int * parity: int
-
-/// Failures from parity-capacity pruning.
-type ForcedParityError =
-    | ForcedParityMissingVertex of int
-    | ForcedParityDuplicateVertex of int
-    | ForcedParityInvalidVertexParity of vertex: int * parity: int
-    | ForcedParityMissingEdgeCapacity of int
-    | ForcedParityDuplicateEdgeCapacity of int
-    | ForcedParityUnknownEdgeCapacity of int
-    | ForcedParityInvalidEdgeCapacity of edge: int * capacity: int
-    | ForcedParityInfeasible of int
-    | ForcedParityAmbiguous of int list
-
 /// One oriented edge occurrence in a face-boundary walk. Left identifies the
 /// face on the visual-left side of the stored edge direction.
 type ArrangementFaceEdge = { EdgeId: int; Left: bool }
@@ -148,94 +129,6 @@ type ArrangementError =
 /// arrangements formed from SVG path segments.
 module Arrangement =
     let internal empty = { Vertices = []; Edges = []; CyclicOrders = [] }
-
-    let private requestData = function
-        | RequiredVertexParity(vertex, parity) -> vertex, parity, false
-        | PreferredVertexParity(vertex, parity) -> vertex, parity, true
-
-    let private validateParityRequests (graph: ArrangementGraph) requests =
-        let rec loop seen = function
-            | [] -> Ok ()
-            | request :: rest ->
-                let vertex, parity, _ = requestData request
-                if parity <> 0 && parity <> 1 then Error(ForcedParityInvalidVertexParity(vertex, parity))
-                elif Set.contains vertex seen then Error(ForcedParityDuplicateVertex vertex)
-                elif not (graph.Vertices |> List.exists (fun candidate -> candidate.Id = vertex)) then
-                    Error(ForcedParityMissingVertex vertex)
-                else loop (Set.add vertex seen) rest
-        loop Set.empty requests
-
-    let private validateCapacities (graph: ArrangementGraph) (assignments: EdgeCapacityAssignment list) =
-        let ids = graph.Edges |> List.map _.Id |> Set.ofList
-        let rec loop seen = function
-            | [] ->
-                graph.Edges
-                |> List.tryFind (fun edge -> not (Set.contains edge.Id seen))
-                |> function
-                    | Some edge -> Error(ForcedParityMissingEdgeCapacity edge.Id)
-                    | None -> Ok ()
-            | assignment :: rest when assignment.Capacity < 0 ->
-                Error(ForcedParityInvalidEdgeCapacity(assignment.EdgeId, assignment.Capacity))
-            | assignment :: _ when not (Set.contains assignment.EdgeId ids) ->
-                Error(ForcedParityUnknownEdgeCapacity assignment.EdgeId)
-            | assignment :: _ when Set.contains assignment.EdgeId seen ->
-                Error(ForcedParityDuplicateEdgeCapacity assignment.EdgeId)
-            | assignment :: rest -> loop (Set.add assignment.EdgeId seen) rest
-        loop Set.empty assignments
-
-    let internal forcedParityCapacitiesWith (graph: ArrangementGraph) (initialCapacities: EdgeCapacityAssignment list) vertexParities =
-        validateParityRequests graph vertexParities
-        |> Result.bind (fun () -> validateCapacities graph initialCapacities)
-        |> Result.bind (fun () ->
-            let requestFor vertex =
-                vertexParities
-                |> List.tryPick (fun request ->
-                    let requested, parity, preferred = requestData request
-                    if requested = vertex then Some(parity, preferred) else None)
-                |> Option.defaultValue (0, false)
-            let rec reduce (assignments: EdgeCapacityAssignment list) =
-                let capacity edgeId = assignments |> List.find (fun (a: EdgeCapacityAssignment) -> a.EdgeId = edgeId) |> _.Capacity
-                let states =
-                    graph.Vertices
-                    |> List.map (fun vertex ->
-                        let parity, preferred = requestFor vertex.Id
-                        let incident =
-                            graph.Edges
-                            |> List.filter (fun edge -> edge.StartVertex = vertex.Id || edge.EndVertex = vertex.Id)
-                            |> List.map (fun edge -> edge.Id, capacity edge.Id)
-                        let total = incident |> List.sumBy snd
-                        vertex.Id, parity, preferred, total, incident |> List.filter (snd >> ((<) 0)) |> List.map fst)
-                let mismatched =
-                    states
-                    |> List.filter (fun (_, parity, preferred, total, _) ->
-                        total % 2 <> parity && not (preferred && total = 0))
-                match mismatched |> List.tryFind (fun (_, _, _, _, positive) -> List.isEmpty positive) with
-                | Some(vertex, _, _, _, _) -> Error(ForcedParityInfeasible vertex)
-                | None ->
-                    let choose positive =
-                        let rec at threshold =
-                            match positive |> List.filter (fun edgeId -> capacity edgeId >= threshold) with
-                            | [ edgeId ] -> Some edgeId
-                            | [] -> None
-                            | _ -> at (threshold + 1)
-                        at 1
-                    match mismatched |> List.tryPick (fun (_, _, _, _, positive) -> choose positive) with
-                    | Some edgeId ->
-                        assignments
-                        |> List.map (fun (assignment: EdgeCapacityAssignment) ->
-                            if assignment.EdgeId = edgeId then { assignment with Capacity = assignment.Capacity - 1 }
-                            else assignment)
-                        |> reduce
-                    | None when List.isEmpty mismatched -> Ok assignments
-                    | None -> Error(ForcedParityAmbiguous(mismatched |> List.map (fun (vertex, _, _, _, _) -> vertex)))
-            reduce initialCapacities)
-
-    let internal forcedParityCapacities (graph: ArrangementGraph) vertexParities =
-        graph.Edges
-        |> List.map (fun (edge: ArrangementEdge) ->
-            { EdgeId = edge.Id
-              Capacity = edge.ForwardMultiplicity + edge.ReverseMultiplicity })
-        |> fun capacities -> forcedParityCapacitiesWith graph capacities vertexParities
 
     let private finite (value: float<length>) = not (System.Double.IsNaN(float value) || System.Double.IsInfinity(float value))
 

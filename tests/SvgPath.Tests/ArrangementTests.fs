@@ -48,29 +48,6 @@ module ArrangementTests =
             Assert.Equal(1, graph.Edges.Head.ReverseMultiplicity)
 
     [<Fact>]
-    let ``forced_parity_reduces_unique_edge_without_mutating_graph_test`` () =
-        let graph =
-            graphWithEdges
-                [ line 0.0 0.0 10.0 0.0
-                  line 0.0 0.0 10.0 0.0 ]
-            |> Result.defaultWith (fun error -> failwithf "%A" error)
-        let originalEdge = graph.Edges.Head
-        Assert.Equal(2, originalEdge.ForwardMultiplicity)
-        let startVertex = graph.Vertices |> List.find (fun vertex -> vertex.Point = point 0.0 0.0)
-        let endVertex = graph.Vertices |> List.find (fun vertex -> vertex.Point = point 10.0 0.0)
-        let result =
-            Arrangement.forcedParityCapacities
-                graph
-                [ RequiredVertexParity(startVertex.Id, 1)
-                  RequiredVertexParity(endVertex.Id, 1) ]
-        match result with
-        | Error error -> failwithf "%A" error
-        | Ok capacities ->
-            let assignment = Assert.Single(capacities)
-            Assert.Equal(1, assignment.Capacity)
-            Assert.Equal(2, originalEdge.ForwardMultiplicity)
-
-    [<Fact>]
     let ``build nodes a transverse crossing symmetrically`` () =
         match Arrangement.buildWith [ line -1.0 0.0 1.0 0.0; line 0.0 -1.0 0.0 1.0 ] 1.0e-8<length> 1.0e-10<length> 0.0<parameter> with
         | Error error -> failwithf "%A" error
@@ -125,14 +102,6 @@ module ArrangementTests =
                 |> List.collect _.Edges
                 |> List.filter (fun image -> image.EdgeId = shared.Id && image.Own)
             Assert.Single(owners) |> ignore
-
-    [<Fact>]
-    let ``forced_parity_reports_capacity_infeasibility_test`` () =
-        let graph = graphWithEdges [ line 0.0 0.0 1.0 0.0 ] |> Result.defaultWith (fun error -> failwithf "%A" error)
-        let capacities = graph.Edges |> List.map (fun edge -> { EdgeId = edge.Id; Capacity = 0 })
-        match Arrangement.forcedParityCapacitiesWith graph capacities [ RequiredVertexParity(0, 1) ] with
-        | Error(ForcedParityInfeasible 0) -> ()
-        | other -> failwithf "unexpected result: %A" other
 
     [<Fact>]
     let ``open_chain_fails_final_even_degree_invariant_test`` () =

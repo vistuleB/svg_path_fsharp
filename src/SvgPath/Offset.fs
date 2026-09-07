@@ -49,6 +49,7 @@ type InternalError =
     | InternalIToKMissingJPreimage of edgeId: int
     | InternalSurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
     | InternalInconsistentContainment
+    | InternalEmptyArrangementSplitWalk
     | InternalInvalidOffsetMapDistance of distance: float<length> * length: float<length>
 
 /// Errors returned by offset and stroke construction.
@@ -4262,19 +4263,21 @@ module Offset =
     let private arrangementSplitWalkToSurvivorChain
         (walk: ArrangementSplitTracedSegment list) =
         match walk with
-        | [] -> failwith "empty arrangement split walk"
+        | [] -> Error InternalEmptyArrangementSplitWalk
         | first :: rest ->
-            rest
-            |> List.fold (fun chain segment ->
-                { chain with
-                    EndVertex = segment.EndVertex
-                    Edges = arrangementSplitSurvivorEdge segment :: chain.Edges
-                    Closed = chain.StartVertex = segment.EndVertex })
-                { StartVertex = first.StartVertex
-                  EndVertex = first.EndVertex
-                  Edges = [ arrangementSplitSurvivorEdge first ]
-                  Closed = first.StartVertex = first.EndVertex }
-            |> fun chain -> { chain with Edges = List.rev chain.Edges }
+            Ok(
+                rest
+                |> List.fold (fun chain segment ->
+                    { chain with
+                        EndVertex = segment.EndVertex
+                        Edges = arrangementSplitSurvivorEdge segment :: chain.Edges
+                        Closed = chain.StartVertex = segment.EndVertex })
+                    { StartVertex = first.StartVertex
+                      EndVertex = first.EndVertex
+                      Edges = [ arrangementSplitSurvivorEdge first ]
+                      Closed = first.StartVertex = first.EndVertex }
+                |> fun chain -> { chain with Edges = List.rev chain.Edges }
+            )
 
     let private cuspTrimExpectedEndpoints
         (segments: ArrangementSplitTracedSegment list) closedValue =
@@ -4656,7 +4659,13 @@ module Offset =
 
     let private offsideSurvivorChains segments =
         offsideClosedWalkDecomposition segments
-        |> List.map arrangementSplitWalkToSurvivorChain
+        |> List.fold (fun chains walk ->
+            chains
+            |> Result.bind (fun chains ->
+                arrangementSplitWalkToSurvivorChain walk
+                |> Result.map (fun chain -> chain :: chains)))
+            (Ok [])
+        |> Result.map List.rev
 
     let private cuspTrimmedSubpathGeometry
         (subpath: CuspTrimmedSubpath)
@@ -4937,12 +4946,14 @@ module Offset =
                     build.Culled offsetImages arrangement dual contaminated
                 |> Result.bind (fun split ->
                     offsideSurvivorChains split.Segments
-                    |> List.fold (fun state chain ->
-                        state |> Result.bind (fun traced ->
-                            tracedSubpathFromSurvivorChain
-                                chain build.Culled.Side sourceSubpathIndex
-                            |> Result.map (fun item -> item :: traced))) (Ok [])
-                    |> Result.map List.rev))
+                    |> Result.bind (fun chains ->
+                        chains
+                        |> List.fold (fun state chain ->
+                            state |> Result.bind (fun traced ->
+                                tracedSubpathFromSurvivorChain
+                                    chain build.Culled.Side sourceSubpathIndex
+                                |> Result.map (fun item -> item :: traced))) (Ok [])
+                        |> Result.map List.rev)))
 
     let rec private offsideTrimmedSingleOffsetSubpathsLoop
         builds offsetImages zeroImages arrangement dual offset options

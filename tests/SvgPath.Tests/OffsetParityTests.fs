@@ -440,7 +440,7 @@ let ``subpath_offset_map_rejects_open_subpath_distances_outside_length_test`` ()
     let source = Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0) ] |> Result.defaultWith (failwithf "%A")
     let mapping = Subject.subpathOffsetMap source |> Result.defaultWith (failwithf "%A")
     match mapping (point 11.0 0.0) with
-    | Error(SvgPath.Error.PathError(InvalidLengthDistance(distance, length))) ->
+    | Error(SvgPath.Error.InvalidOffsetMapDistance(distance, length)) ->
         Assert.Equal(11.0<length>, distance)
         Assert.Equal(10.0<length>, length)
     | other -> failwithf "unexpected result: %A" other

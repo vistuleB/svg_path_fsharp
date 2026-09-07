@@ -49,36 +49,22 @@ type InternalError =
     | InternalIToKMissingJPreimage of edgeId: int
     | InternalSurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
     | InternalInconsistentContainment
+    | InternalInvalidOffsetMapDistance of distance: float<length> * length: float<length>
 
 /// Errors returned by offset and stroke construction.
 type Error =
+    | InvalidOffsetMapDistance of distance: float<length> * length: float<length>
     | PathError of SegmentError
-    | ArrangementGraphError of ArrangementError
-    | ForcedParityPruningError of ForcedParityError
-    | SourceNormalizationError of DegeneracyError
     | InvalidTolerance of tolerance: float<length>
     | InvalidSamples of samples: int
     | InvalidMaxDepth of maxDepth: int
     | InvalidMiterLimit of miterLimit: float
     | InvalidStalledOffsetDiameter of diameter: float<length>
     | InvalidTangentHealAngleDegrees of angle: float<degree>
-    | BandSubpathNotClosed
     | DegenerateTangent of t: float<parameter>
     | MaxDepthReached of error: float<length>
     | NonFinite
-    | SegmentImageCountMismatch
-    | EmptySegmentImage of segmentIndex: int
-    | MissingEdgeImage of edgeId: int
-    | MissingIndexedSegment of segmentIndex: int
-    | MissingWindingOpinion of segmentIndex: int
-    | SurvivorCapacityMismatch of edgeId: int * remaining: int
-    | ForcedParityOpenChain of startVertex: int * endVertex: int
-    | IToKSubpathCount of actual: int
-    | IToKExpectedClosedSubpath
-    | IToKEndpointMismatch of expectedStart: int * actualStart: int * expectedEnd: int * actualEnd: int
-    | IToKMissingJPreimage of edgeId: int
-    | SurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
-    | InconsistentContainment
+    | ConstructionFailed
 
 /// Join geometry inserted between adjacent offset segments.
 type Join =
@@ -579,32 +565,17 @@ module Offset =
     let publicError (error: InternalError) =
         match error with
         | InternalPathError value -> PathError value
-        | InternalArrangementGraphError value -> ArrangementGraphError value
-        | InternalForcedParityPruningError value -> ForcedParityPruningError value
-        | InternalSourceNormalizationError value -> SourceNormalizationError value
+        | InternalInvalidOffsetMapDistance(distance, length) -> InvalidOffsetMapDistance(distance, length)
         | InternalInvalidTolerance tolerance -> InvalidTolerance tolerance
         | InternalInvalidSamples samples -> InvalidSamples samples
         | InternalInvalidMaxDepth maxDepth -> InvalidMaxDepth maxDepth
         | InternalInvalidMiterLimit miterLimit -> InvalidMiterLimit miterLimit
         | InternalInvalidStalledOffsetDiameter diameter -> InvalidStalledOffsetDiameter diameter
         | InternalInvalidTangentHealAngleDegrees angle -> InvalidTangentHealAngleDegrees angle
-        | InternalBandSubpathNotClosed -> BandSubpathNotClosed
         | InternalDegenerateTangent t -> DegenerateTangent t
         | InternalMaxDepthReached error -> MaxDepthReached error
         | InternalNonFinite -> NonFinite
-        | InternalSegmentImageCountMismatch -> SegmentImageCountMismatch
-        | InternalEmptySegmentImage segmentIndex -> EmptySegmentImage segmentIndex
-        | InternalMissingEdgeImage edgeId -> MissingEdgeImage edgeId
-        | InternalMissingIndexedSegment segmentIndex -> MissingIndexedSegment segmentIndex
-        | InternalMissingWindingOpinion segmentIndex -> MissingWindingOpinion segmentIndex
-        | InternalSurvivorCapacityMismatch(edgeId, remaining) -> SurvivorCapacityMismatch(edgeId, remaining)
-        | InternalForcedParityOpenChain(startVertex, endVertex) -> ForcedParityOpenChain(startVertex, endVertex)
-        | InternalIToKSubpathCount actual -> IToKSubpathCount actual
-        | InternalIToKExpectedClosedSubpath -> IToKExpectedClosedSubpath
-        | InternalIToKEndpointMismatch(expectedStart, actualStart, expectedEnd, actualEnd) -> IToKEndpointMismatch(expectedStart, actualStart, expectedEnd, actualEnd)
-        | InternalIToKMissingJPreimage edgeId -> IToKMissingJPreimage edgeId
-        | InternalSurvivorChainDiscontinuous(previousIndex, nextIndex, expected, actual, distance) -> SurvivorChainDiscontinuous(previousIndex, nextIndex, expected, actual, distance)
-        | InternalInconsistentContainment -> InconsistentContainment
+        | _ -> ConstructionFailed
 
     let private requestData = function
         | RequiredVertexParity(vertex, parity) -> vertex, parity, false
@@ -5559,15 +5530,21 @@ module Offset =
     /// Constructs and trims an offset independently for each path subpath.
     let pathWith (path: Path) offset join cap options =
         validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
-        |> Result.bind (fun _ -> normalizeSourcePath path options)
+        |> Result.mapError publicError
+        |> Result.bind (fun _ ->
+            validateJoin join |> Result.mapError publicError)
+        |> Result.bind (fun _ ->
+            normalizeSourcePath path options |> Result.mapError publicError)
         |> Result.bind (fun normalized ->
             singleOffsetUntrimmedPathBuilds
                 (Path.subpaths normalized) offset join options []
+            |> Result.mapError publicError
             |> Result.bind (fun builds ->
                 singleOffsetBandsFromBuilds builds offset cap []
+                |> Result.mapError publicError
                 |> Result.bind (fun bands ->
-                    trimSingleOffsetBuilds builds offset bands cap options)))
+                    trimSingleOffsetBuilds builds offset bands cap options
+                    |> Result.mapError publicError)))
 
     /// Constructs trimmed path offsets with default options.
     let path (path: Path) offset join cap = pathWith path offset join cap defaultOptions
@@ -5744,7 +5721,7 @@ module Offset =
         closedValue =
         if closedValue then Ok(positiveRemainder distance totalLength)
         elif distance < 0.0<length> || distance > totalLength then
-            Error(InternalPathError(InvalidLengthDistance(distance, totalLength)))
+            Error(InternalInvalidOffsetMapDistance(distance, totalLength))
         else Ok distance
 
     let rec private lengthSpanAt spans distance =

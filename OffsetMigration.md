@@ -4,6 +4,9 @@ This is the ordered migration plan copied from the Gleam Offset refactor. Keep
 each batch small, compile after each batch, run `scripts/test-fast`, and commit
 each successful step.
 
+Status: complete as of batch 10. All public Offset APIs return `Error`; unstable
+internal failures collapse to `ConstructionFailed`.
+
 ## Naming Rule
 
 The migration has two distinct error domains:
@@ -209,6 +212,25 @@ F# functions:
 
 - `pathWith`
 - `path`
+
+Final public `Error` narrowing:
+
+- Stable public cases: `InvalidOffsetMapDistance`, `PathError`,
+  `InvalidTolerance`, `InvalidSamples`, `InvalidMaxDepth`, `InvalidMiterLimit`,
+  `InvalidStalledOffsetDiameter`, `InvalidTangentHealAngleDegrees`,
+  `DegenerateTangent`, `MaxDepthReached`, `NonFinite`, `ConstructionFailed`.
+- `publicError` maps only the stable cases; all unstable internal cases
+  (`ArrangementGraphError`, `ForcedParityPruningError`, `SourceNormalizationError`,
+  `BandSubpathNotClosed`, `SegmentImageCountMismatch`, `EmptySegmentImage`,
+  `MissingEdgeImage`, `MissingIndexedSegment`, `MissingWindingOpinion`,
+  `SurvivorCapacityMismatch`, `ForcedParityOpenChain`, `IToK*`,
+  `SurvivorChainDiscontinuous`, `InconsistentContainment`) collapse to
+  `ConstructionFailed`.
+- F# adds a dedicated `InternalInvalidOffsetMapDistance` internal case mapped to
+  public `InvalidOffsetMapDistance(distance, length)` (Gleam parity; F# previously
+  surfaced this as `PathError(InvalidLengthDistance(...))`).
+- F# has no `InvalidStrokeWidth` on `Offset.Error` because stroke moved to
+  `Stroke.fs`; `StrokeError` carries stroke width errors instead.
 
 ## Checkpoint Rules
 

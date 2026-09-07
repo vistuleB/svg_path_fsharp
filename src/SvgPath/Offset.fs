@@ -101,6 +101,7 @@ type SingleOffsetTrimming =
 /// Trimming controls for a two-sided offset band.
 /// InnerCusps and OuterCusps independently trim reversed submerged runs before
 /// the sides are assembled. InBand applies the final band-wide trimming pass.
+/// Each cusp-trimming region uses Butt closures, independently of the final cap.
 type BandTrimming =
     { InnerCusps: bool
       OuterCusps: bool
@@ -4520,7 +4521,7 @@ module Offset =
         (subpath: ICulledOffsetSubpath)
         (zeroSource: Subpath)
         (offset: float<length>)
-        (cap: Cap)
+        (_cap: Cap)
         (options: Options) =
         match subpath.Segments with
         | [] -> Ok None
@@ -4529,7 +4530,9 @@ module Offset =
                 (subpath.Segments |> List.map (fun segment -> segment.Segment))
                 subpath.Closed options.Fitting.Tolerance
             |> Result.bind (fun geometry ->
-                bandFromSides zeroSource 0.0<length> geometry offset cap
+                // Side-local cusp membership always uses straight normal closures.
+                // The cap requested for the final band must not affect this region.
+                bandFromSides zeroSource 0.0<length> geometry offset Butt
                 |> Result.bind (fun band ->
                     internalBandWindingFunction [ band ]
                     |> Result.bind (fun winding ->

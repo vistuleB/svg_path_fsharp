@@ -344,6 +344,26 @@ let ``final_cusp_trimming_handles_open_side_umbrella_test`` () =
     Assert.All(inBandTrimmed.Subpaths, fun subpath -> Assert.True(subpath.Closed))
 
 [<Fact>]
+let ``open cusp trimming ignores final cap style`` () =
+    let source =
+        Subpath.polyline
+            [ point 0.0 -1.0; point -0.8660254037844386 -0.5
+              point 0.8660254037844386 0.5; point 0.8660254037844386 -0.5
+              point -0.8660254037844386 0.5; point 0.0 1.0 ]
+        |> Result.defaultWith (failwithf "%A")
+    let options =
+        { Offset.defaultOptions with
+            SingleOffsetTrimming = { Offside = true; FinalTrimming = CuspTrimming } }
+    let run cap =
+        Offset.subpathWith source 0.15<length> Round cap options
+        |> Result.defaultWith (failwithf "%A")
+    let expected = run Butt
+    Assert.Single(expected.Subpaths) |> ignore
+    Assert.False(expected.Subpaths[0].Closed)
+    for cap in [ RoundCap; Square ] do
+        Assert.Equal<Path>(expected, run cap)
+
+[<Fact>]
 let ``band cusp switches execute side-local trimming before final trimming`` () =
     let source =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 8.0; point 0.0 8.0 ]

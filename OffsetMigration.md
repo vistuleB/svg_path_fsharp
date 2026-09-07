@@ -74,10 +74,13 @@ Gleam commit `0042187`, `map segment offset errors at public boundary`:
 
 F# functions:
 
-- `subpathOffsetMapWith`
+- `subpathOffsetMapWith` (maps `lengthSpans` and per-point map results via `publicError`)
 - `subpathOffsetMap`
-- `segmentWith`
+- `segmentWith` (maps `Subpath.createWith`, `subpathUntrimmedWith`, and the `DegenerateTangent` fallback through `publicError`)
 - `segment`
+
+This batch also reverts the corresponding test assertions to the public
+`Error` cases.
 
 ### 4. Historical Default-Wrapper Checkpoint
 

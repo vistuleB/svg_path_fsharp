@@ -43,7 +43,7 @@ let ``segment_offsets_quadratic_to_cubic_pieces_within_tolerance_test`` () =
 let ``segment_rejects_negative_tangent_heal_angle_test`` () =
     let options = { Offset.defaultOptions with TangentHealAngleDegrees = -1.0<degree> }
     match Offset.segmentWith (Line(point 0.0 0.0, point 1.0 0.0)) 1.0<length> (Miter Offset.defaultMiterLimit) options with
-    | Error(InternalInvalidTangentHealAngleDegrees angle) -> Assert.Equal(-1.0<degree>, angle)
+    | Error(InvalidTangentHealAngleDegrees angle) -> Assert.Equal(-1.0<degree>, angle)
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
@@ -140,13 +140,13 @@ let ``segment_rejects_collapsed_circular_arc_offset_test`` () =
               Sweep = true
               End = point 0.0 10.0 }
     match Offset.segment source -10.0<length> (Miter Offset.defaultMiterLimit) with
-    | Error(SvgPath.InternalError.InternalDegenerateTangent parameterValue) -> Assert.Equal(0.0<parameter>, parameterValue)
+    | Error(SvgPath.Error.DegenerateTangent parameterValue) -> Assert.Equal(0.0<parameter>, parameterValue)
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
 let ``segment_rejects_zero_length_line_test`` () =
     match Offset.segment (Line(point 1.0 2.0, point 1.0 2.0)) 1.0<length> (Miter Offset.defaultMiterLimit) with
-    | Error(SvgPath.InternalError.InternalDegenerateTangent parameterValue) -> Assert.Equal(0.0<parameter>, parameterValue)
+    | Error(SvgPath.Error.DegenerateTangent parameterValue) -> Assert.Equal(0.0<parameter>, parameterValue)
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]

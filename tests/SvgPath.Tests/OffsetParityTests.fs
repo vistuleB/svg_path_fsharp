@@ -440,7 +440,7 @@ let ``subpath_offset_map_rejects_open_subpath_distances_outside_length_test`` ()
     let source = Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0) ] |> Result.defaultWith (failwithf "%A")
     let mapping = Subject.subpathOffsetMap source |> Result.defaultWith (failwithf "%A")
     match mapping (point 11.0 0.0) with
-    | Error(SvgPath.InternalError.InternalPathError(InvalidLengthDistance(distance, length))) ->
+    | Error(SvgPath.Error.PathError(InvalidLengthDistance(distance, length))) ->
         Assert.Equal(11.0<length>, distance)
         Assert.Equal(10.0<length>, length)
     | other -> failwithf "unexpected result: %A" other
@@ -448,7 +448,7 @@ let ``subpath_offset_map_rejects_open_subpath_distances_outside_length_test`` ()
 [<Fact>]
 let ``subpath_offset_map_rejects_zero_length_subpath_test`` () =
     match Subject.subpathOffsetMap (Subpath.empty (point 0.0 0.0)) with
-    | Error(SvgPath.InternalError.InternalDegenerateTangent t) -> Assert.Equal(0.0<parameter>, t)
+    | Error(SvgPath.Error.DegenerateTangent t) -> Assert.Equal(0.0<parameter>, t)
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
@@ -465,14 +465,14 @@ let ``subpath_offset_map_composes_with_try_map_path_points_test`` () =
 let ``segment_rejects_invalid_options_test`` () =
     let options = { Subject.defaultOptions with Fitting = { Subject.defaultOptions.Fitting with Tolerance = 0.0<length> } }
     Assert.Equal(
-        Error(InternalInvalidTolerance 0.0<length>),
+        Error(InvalidTolerance 0.0<length>),
         Subject.segmentWith (Line(point 0.0 0.0, point 10.0 0.0)) 1.0<length> (Miter Offset.defaultMiterLimit) options)
 
 [<Fact>]
 let ``segment_rejects_negative_stalled_offset_diameter_test`` () =
     let options = { Subject.defaultOptions with StalledOffsetDiameter = -1.0<length> }
     Assert.Equal(
-        Error(InternalInvalidStalledOffsetDiameter -1.0<length>),
+        Error(InvalidStalledOffsetDiameter -1.0<length>),
         Subject.segmentWith (Line(point 0.0 0.0, point 10.0 0.0)) 1.0<length> (Miter Offset.defaultMiterLimit) options)
 
 [<Fact>]

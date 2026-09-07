@@ -5453,11 +5453,11 @@ module Offset =
     /// Offsets one segment without topological trimming.
     let segmentWith segment offset join options =
         Subpath.createWith Strict [ segment ]
-        |> Result.mapError InternalPathError
-        |> Result.bind (fun source -> subpathUntrimmedWith source offset join options)
-        |> function
-            | Error(InternalPathError EmptySubpath) -> Error(InternalDegenerateTangent 0.0<parameter>)
-            | result -> result
+        |> Result.mapError (InternalPathError >> publicError)
+        |> Result.bind (fun source ->
+            match subpathUntrimmedWith source offset join options with
+            | Error(InternalPathError EmptySubpath) -> Error(DegenerateTangent 0.0<parameter>)
+            | result -> result |> Result.mapError publicError)
 
     /// Offsets one segment with default options and without topological trimming.
     let segment segment offset join = segmentWith segment offset join defaultOptions
@@ -5759,14 +5759,16 @@ module Offset =
     /// length and whose y coordinate is signed visual-left normal distance.
     let subpathOffsetMapWith subpath (options: LengthOptions) =
         lengthSpans (Subpath.segments subpath) options 0.0<length> []
+        |> Result.mapError publicError
         |> Result.bind (fun spans ->
             let totalLength = lengthSpansTotal spans
             if totalLength <= 0.0<length> then
-                Error(InternalDegenerateTangent 0.0<parameter>)
+                Error(DegenerateTangent 0.0<parameter>)
             else
                 let closedValue = Subpath.isClosed subpath
                 Ok(fun local ->
-                    offsetMapPoint spans totalLength closedValue options local))
+                    offsetMapPoint spans totalLength closedValue options local
+                    |> Result.mapError publicError))
 
     /// Builds a local offset-coordinate map with default length options.
     let subpathOffsetMap subpath =

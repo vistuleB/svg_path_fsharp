@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="990" height="300" viewBox="0 0 990 300">
+<rect x="0" y="0" width="990" height="300" fill="white"/>
+<text x="165" y="24" text-anchor="middle" font-family="sans-serif" font-size="16">Rectangles</text>
+<svg x="0" y="35" width="330" height="260" viewBox="-27.119999999999997 -27.119999999999997 280.24000000000001 206.24000000000001">
+<path d="M 0 22 H 96 V 118 H 0 Z M 42 0 H 150 V 64 H 42 Z M 118 38 H 210 V 118 H 118 Z M 24 88 H 146 V 146 H 24 Z M 152 86 H 226 V 152 H 152 Z" style="fill:#d9f99d;stroke:#365314;stroke-width:2;stroke-linejoin:round"/>
+</svg>
+<text x="495" y="24" text-anchor="middle" font-family="sans-serif" font-size="16">Union</text>
+<svg x="330" y="35" width="330" height="260" viewBox="-27.119999999999997 -27.119999999999997 280.24000000000001 206.24000000000001">
+<path d="M 0 22 H 42 V 0 H 150 V 38 H 210 V 86 H 226 V 152 H 152 V 118 H 146 V 146 H 24 V 118 H 0 Z M 118 64 H 96 V 88 H 118 Z" style="fill:#bfdbfe;stroke:#1f2937;stroke-width:3;stroke-linejoin:round"/>
+</svg>
+<text x="825" y="24" text-anchor="middle" font-family="sans-serif" font-size="16">Rounded union</text>
+<svg x="660" y="35" width="330" height="260" viewBox="-27.119999999999997 -27.119999999999997 280.24000000000001 206.24000000000001">
+<path d="M 8 22 H 34 A 8 8 0 0 0 42 14 V 8 A 8 8 0 0 1 50 0 H 142 A 8 8 0 0 1 150 8 V 30 A 8 8 0 0 0 158 38 H 202 A 8 8 0 0 1 210 46 V 78 A 8 8 0 0 0 218 86 H 218 A 8 8 0 0 1 226 94 V 144 A 8 8 0 0 1 218 152 H 160 A 8 8 0 0 1 152 144 V 121 A 3 3 0 0 0 149 118 H 149 A 3 3 0 0 0 146 121 V 138 A 8 8 0 0 1 138 146 H 32 A 8 8 0 0 1 24 138 V 126 A 8 8 0 0 0 16 118 H 8 A 8 8 0 0 1 0 110 V 30 A 8 8 0 0 1 8 22 Z M 110 64 H 104 A 8 8 0 0 0 96 72 V 80 A 8 8 0 0 0 104 88 H 110 A 8 8 0 0 0 118 80 V 72 A 8 8 0 0 0 110 64 Z" style="fill:#bbf7d0;stroke:#14532d;stroke-width:1.5;stroke-linejoin:round"/>
+</svg>
+</svg>

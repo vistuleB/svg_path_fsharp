@@ -13,10 +13,18 @@ There is a dedicated audience distinction:
 
 - `README.md` is rendered by NuGet, so its figures need externally hosted
   absolute URLs.
-- This project currently has no repository-browsed `GALLERY.md`, so there is no
-  gallery figure promotion step here. The Gleam project also has a gallery
-  workflow; if a gallery is added to this port, copy that section of the Gleam
-  `COMMIT_CYCLE.md`.
+- `GALLERY.md` is browsed in the repository and links directly to `docs/gallery`.
+  Those SVGs are committed on `main`, not the README asset branch.
+
+## Gallery Figures
+
+Run `scripts/generate-gallery-figures` to regenerate the calculated Gallery
+figures and copy the three explicitly archived historical illustrations.
+The self-contained, non-packable generator lives in `tools/GalleryFigures`.
+Use `--check` to compare outputs without rewriting them, or pass SVG filenames
+to run selected figures. Commit the generator, `GALLERY.md`, and `docs/gallery`
+changes together. See the generator README for its Gleam source mapping and
+the distinction between calculated figures and archived snapshots.
 
 ## Local Previews
 

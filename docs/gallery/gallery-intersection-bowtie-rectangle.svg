@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="330" viewBox="0 0 1020 330">
+<rect x="0" y="0" width="1020" height="330" fill="white"/>
+<text x="170" y="24" text-anchor="middle" font-family="sans-serif" font-size="16">Operands</text>
+<svg x="0" y="35" width="340" height="290" viewBox="-8.1999999999999993 -8.1999999999999993 136.40000000000001 116.40000000000001">
+<path d="M 5 5 L 115 95 V 5 L 5 95 Z" style="fill:#bfdbfe;fill-opacity:.55;stroke:#2563eb;stroke-width:1;fill-rule:nonzero"/>
+<path d="M 35 25 H 88 V 82 H 35 Z" style="fill:#fed7aa;fill-opacity:.55;stroke:#c2410c;stroke-width:1;fill-rule:nonzero"/>
+</svg>
+<text x="510" y="24" text-anchor="middle" font-family="sans-serif" font-size="16">Arrangement</text>
+<svg x="340" y="35" width="340" height="290" viewBox="-8.1999999999999993 -8.1999999999999993 136.40000000000001 116.40000000000001">
+<path d="M 5 5 L 35 29.54545" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 35 29.54545 L 60 50" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 60 50 L 88 72.90909" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 88 72.90909 L 115 95" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 115 95 V 5" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 115 5 L 88 27.09091" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 88 27.09091 L 60 50" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 60 50 L 35 70.45455" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 35 70.45455 L 5 95" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 5 95 V 5" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 35 25 H 88" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 88 25 V 27.09091" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 88 27.09091 V 72.90909" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 88 72.90909 V 82" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 88 82 H 35" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 35 82 V 70.45455" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 35 70.45455 V 29.54545" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+<path d="M 35 29.54545 V 25" style="fill:none;stroke:#334155;stroke-width:0.65000000000000002;stroke-linejoin:round"/>
+</svg>
+<text x="850" y="24" text-anchor="middle" font-family="sans-serif" font-size="16">Result</text>
+<svg x="680" y="35" width="340" height="290" viewBox="-8.1999999999999993 -8.1999999999999993 136.40000000000001 116.40000000000001">
+<path d="M 5 5 L 115 95 V 5 L 5 95 Z M 35 25 H 88 V 82 H 35 Z" style="fill:none;stroke:none"/>
+<path d="M 88 72.90909 L 60 50 L 35 70.45455 V 29.54545 L 60 50 L 88 27.09091 Z" style="fill:#bbf7d0;stroke:#14532d;stroke-width:1;stroke-linejoin:round"/>
+</svg>
+</svg>

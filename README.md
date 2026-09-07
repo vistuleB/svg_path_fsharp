@@ -8,6 +8,9 @@ SVG `d` and `transform` attributes and works directly with paths, subpaths,
 lines, quadratic and cubic Beziers, and elliptical arcs. Operations preserve the
 original curve types where possible rather than flattening them into polygons.
 
+The [Gallery](https://github.com/vistuleB/svg_path_fsharp/blob/main/GALLERY.md)
+contains larger geometry examples, with a self-contained F# figure generator.
+
 The package includes:
 
 - construction, editing, evaluation, differentiation, splitting, and

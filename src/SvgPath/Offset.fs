@@ -19,6 +19,37 @@ type ForcedParityError =
     | ForcedParityInfeasible of int
     | ForcedParityAmbiguous of int list
 
+/// Detailed internal offset construction failures. These cross every internal
+/// pipeline boundary; stable caller-facing variants are narrowed by `publicError`.
+type InternalError =
+    | InternalPathError of SegmentError
+    | InternalArrangementGraphError of ArrangementError
+    | InternalForcedParityPruningError of ForcedParityError
+    | InternalSourceNormalizationError of DegeneracyError
+    | InternalInvalidTolerance of tolerance: float<length>
+    | InternalInvalidSamples of samples: int
+    | InternalInvalidMaxDepth of maxDepth: int
+    | InternalInvalidMiterLimit of miterLimit: float
+    | InternalInvalidStalledOffsetDiameter of diameter: float<length>
+    | InternalInvalidTangentHealAngleDegrees of angle: float<degree>
+    | InternalBandSubpathNotClosed
+    | InternalDegenerateTangent of t: float<parameter>
+    | InternalMaxDepthReached of error: float<length>
+    | InternalNonFinite
+    | InternalSegmentImageCountMismatch
+    | InternalEmptySegmentImage of segmentIndex: int
+    | InternalMissingEdgeImage of edgeId: int
+    | InternalMissingIndexedSegment of segmentIndex: int
+    | InternalMissingWindingOpinion of segmentIndex: int
+    | InternalSurvivorCapacityMismatch of edgeId: int * remaining: int
+    | InternalForcedParityOpenChain of startVertex: int * endVertex: int
+    | InternalIToKSubpathCount of actual: int
+    | InternalIToKExpectedClosedSubpath
+    | InternalIToKEndpointMismatch of expectedStart: int * actualStart: int * expectedEnd: int * actualEnd: int
+    | InternalIToKMissingJPreimage of edgeId: int
+    | InternalSurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
+    | InternalInconsistentContainment
+
 /// Errors returned by offset and stroke construction.
 type Error =
     | PathError of SegmentError
@@ -35,18 +66,18 @@ type Error =
     | DegenerateTangent of t: float<parameter>
     | MaxDepthReached of error: float<length>
     | NonFinite
-    | InternalSegmentImageCountMismatch
-    | InternalEmptySegmentImage of segmentIndex: int
-    | InternalMissingEdgeImage of edgeId: int
-    | InternalMissingIndexedSegment of segmentIndex: int
-    | InternalMissingWindingOpinion of segmentIndex: int
-    | InternalSurvivorCapacityMismatch of edgeId: int * remaining: int
-    | InternalForcedParityOpenChain of startVertex: int * endVertex: int
-    | InternalIToKSubpathCount of actual: int
-    | InternalIToKExpectedClosedSubpath
-    | InternalIToKEndpointMismatch of expectedStart: int * actualStart: int * expectedEnd: int * actualEnd: int
-    | InternalIToKMissingJPreimage of edgeId: int
-    | InternalSurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
+    | SegmentImageCountMismatch
+    | EmptySegmentImage of segmentIndex: int
+    | MissingEdgeImage of edgeId: int
+    | MissingIndexedSegment of segmentIndex: int
+    | MissingWindingOpinion of segmentIndex: int
+    | SurvivorCapacityMismatch of edgeId: int * remaining: int
+    | ForcedParityOpenChain of startVertex: int * endVertex: int
+    | IToKSubpathCount of actual: int
+    | IToKExpectedClosedSubpath
+    | IToKEndpointMismatch of expectedStart: int * actualStart: int * expectedEnd: int * actualEnd: int
+    | IToKMissingJPreimage of edgeId: int
+    | SurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
     | InconsistentContainment
 
 /// Join geometry inserted between adjacent offset segments.
@@ -544,6 +575,37 @@ type internal OffsetCurvatureZone =
 /// local offset coordinate maps. Positive offsets lie on the visual left of
 /// the source traversal; negative offsets lie on its visual right.
 module Offset =
+    /// Convert internal offset failures at public API boundaries.
+    let publicError (error: InternalError) =
+        match error with
+        | InternalPathError value -> PathError value
+        | InternalArrangementGraphError value -> ArrangementGraphError value
+        | InternalForcedParityPruningError value -> ForcedParityPruningError value
+        | InternalSourceNormalizationError value -> SourceNormalizationError value
+        | InternalInvalidTolerance tolerance -> InvalidTolerance tolerance
+        | InternalInvalidSamples samples -> InvalidSamples samples
+        | InternalInvalidMaxDepth maxDepth -> InvalidMaxDepth maxDepth
+        | InternalInvalidMiterLimit miterLimit -> InvalidMiterLimit miterLimit
+        | InternalInvalidStalledOffsetDiameter diameter -> InvalidStalledOffsetDiameter diameter
+        | InternalInvalidTangentHealAngleDegrees angle -> InvalidTangentHealAngleDegrees angle
+        | InternalBandSubpathNotClosed -> BandSubpathNotClosed
+        | InternalDegenerateTangent t -> DegenerateTangent t
+        | InternalMaxDepthReached error -> MaxDepthReached error
+        | InternalNonFinite -> NonFinite
+        | InternalSegmentImageCountMismatch -> SegmentImageCountMismatch
+        | InternalEmptySegmentImage segmentIndex -> EmptySegmentImage segmentIndex
+        | InternalMissingEdgeImage edgeId -> MissingEdgeImage edgeId
+        | InternalMissingIndexedSegment segmentIndex -> MissingIndexedSegment segmentIndex
+        | InternalMissingWindingOpinion segmentIndex -> MissingWindingOpinion segmentIndex
+        | InternalSurvivorCapacityMismatch(edgeId, remaining) -> SurvivorCapacityMismatch(edgeId, remaining)
+        | InternalForcedParityOpenChain(startVertex, endVertex) -> ForcedParityOpenChain(startVertex, endVertex)
+        | InternalIToKSubpathCount actual -> IToKSubpathCount actual
+        | InternalIToKExpectedClosedSubpath -> IToKExpectedClosedSubpath
+        | InternalIToKEndpointMismatch(expectedStart, actualStart, expectedEnd, actualEnd) -> IToKEndpointMismatch(expectedStart, actualStart, expectedEnd, actualEnd)
+        | InternalIToKMissingJPreimage edgeId -> IToKMissingJPreimage edgeId
+        | InternalSurvivorChainDiscontinuous(previousIndex, nextIndex, expected, actual, distance) -> SurvivorChainDiscontinuous(previousIndex, nextIndex, expected, actual, distance)
+        | InternalInconsistentContainment -> InconsistentContainment
+
     let private requestData = function
         | RequiredVertexParity(vertex, parity) -> vertex, parity, false
         | PreferredVertexParity(vertex, parity) -> vertex, parity, true
@@ -689,30 +751,30 @@ module Offset =
     let private validateJoin join =
         match join with
         | Miter miterLimit when miterLimit <= 0.0 || not (System.Double.IsFinite miterLimit) ->
-            Error(InvalidMiterLimit miterLimit)
+            Error(InternalInvalidMiterLimit miterLimit)
         | _ -> Ok()
 
     let private validateOptions options =
         if options.Fitting.Tolerance <= 0.0<length>
            || not (System.Double.IsFinite(float options.Fitting.Tolerance)) then
-            Error(InvalidTolerance options.Fitting.Tolerance)
+            Error(InternalInvalidTolerance options.Fitting.Tolerance)
         elif options.Fitting.Samples <= 0 then
-            Error(InvalidSamples options.Fitting.Samples)
+            Error(InternalInvalidSamples options.Fitting.Samples)
         elif options.Fitting.MaxDepth <= 0 then
-            Error(InvalidMaxDepth options.Fitting.MaxDepth)
+            Error(InternalInvalidMaxDepth options.Fitting.MaxDepth)
         elif options.StalledOffsetDiameter < 0.0<length>
              || not (System.Double.IsFinite(float options.StalledOffsetDiameter)) then
-            Error(InvalidStalledOffsetDiameter options.StalledOffsetDiameter)
+            Error(InternalInvalidStalledOffsetDiameter options.StalledOffsetDiameter)
         elif options.TangentHealAngleDegrees < 0.0<degree>
              || not (System.Double.IsFinite(float options.TangentHealAngleDegrees)) then
-            Error(InvalidTangentHealAngleDegrees options.TangentHealAngleDegrees)
+            Error(InternalInvalidTangentHealAngleDegrees options.TangentHealAngleDegrees)
         else
             Ok()
 
     let private requiredDirection t direction =
         match direction with
         | Some value -> Ok value
-        | None -> Error(DegenerateTangent t)
+        | None -> Error(InternalDegenerateTangent t)
 
     let private directionAgreementAngle (incoming: Point<1>) (outgoing: Point<1>) =
         let clockwise = Point.clockwiseAperture incoming outgoing
@@ -722,20 +784,20 @@ module Offset =
         match directions.Incoming, directions.Outgoing with
         | Some incoming, Some outgoing ->
             if directionAgreementAngle incoming outgoing > tangentHealAgreementAngleDegrees then
-                Error(DegenerateTangent t)
+                Error(InternalDegenerateTangent t)
             else
                 let sum = Point.add incoming outgoing
                 if Point.norm sum > smallUnitDivisionTolerance () then
                     match Point.normalize sum with
                     | Some direction -> Ok direction
-                    | None -> Error(DegenerateTangent t)
+                    | None -> Error(InternalDegenerateTangent t)
                 else
-                    Error(DegenerateTangent t)
-        | _ -> Error(DegenerateTangent t)
+                    Error(InternalDegenerateTangent t)
+        | _ -> Error(InternalDegenerateTangent t)
 
     let private unitTangent segment t =
         Segment.directions segment t
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.bind (fun directions ->
             if t = 0.0<parameter> then requiredDirection t directions.Outgoing
             elif t = 1.0<parameter> then requiredDirection t directions.Incoming
@@ -898,11 +960,11 @@ module Offset =
 
     let private colinearizeOffsetSourceTangents subpath tolerance =
         Subpath.rebuildWith (colinearizeSourceTangentPolicy tolerance) subpath
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
 
     let private segmentDiameter segment =
         Segment.boundingBox segment
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.map BoundingBox.diameter
 
     let private segmentIsShort segment tolerance =
@@ -953,13 +1015,13 @@ module Offset =
             Subpath.createWith (WiggleThenBridgeWith tolerance) normalized
             |> Result.bind (fun normalizedSubpath ->
                 Subpath.setClosedWith (WiggleThenBridgeWith tolerance) subpath.Closed normalizedSubpath)
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
 
     let private normalizeSourceSubpath subpath options =
         eliminateSmallOffsetSourceSegments subpath 0.001<length>
         |> Result.bind (fun subpath ->
             Degeneracy.normalizeDegenerateSegments subpath options.Fitting.Tolerance
-            |> Result.mapError SourceNormalizationError)
+            |> Result.mapError InternalSourceNormalizationError)
         |> Result.bind (fun subpath ->
             if List.isEmpty subpath.Segments then Ok subpath
             else colinearizeOffsetSourceTangents subpath sourceTangentColinearizationAngleDegrees)
@@ -989,7 +1051,7 @@ module Offset =
         fromParameter
         toParameter =
         Segment.betweenInside prepared.Segment fromParameter toParameter
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
 
     let private segmentIsBezier segment =
         match segment with
@@ -1119,7 +1181,7 @@ module Offset =
             | SideStalled -> Ok []
             | SideNotStalled ->
                 Curvature.segmentLeftNormalCuspParameters segment offset Curvature.defaultOptions
-                |> Result.mapError (fun _ -> NonFinite)
+                |> Result.mapError (fun _ -> InternalNonFinite)
 
         match reversalParameters innerStatus inner, reversalParameters outerStatus outer,
               Curvature.segmentInflectionParameters segment Curvature.defaultOptions with
@@ -1139,7 +1201,7 @@ module Offset =
             |> List.sortBy (fun value -> value.T)
             |> uniqueCurvatureSplitParameters curvatureParameterTolerance
             |> Ok
-        | _ -> Error NonFinite
+        | _ -> Error InternalNonFinite
 
     let private splitPreparedSegmentForBothOffsets
         (prepared: APreparedSegment)
@@ -1151,7 +1213,7 @@ module Offset =
             match inner, outer with
             | innerFrom :: innerTo :: innerRest, outerFrom :: outerTo :: outerRest ->
                 if innerFrom.T <> outerFrom.T || innerTo.T <> outerTo.T then
-                    Error NonFinite
+                    Error InternalNonFinite
                 else
                     match loop (innerTo :: innerRest) (outerTo :: outerRest) synchronized with
                     | Error error -> Error error
@@ -1170,7 +1232,7 @@ module Offset =
                             :: rest)
             | [ _ ], [ _ ]
             | [], [] -> Ok(List.rev synchronized)
-            | _ -> Error NonFinite
+            | _ -> Error InternalNonFinite
         loop innerBoundaries outerBoundaries []
 
     let private markSynchronizedAdjacentReversal
@@ -1284,9 +1346,9 @@ module Offset =
 
     let private splitEJoinFreeSegmentAtMidpoint
         (source: EJoinFreeSegment)
-        : Result<EJoinFreeSegment * EJoinFreeSegment, Error> =
+        : Result<EJoinFreeSegment * EJoinFreeSegment, InternalError> =
         Segment.split source.Segment 0.5<parameter>
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.map (fun (left, right) ->
             let sourceMid = source.RefinedFrom + (source.RefinedTo - source.RefinedFrom) / 2.0
             { source with
@@ -1307,22 +1369,22 @@ module Offset =
         match Segment.point segment t, unitNormal segment t with
         | Ok point, Ok normal ->
             let offsetPoint = Point.translate (Point.scale offset normal) point
-            if pointIsFinite offsetPoint then Ok offsetPoint else Error NonFinite
-        | Error error, _ -> Error(PathError error)
+            if pointIsFinite offsetPoint then Ok offsetPoint else Error InternalNonFinite
+        | Error error, _ -> Error(InternalPathError error)
         | _, Error error -> Error error
 
     let private circularArcOffsetRadius segment offset =
         match segment with
         | Arc endpoint ->
             Ellipse.endpointToCenter endpoint
-            |> Result.mapError (fun _ -> PathError DegenerateArc)
+            |> Result.mapError (fun _ -> InternalPathError DegenerateArc)
             |> Result.bind (fun center ->
                 if abs (center.Radius.X - center.Radius.Y) > pointTolerance then
-                    Error NonFinite
+                    Error InternalNonFinite
                 else
                     let signedOffset = if center.DeltaAngle >= 0.0<degree> then offset else -offset
                     Ok(center.Radius.X + signedOffset))
-        | _ -> Error NonFinite
+        | _ -> Error InternalNonFinite
 
     let private offsetCircularArcSegmentRaw segment offset radius =
         match segment with
@@ -1342,8 +1404,8 @@ module Offset =
                 )
             | Error error, _, _
             | _, Error error, _ -> Error error
-            | _, _, Error _ -> Error(PathError DegenerateArc)
-        | _ -> Error NonFinite
+            | _, _, Error _ -> Error(InternalPathError DegenerateArc)
+        | _ -> Error InternalNonFinite
 
     let private makeOffsetSegment segment source startTangent endTangent : FUnhealedOffsetSegment =
         { Segment = segment
@@ -1362,7 +1424,7 @@ module Offset =
 
     let private offsetReversalParameters segment offset =
         Curvature.segmentLeftNormalCuspParameters segment offset Curvature.defaultOptions
-        |> Result.mapError (fun _ -> NonFinite)
+        |> Result.mapError (fun _ -> InternalNonFinite)
 
     let private offsetInflectionParameters segment =
         let options: CurvatureOptions =
@@ -1370,7 +1432,7 @@ module Offset =
               Samples = 100
               MaxDepth = 32 }
         Curvature.segmentInflectionParameters segment options
-        |> Result.mapError (fun _ -> NonFinite)
+        |> Result.mapError (fun _ -> InternalNonFinite)
 
     let private sourceSegmentOffsetIsStalled
         segment
@@ -1448,7 +1510,7 @@ module Offset =
             / (source.PreparedTo - source.PreparedFrom)
             |> Parameter.fromFloat
         Segment.split source.Segment local
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.map (fun (left, right) ->
             let ordinary = { Inner = Ordinary; Outer = Ordinary }
             { source with
@@ -1531,7 +1593,7 @@ module Offset =
         outerStartBoundary
         outerEndBoundary
         (stalledThreshold: float<length>)
-        : Result<SynchronizedSourceSegment list, Error> =
+        : Result<SynchronizedSourceSegment list, InternalError> =
         synchronizedCurvatureSplitParameters
             prepared.Segment
             distances.Inner
@@ -1601,12 +1663,12 @@ module Offset =
         match curve with
         | CubicBezierData(startPoint, control1, control2, endPoint) ->
             Ok(CubicBezier(startPoint, control1, control2, endPoint))
-        | _ -> Error NonFinite
+        | _ -> Error InternalNonFinite
 
     let private cubicFitError error =
         match error with
-        | BezierError.DegenerateTangent -> DegenerateTangent 0.0<parameter>
-        | _ -> NonFinite
+        | BezierError.DegenerateTangent -> InternalDegenerateTangent 0.0<parameter>
+        | _ -> InternalNonFinite
 
     let private stalledSegmentOffsetSamples segment offset index count tValues samples =
         let rec loop remaining collected =
@@ -1650,7 +1712,7 @@ module Offset =
             |> Result.mapError cubicFitError
             |> Result.bind (fst >> fittedCurveToSegment)
             |> Result.bind (fun segment ->
-                if not (segmentIsFinite segment) then Error NonFinite
+                if not (segmentIsFinite segment) then Error InternalNonFinite
                 else
                     match unitTangent segment 0.0<parameter>, unitTangent segment 1.0<parameter> with
                     | Ok startDirection, Ok endDirection ->
@@ -1692,7 +1754,7 @@ module Offset =
     let private unitVector t point =
         let norm = Point.norm point
         if norm > smallUnitDivisionTolerance () then Ok(Point.scale (1.0 / norm) point)
-        else Error(DegenerateTangent t)
+        else Error(InternalDegenerateTangent t)
 
     let private signedAngle a b = Trig.atan2Degrees (Point.cross a b) (Point.dot a b)
 
@@ -1704,7 +1766,7 @@ module Offset =
            && chord > pointTolerance
            && value >= minimum
            && value <= maximum then Ok()
-        else Error NonFinite
+        else Error InternalNonFinite
 
     let private fitOneHandle samples fixedPoint column =
         let ata, atb, count =
@@ -1715,7 +1777,7 @@ module Offset =
                 ata + Point.dot col col,
                 atb + Point.dot col target,
                 count + 1) (0.0, 0.0<length>, 0)
-        if count = 0 || abs ata <= 1.0e-9 then Error NonFinite
+        if count = 0 || abs ata <= 1.0e-9 then Error InternalNonFinite
         else Ok(atb / ata)
 
     let private fitStartTangentOneHandle startPoint endPoint direction control2 samples =
@@ -1773,14 +1835,14 @@ module Offset =
         let toScore = score toValue
         if fromScore = 0.0 then Ok fromValue
         elif toScore = 0.0 then Ok toValue
-        elif fromScore * toScore > 0.0 then Error NonFinite
+        elif fromScore * toScore > 0.0 then Error InternalNonFinite
         else Ok(loop fromValue toValue fromScore iterations)
 
     let private directionLineIntersection a aDirection b bDirection =
         match unitVector 0.0<parameter> aDirection, unitVector 0.0<parameter> bDirection with
         | Ok aUnit, Ok bUnit ->
             let determinant = Point.cross aUnit bUnit
-            if abs determinant < Trig.sinDegrees reversalFitLineApertureDegrees then Error NonFinite
+            if abs determinant < Trig.sinDegrees reversalFitLineApertureDegrees then Error InternalNonFinite
             else
                 let delta = Point.displacement a b
                 let scaleA = Point.cross delta bUnit / determinant
@@ -1894,11 +1956,11 @@ module Offset =
         let speedFactor = 1.0 - offset * curvature
         if speedFactor > 0.0 then Ok tangent
         elif speedFactor < 0.0 then Ok(Point.negate tangent)
-        else Error(DegenerateTangent t)
+        else Error(InternalDegenerateTangent t)
 
     let rec private offsetEndpointDirectionLimitFromInterior
         segment tangent endpointT interiorDistance offset =
-        if interiorDistance > 0.01<parameter> then Error(DegenerateTangent endpointT)
+        if interiorDistance > 0.01<parameter> then Error(InternalDegenerateTangent endpointT)
         else
             let interiorT =
                 if endpointT = 0.0<parameter> then interiorDistance
@@ -1914,7 +1976,7 @@ module Offset =
         if t = 0.0<parameter> || t = 1.0<parameter> then
             offsetEndpointDirectionLimitFromInterior
                 segment tangent t curvatureParameterTolerance offset
-        else Error(DegenerateTangent t)
+        else Error(InternalDegenerateTangent t)
 
     let private offsetDirection segment t offset =
         unitTangent segment t
@@ -2011,7 +2073,7 @@ module Offset =
            && boundaryIsReversal source.EndBoundary
            && eJoinFreeEndpointReachesOffsetRadius source offset SegmentStart
            && eJoinFreeEndpointReachesOffsetRadius source offset SegmentEnd
-           && segmentIsBezier source.Segment then Error NonFinite
+           && segmentIsBezier source.Segment then Error InternalNonFinite
         else Ok()
 
     let private eJoinFreeEndpointOffsetDirection
@@ -2055,7 +2117,7 @@ module Offset =
             let endAngle = abs (signedAngle endDirection chordDirection)
             if startAngle <= reversalTangentGapDegrees && endAngle <= reversalTangentGapDegrees then
                 Ok(Line(startPoint, endPoint))
-            else Error NonFinite
+            else Error InternalNonFinite
 
     let private fitOffsetCubicStartStalledEndTangent startPoint endPoint startDirection endDirection samples =
         stalledStartControl2 startPoint endPoint startDirection endDirection samples
@@ -2119,7 +2181,7 @@ module Offset =
             |> Result.mapError cubicFitError
             |> Result.map fst
         | FitPositionAndDirectionWithCollapsedHandle _,
-          FitPositionAndDirectionWithCollapsedHandle _ -> Error NonFinite
+          FitPositionAndDirectionWithCollapsedHandle _ -> Error InternalNonFinite
         | FitPositionAndDirectionWithCollapsedHandle startDirection,
           FitPositionAndDirection endDirection ->
             fitOffsetCubicStartStalledEndTangent
@@ -2146,7 +2208,7 @@ module Offset =
         endDirection
         samples =
         match report.StartHandle, report.EndHandle with
-        | CollapsedHandle, CollapsedHandle -> Error NonFinite
+        | CollapsedHandle, CollapsedHandle -> Error InternalNonFinite
         | CollapsedHandle, PositiveHandle ->
             fitOffsetCubicDataWithEndpointPolicies
                 startPoint endPoint
@@ -2161,7 +2223,7 @@ module Offset =
                 samples
         | PositiveHandle, PositiveHandle -> Ok curve
         | UnconstrainedHandle, _
-        | _, UnconstrainedHandle -> Error NonFinite
+        | _, UnconstrainedHandle -> Error InternalNonFinite
 
     let private fitOffsetCubicWithNonBothStalledEndpointPolicies
         startPoint endPoint startPolicy endPolicy samples =
@@ -2204,15 +2266,15 @@ module Offset =
     let private smartOffsetDivergence source candidate offset options =
         let rec loop sample best validSamples =
             if sample > options.Fitting.Samples then
-                if validSamples = 0 then Error(DegenerateTangent 0.5<parameter>) else Ok best
+                if validSamples = 0 then Error(InternalDegenerateTangent 0.5<parameter>) else Ok best
             else
                 let t = Parameter.fromFloat (float sample / float (options.Fitting.Samples + 1))
                 match offsetPoint source t offset with
-                | Error(DegenerateTangent _) -> loop (sample + 1) best validSamples
+                | Error(InternalDegenerateTangent _) -> loop (sample + 1) best validSamples
                 | Error error -> Error error
                 | Ok point ->
                     Segment.point candidate t
-                    |> Result.mapError PathError
+                    |> Result.mapError InternalPathError
                     |> Result.bind (fun candidatePoint ->
                         let best = max best (Point.distance point candidatePoint)
                         if best > options.Fitting.Tolerance then Ok best
@@ -2229,7 +2291,7 @@ module Offset =
                 offsetPoint source t offset
                 |> Result.bind (fun point ->
                     Segment.point candidate t
-                    |> Result.mapError PathError
+                    |> Result.mapError InternalPathError
                     |> Result.bind (fun candidatePoint ->
                         let best = max best (Point.distance point candidatePoint)
                         if best > options.Fitting.Tolerance then Ok best
@@ -2239,7 +2301,7 @@ module Offset =
     let private fitEJoinFreeOffsetSegment
         (source: EJoinFreeSegment)
         offset
-        : Result<Segment, Error> =
+        : Result<Segment, InternalError> =
         match offsetPoint source.Segment 0.0<parameter> offset,
               offsetPoint source.Segment 1.0<parameter> offset with
         | Ok startPoint, Ok endPoint ->
@@ -2255,7 +2317,7 @@ module Offset =
                 fitOffsetCubicWithEndpointPolicies
                     startPoint endPoint startPolicy endPolicy samples
                 |> Result.bind (fun candidate ->
-                    if segmentIsFinite candidate then Ok candidate else Error NonFinite)
+                    if segmentIsFinite candidate then Ok candidate else Error InternalNonFinite)
             | Error error, _, _
             | _, Error error, _
             | _, _, Error error -> Error error
@@ -2266,7 +2328,7 @@ module Offset =
         (source: EJoinFreeSegment)
         offset
         (options: Options)
-        : Result<OffsetAttempt, Error> =
+        : Result<OffsetAttempt, InternalError> =
         fitEJoinFreeOffsetSegment source offset
         |> Result.bind (fun candidate ->
             smartOffsetDivergence source.Segment candidate offset options
@@ -2281,7 +2343,7 @@ module Offset =
         (source: EJoinFreeSegment)
         offset
         (options: Options)
-        : Result<OffsetAttempt, Error> =
+        : Result<OffsetAttempt, InternalError> =
         match source.Segment with
         | Line _ ->
             match offsetPoint source.Segment 0.0<parameter> offset,
@@ -2296,7 +2358,7 @@ module Offset =
             | _, Error error -> Error error
         | Arc _ ->
             match circularArcOffsetRadius source.Segment offset with
-            | Ok radius when abs radius <= pointTolerance -> Error(DegenerateTangent 0.0<parameter>)
+            | Ok radius when abs radius <= pointTolerance -> Error(InternalDegenerateTangent 0.0<parameter>)
             | Ok radius ->
                 offsetCircularArcSegmentRaw source.Segment offset radius
                 |> Result.bind (fun arc ->
@@ -2310,13 +2372,13 @@ module Offset =
         offset
         (options: Options)
         depth
-        : Result<FUnhealedOffsetSegment list * SynchronizedSideSource, Error> =
+        : Result<FUnhealedOffsetSegment list * SynchronizedSideSource, InternalError> =
         offsetEJoinFreeSegmentAttempt source offset options
         |> Result.bind (function
             | OffsetAccepted offsetSegment ->
                 Ok([ offsetSegment ], RefinableSideSource source)
             | OffsetNeedsRefinement divergence when depth <= 0 ->
-                Error(MaxDepthReached divergence)
+                Error(InternalMaxDepthReached divergence)
             | OffsetNeedsRefinement _ ->
                 splitEJoinFreeSegmentAtMidpoint source
                 |> Result.bind (fun (left, right) ->
@@ -2333,7 +2395,7 @@ module Offset =
         (distances: OffsetDistances)
         (options: Options)
         depth
-        : Result<SynchronizedUnhealedResult, Error> =
+        : Result<SynchronizedUnhealedResult, InternalError> =
         match offsetEJoinFreeSegmentAttempt innerSource distances.Inner options,
               offsetEJoinFreeSegmentAttempt outerSource distances.Outer options with
         | Ok(OffsetAccepted innerOffset), Ok(OffsetAccepted outerOffset) ->
@@ -2343,7 +2405,7 @@ module Offset =
                   InnerSource = RefinableSideSource innerSource
                   OuterSource = RefinableSideSource outerSource }
         | Ok innerAttempt, Ok outerAttempt when depth <= 0 ->
-            Error(MaxDepthReached(largestAttemptDivergence innerAttempt outerAttempt))
+            Error(InternalMaxDepthReached(largestAttemptDivergence innerAttempt outerAttempt))
         | Ok _, Ok _ ->
             match splitEJoinFreeSegmentAtMidpoint innerSource,
                   splitEJoinFreeSegmentAtMidpoint outerSource with
@@ -2411,7 +2473,7 @@ module Offset =
     let rec private offsetRefinableSynchronizedGroup
         sources side offset options portionIndex segmentIndex =
         match sources with
-        | [] -> Error NonFinite
+        | [] -> Error InternalNonFinite
         | first :: rest ->
             let refined = synchronizedRefinedSegment first side
             let source = synchronizedESegment refined portionIndex segmentIndex
@@ -2471,13 +2533,13 @@ module Offset =
                       OuterSource = StalledSideSource outerStalled }
             | Error error, _
             | _, Error error -> Error error
-        | SideNotStalled, SideNotStalled -> Error NonFinite
+        | SideNotStalled, SideNotStalled -> Error InternalNonFinite
 
     let private offsetSynchronizedSourceGroup
         (sources: SynchronizedSourceSegment list)
         distances options portionIndex correspondenceIndex =
         match sources with
-        | [] -> Error NonFinite
+        | [] -> Error InternalNonFinite
         | [ source ] ->
             offsetSynchronizedSourceSegment
                 source distances options portionIndex correspondenceIndex
@@ -2530,10 +2592,10 @@ module Offset =
         | [] -> Ok portions
         | _ ->
             Subpath.create (List.rev segments)
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.bind (fun openSubpath ->
                 Subpath.setClosed closedValue openSubpath
-                |> Result.mapError PathError)
+                |> Result.mapError InternalPathError)
             |> Result.map (fun subpath ->
                 { Index = 0; Subpath = subpath; Closed = closedValue } :: portions)
 
@@ -2656,14 +2718,14 @@ module Offset =
         (left: FUnhealedOffsetSegment)
         (right: FUnhealedOffsetSegment)
         offset options =
-        if not (offsetBoundaryIsKnownReversal left right) then Error NonFinite
+        if not (offsetBoundaryIsKnownReversal left right) then Error InternalNonFinite
         else
             let boundary = Point.midpoint (Segment.finish left.Segment) (Segment.start right.Segment)
             let healedLeft = snapOffsetEndPositionOnly left boundary
             let healedRight = snapOffsetStartPositionOnly right boundary
             if certifiedHealedBoundary healedLeft healedRight offset options then
                 Ok(healedLeft, healedRight)
-            else Error NonFinite
+            else Error InternalNonFinite
 
     let private healOffsetBoundary left right offset options =
         match healReversalOffsetBoundary left right offset options with
@@ -2895,7 +2957,7 @@ module Offset =
             | Ok leftTangent, Ok rightTangent ->
                 let angle = abs (signedAngle leftTangent rightTangent)
                 if angle <= healAngle || 180.0<degree> - angle <= healAngle then Ok()
-                else Error(DegenerateTangent 1.0<parameter>)
+                else Error(InternalDegenerateTangent 1.0<parameter>)
             | Error error, _
             | _, Error error -> Error error
         | Ok _, Ok _ -> Ok()
@@ -2904,7 +2966,7 @@ module Offset =
 
     let private assertSmoothOffsetBoundary
         (left: FUnhealedOffsetSegment) (right: FUnhealedOffsetSegment) healAngle =
-        if Segment.finish left.Segment <> Segment.start right.Segment then Error NonFinite
+        if Segment.finish left.Segment <> Segment.start right.Segment then Error InternalNonFinite
         elif offsetSegmentSourceEnd left.Source <> offsetSegmentSourceStart right.Source then Ok()
         elif offsetBoundaryIsKnownReversal left right then Ok()
         else assertContinuousOffsetTangentBoundary left.Segment right.Segment healAngle
@@ -2919,7 +2981,7 @@ module Offset =
 
     let private splitSynchronizedSourceAtMidpoint (source: SynchronizedSourceSegment) =
         Segment.split source.Segment 0.5<parameter>
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.map (fun (left, right) ->
             let midpoint = source.PreparedFrom + (source.PreparedTo - source.PreparedFrom) / 2.0
             let ordinary = { Inner = Ordinary; Outer = Ordinary }
@@ -2969,7 +3031,7 @@ module Offset =
         (portion: JoinFreePortion)
         (distances: OffsetDistances)
         (options: Options)
-        : Result<SynchronizedOffsetSegmentsBuild, Error> =
+        : Result<SynchronizedOffsetSegmentsBuild, InternalError> =
         let classified =
             preparedSegments portion.Subpath 0
             |> fun prepared ->
@@ -3052,14 +3114,14 @@ module Offset =
             match endpoint, run with
             | SegmentStart, first :: _ -> unitTangentAtEndpoint first.Segment endpoint
             | SegmentEnd, _ :: _ -> unitTangentAtEndpoint (List.last run).Segment endpoint
-            | _ -> Error(DegenerateTangent 0.0<parameter>)
+            | _ -> Error(InternalDegenerateTangent 0.0<parameter>)
 
     let private offsetPortionJoinBoundary
         (left: GHealedOffsetSegment list) (right: GHealedOffsetSegment list) =
         match List.tryLast left, right with
         | Some previous, next :: _ ->
             Ok(Segment.finish previous.Segment, Segment.start next.Segment)
-        | _ -> Error(DegenerateTangent 0.0<parameter>)
+        | _ -> Error(InternalDegenerateTangent 0.0<parameter>)
 
     let private joinBetweenOffsetPortions
         (left: GHealedOffsetSegment list) (right: GHealedOffsetSegment list)
@@ -3081,7 +3143,7 @@ module Offset =
                 Ok(Point.dot averageDirection joinChord < 0.0<length>)
             | Error error, _
             | _, Error error -> Error error
-        | _ -> Error(DegenerateTangent 0.0<parameter>)
+        | _ -> Error(InternalDegenerateTangent 0.0<parameter>)
 
     let private synchronizedJoinCorrespondence
         (left: SynchronizedHealedPortion)
@@ -3163,7 +3225,7 @@ module Offset =
 
     let private shortCircuitAdjacentOffsetSegmentLoopWithParameters left right =
         Intersections.segment left right
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.bind (fun intersections ->
             match earliestInteriorAdjacentIntersection intersections None with
             | None -> Ok(left, 1.0<parameter>, right, 0.0<parameter>)
@@ -3177,7 +3239,7 @@ module Offset =
                         segmentWithStart retainedRight intersection.Point,
                         intersection.RightT)
                 | Error error, _
-                | _, Error error -> Error(PathError error))
+                | _, Error error -> Error(InternalPathError error))
 
     let internal internalShortCircuitAdjacentOffsetSegmentLoop left right =
         shortCircuitAdjacentOffsetSegmentLoopWithParameters left right
@@ -3428,7 +3490,7 @@ module Offset =
         (left: ICulledOffsetSegment)
         (right: ICulledOffsetSegment) =
         OverlapDetection.detect left.Segment right.Segment 1.0e-9<length>
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.bind (fun found ->
             match adjacentEndpointOverlap found with
             | None -> Ok(left, Some right)
@@ -3447,7 +3509,7 @@ module Offset =
                         Ok(retainedLeft, None)
                     else
                         Segment.betweenInside right.Segment rightEnd 1.0<parameter>
-                        |> Result.mapError PathError
+                        |> Result.mapError InternalPathError
                         |> Result.map (fun rightSegment ->
                             retainedLeft,
                             Some
@@ -3457,7 +3519,7 @@ module Offset =
                                         intervalParameter
                                             right.PreimageFrom right.PreimageTo rightEnd })
                 | Error error, _
-                | _, Error error -> Error(PathError error))
+                | _, Error error -> Error(InternalPathError error))
 
     let private cullOffsetSegmentLoop
         (left: ICulledOffsetSegment)
@@ -3466,7 +3528,7 @@ module Offset =
             Ok(left, Some right)
         else
             match shortCircuitAdjacentOffsetSegmentLoopWithParameters left.Segment right.Segment with
-            | Error(PathError OverlappingSegments) ->
+            | Error(InternalPathError OverlappingSegments) ->
                 cullAdjacentOffsetSegmentOverlap left right
             | Error error -> Error error
             | Ok(leftSegment, leftTo, rightSegment, rightFrom) ->
@@ -3530,7 +3592,7 @@ module Offset =
 
     let private cullAdjacentPreimageLoops
         (subpath: HPreimageSubpath)
-        : Result<ICulledOffsetSubpath, Error> =
+        : Result<ICulledOffsetSubpath, InternalError> =
         let segments: ICulledOffsetSegment list =
             subpath.Segments
             |> List.map (fun preimage ->
@@ -3552,21 +3614,21 @@ module Offset =
     let private subpathFromSynchronizedSegments
         (segments: Segment list) closedValue (tolerance: float<length>) =
         match segments with
-        | [] -> Error(DegenerateTangent 0.0<parameter>)
+        | [] -> Error(InternalDegenerateTangent 0.0<parameter>)
         | _ ->
             let policy = WiggleWith tolerance
             Subpath.createWith policy segments
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.bind (fun subpath ->
                 Subpath.setClosedWith policy closedValue subpath
-                |> Result.mapError PathError)
+                |> Result.mapError InternalPathError)
 
     let private buildSynchronizedUntrimmed
         (subpath: Subpath)
         (innerOffset: float<length>) (outerOffset: float<length>)
         (join: Join)
         (options: Options)
-        : Result<SynchronizedUntrimmedBuild, Error> =
+        : Result<SynchronizedUntrimmedBuild, InternalError> =
         let distances: OffsetDistances = { Inner = innerOffset; Outer = outerOffset }
         let closedValue = Subpath.isClosed subpath
         match Subpath.segments subpath with
@@ -3666,7 +3728,7 @@ module Offset =
         let segments = indexed |> List.map (fun item -> item.Segment)
         Arrangement.buildWith
             segments arrangementTolerance arrangementTolerance 0.0001<parameter>
-        |> Result.mapError (Arrangement.publicError >> ArrangementGraphError)
+        |> Result.mapError (Arrangement.publicError >> InternalArrangementGraphError)
         |> Result.map (fun build ->
             { Graph = build.Graph
               IndexedSegments = indexed
@@ -3714,7 +3776,7 @@ module Offset =
             state
             |> Result.bind (fun found ->
                 arrangementEdgeById build.Graph.Edges reference.EdgeId
-                |> Result.mapError (Arrangement.publicError >> ArrangementGraphError)
+                |> Result.mapError (Arrangement.publicError >> InternalArrangementGraphError)
                 |> Result.map (fun edge -> (edge, reference.Reversed) :: found))) (Ok [])
         |> Result.map List.rev
 
@@ -3995,7 +4057,7 @@ module Offset =
                 && List.contains chain.EndVertex protectedVertices))
 
     let private survivorChainDiscontinuity = function
-        | PathError(Discontinuous(previousIndex, nextIndex, expected, actual, distance)) ->
+        | InternalPathError(Discontinuous(previousIndex, nextIndex, expected, actual, distance)) ->
             InternalSurvivorChainDiscontinuous(previousIndex, nextIndex, expected, actual, distance)
         | error -> error
 
@@ -4008,11 +4070,11 @@ module Offset =
         | first :: rest ->
             let segments = first.Edges |> List.map (fun edge -> edge.Segment)
             Subpath.createWith (WiggleWith tolerance) segments
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.mapError survivorChainDiscontinuity
             |> Result.bind (fun subpath ->
                 Subpath.setClosedWith (WiggleThenBridgeWith tolerance) first.Closed subpath
-                |> Result.mapError PathError)
+                |> Result.mapError InternalPathError)
             |> Result.bind (fun subpath ->
                 survivorChainsToSubpaths rest tolerance (subpath :: subpaths))
 
@@ -4020,7 +4082,7 @@ module Offset =
         if Subpath.isClosed subpath then Ok subpath
         elif Point.distance (Subpath.start subpath) (Subpath.finish subpath) <= tolerance then
             Subpath.setClosedWith (WiggleThenBridgeWith tolerance) true subpath
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
         else Ok subpath
 
     let rec private closeSurvivorSubpaths subpaths tolerance =
@@ -4037,7 +4099,7 @@ module Offset =
         (build: OffsetArrangementBuild)
         (sources: ArrangementEdgeSourceImage list)
         (opinion: WindingSideOpinion)
-        : Result<WindingSideOpinion, Error> =
+        : Result<WindingSideOpinion, InternalError> =
         match sources with
         | [] -> Ok opinion
         | first :: rest ->
@@ -4066,12 +4128,12 @@ module Offset =
     let private arrangementEdgeWindingMatchesOpinion
         (build: OffsetArrangementBuild)
         (edge: ArrangementEdge)
-        (winding: Point<length> -> Result<int, Error>)
+        (winding: Point<length> -> Result<int, InternalError>)
         (sideSamplingDistance: float<length>) =
         arrangementEdgeWindingOpinion build edge.Id
         |> Result.bind (fun expected ->
             Segment.point edge.Segment 0.5<parameter>
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.bind (fun point ->
                 unitNormal edge.Segment 0.5<parameter>
                 |> Result.bind (fun normal ->
@@ -4124,7 +4186,7 @@ module Offset =
               CyclicOrders = [] }
         forcedParityCapacities
             arrangement (protectedVertexParities protectedVertices)
-        |> Result.mapError ForcedParityPruningError
+        |> Result.mapError InternalForcedParityPruningError
         |> Result.map (fun assignments ->
             let edgeCapacities =
                 assignments |> List.map (fun assignment -> assignment.EdgeId, assignment.Capacity)
@@ -4260,9 +4322,9 @@ module Offset =
                     Subpath.segments sideA @ endCap
                     @ reverseSegments (Subpath.segments sideB) @ startCap
                 Subpath.createWith Wiggle segments
-                |> Result.mapError PathError
+                |> Result.mapError InternalPathError
                 |> Result.bind (fun outline ->
-                    Subpath.setClosedWith Wiggle true outline |> Result.mapError PathError)))
+                    Subpath.setClosedWith Wiggle true outline |> Result.mapError InternalPathError)))
 
     let private bandFromSides sideA innerOffset sideB outerOffset cap =
         let exterior, interior =
@@ -4272,7 +4334,7 @@ module Offset =
 
     let private requireClosedBandSubpath subpath =
         if Subpath.isClosed subpath then Ok()
-        else Error BandSubpathNotClosed
+        else Error InternalBandSubpathNotClosed
 
     let private oneSubpathBandSemanticPath band =
         match band with
@@ -4301,10 +4363,10 @@ module Offset =
                 |> Path.ofSubpaths
             fun point ->
                 WindingField.pathWinding point path
-                |> Result.mapError PathError
+                |> Result.mapError InternalPathError
                 |> Result.bind (function
                     | Winding value -> Ok value
-                    | BoundaryWinding -> Error InconsistentContainment))
+                    | BoundaryWinding -> Error InternalInconsistentContainment))
 
     let private arrangementSplitSurvivorEdge
         (segment: ArrangementSplitTracedSegment) : SurvivorEdge =
@@ -4391,7 +4453,7 @@ module Offset =
                 graph
                 (arrangementSplitEdgeCapacities graph retained)
                 (protectedVertexParities protectedVertices)
-            |> Result.mapError ForcedParityPruningError
+            |> Result.mapError InternalForcedParityPruningError
             |> Result.bind (arrangementSplitParityChainsFromAssignments retained)
 
     let private cuspTrimSubpathFromChain
@@ -4451,7 +4513,7 @@ module Offset =
         | [] -> Ok(List.rev split)
         | image :: rest ->
             arrangementEdgeById build.Graph.Edges image.EdgeId
-            |> Result.mapError (Arrangement.publicError >> ArrangementGraphError)
+            |> Result.mapError (Arrangement.publicError >> InternalArrangementGraphError)
             |> Result.bind (fun edge ->
                 arrangementEdgeWindingMatchesOpinion
                     build edge winding submergedSideSamplingDistance
@@ -4724,12 +4786,12 @@ module Offset =
     let rec private orientBandSubpath
         (subpath: Subpath)
         (segments: Segment list)
-        (winding: Point<length> -> Result<int, Error>) =
+        (winding: Point<length> -> Result<int, InternalError>) =
         match segments with
         | [] -> Ok subpath
         | first :: rest ->
             Segment.point first 0.5<parameter>
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.bind (fun point ->
                 match unitNormal first 0.5<parameter> with
                 | Error _ -> orientBandSubpath subpath rest winding
@@ -4980,7 +5042,7 @@ module Offset =
         |> List.tryFind (fun edge -> edge.EdgeId = edgeId)
         |> function
             | Some edge -> Ok edge
-            | None -> Error(ArrangementGraphError(Arrangement.publicError (InternalMissingArrangementEdge edgeId)))
+            | None -> Error(InternalArrangementGraphError(Arrangement.publicError (InternalMissingArrangementEdge edgeId)))
 
     let rec private contaminationSeedFaces
         (images: ArrangementSourceSegmentImage list)
@@ -5054,7 +5116,7 @@ module Offset =
                       DeletionCandidate = offside }
                 arrangementSplitSegmentsFromIContaminationEdges
                     source rest build dual contaminated (item :: split)
-            | Error error, _ -> Error(ArrangementGraphError(Arrangement.publicError error))
+            | Error error, _ -> Error(InternalArrangementGraphError(Arrangement.publicError error))
             | _, Error error -> Error error
 
     let private arrangementSplitSegmentsFromIContaminationImage
@@ -5141,7 +5203,7 @@ module Offset =
         takeSegmentImages arrangement.SegmentImages offsetCount
         |> Result.bind (fun (offsetImages, zeroImages) ->
             Arrangement.dual arrangement.Graph
-            |> Result.mapError ArrangementGraphError
+            |> Result.mapError InternalArrangementGraphError
             |> Result.bind (fun dual ->
                 offsideTrimmedSingleOffsetSubpathsLoop
                     builds offsetImages zeroImages arrangement dual offset options 0 []))
@@ -5202,10 +5264,10 @@ module Offset =
             let path = Path.ofSubpaths subpaths
             fun point ->
                 WindingField.pathWinding point path
-                |> Result.mapError PathError
+                |> Result.mapError InternalPathError
                 |> Result.bind (function
                     | Winding value -> Ok value
-                    | BoundaryWinding -> Error InconsistentContainment))
+                    | BoundaryWinding -> Error InternalInconsistentContainment))
 
     let private cuspTrimTracedSubpath
         (traced: TracedOffsetSubpath)
@@ -5307,10 +5369,10 @@ module Offset =
     let rec private outlineContourProbeSegments
         subpath (segments: Segment list) =
         match segments with
-        | [] -> Error(PathError EmptySubpath)
+        | [] -> Error(InternalPathError EmptySubpath)
         | first :: rest ->
             Segment.point first 0.5<parameter>
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.bind (fun point ->
                 match unitNormal first 0.5<parameter> with
                 | Error _ -> outlineContourProbeSegments subpath rest
@@ -5328,7 +5390,7 @@ module Offset =
                     | Ok Outside, Ok Inside -> Ok right
                     | Ok _, Ok _ -> outlineContourProbeSegments subpath rest
                     | Error error, _
-                    | _, Error error -> Error(PathError error))
+                    | _, Error error -> Error(InternalPathError error))
 
     let private outlineContourProbe subpath =
         outlineContourProbeSegments subpath (Subpath.segments subpath)
@@ -5339,7 +5401,7 @@ module Offset =
         | first :: rest ->
             WindingField.pathContainment
                 probe (Path.ofSubpaths [ first ]) Nonzero
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.bind (fun containment ->
                 outlineContourDepthLoop probe rest
                     (if containment = Inside then depth + 1 else depth))
@@ -5391,10 +5453,10 @@ module Offset =
     /// Offsets one segment without topological trimming.
     let segmentWith segment offset join options =
         Subpath.createWith Strict [ segment ]
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.bind (fun source -> subpathUntrimmedWith source offset join options)
         |> function
-            | Error(PathError EmptySubpath) -> Error(DegenerateTangent 0.0<parameter>)
+            | Error(InternalPathError EmptySubpath) -> Error(InternalDegenerateTangent 0.0<parameter>)
             | result -> result
 
     /// Offsets one segment with default options and without topological trimming.
@@ -5577,7 +5639,7 @@ module Offset =
                     takeSegmentImages arrangement.SegmentImages offsetCount
                     |> Result.bind (fun (offsetImages, zeroImages) ->
                         Arrangement.dual arrangement.Graph
-                        |> Result.mapError ArrangementGraphError
+                        |> Result.mapError InternalArrangementGraphError
                         |> Result.bind (fun dual ->
                             contaminationArrangementTraceBuilds
                                 builds offsetImages zeroImages
@@ -5588,7 +5650,7 @@ module Offset =
         | [] -> Ok false
         | first :: rest ->
             WindingField.pathContainment point first Nonzero
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.bind (function
                 | Inside -> Ok true
                 | Outside
@@ -5600,10 +5662,10 @@ module Offset =
 
     let private submergedSegment
         segment
-        (inside: Point<length> -> Result<bool, Error>)
+        (inside: Point<length> -> Result<bool, InternalError>)
         sideSamplingDistance =
         Segment.point segment 0.5<parameter>
-        |> Result.mapError PathError
+        |> Result.mapError InternalPathError
         |> Result.bind (fun point ->
             unitNormal segment 0.5<parameter>
             |> Result.bind (fun normal ->
@@ -5626,7 +5688,7 @@ module Offset =
         | [] -> Ok(List.rev spans)
         | first :: rest ->
             Segment.lengthWith first options
-            |> Result.mapError PathError
+            |> Result.mapError InternalPathError
             |> Result.bind (fun segmentLength ->
                 let spans =
                     if segmentLength > 0.0<length> then
@@ -5660,12 +5722,12 @@ module Offset =
         closedValue =
         if closedValue then Ok(positiveRemainder distance totalLength)
         elif distance < 0.0<length> || distance > totalLength then
-            Error(PathError(InvalidLengthDistance(distance, totalLength)))
+            Error(InternalPathError(InvalidLengthDistance(distance, totalLength)))
         else Ok distance
 
     let rec private lengthSpanAt spans distance =
         match spans with
-        | [] -> Error(DegenerateTangent 0.0<parameter>)
+        | [] -> Error(InternalDegenerateTangent 0.0<parameter>)
         | [ first ] -> Ok first
         | first :: rest ->
             if distance <= first.StartDistance + first.Length then Ok first
@@ -5675,7 +5737,7 @@ module Offset =
         spans totalLength closedValue
         (options: LengthOptions)
         (local: Point<length>) =
-        if not (pointIsFinite local) then Error NonFinite
+        if not (pointIsFinite local) then Error InternalNonFinite
         else
             offsetMapDistance local.X totalLength closedValue
             |> Result.bind (fun distance ->
@@ -5683,13 +5745,13 @@ module Offset =
                 |> Result.bind (fun span ->
                     let localDistance = distance - span.StartDistance
                     Segment.parameterAtLengthWith span.Segment localDistance options
-                    |> Result.mapError PathError
+                    |> Result.mapError InternalPathError
                     |> Result.bind (fun t ->
-                        match Segment.point span.Segment t |> Result.mapError PathError,
+                        match Segment.point span.Segment t |> Result.mapError InternalPathError,
                               unitNormal span.Segment t with
                         | Ok point, Ok normal ->
                             let mapped = Point.add point (Point.scale local.Y normal)
-                            if pointIsFinite mapped then Ok mapped else Error NonFinite
+                            if pointIsFinite mapped then Ok mapped else Error InternalNonFinite
                         | Error error, _
                         | _, Error error -> Error error)))
 
@@ -5700,7 +5762,7 @@ module Offset =
         |> Result.bind (fun spans ->
             let totalLength = lengthSpansTotal spans
             if totalLength <= 0.0<length> then
-                Error(DegenerateTangent 0.0<parameter>)
+                Error(InternalDegenerateTangent 0.0<parameter>)
             else
                 let closedValue = Subpath.isClosed subpath
                 Ok(fun local ->

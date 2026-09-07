@@ -125,16 +125,20 @@ Gleam commit `b9db16b`, `map band errors at public boundaries`:
 
 F# functions:
 
-- `subpathBandWith`
+- `subpathBandWith` (maps `validateOptions`, `validateJoin`, `normalizeSourceSubpath`, `buildSynchronizedUntrimmed`, both `trimBandSideCusps`, `bandFromSides`, and the in-band/one-subpath path construction through `publicError`)
 - `subpathBand`
-- `pathBandWith`
+- `pathBandWith` (maps `validateOptions` and `validateJoin` through `publicError`)
 - `pathBand`
-- `bandPathSubpaths`
+- `bandPathSubpaths` (delegates to the now-public `subpathBandWith`, no mapping changes needed in the helper)
 
 This batch also flips `StrokeError.StrokeOffsetError` back from `InternalError`
 to the public `Error`, because `Stroke.subpathWith` consumes `subpathBandWith`
 which now returns public `Error`. Update the two Stroke tests that assert
 offset error cases to use the unprefixed constructors.
+
+Note: in the same commit, keep `path`/`pathUntrimmed` assertions on `Internal*`
+constructors; they are migrated in their own later batches. `pathBand` and the
+Stroke assertions flip to public `Error` now.
 
 ### 7. Stroke APIs (Already Complete)
 

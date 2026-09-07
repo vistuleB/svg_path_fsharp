@@ -273,12 +273,12 @@ let ``stroke rejects non positive width`` () =
 [<Fact>]
 let ``stroke converts explicit miter errors and preserves technical options`` () =
     let source = rightAngle ()
-    Assert.Equal(Error(StrokeOffsetError(InternalInvalidMiterLimit 0.0)),
+    Assert.Equal(Error(StrokeOffsetError(InvalidMiterLimit 0.0)),
         Stroke.subpathWith source (Miter 0.0) Butt Stroke.defaultOptions)
     let options =
         { Stroke.defaultOptions with
             Offset = { Offset.defaultOptions with Fitting = { Offset.defaultFittingOptions with Tolerance = 0.0<length> } } }
-    Assert.Equal(Error(StrokeOffsetError(InternalInvalidTolerance 0.0<length>)),
+    Assert.Equal(Error(StrokeOffsetError(InvalidTolerance 0.0<length>)),
         Stroke.subpathWith source Round RoundCap options)
 
 [<Fact>]

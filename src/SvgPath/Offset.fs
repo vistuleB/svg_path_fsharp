@@ -5493,19 +5493,24 @@ module Offset =
     let subpathBandWith
         subpath innerOffset outerOffset join cap (options: Options) =
         validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
-        |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
+        |> Result.mapError publicError
+        |> Result.bind (fun _ ->
+            validateJoin join |> Result.mapError publicError)
+        |> Result.bind (fun _ ->
+            normalizeSourceSubpath subpath options |> Result.mapError publicError)
         |> Result.bind (fun normalized ->
             buildSynchronizedUntrimmed normalized innerOffset outerOffset join options
+            |> Result.mapError publicError
             |> Result.bind (fun build ->
                 match trimBandSideCusps
                           build.InnerCulled normalized innerOffset cap options
-                          options.BandTrimming.InnerCusps,
+                          options.BandTrimming.InnerCusps |> Result.mapError publicError,
                       trimBandSideCusps
                           build.OuterCulled normalized outerOffset cap options
-                          options.BandTrimming.OuterCusps with
+                          options.BandTrimming.OuterCusps |> Result.mapError publicError with
                 | Ok(Some inner), Ok(Some outer) ->
                     bandFromSides inner innerOffset outer outerOffset cap
+                    |> Result.mapError publicError
                     |> Result.bind (fun band ->
                         let opinions =
                             if innerOffset >= outerOffset then
@@ -5514,12 +5519,13 @@ module Offset =
                             else
                                 [ { Left = 1; Right = 0 }
                                   { Left = 0; Right = 1 } ]
-                        let path =
+                        let pathResult =
                             if options.BandTrimming.InBand then
                                 topologicalBandPathWithOpinions
                                     [ inner; outer ] [ band ] opinions options
                             else oneSubpathBandSemanticPath band
-                        path
+                        pathResult
+                        |> Result.mapError publicError
                         |> Result.map (fun path ->
                             if innerOffset > outerOffset then Path.reverse path
                             else path))
@@ -5571,7 +5577,9 @@ module Offset =
     /// Constructs a trimmed offset band independently for each path subpath.
     let pathBandWith (path: Path) innerOffset outerOffset join cap options =
         validateOptions options
-        |> Result.bind (fun _ -> validateJoin join)
+        |> Result.mapError publicError
+        |> Result.bind (fun _ ->
+            validateJoin join |> Result.mapError publicError)
         |> Result.bind (fun _ ->
             bandPathSubpaths
                 (Path.subpaths path) innerOffset outerOffset join cap options [])

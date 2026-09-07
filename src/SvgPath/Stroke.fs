@@ -2,7 +2,7 @@ namespace SvgPath
 
 type StrokeError =
     | StrokePathError of SegmentError
-    | StrokeOffsetError of InternalError
+    | StrokeOffsetError of Error
     | InvalidStrokeOutlineWidth of float<length>
     | InvalidDashLength of float<length>
     | InvalidDashOffset of float<length>
@@ -43,7 +43,7 @@ module Stroke =
 
     let private validateJoin = function
         | Miter limit when limit <= 0.0 || not (System.Double.IsFinite limit) ->
-            Error(StrokeOffsetError(InternalInvalidMiterLimit limit))
+            Error(StrokeOffsetError(InvalidMiterLimit limit))
         | _ -> Ok()
 
     let rec private validateDashPattern = function

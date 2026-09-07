@@ -307,7 +307,7 @@ let ``exact point tangent split finds quadratic interior tangencies`` () =
 [<Fact>]
 let ``exact tangent search rejects conflicting line-like orientation`` () =
     Assert.Equal(
-        Error TangentSearchDegenerateLoop,
+        Error InternalTangentSearchDegenerateLoop,
         ConvexHull.internalLoopPlusPointHull (conflictingTangentLineLikeLoop ()) (point 5.0 4.0))
 
 [<Fact>]

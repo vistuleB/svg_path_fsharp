@@ -106,7 +106,7 @@ let ``point chord polygon tangent subpaths reject nonconvex loop`` () =
           Line(point 5.0 5.0, point 10.0 10.0)
           Line(point 10.0 10.0, point 0.0 10.0)
           Line(point 0.0 10.0, point 0.0 0.0) ]
-    Assert.Equal(Error(TangentSearchNonConvexVertex 2), ConvexHull.internalPointChordPolygonTangentSubpaths loop (point 15.0 5.0))
+    Assert.Equal(Error(InternalTangentSearchNonConvexVertex 2), ConvexHull.internalPointChordPolygonTangentSubpaths loop (point 15.0 5.0))
 
 [<Fact>]
 let ``point exact loop tangent subpaths split square`` () =
@@ -180,7 +180,7 @@ let ``loop plus point hull handles line like loop`` () =
 
 [<Fact>]
 let ``loop plus point hull rejects conflicting tangent orientation`` () =
-    Assert.Equal(Error TangentSearchDegenerateLoop, ConvexHull.internalLoopPlusPointHull (conflictingTangentLineLikeLoop ()) (point 5.0 4.0))
+    Assert.Equal(Error InternalTangentSearchDegenerateLoop, ConvexHull.internalLoopPlusPointHull (conflictingTangentLineLikeLoop ()) (point 5.0 4.0))
 
 [<Fact>]
 let ``point exact loop tangent subpaths finds cubic interior tangencies`` () =

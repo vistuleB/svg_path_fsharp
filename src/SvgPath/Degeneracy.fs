@@ -1,6 +1,8 @@
 namespace SvgPath
 
 type DegeneracyError =
+    /// The tolerance must be finite and non-negative.
+    | DegeneracyInvalidTolerance of float<length>
     | DegeneracyPathError of SegmentError
     | DegeneracyConvexHullError of ConvexHullError
 
@@ -204,7 +206,7 @@ module Degeneracy =
     /// A 0.0 tolerance collapses a window only when its strip width is exactly zero.
     let normalizeDegenerateSegments (subpath: Subpath) (tolerance: float<length>) =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
-            Error(DegeneracyPathError(InvalidLinearizeTolerance tolerance))
+            Error(DegeneracyInvalidTolerance tolerance)
         else
             normalizeSegments tolerance subpath.Segments []
             |> Result.bind (fun segments ->

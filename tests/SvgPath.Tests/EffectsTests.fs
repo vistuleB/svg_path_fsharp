@@ -43,10 +43,20 @@ let ``round corners rounds closed square`` () =
     Assert.Contains(Line(point 10.0 2.0, point 10.0 8.0), rounded.Segments)
 
 [<Fact>]
+let ``normalize degenerate segments returns direct tolerance error`` () =
+    let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
+    Assert.Equal(
+        Error(InvalidDegeneracyTolerance -0.000001<length>),
+        Effects.normalizeDegenerateSegments source -0.000001<length>)
+
+[<Fact>]
 let ``normalize degenerate segments rejects nonfinite tolerance`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
-    Assert.True(Effects.normalizeDegenerateSegments source (Length.fromFloat System.Double.PositiveInfinity) |> Result.isError)
-    Assert.True(Effects.normalizeDegenerateSegments source (Length.fromFloat System.Double.NaN) |> Result.isError)
+    let infinity = Length.fromFloat System.Double.PositiveInfinity
+    Assert.Equal(Error(InvalidDegeneracyTolerance infinity), Effects.normalizeDegenerateSegments source infinity)
+    match Effects.normalizeDegenerateSegments source (Length.fromFloat System.Double.NaN) with
+    | Error(InvalidDegeneracyTolerance tolerance) -> Assert.True(System.Double.IsNaN(float tolerance))
+    | result -> failwithf "expected a direct invalid-tolerance error, got %A" result
 
 [<Fact>]
 let ``angular tolerance controls corner eligibility in degrees`` () =

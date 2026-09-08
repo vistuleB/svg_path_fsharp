@@ -24,6 +24,17 @@ type EndpointPolicy =
     | WiggleThenBridgeWith of float<length>
     | Custom of (Segment -> Segment -> bool -> Segment list)
 
+/// Constructors for endpoint policies with caller-supplied tolerances.
+[<RequireQualifiedAccess>]
+module EndpointPolicy =
+    /// Create a wiggle policy; subpath construction validates the tolerance.
+    let wiggleWith (tolerance: float<length>) : EndpointPolicy =
+        WiggleWith tolerance
+
+    /// Create a wiggle-then-bridge policy; construction validates the tolerance.
+    let wiggleThenBridgeWith (tolerance: float<length>) : EndpointPolicy =
+        WiggleThenBridgeWith tolerance
+
 [<Struct>]
 /// A segment index and local parameter within a subpath.
 type SubpathParameter =

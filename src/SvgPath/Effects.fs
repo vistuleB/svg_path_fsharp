@@ -1,13 +1,15 @@
 namespace SvgPath
 
 type EffectsError =
+    /// The degeneracy tolerance must be finite and non-negative.
+    | InvalidDegeneracyTolerance of float<length>
     | EffectsPathError of SegmentError
     | InvalidRadius of float<length>
     | InvalidDistanceTolerance of float<length>
     | InvalidAngularTolerance of float<degree>
     | CannotRoundCorner of int
     | CornerTrimsOverlap of int
-    | EffectsDegeneracyError of DegeneracyError
+    | EffectsConvexHullError of ConvexHullError
 
 type FailureMode =
     | ErrorOnFailure
@@ -46,9 +48,14 @@ module Effects =
           DistanceTolerance = 1.0e-6<length>
           AngularTolerance = 1.0e-6<degree> }
 
+    let private degeneracyError = function
+        | DegeneracyInvalidTolerance tolerance -> InvalidDegeneracyTolerance tolerance
+        | DegeneracyPathError error -> EffectsPathError error
+        | DegeneracyConvexHullError error -> EffectsConvexHullError error
+
     let normalizeDegenerateSegments subpath tolerance =
         Degeneracy.normalizeDegenerateSegments subpath tolerance
-        |> Result.mapError EffectsDegeneracyError
+        |> Result.mapError degeneracyError
 
     let private remapEndpoints segment newStart newFinish =
         match segment with

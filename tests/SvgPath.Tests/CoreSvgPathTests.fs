@@ -1034,24 +1034,24 @@ let ``subpath with wiggle rejects gaps beyond tolerance`` () =
 [<Fact>]
 let ``subpath with custom wiggle tolerance accepts larger gap`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.1 0.0, point 20.0 0.0
-    let subpath = Subpath.createWith (WiggleWith 0.2<length>) [ Line(a, b); Line(c, d) ] |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.createWith (EndpointPolicy.wiggleWith 0.2<length>) [ Line(a, b); Line(c, d) ] |> Result.defaultWith (failwithf "%A")
     Assert.Equal(d, Subpath.finish subpath)
 
 [<Fact>]
 let ``subpath with custom wiggle then bridge tolerance accepts larger gap`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.1 0.0, point 20.0 0.0
-    let subpath = Subpath.createWith (WiggleThenBridgeWith 0.2<length>) [ Line(a, b); Line(c, d) ] |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.createWith (EndpointPolicy.wiggleThenBridgeWith 0.2<length>) [ Line(a, b); Line(c, d) ] |> Result.defaultWith (failwithf "%A")
     Assert.Equal(d, Subpath.finish subpath)
 
 [<Fact>]
 let ``subpath with rejects negative custom wiggle tolerance`` () =
     let segment = Line(point 0.0 0.0, point 1.0 0.0)
-    Assert.Equal(Error(InvalidWiggleTolerance -0.1<length>), Subpath.createWith (WiggleWith -0.1<length>) [ segment ])
+    Assert.Equal(Error(InvalidWiggleTolerance -0.1<length>), Subpath.createWith (EndpointPolicy.wiggleWith -0.1<length>) [ segment ])
 
 [<Fact>]
 let ``subpath with rejects negative wiggle then bridge tolerance`` () =
     let first, second = Line(point 0.0 0.0, point 1.0 0.0), Line(point 2.0 0.0, point 3.0 0.0)
-    Assert.Equal(Error(InvalidWiggleTolerance -0.1<length>), Subpath.createWith (WiggleThenBridgeWith -0.1<length>) [ first; second ])
+    Assert.Equal(Error(InvalidWiggleTolerance -0.1<length>), Subpath.createWith (EndpointPolicy.wiggleThenBridgeWith -0.1<length>) [ first; second ])
 
 [<Fact>]
 let ``subpath with wiggle bridges misaligned vertical lines`` () =

@@ -4,14 +4,14 @@ open System
 open System.Globalization
 
 type PathParseErrorReason =
-    | ParsedPathError of SegmentError
+    | ParsedPathError of error: SegmentError
     | ExpectedArcFlag
     | ExpectedCommand
     | ExpectedMove
     | ExpectedNumber
-    | InvalidNumber of string
+    | InvalidNumber of token: string
     | InvalidSeparator
-    | UnsupportedCommand of string
+    | UnsupportedCommand of command: string
 
 type PathParseError =
     | ParseError of reason: PathParseErrorReason * remaining: string

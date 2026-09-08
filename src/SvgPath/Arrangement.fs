@@ -94,43 +94,43 @@ type ArrangementSegmentBuild =
 
 /// Errors returned while constructing, validating, or dualizing arrangements.
 type internal ArrangementInternalError =
-    | InternalArrangementSegmentError of SegmentError
+    | InternalArrangementSegmentError of error: SegmentError
     | InternalNormalizationError
-    | InternalInvalidArrangementTolerance of float<length>
-    | InternalInvalidMinimumChord of float<length>
-    | InternalInvalidEndpointSliverTolerance of float<parameter>
+    | InternalInvalidArrangementTolerance of tolerance: float<length>
+    | InternalInvalidMinimumChord of minimumChord: float<length>
+    | InternalInvalidEndpointSliverTolerance of tolerance: float<parameter>
     | InternalSegmentTooShort of chord: float<length> * minimum: float<length>
-    | InternalSegmentCollapsedToVertex of int
-    | InternalLoopEdge of int
-    | InternalMissingArrangementVertex of int
-    | InternalMissingArrangementEdge of int
-    | InternalIsolatedVertex of int
-    | InternalInvalidMultiplicity of int
+    | InternalSegmentCollapsedToVertex of vertex: int
+    | InternalLoopEdge of vertex: int
+    | InternalMissingArrangementVertex of vertex: int
+    | InternalMissingArrangementEdge of edge: int
+    | InternalIsolatedVertex of vertex: int
+    | InternalInvalidMultiplicity of edge: int
     | InternalOddWeightedDegree of vertex: int * degree: int
     | InternalEdgeEndpointMismatch of edge: int * vertex: int * distance: float<length>
-    | InternalVertexWithoutEndpointSamples of int
+    | InternalVertexWithoutEndpointSamples of vertex: int
     | InternalVertexCenterMismatch of vertex: int * distanceSquared: float<length^2>
     | InternalVertexSampleOutsideTolerance of vertex: int * distanceSquared: float<length^2> * toleranceSquared: float<length^2>
-    | InternalContourTraceFailed of int
-    | InternalCyclicOrderMissingVertex of int
-    | InternalCyclicOrderRadiusUnavailable of int
-    | InternalInvalidCyclicOrderAttempts of int
+    | InternalContourTraceFailed of vertex: int
+    | InternalCyclicOrderMissingVertex of vertex: int
+    | InternalCyclicOrderRadiusUnavailable of vertex: int
+    | InternalInvalidCyclicOrderAttempts of maxAttempts: int
     | InternalCyclicOrderCircleIntersectionFailed of vertex: int * edge: int * radius: float<length>
-    | InternalDualMissingCyclicOrder of int
+    | InternalDualMissingCyclicOrder of vertex: int
     | InternalDualMissingIncidentEdge of vertex: int * edge: int
     | InternalDualWalkDidNotClose of edge: int * left: bool
     | InternalDualFaceSampleUnavailable of edge: int * left: bool
-    | InternalDualInvalidOuterWalkCount of int
+    | InternalDualInvalidOuterWalkCount of count: int
     | InternalDualMissingEdgeFace of edge: int * left: bool
-    | InternalDualInvalidOuterFaceCount of int
+    | InternalDualInvalidOuterFaceCount of count: int
 
 
 /// Stable errors returned by arrangement construction and validation.
 type ArrangementError =
-    | ArrangementSegmentError of SegmentError
-    | InvalidArrangementTolerance of float<length>
-    | InvalidMinimumChord of float<length>
-    | InvalidEndpointSliverTolerance of float<parameter>
+    | ArrangementSegmentError of error: SegmentError
+    | InvalidArrangementTolerance of tolerance: float<length>
+    | InvalidMinimumChord of minimumChord: float<length>
+    | InvalidEndpointSliverTolerance of tolerance: float<parameter>
     | SegmentTooShort of chord: float<length> * minimum: float<length>
     | ConstructionFailed
 

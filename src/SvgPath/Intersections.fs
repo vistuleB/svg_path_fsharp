@@ -142,12 +142,12 @@ type ClassificationOptions =
 
 [<RequireQualifiedAccess>]
 type ClassificationError =
-    | PathError of SegmentError
-    | InvalidAngularTolerance of float<degree>
-    | InvalidClassificationDistanceTolerance of float<length>
-    | InvalidClassificationInitialArcLength of float<length>
-    | InvalidClassificationMaximumArcLength of float<length>
-    | InvalidClassificationMaxSamplingSteps of int
+    | PathError of error: SegmentError
+    | InvalidAngularTolerance of tolerance: float<degree>
+    | InvalidClassificationDistanceTolerance of tolerance: float<length>
+    | InvalidClassificationInitialArcLength of initialArcLength: float<length>
+    | InvalidClassificationMaximumArcLength of maximumArcLength: float<length>
+    | InvalidClassificationMaxSamplingSteps of maxSamplingSteps: int
 
 [<Struct>]
 type IntersectionOptions =
@@ -1324,7 +1324,9 @@ module Intersections =
             InvalidSelfIntersectionMinimumArcLengthSeparation value
         | InvalidCubicSelfIntersectionDistanceTolerance value ->
             InvalidSelfIntersectionDistanceTolerance value
-        | _ -> InvalidSelfIntersectionDistanceTolerance 0.0<length>
+        | BezierError.SplitOutsideBezier -> SegmentError.SplitOutsideSegment
+        | BezierError.DegenerateTangent -> SegmentError.DegenerateCubicFitTangent
+        | BezierError.UnderdeterminedCubicFit -> SegmentError.UnderdeterminedCubicFit
 
     let private segmentSelfValid segmentValue options =
         match segmentValue with

@@ -31,13 +31,37 @@ let ``linear part preserves the input coordinate unit`` () =
     Assert.Equal(Point.create 8.0<length / parameter> 15.0<length / parameter>, transformed)
 
 [<Fact>]
-let ``point pair similarity rejects a collapsed source pair`` () =
-    Assert.Equal(Error(), Affine.pointPairSimilarity (point 1.0 2.0) (point 1.0 2.0) (point 3.0 4.0) (point 5.0 6.0))
+let ``point_pair_similarity_reports_degenerate_source_test`` () =
+    Assert.Equal(Error AffineError.DegenerateSourcePair, Affine.pointPairSimilarity (point 1.0 2.0) (point 1.0 2.0) (point 0.0 0.0) (point 1.0 0.0))
 
 [<Fact>]
-let ``point triple map rejects collinear source points`` () =
-    let result = Affine.pointTripleMap (point 0.0 0.0) (point 1.0 1.0) (point 2.0 2.0) (point 0.0 0.0) (point 1.0 0.0) (point 0.0 1.0)
-    Assert.Equal(Error(), result)
+let ``point_triple_map_reports_degenerate_source_test`` () =
+    let result = Affine.pointTripleMap (point 0.0 0.0) (point 1.0 0.0) (point 2.0 0.0) (point 0.0 0.0) (point 1.0 0.0) (point 0.0 1.0)
+    Assert.Equal(Error AffineError.DegenerateSourceTriple, result)
+    let origin = point 0.0 0.0
+    Assert.Equal(Error AffineError.DegenerateSourceTriple,
+        Affine.pointTripleMap origin origin origin origin origin origin)
+
+[<Fact>]
+let ``point_pair_similarity_reports_nonfinite_transform_test`` () =
+    Assert.Equal(Error AffineError.NonFiniteTransform,
+        Affine.pointPairSimilarity (point 1.0e200 0.0) (point 1.0e200 1.0) (point 0.0 0.0) (point 0.0 1.0e150))
+
+[<Fact>]
+let ``point_triple_map_reports_nonfinite_transform_test`` () =
+    Assert.Equal(Error AffineError.NonFiniteTransform,
+        Affine.pointTripleMap (point 0.0 0.0) (point 0.5 0.0) (point 0.0 0.5)
+            (point 0.0 0.0) (point 1.0e308 0.0) (point 0.0 1.0e308))
+
+[<Fact>]
+let ``point_correspondence_maps_allow_collapsed_targets_test`` () =
+    let target = point 2.0 3.0
+    let pair = Affine.pointPairSimilarity (point 0.0 0.0) (point 1.0 0.0) target target
+               |> Result.defaultWith (failwithf "%A")
+    let triple = Affine.pointTripleMap (point 0.0 0.0) (point 1.0 0.0) (point 0.0 1.0) target target target
+                 |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(target, Affine.point pair (point 5.0 6.0))
+    Assert.Equal(target, Affine.point triple (point 5.0 6.0))
 
 [<Fact>]
 let ``finiteness includes length-valued translations`` () =

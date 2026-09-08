@@ -44,8 +44,8 @@ type BezierError =
     | SplitOutsideBezier
     | DegenerateTangent
     | UnderdeterminedCubicFit
-    | InvalidCubicSelfIntersectionMinimumArcLengthSeparation of float<length>
-    | InvalidCubicSelfIntersectionDistanceTolerance of float<length>
+    | InvalidCubicSelfIntersectionMinimumArcLengthSeparation of minimumArcLengthSeparation: float<length>
+    | InvalidCubicSelfIntersectionDistanceTolerance of distanceTolerance: float<length>
 
 /// Evaluation, subdivision, fitting, bounds, and intersections for Bézier curves.
 [<RequireQualifiedAccess>]

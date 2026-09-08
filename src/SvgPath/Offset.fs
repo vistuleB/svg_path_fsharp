@@ -9,23 +9,25 @@ type internal VertexParityRequest =
 
 /// Failures from parity-capacity pruning.
 type internal ForcedParityError =
-    | ForcedParityMissingVertex of int
-    | ForcedParityDuplicateVertex of int
+    | ForcedParityMissingVertex of vertex: int
+    | ForcedParityDuplicateVertex of vertex: int
     | ForcedParityInvalidVertexParity of vertex: int * parity: int
-    | ForcedParityMissingEdgeCapacity of int
-    | ForcedParityDuplicateEdgeCapacity of int
-    | ForcedParityUnknownEdgeCapacity of int
+    | ForcedParityMissingEdgeCapacity of edgeId: int
+    | ForcedParityDuplicateEdgeCapacity of edgeId: int
+    | ForcedParityUnknownEdgeCapacity of edgeId: int
     | ForcedParityInvalidEdgeCapacity of edge: int * capacity: int
-    | ForcedParityInfeasible of int
-    | ForcedParityAmbiguous of int list
+    | ForcedParityInfeasible of vertex: int
+    | ForcedParityAmbiguous of vertices: int list
 
 /// Detailed internal offset construction failures. These cross every internal
 /// pipeline boundary; stable caller-facing variants are narrowed by `publicError`.
 type internal InternalError =
-    | InternalPathError of SegmentError
-    | InternalArrangementGraphError of ArrangementError
-    | InternalForcedParityPruningError of ForcedParityError
-    | InternalSourceNormalizationError of DegeneracyError
+    /// Preserve the fitting cause without inventing a parameter or non-finite value.
+    | InternalBezierFitError of error: BezierError
+    | InternalPathError of error: SegmentError
+    | InternalArrangementGraphError of error: ArrangementError
+    | InternalForcedParityPruningError of error: ForcedParityError
+    | InternalSourceNormalizationError of error: DegeneracyError
     | InternalInvalidTolerance of tolerance: float<length>
     | InternalInvalidSamples of samples: int
     | InternalInvalidMaxDepth of maxDepth: int
@@ -33,7 +35,9 @@ type internal InternalError =
     | InternalInvalidStalledOffsetDiameter of diameter: float<length>
     | InternalInvalidTangentHealAngleDegrees of angle: float<degree>
     | InternalBandSubpathNotClosed
+    /// Carries the parameter where the tangent query failed.
     | InternalDegenerateTangent of t: float<parameter>
+    /// Carries remaining geometric divergence, not recursion depth.
     | InternalMaxDepthReached of divergence: float<length>
     | InternalNonFinite
     | InternalSegmentImageCountMismatch
@@ -55,14 +59,16 @@ type internal InternalError =
 /// Errors returned by offset construction.
 type Error =
     | InvalidOffsetMapDistance of distance: float<length> * length: float<length>
-    | PathError of SegmentError
+    | PathError of error: SegmentError
     | InvalidTolerance of tolerance: float<length>
     | InvalidSamples of samples: int
     | InvalidMaxDepth of maxDepth: int
     | InvalidMiterLimit of miterLimit: float
     | InvalidStalledOffsetDiameter of diameter: float<length>
     | InvalidTangentHealAngleDegrees of angle: float<degree>
+    /// Carries the parameter where the tangent query failed.
     | DegenerateTangent of t: float<parameter>
+    /// Carries remaining geometric divergence, not recursion depth.
     | MaxDepthReached of divergence: float<length>
     | NonFinite
     | ConstructionFailed
@@ -1597,9 +1603,7 @@ module Offset =
         | _ -> Error InternalNonFinite
 
     let private cubicFitError error =
-        match error with
-        | BezierError.DegenerateTangent -> InternalDegenerateTangent 0.0<parameter>
-        | _ -> InternalNonFinite
+        InternalBezierFitError error
 
     let private stalledSegmentOffsetSamples segment offset index count tValues samples =
         let rec loop remaining collected =

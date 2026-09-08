@@ -10,8 +10,8 @@ module TransformParse =
         | ExpectedClose
         | ExpectedOpen
         | ExpectedTransform
-        | InvalidArgumentCount of name: string * count: int
-        | InvalidNumber of raw: string
+        | InvalidArgumentCount of transform: string * count: int
+        | InvalidNumber of token: string
         | NonFiniteTransform
         | UnexpectedToken of token: string
         | UnknownTransform of name: string

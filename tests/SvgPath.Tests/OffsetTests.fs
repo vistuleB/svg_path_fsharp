@@ -6,6 +6,11 @@ open Xunit
 let private point x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
 
 [<Fact>]
+let ``cubic_fit_failures_do_not_invent_public_numeric_diagnostics_test`` () =
+    Assert.Equal<global.SvgPath.Error>(global.SvgPath.Error.ConstructionFailed, Offset.publicError(InternalBezierFitError BezierError.UnderdeterminedCubicFit))
+    Assert.Equal<global.SvgPath.Error>(global.SvgPath.Error.ConstructionFailed, Offset.publicError(InternalBezierFitError BezierError.DegenerateTangent))
+
+[<Fact>]
 let ``subpath_offset_map_uses_cumulative_segment_lengths_test`` () =
     let subpath =
         Subpath.create [ Line(point 0.0 0.0, point 3.0 0.0); Line(point 3.0 0.0, point 3.0 4.0) ]
@@ -484,9 +489,9 @@ let ``open band outlines use explicit cap geometry`` () =
         Assert.Equal(expected, Serialize.path band)
 
 [<Fact>]
-let ``offset validates empty path joins while stroke defers to subpaths`` () =
+let ``offset and stroke validate empty path joins`` () =
     let invalid = Miter 0.0
     Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.path Path.empty 1.0<length> invalid Butt)
     Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.pathUntrimmed Path.empty 1.0<length> invalid)
     Assert.Equal(Error(InvalidMiterLimit 0.0), Offset.pathBand Path.empty -1.0<length> 1.0<length> invalid Butt)
-    Assert.Equal(Ok Path.empty, Stroke.path Path.empty 2.0<length> invalid Butt)
+    Assert.Equal(Error(StrokeOffsetError(InvalidMiterLimit 0.0)), Stroke.path Path.empty 2.0<length> invalid Butt)

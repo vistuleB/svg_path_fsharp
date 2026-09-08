@@ -1,15 +1,15 @@
 namespace SvgPath
 
 type BasicShapeError =
-    | InvalidRectWidth of float<length>
-    | InvalidRectHeight of float<length>
-    | InvalidRectRadiusX of float<length>
-    | InvalidRectRadiusY of float<length>
-    | InvalidCircleRadius of float<length>
-    | InvalidEllipseRadiusX of float<length>
-    | InvalidEllipseRadiusY of float<length>
+    | InvalidRectWidth of width: float<length>
+    | InvalidRectHeight of height: float<length>
+    | InvalidRectRadiusX of rx: float<length>
+    | InvalidRectRadiusY of ry: float<length>
+    | InvalidCircleRadius of r: float<length>
+    | InvalidEllipseRadiusX of rx: float<length>
+    | InvalidEllipseRadiusY of ry: float<length>
     | DisabledRendering
-    | PathError of SegmentError
+    | PathError of error: SegmentError
 
 /// Conversion of SVG basic shapes to path geometry.
 [<RequireQualifiedAccess>]

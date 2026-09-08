@@ -3,11 +3,11 @@ namespace SvgPath
 type MarkerError =
     | EmptyMarkerSubpath
     | DegenerateMarkerTangent
-    | MarkerPathError of SegmentError
-    | InvalidMarkerWidth of float<length>
-    | InvalidMarkerHeight of float<length>
-    | InvalidMarkerStrokeWidth of float<length>
-    | InvalidMarkerViewBox of BoundingBox
+    | MarkerPathError of error: SegmentError
+    | InvalidMarkerWidth of width: float<length>
+    | InvalidMarkerHeight of height: float<length>
+    | InvalidMarkerStrokeWidth of width: float<length>
+    | InvalidMarkerViewBox of viewBox: BoundingBox
 
 type MarkerKind =
     | MarkerStart

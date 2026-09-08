@@ -70,34 +70,34 @@ type SegmentError =
     | MultipleNonemptySubpaths
     | NotClosed
     | SplitOutsideSegment
-    | InvalidLinearizeTolerance of float<length>
-    | InvalidLinearizeMaxDepth of int
-    | LinearizeMaxDepthReached of float<length>
-    | InvalidOverlapTolerance of float<length>
-    | InvalidOverlapSamples of int
+    | InvalidLinearizeTolerance of tolerance: float<length>
+    | InvalidLinearizeMaxDepth of maxDepth: int
+    | LinearizeMaxDepthReached of error: float<length>
+    | InvalidOverlapTolerance of tolerance: float<length>
+    | InvalidOverlapSamples of samples: int
     | NonAffineOverlapCorrespondence
-    | InvalidIntersectionTolerance of float<length>
-    | InvalidParameterSnapTolerance of float<parameter>
-    | InvalidIntersectionMaxDepth of int
-    | InvalidIntersectionParameterSnapExponent of int
-    | IntersectionTerminalWindowLimitExceeded of int
+    | InvalidIntersectionTolerance of tolerance: float<length>
+    | InvalidParameterSnapTolerance of tolerance: float<parameter>
+    | InvalidIntersectionMaxDepth of maxDepth: int
+    | InvalidIntersectionParameterSnapExponent of exponent: int
+    | IntersectionTerminalWindowLimitExceeded of limit: int
     | OverlappingSegments
     | InternalOverlapClassificationInconsistency
     | InternalUncertifiedSegmentIntersection of
         leftDistance: float<length> * rightDistance: float<length> * tolerance: float<length>
-    | InvalidSelfIntersectionMinimumArcLengthSeparation of float<length>
-    | InvalidSelfIntersectionDistanceTolerance of float<length>
+    | InvalidSelfIntersectionMinimumArcLengthSeparation of minimumArcLengthSeparation: float<length>
+    | InvalidSelfIntersectionDistanceTolerance of distanceTolerance: float<length>
     | InternalOverlapParameterCorrespondenceInconsistency
-    | InvalidCrossingTolerance of float<length>
-    | InvalidCrossingSamples of int
-    | InvalidCrossingMaxIterations of int
+    | InvalidCrossingTolerance of tolerance: float<length>
+    | InvalidCrossingSamples of samples: int
+    | InvalidCrossingMaxIterations of maxIterations: int
     | CrossingMaxIterationsReached of estimate: float<parameter> * value: float<length>
     | IndeterminateDirection
     | InconsistentContainment
-    | InvalidContainmentTolerance of float<length>
-    | InvalidContainmentSamples of int
-    | InvalidContainmentMaxIterations of int
-    | InvalidContainmentRayAngle of float<degree>
+    | InvalidContainmentTolerance of tolerance: float<length>
+    | InvalidContainmentSamples of samples: int
+    | InvalidContainmentMaxIterations of maxIterations: int
+    | InvalidContainmentRayAngle of angle: float<degree>
     | IndeterminateWindingSideLevels
     | InconsistentWindingSideLevels
     | CannotMapArcNonlinearly
@@ -112,38 +112,40 @@ type SegmentError =
         actual: Point<length> *
         distance: float<length>
     | AlreadyClosed
-    | InvalidWiggleTolerance of float<length>
-    | InvalidDirectionRelativeTolerance of float
-    | InvalidLengthTolerance of float<length>
-    | InvalidLengthMaxDepth of int
+    | InvalidWiggleTolerance of tolerance: float<length>
+    | InvalidDirectionRelativeTolerance of relativeTolerance: float
+    | InvalidLengthTolerance of tolerance: float<length>
+    | InvalidLengthMaxDepth of maxDepth: int
     | LengthMaxDepthReached of estimate: float<length> * error: float<length>
     | InvalidLengthDistance of distance: float<length> * segmentLength: float<length>
-    | InvalidZeroLengthTolerance of float<length>
-    | InvalidSubdivisionMaxLength of float<length>
-    | InvalidMinimizeSamples of int
-    | InvalidMinimizeTolerance of float<parameter>
-    | InvalidMinimizeMaxIterations of int
+    | InvalidZeroLengthTolerance of tolerance: float<length>
+    | InvalidSubdivisionMaxLength of maxLength: float<length>
+    | InvalidMinimizeSamples of samples: int
+    | InvalidMinimizeTolerance of tolerance: float<parameter>
+    | InvalidMinimizeMaxIterations of maxIterations: int
     | MinimizeMaxIterationsReached of estimate: float<parameter> * value: float
     | DegeneratePointPairSimilarity
-    | InvalidParametricTolerance of float<length>
-    | InvalidParametricSamplesPerPiece of int
-    | InvalidParametricInitialPieceCount of int
-    | InvalidParametricMaxDepth of int
+    | InvalidParametricTolerance of tolerance: float<length>
+    | InvalidParametricSamplesPerPiece of samples: int
+    | InvalidParametricInitialPieceCount of pieceCount: int
+    | InvalidParametricMaxDepth of maxDepth: int
     | InvalidParametricInterval of startValue: float * endValue: float
     | NonFiniteParametricPoint of parameterValue: float * point: Point<length>
     | NonFiniteParametricTangent of parameterValue: float * tangent: Point<length>
-    | ParametricMaxDepthReached of float<length>
+    | ParametricMaxDepthReached of error: float<length>
     | ParametricFitFailed
-    | InvalidDistanceTolerance of float<length>
-    | InvalidDistanceSamples of int
-    | InvalidDistanceMaxIterations of int
+    | DegenerateCubicFitTangent
+    | UnderdeterminedCubicFit
+    | InvalidDistanceTolerance of tolerance: float<length>
+    | InvalidDistanceSamples of samples: int
+    | InvalidDistanceMaxIterations of maxIterations: int
     | DistanceMaxIterationsReached of estimate: float<parameter> * value: float<length^2 / parameter>
     | DistanceRootIsolationFailed
 
 /// Distinguishes an error from a caller-supplied point mapping from a path error.
 type PointMapError<'error> =
-    | PointMappingError of 'error
-    | PointMapSegmentError of SegmentError
+    | PointMappingError of error: 'error
+    | PointMapSegmentError of error: SegmentError
 
 [<Struct>]
 /// A continuous sequence of SVG segments with an explicit start and closure flag.

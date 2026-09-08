@@ -1,21 +1,20 @@
 namespace SvgPath
 
 type ConvexHullError =
-    | ConvexHullPathError of SegmentError
+    | ConvexHullPathError of error: SegmentError
     | ConvexHullConstructionFailed
 
 type internal ConvexHullInternalError =
-    | InternalConstructionPathError of SegmentError
+    | InternalConstructionPathError of error: SegmentError
     | InternalHullPiecesDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
     | InternalConsecutiveCurves
     | InternalDuplicateAdjacentTValues
-    | InternalRefinementReachedMaxIterations of int
-    | InternalPurificationReachedMaxIterations of int
+    | InternalRefinementReachedMaxIterations of maxIterations: int
+    | InternalPurificationReachedMaxIterations of maxIterations: int
     | InternalLoopUnionCollapsed
     | InternalTangentSearchDegenerateLoop
-    | InternalTangentSearchNonConvexVertex of int
-    | InternalTangentSearchExpectedTwoTangencies of int
-    | InternalSeededWorstDirectionExceededThreshold of direction: float<degree> * threshold: float<degree>
+    | InternalTangentSearchNonConvexVertex of vertexIndex: int
+    | InternalTangentSearchExpectedTwoTangencies of actualCount: int
 
 type internal PointLoopView =
     | TangentPoint

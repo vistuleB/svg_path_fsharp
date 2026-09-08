@@ -1,5 +1,14 @@
 namespace SvgPath
 
+/// Failures while constructing a transform from point correspondences.
+type AffineError =
+    /// Zero source separation in the scaled calculation.
+    | DegenerateSourcePair
+    /// Zero computed determinant, for example collinear or repeated source points.
+    | DegenerateSourceTriple
+    /// Construction produced a non-finite denominator or matrix coefficient.
+    | NonFiniteTransform
+
 /// A two-dimensional affine transform in SVG's six-value matrix form.
 /// The linear coefficients are dimensionless; translations use SVG lengths.
 [<Struct>]
@@ -83,12 +92,14 @@ module Affine =
         && System.Double.IsFinite (float transform.F)
 
     /// Find a translation, rotation, and uniform scale mapping one point pair to another.
+    /// Reports DegenerateSourcePair for zero computed source separation;
+    /// NonFiniteTransform distinguishes non-finite arithmetic from degeneracy.
     let pointPairSimilarity
         (sourceStart: Point<length>)
         (sourceEnd: Point<length>)
         (targetStart: Point<length>)
         (targetEnd: Point<length>)
-        : Result<Affine, unit> =
+        : Result<Affine, AffineError> =
         let source = Point.displacement sourceStart sourceEnd
         let target = Point.displacement targetStart targetEnd
         let vectorScale =
@@ -103,7 +114,9 @@ module Affine =
         let denominator = sourceX * sourceX + sourceY * sourceY
 
         if denominator = 0.0 then
-            Error()
+            Error DegenerateSourcePair
+        elif not (System.Double.IsFinite denominator) then
+            Error NonFiniteTransform
         else
             let a = (sourceX * targetX + sourceY * targetY) / denominator
             let b = (sourceX * targetY - sourceY * targetX) / denominator
@@ -115,9 +128,11 @@ module Affine =
                     a
                     (targetStart.X - (a * sourceStart.X - b * sourceStart.Y))
                     (targetStart.Y - (b * sourceStart.X + a * sourceStart.Y))
-            if isFinite transform then Ok transform else Error()
+            if isFinite transform then Ok transform else Error NonFiniteTransform
 
     /// Find an affine transform mapping one point triple to another.
+    /// Reports DegenerateSourceTriple for a zero computed source determinant.
+    /// Non-finite arithmetic returns NonFiniteTransform. Collapsed targets are allowed.
     let pointTripleMap
         (sourceA: Point<length>)
         (sourceB: Point<length>)
@@ -125,22 +140,25 @@ module Affine =
         (targetA: Point<length>)
         (targetB: Point<length>)
         (targetC: Point<length>)
-        : Result<Affine, unit> =
+        : Result<Affine, AffineError> =
         let sourceAB = Point.displacement sourceA sourceB
         let sourceAC = Point.displacement sourceA sourceC
         let targetAB = Point.displacement targetA targetB
         let targetAC = Point.displacement targetA targetC
         let denominator = sourceAB.X * sourceAC.Y - sourceAB.Y * sourceAC.X
-        let a = (targetAB.X * sourceAC.Y - targetAC.X * sourceAB.Y) / denominator
-        let b = (targetAB.Y * sourceAC.Y - targetAC.Y * sourceAB.Y) / denominator
-        let c = (targetAC.X * sourceAB.X - targetAB.X * sourceAC.X) / denominator
-        let d = (targetAC.Y * sourceAB.X - targetAB.Y * sourceAC.X) / denominator
-        let transform =
-            matrix
-                (float a)
-                (float b)
-                (float c)
-                (float d)
-                (targetA.X - (float a * sourceA.X + float c * sourceA.Y))
-                (targetA.Y - (float b * sourceA.X + float d * sourceA.Y))
-        if isFinite transform then Ok transform else Error()
+        if denominator = 0.0<length^2> then Error DegenerateSourceTriple
+        elif not (System.Double.IsFinite(float denominator)) then Error NonFiniteTransform
+        else
+            let a = (targetAB.X * sourceAC.Y - targetAC.X * sourceAB.Y) / denominator
+            let b = (targetAB.Y * sourceAC.Y - targetAC.Y * sourceAB.Y) / denominator
+            let c = (targetAC.X * sourceAB.X - targetAB.X * sourceAC.X) / denominator
+            let d = (targetAC.Y * sourceAB.X - targetAB.Y * sourceAC.X) / denominator
+            let transform =
+                matrix
+                    (float a)
+                    (float b)
+                    (float c)
+                    (float d)
+                    (targetA.X - (float a * sourceA.X + float c * sourceA.Y))
+                    (targetA.Y - (float b * sourceA.X + float d * sourceA.Y))
+            if isFinite transform then Ok transform else Error NonFiniteTransform

@@ -14,7 +14,7 @@ type Anchor =
 type TransformError =
     | DegenerateArcTransform
     | InvalidMatrix
-    | PathError of SegmentError
+    | PathError of error: SegmentError
 
 /// Affine transformation of SVG segments, subpaths, paths, and bounds.
 [<RequireQualifiedAccess>]
@@ -40,6 +40,7 @@ module Transform =
         if tolerance < 0.0<length> then Error()
         else
             Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd
+            |> Result.mapError (fun _ -> ())
             |> Result.bind (fun transform ->
                 let mappedStart = point transform sourceStart
                 let mappedEnd = point transform sourceEnd
@@ -51,6 +52,7 @@ module Transform =
         if tolerance < 0.0<length> then Error()
         else
             Affine.pointTripleMap sourceA sourceB sourceC targetA targetB targetC
+            |> Result.mapError (fun _ -> ())
             |> Result.bind (fun transform ->
                 if Point.distance (point transform sourceA) targetA <= tolerance
                    && Point.distance (point transform sourceB) targetB <= tolerance

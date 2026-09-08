@@ -2,9 +2,9 @@ namespace SvgPath
 
 type DegeneracyError =
     /// The tolerance must be finite and non-negative.
-    | DegeneracyInvalidTolerance of float<length>
-    | DegeneracyPathError of SegmentError
-    | DegeneracyConvexHullError of ConvexHullError
+    | DegeneracyInvalidTolerance of tolerance: float<length>
+    | DegeneracyPathError of error: SegmentError
+    | DegeneracyConvexHullError of error: ConvexHullError
 
 [<Struct>]
 type internal ThinPrefix =

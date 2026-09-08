@@ -1,11 +1,11 @@
 namespace SvgPath
 
 type StrokeError =
-    | StrokePathError of SegmentError
-    | StrokeOffsetError of Error
-    | InvalidStrokeOutlineWidth of float<length>
-    | InvalidDashLength of float<length>
-    | InvalidDashOffset of float<length>
+    | StrokePathError of error: SegmentError
+    | StrokeOffsetError of error: Error
+    | InvalidStrokeOutlineWidth of width: float<length>
+    | InvalidDashLength of length: float<length>
+    | InvalidDashOffset of offset: float<length>
     | InvalidDashPatternLength
 
 [<Struct>]
@@ -36,10 +36,14 @@ module Stroke =
           Offset = offset
           LengthOptions = Segment.defaultLengthOptions }
 
-    let private validateOptions options =
+    let private validateOptions options join =
         if options.Width <= 0.0<length> || not (System.Double.IsFinite(float options.Width)) then
             Error(InvalidStrokeOutlineWidth options.Width)
-        else Ok()
+        else
+            // Validate even when the path or generated dash list is empty.
+            Offset.validateOptions options.Offset
+            |> Result.bind (fun () -> Offset.validateJoin join)
+            |> Result.mapError (Offset.publicError >> StrokeOffsetError)
 
     let rec private validateDashPattern = function
         | [] -> Ok()
@@ -222,11 +226,9 @@ module Stroke =
 
     /// Build and trim the complete outline; band-side cusp settings do not apply.
     let subpathWith subpath join cap (options: StrokeOptions) =
-        validateOptions options
+        validateOptions options join
         |> Result.bind (fun () ->
-            Offset.validateOptions options.Offset
-            |> Result.bind (fun () -> Offset.validateJoin join)
-            |> Result.bind (fun () ->
+            let result =
                 let radius = options.Width / 2.0
                 match Subpath.segments subpath with
                 | [] -> Ok Path.empty
@@ -243,8 +245,8 @@ module Stroke =
                             |> Result.bind (fun untrimmed ->
                                 Offset.topologicalBandPath
                                     [ untrimmed ] [ OpenSubpathBand untrimmed ] options.Offset)
-                            |> Result.bind Offset.orientOutlinePath))
-            |> Result.mapError (Offset.publicError >> StrokeOffsetError))
+                            |> Result.bind Offset.orientOutlinePath)
+            result |> Result.mapError (Offset.publicError >> StrokeOffsetError))
 
     let rec private strokeSubpaths subpaths join cap options reversedStroked =
         match subpaths with
@@ -257,7 +259,7 @@ module Stroke =
     let subpath subpath width join cap = subpathWith subpath join cap { defaultOptions with Width = width }
 
     let segmentWith segment join cap options =
-        validateOptions options
+        validateOptions options join
         |> Result.bind (fun () ->
             Subpath.create [ segment ]
             |> Result.mapError StrokePathError
@@ -266,9 +268,7 @@ module Stroke =
     let segment segment width join cap = segmentWith segment join cap { defaultOptions with Width = width }
 
     let pathWith (path: Path) join cap options =
-        validateOptions options
-        // Match Gleam: style/offset validation happens when a subpath is stroked.
-        // An empty path still validates width, but has no join to validate.
+        validateOptions options join
         |> Result.bind (fun () -> strokeSubpaths path.Subpaths join cap options [] |> Result.map Path.ofSubpaths)
 
     let path path width join cap = pathWith path join cap { defaultOptions with Width = width }
@@ -378,7 +378,7 @@ module Stroke =
     let pathDashes path pattern offset = pathDashesWith path (defaultDashOptions pattern offset)
 
     let subpathDashedWith subpath join cap options dashOptions =
-        validateOptions options
+        validateOptions options join
         |> Result.bind (fun () -> subpathDashesWith subpath dashOptions)
         |> Result.bind (fun dashes -> strokeSubpaths dashes join cap options [] |> Result.map Path.ofSubpaths)
 
@@ -386,7 +386,7 @@ module Stroke =
         subpathDashedWith subpath join cap { defaultOptions with Width = width } (defaultDashOptions pattern offset)
 
     let pathDashedWith path join cap options dashOptions =
-        validateOptions options
+        validateOptions options join
         |> Result.bind (fun () -> pathDashesWith path dashOptions)
         |> Result.bind (fun dashes -> pathWith dashes join cap options)
 

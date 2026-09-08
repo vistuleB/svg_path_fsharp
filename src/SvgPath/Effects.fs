@@ -2,14 +2,14 @@ namespace SvgPath
 
 type EffectsError =
     /// The degeneracy tolerance must be finite and non-negative.
-    | InvalidDegeneracyTolerance of float<length>
-    | EffectsPathError of SegmentError
-    | InvalidRadius of float<length>
-    | InvalidDistanceTolerance of float<length>
-    | InvalidAngularTolerance of float<degree>
-    | CannotRoundCorner of int
-    | CornerTrimsOverlap of int
-    | EffectsConvexHullError of ConvexHullError
+    | InvalidDegeneracyTolerance of tolerance: float<length>
+    | EffectsPathError of error: SegmentError
+    | InvalidRadius of radius: float<length>
+    | InvalidDistanceTolerance of tolerance: float<length>
+    | InvalidAngularTolerance of tolerance: float<degree>
+    | CannotRoundCorner of index: int
+    | CornerTrimsOverlap of segmentIndex: int
+    | EffectsConvexHullError of error: ConvexHullError
 
 type FailureMode =
     | ErrorOnFailure
@@ -62,6 +62,7 @@ module Effects =
         | Line _ -> Ok(Line(newStart, newFinish))
         | _ ->
             Affine.pointPairSimilarity (Segment.start segment) (Segment.finish segment) newStart newFinish
+            |> Result.mapError (fun _ -> ())
             |> Result.bind (fun transform -> Transform.segment segment transform |> Result.mapError (fun _ -> ()))
             |> Result.map (Segment.withStart newStart >> Segment.withFinish newFinish)
 

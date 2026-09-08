@@ -5,6 +5,13 @@ open Xunit
 
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private parameter value = Parameter.fromFloat value
+
+[<Fact>]
+let ``invalid_arc_curvature_preserves_path_error_test`` () =
+    let arc = Arc { Start = point 0.0 0.0; Radius = point 1.0 1.0
+                    XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 0.0 0.0 }
+    Assert.Equal(Error(CurvaturePathError SegmentError.DegenerateArc),
+        Curvature.segmentLeftNormalCurvature arc (parameter 0.5))
 let private downwardCubic = CubicBezier(point 0.0 0.0, point 1.0 0.0, point 1.0 0.0, point 1.0 1.0)
 let private upwardCubic = CubicBezier(point 0.0 0.0, point 1.0 0.0, point 1.0 0.0, point 1.0 -1.0)
 

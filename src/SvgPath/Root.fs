@@ -29,7 +29,7 @@ type internal ClassifiedRoot =
       Kind: RootKind }
 
 type internal RootError<[<Measure>] 'Value> =
-    | InvalidMaxIterations of int
+    | InvalidMaxIterations of maxIterations: int
     | NotBracketed of
         left: float<parameter> *
         right: float<parameter> *

@@ -119,25 +119,28 @@ module Overlaps =
         pieces |> List.sortWith comparePieces |> fun sorted -> loop sorted [] []
 
     let subpathWith (left: Subpath) (right: Subpath) tolerance =
-        let pairs =
-            left.Segments
-            |> List.indexed
-            |> List.collect (fun (leftIndex, leftSegment) ->
-                right.Segments
+        if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
+            Error(InvalidOverlapTolerance tolerance)
+        else
+            let pairs =
+                left.Segments
                 |> List.indexed
-                |> List.map (fun (rightIndex, rightSegment) -> leftIndex, leftSegment, rightIndex, rightSegment))
-        pairs
-        |> List.fold (fun state (leftIndex, leftSegment, rightIndex, rightSegment) ->
-            state
-            |> Result.bind (fun found ->
-                segmentWith leftSegment rightSegment tolerance
-                |> Result.map (fun overlaps ->
-                    overlaps
-                    |> List.fold (fun accumulated correspondence ->
-                        { LeftSegmentIndex = leftIndex
-                          RightSegmentIndex = rightIndex
-                          Correspondence = correspondence } :: accumulated) found))) (Ok [])
-        |> Result.map (mergePieces tolerance)
+                |> List.collect (fun (leftIndex, leftSegment) ->
+                    right.Segments
+                    |> List.indexed
+                    |> List.map (fun (rightIndex, rightSegment) -> leftIndex, leftSegment, rightIndex, rightSegment))
+            pairs
+            |> List.fold (fun state (leftIndex, leftSegment, rightIndex, rightSegment) ->
+                state
+                |> Result.bind (fun found ->
+                    segmentWith leftSegment rightSegment tolerance
+                    |> Result.map (fun overlaps ->
+                        overlaps
+                        |> List.fold (fun accumulated correspondence ->
+                            { LeftSegmentIndex = leftIndex
+                              RightSegmentIndex = rightIndex
+                              Correspondence = correspondence } :: accumulated) found))) (Ok [])
+            |> Result.map (mergePieces tolerance)
 
     let subpath left right = subpathWith left right defaultTolerance
 
@@ -323,24 +326,27 @@ module Overlaps =
         | _ -> Ok None
 
     let pathWith (left: Path) (right: Path) tolerance =
-        let pairs =
-            left.Subpaths
-            |> List.indexed
-            |> List.collect (fun (leftIndex, leftSubpath) ->
-                right.Subpaths
+        if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
+            Error(InvalidOverlapTolerance tolerance)
+        else
+            let pairs =
+                left.Subpaths
                 |> List.indexed
-                |> List.map (fun (rightIndex, rightSubpath) -> leftIndex, leftSubpath, rightIndex, rightSubpath))
-        pairs
-        |> List.fold (fun state (leftIndex, leftSubpath, rightIndex, rightSubpath) ->
-            state
-            |> Result.bind (fun found ->
-                subpathWith leftSubpath rightSubpath tolerance
-                |> Result.map (fun overlaps ->
-                    overlaps
-                    |> List.fold (fun accumulated correspondence ->
-                        { LeftSubpathIndex = leftIndex
-                          RightSubpathIndex = rightIndex
-                          Correspondence = correspondence } :: accumulated) found))) (Ok [])
-        |> Result.map List.rev
+                |> List.collect (fun (leftIndex, leftSubpath) ->
+                    right.Subpaths
+                    |> List.indexed
+                    |> List.map (fun (rightIndex, rightSubpath) -> leftIndex, leftSubpath, rightIndex, rightSubpath))
+            pairs
+            |> List.fold (fun state (leftIndex, leftSubpath, rightIndex, rightSubpath) ->
+                state
+                |> Result.bind (fun found ->
+                    subpathWith leftSubpath rightSubpath tolerance
+                    |> Result.map (fun overlaps ->
+                        overlaps
+                        |> List.fold (fun accumulated correspondence ->
+                            { LeftSubpathIndex = leftIndex
+                              RightSubpathIndex = rightIndex
+                              Correspondence = correspondence } :: accumulated) found))) (Ok [])
+            |> Result.map List.rev
 
     let path left right = pathWith left right defaultTolerance

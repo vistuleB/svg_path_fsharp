@@ -11,7 +11,7 @@ type BoundaryTopologyFailure =
 
 type CsgError =
     | CsgArrangementError
-    | CsgPathError of SegmentError
+    | CsgPathError of error: SegmentError
     | InternalBoundaryTopologyError of vertex: int * reason: BoundaryTopologyFailure
 
 type CsgResult =

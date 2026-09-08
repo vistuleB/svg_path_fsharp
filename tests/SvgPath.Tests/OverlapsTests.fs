@@ -6,6 +6,16 @@ open Xunit
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private parameter value = Parameter.fromFloat value
 
+[<Fact>]
+let ``empty_overlaps_validate_tolerance_test`` () =
+    let empty = Path.empty
+    let subpath = Subpath.empty (point 0.0 0.0)
+    let nonempty = Path.ofSubpaths [subpath]
+    Assert.Equal(Error(InvalidOverlapTolerance -1.0<length>), Overlaps.pathWith empty nonempty -1.0<length>)
+    Assert.Equal(Error(InvalidOverlapTolerance -1.0<length>), Overlaps.pathWith nonempty empty -1.0<length>)
+    Assert.Equal(Error(InvalidOverlapTolerance -1.0<length>), Overlaps.subpathWith subpath subpath -1.0<length>)
+    Assert.Equal(Ok [], Overlaps.pathWith empty empty 0.0<length>)
+
 let private polyline xs =
     let points = xs |> List.map (fun x -> point x 0.0)
     Subpath.polyline points |> Result.defaultWith (failwithf "%A")

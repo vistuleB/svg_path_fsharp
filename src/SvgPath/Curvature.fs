@@ -1,11 +1,12 @@
 namespace SvgPath
 
-/// Invalid curvature arguments and undefined geometric configurations.
+/// Invalid curvature arguments, underlying path failures, and undefined geometry.
 type CurvatureError =
-    | InvalidCurvatureTolerance of float<parameter>
-    | InvalidCurvatureSamples of int
-    | InvalidCurvatureMaxDepth of int
-    | InvalidCurvatureMargin of float<length>
+    | CurvaturePathError of error: SegmentError
+    | InvalidCurvatureTolerance of tolerance: float<parameter>
+    | InvalidCurvatureSamples of samples: int
+    | InvalidCurvatureMaxDepth of maxDepth: int
+    | InvalidCurvatureMargin of margin: float<length>
     | DegenerateCurvatureDerivative
     | InfiniteRadiusOfCurvature
 
@@ -59,7 +60,7 @@ module Curvature =
 
     let segmentLeftNormalCurvature segment t =
         segmentDerivatives segment t
-        |> Result.mapError (fun _ -> DegenerateCurvatureDerivative)
+        |> Result.mapError CurvaturePathError
         |> Result.bind leftNormalCurvatureFromDerivatives
 
     let segmentLeftNormalRadius segment t : Result<float<length>, CurvatureError> =
@@ -76,14 +77,14 @@ module Curvature =
 
     let segmentLeftNormalCuspResidual segment offset t =
         segmentDerivatives segment t
-        |> Result.mapError (fun _ -> DegenerateCurvatureDerivative)
+        |> Result.mapError CurvaturePathError
         |> Result.bind (fun data -> cuspResidualFromDerivatives data offset)
 
     let segmentLeftNormalRadiusCloseTo segment offset margin t =
         if margin < 0.0<length> || not (System.Double.IsFinite(float margin)) then Error(InvalidCurvatureMargin margin)
         else
             segmentDerivatives segment t
-            |> Result.mapError (fun _ -> DegenerateCurvatureDerivative)
+            |> Result.mapError CurvaturePathError
             |> Result.bind (fun data ->
                 let speedSquared = Point.dot data.First data.First
                 let cross = Point.cross data.First data.Second

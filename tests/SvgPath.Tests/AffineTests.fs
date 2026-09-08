@@ -16,7 +16,7 @@ let ``point pair similarity maps coordinates`` () =
     let targetStart, targetEnd = point 10.0 -5.0, point 10.0 1.0
     let transform =
         Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd
-        |> Result.defaultWith (fun () -> failwith "expected similarity")
+        |> Result.defaultWith (failwithf "expected similarity: %A")
     Assert.Equal(targetStart, Affine.point transform sourceStart)
     Assert.Equal(targetEnd, Affine.point transform sourceEnd)
 
@@ -26,7 +26,7 @@ let ``point triple map maps coordinates`` () =
     let targetA, targetB, targetC = point 10.0 20.0, point 12.0 20.0, point 10.0 23.0
     let transform =
         Affine.pointTripleMap sourceA sourceB sourceC targetA targetB targetC
-        |> Result.defaultWith (fun () -> failwith "expected affine map")
+        |> Result.defaultWith (failwithf "expected affine map: %A")
     Assert.Equal(targetA, Affine.point transform sourceA)
     Assert.Equal(targetB, Affine.point transform sourceB)
     Assert.Equal(targetC, Affine.point transform sourceC)

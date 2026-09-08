@@ -4,6 +4,22 @@ open SvgPath
 open Xunit
 
 [<Fact>]
+let ``empty_path_stroke_defers_join_validation_test`` () =
+    Assert.Equal(Ok Path.empty, Stroke.pathWith Path.empty (Miter 0.0) Butt Stroke.defaultOptions)
+    Assert.Equal(Error(InvalidStrokeOutlineWidth 0.0<length>),
+        Stroke.pathWith Path.empty (Miter 0.0) Butt {Stroke.defaultOptions with Width=0.0<length>})
+    let source = Subpath.ofSegment(Line(Point.create 0.0<length> 0.0<length>, Point.create 10.0<length> 0.0<length>))
+    Assert.Equal(Error(StrokeOffsetError(InvalidMiterLimit 0.0)),
+        Stroke.pathWith (Path.ofSubpaths[source]) (Miter 0.0) Butt Stroke.defaultOptions)
+
+[<Fact>]
+let ``empty_dashed_path_stroke_defers_join_validation_test`` () =
+    let source = Subpath.ofSegment(Line(Point.create 0.0<length> 0.0<length>, Point.create 10.0<length> 0.0<length>))
+    let dashes = Stroke.defaultDashOptions [0.0<length>;20.0<length>] 0.0<length>
+    Assert.Equal(Ok Path.empty,
+        Stroke.pathDashedWith (Path.ofSubpaths[source]) (Miter 0.0) Butt Stroke.defaultOptions dashes)
+
+[<Fact>]
 let ``stroke preserves gallery hairpin dash`` () =
     let p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
     let source = Subpath.ofSegment (CubicBezier(

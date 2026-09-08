@@ -41,11 +41,6 @@ module Stroke =
             Error(InvalidStrokeOutlineWidth options.Width)
         else Ok()
 
-    let private validateJoin = function
-        | Miter limit when limit <= 0.0 || not (System.Double.IsFinite limit) ->
-            Error(StrokeOffsetError(InvalidMiterLimit limit))
-        | _ -> Ok()
-
     let rec private validateDashPattern = function
         | [] -> Ok()
         | first :: rest ->
@@ -272,7 +267,8 @@ module Stroke =
 
     let pathWith (path: Path) join cap options =
         validateOptions options
-        |> Result.bind (fun () -> validateJoin join)
+        // Match Gleam: style/offset validation happens when a subpath is stroked.
+        // An empty path still validates width, but has no join to validate.
         |> Result.bind (fun () -> strokeSubpaths path.Subpaths join cap options [] |> Result.map Path.ofSubpaths)
 
     let path path width join cap = pathWith path join cap { defaultOptions with Width = width }

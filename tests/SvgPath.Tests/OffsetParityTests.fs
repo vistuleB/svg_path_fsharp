@@ -771,15 +771,6 @@ let ``band_inside_function_rejects_open_payload_test`` () =
     Assert.Equal(Error InternalBandSubpathNotClosed, Subject.internalBandInsideFunction [ OpenSubpathBand openSubpath ])
 
 [<Fact>]
-let ``segment_is_submerged_checks_both_immediate_sides_test`` () =
-    let outline = squareLoop ()
-    let inside = Subject.internalBandInsideFunction [ OpenSubpathBand outline ] |> Result.defaultWith (failwithf "%A")
-    let middle = Line(point 2.0 5.0, point 8.0 5.0)
-    let boundary = Line(point 2.0 0.0, point 8.0 0.0)
-    Assert.Equal(Ok true, Subject.internalSegmentIsSubmerged middle inside 0.5<length>)
-    Assert.Equal(Ok false, Subject.internalSegmentIsSubmerged boundary inside 0.5<length>)
-
-[<Fact>]
 let ``topological_band_loops_filters_submerged_loop_test`` () =
     let loop = squareLoop ()
     let containingBand =

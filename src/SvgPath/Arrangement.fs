@@ -196,7 +196,8 @@ module Arrangement =
                           CyclicOrders = [] })
                 | _ -> Ok { Vertices = vertices; Edges = edges; CyclicOrders = [] }
 
-    /// Validates graph topology, geometry, multiplicities, and cyclic orders.
+    // Checks edges and endpoint clusters, including closed-boundary degree parity.
+    // This does not validate cyclic orders.
     let private validateInternal (graph: ArrangementGraph) tolerance minimumChord =
         if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
         elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
@@ -239,6 +240,8 @@ module Arrangement =
           Point: Point<length>
           Angle: float<degree> }
 
+    /// Validates edges, endpoint clusters, and closed-boundary degree parity.
+    /// Does not validate cyclic orders; open-boundary graphs may fail parity.
     let validate graph tolerance minimumChord =
         validateInternal graph tolerance minimumChord
         |> Result.mapError publicError
@@ -1005,7 +1008,7 @@ module Arrangement =
                       Edges = image.Edges |> List.map (fun edge -> { EdgeId = edge.EdgeId; Reversed = edge.Reversed }) })
             { Graph = built.Graph; SegmentImages = images })
 
-    /// Resolves a segment image to oriented arrangement-edge geometry.
+    /// Builds a planar arrangement and ordered source-segment edge images.
     let build paths tolerance minimumChord =
         buildInternal paths tolerance minimumChord
         |> Result.mapError publicError

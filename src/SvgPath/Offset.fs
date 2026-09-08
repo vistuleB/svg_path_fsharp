@@ -8,7 +8,7 @@ type internal VertexParityRequest =
     | PreferredVertexParity of vertex: int * parity: int
 
 /// Failures from parity-capacity pruning.
-type ForcedParityError =
+type internal ForcedParityError =
     | ForcedParityMissingVertex of int
     | ForcedParityDuplicateVertex of int
     | ForcedParityInvalidVertexParity of vertex: int * parity: int
@@ -21,7 +21,7 @@ type ForcedParityError =
 
 /// Detailed internal offset construction failures. These cross every internal
 /// pipeline boundary; stable caller-facing variants are narrowed by `publicError`.
-type InternalError =
+type internal InternalError =
     | InternalPathError of SegmentError
     | InternalArrangementGraphError of ArrangementError
     | InternalForcedParityPruningError of ForcedParityError
@@ -52,7 +52,7 @@ type InternalError =
     | InternalEmptyArrangementSplitWalk
     | InternalInvalidOffsetMapDistance of distance: float<length> * length: float<length>
 
-/// Errors returned by offset and stroke construction.
+/// Errors returned by offset construction.
 type Error =
     | InvalidOffsetMapDistance of distance: float<length> * length: float<length>
     | PathError of SegmentError
@@ -527,12 +527,12 @@ type internal OffsetCurvatureZone =
     | UnknownCurvatureZone
 
 [<RequireQualifiedAccess>]
-/// Construction of signed left-normal offsets, two-sided bands, strokes, and
+/// Construction of signed left-normal offsets, two-sided bands, and
 /// local offset coordinate maps. Positive offsets lie on the visual left of
 /// the source traversal; negative offsets lie on its visual right.
 module Offset =
     /// Convert internal offset failures at public API boundaries.
-    let publicError (error: InternalError) =
+    let internal publicError (error: InternalError) =
         match error with
         | InternalPathError value -> PathError value
         | InternalInvalidOffsetMapDistance(distance, length) -> InvalidOffsetMapDistance(distance, length)
@@ -5329,7 +5329,8 @@ module Offset =
             |> Result.bind (fun band ->
                 singleOffsetBandsFromBuilds rest offset cap (band :: converted))
 
-    /// Constructs and trims an offset independently for each path subpath.
+    /// Constructs each source subpath's offset, then trims the builds together.
+    /// Offside trimming is source-local; final in-band trimming is shared.
     let pathWith (path: Path) offset join cap options =
         validateOptions options
         |> Result.mapError publicError
@@ -5390,25 +5391,6 @@ module Offset =
     let internal internalBandInsideFunction bands =
         oneSubpathBandSemanticPaths bands []
         |> Result.map (fun paths -> fun point -> pointInsideAnySemanticBand point paths)
-
-    let private submergedSegment
-        segment
-        (inside: Point<length> -> Result<bool, InternalError>)
-        sideSamplingDistance =
-        Segment.point segment 0.5<parameter>
-        |> Result.mapError InternalPathError
-        |> Result.bind (fun point ->
-            unitNormal segment 0.5<parameter>
-            |> Result.bind (fun normal ->
-                let first = Point.add point (Point.scale sideSamplingDistance normal)
-                let second = Point.add point (Point.scale -sideSamplingDistance normal)
-                match inside first, inside second with
-                | Ok firstInside, Ok secondInside -> Ok(firstInside && secondInside)
-                | Error error, _
-                | _, Error error -> Error error))
-
-    let internal internalSegmentIsSubmerged segment inside sideSamplingDistance =
-        submergedSegment segment inside sideSamplingDistance
 
     let rec private lengthSpans
         (segments: Segment list)

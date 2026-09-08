@@ -61,39 +61,39 @@ let ``about_point_matrix_transforms_points_about_point_test`` () =
     Assert.Equal(point 5.0 8.0, transformed)
 
 [<Fact>]
-let ``point_pair_map_maps_source_points_to_targets_test`` () =
+let ``point_pair_similarity_maps_source_points_to_targets_test`` () =
     let sourceStart = point 1.0 2.0
     let sourceEnd = point 4.0 2.0
     let targetStart = point 10.0 -5.0
     let targetEnd = point 10.0 1.0
-    let matrix = Transform.pointPairMap sourceStart sourceEnd targetStart targetEnd tolerance |> Result.defaultWith (failwithf "%A")
+    let matrix = Transform.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd tolerance |> Result.defaultWith (failwithf "%A")
     Assert.True(pointNear (Transform.point matrix sourceStart) targetStart)
     Assert.True(pointNear (Transform.point matrix sourceEnd) targetEnd)
     Assert.Equal((0.0, 2.0, -2.0, 0.0, 14.0<length>, -7.0<length>), Transform.toTuple matrix)
 
 [<Fact>]
-let ``point_pair_map_maps_distinct_source_to_collapsed_target_test`` () =
+let ``point_pair_similarity_maps_distinct_source_to_collapsed_target_test`` () =
     let matrix =
-        Transform.pointPairMap (point 1.0 2.0) (point 4.0 2.0) (point 10.0 -5.0) (point 10.0 -5.0) tolerance
+        Transform.pointPairSimilarity (point 1.0 2.0) (point 4.0 2.0) (point 10.0 -5.0) (point 10.0 -5.0) tolerance
         |> Result.defaultWith (failwithf "%A")
     Assert.True(pointNear (Transform.point matrix (point 1.0 2.0)) (point 10.0 -5.0))
     Assert.True(pointNear (Transform.point matrix (point 4.0 2.0)) (point 10.0 -5.0))
     Assert.Equal((0.0, 0.0, -0.0, 0.0, 10.0<length>, -5.0<length>), Transform.toTuple matrix)
 
 [<Fact>]
-let ``point_pair_map_handles_large_finite_vectors_test`` () =
+let ``point_pair_similarity_handles_large_finite_vectors_test`` () =
     let sourceStart = point -1.0e200 0.0
     let sourceEnd = point 1.0e200 0.0
-    let matrix = Transform.pointPairMap sourceStart sourceEnd sourceStart sourceEnd tolerance |> Result.defaultWith (failwithf "%A")
+    let matrix = Transform.pointPairSimilarity sourceStart sourceEnd sourceStart sourceEnd tolerance |> Result.defaultWith (failwithf "%A")
     Assert.Equal((1.0, 0.0, -0.0, 1.0, 0.0<length>, 0.0<length>), Transform.toTuple matrix)
 
 [<Fact>]
-let ``point_pair_map_rejects_points_outside_tolerance_test`` () =
-    Assert.Equal(Error(), Transform.pointPairMap (point 1.0 2.0) (point 1.0 2.0) (point 10.0 -5.0) (point 10.0 1.0) tolerance)
+let ``point_pair_similarity_rejects_points_outside_tolerance_test`` () =
+    Assert.Equal(Error(), Transform.pointPairSimilarity (point 1.0 2.0) (point 1.0 2.0) (point 10.0 -5.0) (point 10.0 1.0) tolerance)
 
 [<Fact>]
-let ``point_pair_map_rejects_negative_tolerance_test`` () =
-    Assert.Equal(Error(), Transform.pointPairMap (point 0.0 0.0) (point 1.0 0.0) (point 0.0 0.0) (point 1.0 0.0) -0.001<length>)
+let ``point_pair_similarity_rejects_negative_tolerance_test`` () =
+    Assert.Equal(Error(), Transform.pointPairSimilarity (point 0.0 0.0) (point 1.0 0.0) (point 0.0 0.0) (point 1.0 0.0) -0.001<length>)
 
 [<Fact>]
 let ``point_triple_map_maps_source_points_to_targets_test`` () =

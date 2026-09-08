@@ -70,7 +70,7 @@ module Congruency =
                         Affine.translate (first.Target.X - first.Source.X) (first.Target.Y - first.Source.Y)
                         |> checkPoints indexed <| tolerance
                     else
-                        Transform.pointPairMap
+                        Transform.pointPairSimilarity
                             first.Source second.Source first.Target second.Target tolerance
                         |> Result.bind (fun transform -> checkPoints indexed transform tolerance))
 

@@ -215,7 +215,7 @@ let ``classified polynomial roots report sign changes`` () =
 
     near 0.0 crossing.Isolation.Estimate
     Assert.Equal(NegativeToPositive, crossing.Kind)
-    Assert.True(Root.isSignChangeRoot NegativeToPositive)
+    Assert.True(Root.isCrossingRoot NegativeToPositive)
     Assert.True(Root.isCrossingRoot PositiveToNegative)
 
 [<Fact>]
@@ -241,7 +241,7 @@ let ``classified polynomial roots report even roots`` () =
         |> List.exactlyOne
 
     Assert.Equal(PositiveToPositive, positiveEven.Kind)
-    Assert.False(Root.isSignChangeRoot positiveEven.Kind)
+    Assert.False(Root.isCrossingRoot positiveEven.Kind)
     Assert.Equal(NegativeToNegative, negativeEven.Kind)
     Assert.False(Root.isCrossingRoot negativeEven.Kind)
 

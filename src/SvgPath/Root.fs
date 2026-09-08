@@ -419,13 +419,12 @@ module internal Root =
     let realCubic01Roots a b c d options =
         classifiedPolynomialRootsWith [ a; b; c; d ] (Parameter.fromFloat 0.0) (Parameter.fromFloat 1.0) options
 
-    let isSignChangeRoot kind =
+    /// Whether a classified root changes sign.
+    let isCrossingRoot kind =
         match kind with
         | NegativeToPositive
         | PositiveToNegative -> true
         | _ -> false
-
-    let isCrossingRoot = isSignChangeRoot
 
     let private polynomialRootBound (leading: float<'Value>) (rest: float<'Value> list) =
         rest

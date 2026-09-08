@@ -194,6 +194,21 @@ let ``segment crossings finds arc crossing`` () =
     assertNear 0.5 crossing
 
 [<Fact>]
+let ``segment_ray_crossings_defaults_match_explicit_options_test`` () =
+    let source = line 10.0 -5.0 10.0 5.0
+    let origin = point 5.0 0.0
+    let direction = Point.create 1.0 0.0
+    let crossings =
+        Segment.rayCrossings source origin direction
+        |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(
+        Ok crossings,
+        Segment.rayCrossingsWith source origin direction Segment.defaultCrossingOptions)
+    let crossing, rayT = List.exactlyOne crossings
+    assertNear 0.5 crossing
+    assertLengthNear 5.0 rayT
+
+[<Fact>]
 let ``segment ray crossings finds line crossing`` () =
     let crossing, rayT =
         Segment.rayCrossingsWith (line 10.0 -5.0 10.0 5.0) (point 5.0 0.0) (Point.create 1.0 0.0) Segment.defaultCrossingOptions

@@ -898,6 +898,8 @@ module Segment =
                                 (root, rayT) :: crossings))) (Ok [])
                     |> Result.map List.rev))
 
+    /// Find supporting-line crossings using default crossing options.
+    /// Includes negative ray parameters, just like rayCrossingsWith.
     let rayCrossings segment origin direction =
         rayCrossingsWith segment origin direction defaultCrossingOptions
 

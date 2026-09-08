@@ -34,7 +34,9 @@ module Transform =
     let skewY = Affine.skewY
     let point = Affine.point
 
-    let pointPairMap sourceStart sourceEnd targetStart targetEnd tolerance =
+    /// Construct a translation, rotation, and uniform scale mapping a point pair.
+    /// Delegates to Affine, then checks both mapped endpoints against tolerance.
+    let pointPairSimilarity sourceStart sourceEnd targetStart targetEnd tolerance =
         if tolerance < 0.0<length> then Error()
         else
             Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd

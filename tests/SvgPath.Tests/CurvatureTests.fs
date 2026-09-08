@@ -7,6 +7,12 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private parameter value = Parameter.fromFloat value
 
 [<Fact>]
+let ``line_cusp_residual_is_speed_cubed_test`` () =
+    let line = Line(point 0.0 0.0, point 3.0 4.0)
+    Assert.Equal(Ok 125.0<length^3 / parameter^3>,
+        Curvature.segmentLeftNormalCuspResidual line 2.0<length> (parameter 0.5))
+
+[<Fact>]
 let ``invalid_arc_curvature_preserves_path_error_test`` () =
     let arc = Arc { Start = point 0.0 0.0; Radius = point 1.0 1.0
                     XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 0.0 0.0 }

@@ -10,25 +10,36 @@ type CurvatureError =
     | DegenerateCurvatureDerivative
     | InfiniteRadiusOfCurvature
 
+/// Options for sampled cusp/root/band discovery. Discovery functions validate
+/// every field. Band discovery uses only Samples; algebraic inflection discovery
+/// uses none of the fields after validation.
 [<Struct>]
 type CurvatureOptions =
     { Tolerance: float<parameter>
       Samples: int
       MaxDepth: int }
 
+/// First and second parameter derivatives at a segment parameter.
 [<Struct>]
 type SegmentDerivatives =
     { First: Point<length / parameter>
       Second: Point<length / parameter^2> }
 
+/// A sampled parameter interval where signed radius is close to a target offset.
 [<Struct>]
 type CurvatureBand =
     { From: float<parameter>
       To: float<parameter> }
 
-/// Derivatives, visual-left-normal curvature, and curvature-event parameters.
+/// Signed curvature, radius, inflection points, and offset-cusp diagnostics.
+/// Signs refer to the visual left normal in SVG coordinates (positive y down).
+/// Curvature has inverse-length units; radius, offsets, and margins have length
+/// units. Parameters refer to the segment's 0..1 interval.
+/// Pointwise queries evaluate derivatives directly. Cusp-parameter and near-radius
+/// band discovery use sampling and are not exhaustive root or interval solvers.
 [<RequireQualifiedAccess>]
 module Curvature =
+    /// Default sampling and refinement options.
     let defaultOptions =
         { Tolerance = 1.0e-9<parameter>
           Samples = 100
@@ -44,6 +55,8 @@ module Curvature =
         elif options.MaxDepth <= 0 then Error(InvalidCurvatureMaxDepth options.MaxDepth)
         else Ok()
 
+    /// Return first and second parameter derivatives. Lines have zero second
+    /// derivative; arcs use exact ellipse derivatives.
     let segmentDerivatives segment t =
         match Segment.derivative segment t, Segment.secondDerivative segment t with
         | Ok first, Ok second -> Ok { First = first; Second = second }
@@ -58,11 +71,17 @@ module Curvature =
             let speed = sqrt (float speedSquared) * 1.0<length / parameter>
             Ok(-Point.cross data.First data.Second / (speedSquared * speed))
 
+    /// Signed curvature, positive toward the visual left of the tangent and
+    /// negative toward the visual right. Lines return zero; zero-speed parameters
+    /// return DegenerateCurvatureDerivative.
     let segmentLeftNormalCurvature segment t =
         segmentDerivatives segment t
         |> Result.mapError CurvaturePathError
         |> Result.bind leftNormalCurvatureFromDerivatives
 
+    /// Signed visual-left radius. Lines and inflection points return
+    /// InfiniteRadiusOfCurvature; zero-speed parameters return
+    /// DegenerateCurvatureDerivative.
     let segmentLeftNormalRadius segment t : Result<float<length>, CurvatureError> =
         segmentLeftNormalCurvature segment t
         |> Result.bind (fun curvature -> if curvature = 0.0<1 / length> then Error InfiniteRadiusOfCurvature else Ok(1.0 / curvature))
@@ -75,11 +94,19 @@ module Curvature =
             let speed = sqrt (float speedSquared) * 1.0<length / parameter>
             Ok(speedSquared * speed + offset * Point.cross data.First data.Second)
 
+    /// Return |p'|^3 + offset * cross(p', p''). Zero means the signed visual-left
+    /// radius equals offset, assuming finite nonzero curvature. Its magnitude
+    /// depends on parameter speed and is not a geometric distance error.
+    /// Units are length^3 / parameter^3. Lines return |p'|^3; zero-speed
+    /// parameters return DegenerateCurvatureDerivative.
     let segmentLeftNormalCuspResidual segment offset t =
         segmentDerivatives segment t
         |> Result.mapError CurvaturePathError
         |> Result.bind (fun data -> cuspResidualFromDerivatives data offset)
 
+    /// Test abs(R_left(t) - offset) < margin without dividing by curvature.
+    /// For finite nonzero curvature, this is equivalent to
+    /// abs(|p'|^3 + offset * cross(p', p'')) < margin * abs(cross(p', p'')).
     let segmentLeftNormalRadiusCloseTo segment offset margin t =
         if margin < 0.0<length> || not (System.Double.IsFinite(float margin)) then Error(InvalidCurvatureMargin margin)
         else
@@ -145,9 +172,19 @@ module Curvature =
             |> uniqueSorted options.Tolerance
             |> Ok
 
+    /// Sample the cusp residual on a uniform grid and bisect sign-changing
+    /// windows. Exact sampled zeros are included. Multiple roots within one
+    /// window and non-sign-changing roots between samples may be missed.
+    /// Failed evaluations or bisections can cause roots to be omitted.
+    /// At MaxDepth, return the current midpoint without an accuracy guarantee.
+    /// Results are sorted and merged within Tolerance in parameter space.
     let segmentLeftNormalCuspParameters segment offset options =
         sampledRoots (segmentLeftNormalCuspResidual segment offset) options
 
+    /// Return algebraically computed interior roots of cross(p', p'') = 0.
+    /// Cubics use the Bezier inflection solver; lines, quadratics, arcs, and
+    /// identically flat pieces return an empty list. Endpoint roots are excluded.
+    /// Options are validated but do not affect the algebraic solve.
     let segmentInflectionParameters segment options =
         match validateOptions options with
         | Error error -> Error error
@@ -161,6 +198,11 @@ module Curvature =
                 |> Bezier.cubicInflectionParameters
                 |> Ok
 
+    /// Merge adjacent close samples on a uniform grid into parameter bands.
+    /// A band starts at its first close sample and ends at the first subsequent
+    /// non-close sample (or 1). Evaluation errors count as non-close samples.
+    /// Bands are approximate: narrow intervals may be missed, and not every point
+    /// inside a returned band is guaranteed to satisfy the predicate.
     let segmentLeftNormalRadiusCloseBands segment offset margin options =
         match validateOptions options with
         | Error error -> Error error

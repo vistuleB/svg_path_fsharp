@@ -31,6 +31,24 @@ let ``graceful arc subpaths preserve exact noncardinal endpoints`` () =
             Assert.True(abs(box.Max.X - 5.0<length>)<1e-6<length>)
 
 [<Fact>]
+let ``singular oblique arc transform uses graceful collapse`` () =
+    let arc = Arc {Start=point 3. 4.;Radius=point 3. 2.;XAxisRotation=2.0<degree>;LargeArc=false;Sweep=true;End=point -3. 4.}
+    let matrix = Affine.fromTuple(1.,2.,0.,0.,0.0<length>,0.0<length>)
+    Assert.Equal(Error DegenerateArcTransform,Transform.segment arc matrix)
+    match Transform.segmentGracefully arc matrix with
+    | Ok(Line _) -> ()
+    | other -> failwithf "%A" other
+    let collapsed = Transform.segmentToSubpathGracefully arc matrix |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(Affine.point matrix (Segment.start arc),Subpath.start collapsed)
+    Assert.Equal(Affine.point matrix (Segment.finish arc),Subpath.finish collapsed)
+    for segment in Subpath.segments collapsed do
+        match segment with
+        | Line(start,finish) ->
+            Assert.True(abs(start.Y-2.0*start.X)<1e-6<length>)
+            Assert.True(abs(finish.Y-2.0*finish.X)<1e-6<length>)
+        | other -> failwithf "%A" other
+
+[<Fact>]
 let ``matrix coefficients transform points with measured translations`` () =
     let transform = Transform.matrix 2.0 3.0 5.0 7.0 11.0<length> 13.0<length>
     Assert.Equal(point 30.0 40.0, Transform.point transform (point 2.0 3.0))

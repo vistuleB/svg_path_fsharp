@@ -325,7 +325,10 @@ module Ellipse =
         let syy = xAxis.Y * xAxis.Y + yAxis.Y * yAxis.Y
         let discriminant = sqrtMeasured ((sxx - syy) * (sxx - syy) + 4.0 * sxy * sxy)
         let lambda1 = (sxx + syy + discriminant) / 2.0
-        let lambda2 = (sxx + syy - discriminant) / 2.0
+        // det(B B^T) = det(B)^2 = lambda1 * lambda2. Avoid cancellation
+        // in both trace-minus-discriminant and the expanded determinant.
+        let determinant = xAxis.X*yAxis.Y-xAxis.Y*yAxis.X
+        let lambda2 = if lambda1>squaredLengthTolerance then determinant*determinant/lambda1 else 0.0<length^2>
         if lambda1 <= squaredLengthTolerance || lambda2 <= squaredLengthTolerance then
             Error DegenerateInputArc
         else
@@ -339,7 +342,10 @@ module Ellipse =
     let transformedAxes radius xAxisRotation transform =
         match arcAxes radius xAxisRotation with
         | Error error -> Error error
-        | Ok(xAxis, yAxis) -> extractAxes (Affine.linearPoint transform xAxis) (Affine.linearPoint transform yAxis)
+        | Ok(xAxis, yAxis) ->
+            // Transforming the axes can obscure an exactly singular map.
+            if InternalNumber.isZero(Affine.determinant transform) then Error DegenerateInputArc
+            else extractAxes (Affine.linearPoint transform xAxis) (Affine.linearPoint transform yAxis)
 
     let private transformedPoint transform point = Affine.point transform point
 

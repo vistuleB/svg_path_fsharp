@@ -1,6 +1,12 @@
 module SvgPath.Tests.EllipseReviewTests
 open SvgPath
 open Xunit
+
+[<Fact>]
+let ``transformed axes preserves small nonsingular eigenvalue`` () =
+    let radius,_ = Ellipse.transformedAxes (Point.create 3.0<length> 2.0<length>) 2.0<degree> (Affine.scaleXY 1.0 1e-8) |> Result.defaultWith (failwithf "%A")
+    Assert.True(abs(radius.X * radius.Y / 6e-8<length^2> - 1.0) < 1e-9)
+    Assert.True(min radius.X radius.Y>1e-8<length>)
 let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 [<Fact>]
 let ``collapsed quarter preserves direction and endpoints`` () =

@@ -235,4 +235,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `d92b75e` — document overlap-window partitioning, off-diagonal pairs, and
   encounter filtering/order. Documentation-only; `git diff --check` passes.
 
-Next: `918e167` (stable transformed ellipse minor eigenvalue).
+- `918e167` — compute the minor eigenvalue from the axis determinant and
+  reject exactly singular input maps before rounded axis extraction. Both
+  source regressions ported. `scripts/test-fast`: 1711 passed.
+
+Next: `7345278` (CSG closure and winding tolerances).

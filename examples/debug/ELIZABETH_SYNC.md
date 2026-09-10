@@ -1,5 +1,10 @@
 # Elizabeth historical integration checkpoint
 
+Update at Gleam `18fc6f3`: Henry and Edward and their comparison switches have
+also been removed. Elizabeth is the sole general curve-pair intersection route;
+distance projection retains its separate minimization machinery. Bounded solver
+errors are named `CurveSolverError`. Descriptions below are historical only.
+
 Update at Gleam `f730fc1`: depth-first Elizabeth, its total-window budget, and
 alternating terminal refinement have been removed. Production tests now use
 the beam route directly. The historical description below records `fac1bc2`.

@@ -6,10 +6,9 @@ type SegmentIntersection =
       RightT: float<parameter>
       Point: Point<length> }
 
-type internal ExperimentalSolver = Henry | Edward | Elizabeth
-type internal ExperimentalSolverError =
-    | ExperimentalPathError of error: SegmentError
-    | ExperimentalDepthLimit of leftFrom: float<parameter> * leftTo: float<parameter> * rightFrom: float<parameter> * rightTo: float<parameter>
+type internal CurveSolverError =
+    | CurveSolverPathError of error: SegmentError
+    | CurveSolverDepthLimit of leftFrom: float<parameter> * leftTo: float<parameter> * rightFrom: float<parameter> * rightTo: float<parameter>
 type internal ElizabethBeamReport =
     { Intersections: SegmentIntersection list; Examined: int
       DiscardedCrossing: int; DiscardedOther: int; PeakRetained: int; DiscardedCandidates: int }
@@ -226,7 +225,6 @@ module Intersections =
           MaximumArcLength = 0.25<length>
           MaxSamplingSteps = 18 }
 
-    let private maximumWindows = 1000
     let private parameterTolerance = 1.0e-9<parameter>
     let private enclosureSlack = 1.0e-12<length>
     let private terminalSubdivisionTolerance = 0.01<length>
@@ -244,11 +242,6 @@ module Intersections =
     let private midpoint (left: Point<length>) (right: Point<length>) =
         Point.create ((left.X + right.X) / 2.0) ((left.Y + right.Y) / 2.0)
 
-    let private boxesOverlap slack left right =
-        left.Max.X + slack >= right.Min.X
-        && right.Max.X + slack >= left.Min.X
-        && left.Max.Y + slack >= right.Min.Y
-        && right.Max.Y + slack >= left.Min.Y
 
     let private pointsNear tolerance left right = Point.squaredDistance left right <= tolerance * tolerance
 
@@ -269,33 +262,6 @@ module Intersections =
         | Some _ -> existing
         | None -> candidate :: existing
 
-    let private insertWindowCandidate
-        (candidate: SegmentIntersection)
-        (existing: SegmentIntersection list) =
-        if existing
-           |> List.exists (fun (found: SegmentIntersection) ->
-               abs (found.LeftT - candidate.LeftT) <= 1.0e-7<parameter>
-               && abs (found.RightT - candidate.RightT) <= 1.0e-7<parameter>) then existing
-        else candidate :: existing
-
-    let private endpointCandidates left right tolerance =
-        let samples =
-            [ 0.0<parameter>, 0.0<parameter>
-              0.0<parameter>, 1.0<parameter>
-              1.0<parameter>, 0.0<parameter>
-              1.0<parameter>, 1.0<parameter> ]
-        samples
-        |> List.fold (fun state (leftT, rightT) ->
-            state
-            |> Result.bind (fun found ->
-                match Segment.point left leftT, Segment.point right rightT with
-                | Ok leftPoint, Ok rightPoint when pointsNear tolerance leftPoint rightPoint ->
-                    let candidate: SegmentIntersection =
-                        { LeftT = leftT; RightT = rightT; Point = midpoint leftPoint rightPoint }
-                    Ok(insert candidate found)
-                | Ok _, Ok _ -> Ok found
-                | Error error, _
-                | _, Error error -> Error error)) (Ok [])
 
     let private cross (left: Point<'Left>) (right: Point<'Right>) =
         left.X * right.Y - left.Y * right.X
@@ -352,35 +318,6 @@ module Intersections =
         && rightSquared > 0.0<_>
         && determinant * determinant > 1.0e-18 * leftSquared * rightSquared
 
-    let private refineCrossing left right tolerance leftT rightT =
-        let rec loop leftT rightT remaining =
-            Segment.point left leftT
-            |> Result.bind (fun leftPoint ->
-                Segment.point right rightT
-                |> Result.bind (fun rightPoint ->
-                    if Point.distance leftPoint rightPoint <= tolerance then
-                        Ok(Some({ LeftT = leftT; RightT = rightT; Point = midpoint leftPoint rightPoint } : SegmentIntersection))
-                    elif remaining <= 0 then Ok None
-                    else
-                        Segment.derivative left leftT
-                        |> Result.bind (fun leftDirection ->
-                            Segment.derivative right rightT
-                            |> Result.bind (fun rightDirection ->
-                                if not (directionsIndependent leftDirection rightDirection) then Ok None
-                                else
-                                    let delta = Point.displacement leftPoint rightPoint
-                                    let denominator = cross leftDirection rightDirection
-                                    let leftStep = cross delta rightDirection / denominator
-                                    let rightStep = -(cross leftDirection delta / denominator)
-                                    let nextLeft = leftT + leftStep
-                                    let nextRight = rightT + rightStep
-                                    if nextLeft < -1.0e-12<parameter> || nextLeft > 1.0<parameter> + 1.0e-12<parameter>
-                                       || nextRight < -1.0e-12<parameter> || nextRight > 1.0<parameter> + 1.0e-12<parameter> then Ok None
-                                    else loop (clamp01 nextLeft) (clamp01 nextRight) (remaining - 1)))))
-        loop leftT rightT 20
-
-    let private candidateAt left right tolerance leftT rightT =
-        refineCrossing left right tolerance leftT rightT
 
     let private initialWindows maxDepth =
         [ for leftIndex in 0 .. 7 do
@@ -415,8 +352,6 @@ module Intersections =
             && (child.LeftFrom > window.LeftFrom || child.LeftTo < window.LeftTo
                 || child.RightFrom > window.RightFrom || child.RightTo < window.RightTo))
 
-    type private WindowBounds = BoundingBoxes | EnclosingPolygons
-    let private windowBounds = EnclosingPolygons
 
     let rec private arcEnclosingPoints (arc: CenterArcData) (fromT: float<parameter>) (toT: float<parameter>) =
         let middle = fromT + (toT - fromT) / 2.0
@@ -469,121 +404,6 @@ module Intersections =
                 let margin = 1e-12 * scale * (abs axis.X + abs axis.Y)
                 b + margin < c || d + margin < a)
 
-    let private windowSegmentBoundingBox segment fromT toT =
-        match segment with
-        | Arc _ -> segmentEnclosingPoints segment fromT toT |> Result.map (fun points ->
-            let first = List.head points
-            List.fold (fun (box: BoundingBox) p ->
-                { Min=Point.create (min box.Min.X p.X) (min box.Min.Y p.Y)
-                  Max=Point.create (max box.Max.X p.X) (max box.Max.Y p.Y) }) {Min=first;Max=first} (List.tail points))
-        | _ -> Segment.between segment fromT toT |> Result.bind Segment.boundingBox
-
-    let private windowBoundsOverlap left right window leftBox rightBox =
-        if not (boxesOverlap enclosureSlack leftBox rightBox) then Ok false
-        else match windowBounds with
-             | BoundingBoxes -> Ok true
-             | EnclosingPolygons ->
-                 segmentEnclosingPoints left window.LeftFrom window.LeftTo |> Result.bind (fun a ->
-                     segmentEnclosingPoints right window.RightFrom window.RightTo |> Result.map (fun b -> not (enclosingPointsDisjoint a b)))
-
-    let private inspectWindow left right tolerance window =
-        match windowSegmentBoundingBox left window.LeftFrom window.LeftTo,
-              windowSegmentBoundingBox right window.RightFrom window.RightTo with
-        | Error error, _
-        | _, Error error -> Error error
-        | Ok leftBox, Ok rightBox ->
-            match windowBoundsOverlap left right window leftBox rightBox with
-            | Error error -> Error error
-            | Ok false -> Ok(None, false)
-            | Ok true ->
-                match Segment.point left window.LeftFrom, Segment.point left window.LeftTo,
-                      Segment.point right window.RightFrom, Segment.point right window.RightTo with
-                | Ok leftStart, Ok leftFinish, Ok rightStart, Ok rightFinish ->
-                    let centerLeftT = (window.LeftFrom + window.LeftTo) / 2.0
-                    let centerRightT = (window.RightFrom + window.RightTo) / 2.0
-                    Segment.point left centerLeftT
-                    |> Result.bind (fun centerLeft ->
-                        Segment.point right centerRightT
-                        |> Result.map (fun centerRight -> centerLeft, centerRight))
-                    |> Result.bind (fun (centerLeft, centerRight) ->
-                        if Point.distance centerLeft centerRight <= min tolerance 1.0e-12<length> then
-                            Ok(Some({ LeftT = centerLeftT; RightT = centerRightT; Point = midpoint centerLeft centerRight } : SegmentIntersection), false)
-                        else
-                            let local =
-                                chordCrossing leftStart leftFinish rightStart rightFinish
-                                |> Option.defaultWith (fun () -> chordClosestParameters leftStart leftFinish rightStart rightFinish)
-                            let leftT = interpolate window.LeftFrom window.LeftTo (fst local)
-                            let rightT = interpolate window.RightFrom window.RightTo (snd local)
-                            Segment.point left leftT
-                            |> Result.bind (fun leftPoint ->
-                                Segment.point right rightT
-                                |> Result.map (fun rightPoint ->
-                                    if Point.distance leftPoint rightPoint <= tolerance then
-                                        Some({ LeftT = leftT; RightT = rightT; Point = midpoint leftPoint rightPoint } : SegmentIntersection), false
-                                    else None, true)))
-                | Error error, _, _, _
-                | _, Error error, _, _
-                | _, _, Error error, _
-                | _, _, _, Error error -> Error error
-
-    let private windowResolved window intersections =
-        let leftWidth = window.LeftTo - window.LeftFrom
-        let rightWidth = window.RightTo - window.RightFrom
-        leftWidth <= 0.125<parameter>
-        && rightWidth <= 0.125<parameter>
-        && intersections
-           |> List.exists (fun (intersection: SegmentIntersection) ->
-               intersection.LeftT >= window.LeftFrom - leftWidth * 2.0
-               && intersection.LeftT <= window.LeftTo + leftWidth * 2.0
-               && intersection.RightT >= window.RightFrom - rightWidth * 2.0
-               && intersection.RightT <= window.RightTo + rightWidth * 2.0)
-
-    let private search left right options initialIntersections initial =
-        let rec loop pending (found: SegmentIntersection list) examined =
-            match pending with
-            | [] -> Ok(found |> List.sortBy (fun item -> item.LeftT, item.RightT))
-            | _ when examined >= maximumWindows -> Error(IntersectionTerminalWindowLimitExceeded maximumWindows)
-            | window :: rest ->
-                if windowResolved window found then loop rest found examined
-                else
-                    inspectWindow left right options.Tolerance window
-                    |> Result.bind (fun (candidate, refine) ->
-                        let found =
-                            candidate
-                            |> Option.map (fun value -> insertWindowCandidate value found)
-                            |> Option.defaultValue found
-                        if refine && window.Depth > 0 then loop ((splitNine window) @ rest) found (examined + 1)
-                        else loop rest found (examined + 1))
-        loop initial initialIntersections 0
-
-    let private sampledCrossingCandidates left right tolerance =
-        let intervals =
-            [ for index in 0 .. 15 ->
-                  Parameter.fromFloat(float index / 16.0),
-                  Parameter.fromFloat(float (index + 1) / 16.0) ]
-        [ for leftFrom, leftTo in intervals do
-              for rightFrom, rightTo in intervals do
-                  yield leftFrom, leftTo, rightFrom, rightTo ]
-        |> List.fold (fun state (leftFrom, leftTo, rightFrom, rightTo) ->
-            state
-            |> Result.bind (fun found ->
-                Segment.point left leftFrom
-                |> Result.bind (fun leftStart ->
-                    Segment.point left leftTo
-                    |> Result.bind (fun leftEnd ->
-                        Segment.point right rightFrom
-                        |> Result.bind (fun rightStart ->
-                            Segment.point right rightTo
-                            |> Result.bind (fun rightEnd ->
-                                match chordCrossing leftStart leftEnd rightStart rightEnd with
-                                | None -> Ok found
-                                | Some(leftLocal, rightLocal) ->
-                                    let leftT = interpolate leftFrom leftTo leftLocal
-                                    let rightT = interpolate rightFrom rightTo rightLocal
-                                    refineCrossing left right tolerance leftT rightT
-                                    |> Result.map (function
-                                        | Some candidate -> insertWindowCandidate candidate found
-                                        | None -> found))))))) (Ok [])
 
     let private pieceBoundingBox piece =
         Segment.between piece.Segment piece.From piece.To |> Result.bind Segment.boundingBox
@@ -591,6 +411,7 @@ module Intersections =
     let private splitPiece piece =
         let middle = (piece.From + piece.To) / 2.0
         { piece with To = middle }, { piece with From = middle }
+
 
     let private splitPieceThirds piece =
         let firstTo = interpolate piece.From piece.To (parameter (1.0 / 3.0))
@@ -607,29 +428,6 @@ module Intersections =
                         Right = rightPiece
                         StartLeftT = startLeftT
                         StartRightT = startRightT } ] @ windows
-
-    let private collectIntersectionTerminalWindows left right options =
-        let rec collect left right remainingDepth windows =
-            pieceBoundingBox left
-            |> Result.bind (fun leftBox ->
-                pieceBoundingBox right
-                |> Result.bind (fun rightBox ->
-                    if not (boxesOverlap options.Tolerance leftBox rightBox) then Ok windows
-                    elif remainingDepth <= 0
-                         || (BoundingBox.diameter leftBox <= terminalSubdivisionTolerance
-                             && BoundingBox.diameter rightBox <= terminalSubdivisionTolerance) then
-                        if List.length windows + 9 > maximumWindows then
-                            Error(IntersectionTerminalWindowLimitExceeded maximumWindows)
-                        else Ok(addTerminalWindowGrid left right windows)
-                    elif BoundingBox.diameter leftBox >= BoundingBox.diameter rightBox then
-                        let first, second = splitPiece left
-                        collect first right (remainingDepth - 1) windows
-                        |> Result.bind (collect second right (remainingDepth - 1))
-                    else
-                        let first, second = splitPiece right
-                        collect left first (remainingDepth - 1) windows
-                        |> Result.bind (collect left second (remainingDepth - 1))))
-        collect left right options.MaxDepth [] |> Result.map List.rev
 
     let private globalDistanceMinimumAt left right leftT rightT =
         Segment.point left.Segment leftT
@@ -746,31 +544,6 @@ module Intersections =
         |> List.fold (fun state candidate ->
             state |> Result.bind (fun minima -> candidate |> Result.map (fun minimum -> minimum :: minima))) (Ok [])
 
-    let private legacySearch left right options =
-        let leftPiece = { Segment = left; From = 0.0<parameter>; To = 1.0<parameter> }
-        let rightPiece = { Segment = right; From = 0.0<parameter>; To = 1.0<parameter> }
-        boundaryMinima left right options
-        |> Result.bind (fun boundary ->
-            collectIntersectionTerminalWindows leftPiece rightPiece options
-            |> Result.bind (fun windows ->
-                minimaFromTerminalWindows windows options.Tolerance
-                |> Result.bind (fun terminal ->
-                    boundary @ terminal
-                    |> List.fold (fun state minimum ->
-                        state
-                        |> Result.bind (fun intersections ->
-                            if minimum.DistanceSquared > options.Tolerance * options.Tolerance then Ok intersections
-                            else
-                                Segment.point left minimum.LeftT
-                                |> Result.bind (fun leftPoint ->
-                                    Segment.point right minimum.RightT
-                                    |> Result.map (fun rightPoint ->
-                                        let candidate =
-                                            { LeftT = minimum.LeftT
-                                              RightT = minimum.RightT
-                                              Point = midpoint leftPoint rightPoint }
-                                        insert candidate intersections)))) (Ok [])
-                    |> Result.map (List.sortBy (fun item -> item.LeftT, item.RightT)))))
 
     let private boxDistanceSquared (left: BoundingBox) (right: BoundingBox) =
         let dx =
@@ -1053,94 +826,6 @@ module Intersections =
                 lineSegmentIntersectionsByRay
                     lineStart lineEnd lineIsLeft segmentValue options lineParameterTolerance
 
-    let private bezierPoints = function
-        | Line(startPoint, endPoint) -> Some [ startPoint; endPoint ]
-        | QuadraticBezier(startPoint, control, endPoint) -> Some [ startPoint; control; endPoint ]
-        | CubicBezier(startPoint, control1, control2, endPoint) ->
-            Some [ startPoint; control1; control2; endPoint ]
-        | Arc _ -> None
-
-    let private certifiedDisjointTranslation left right =
-        match bezierPoints left, bezierPoints right with
-        | Some(leftStart :: _ as leftPoints), Some(rightStart :: _ as rightPoints) ->
-            let translation = Point.displacement leftStart rightStart
-            Point.squaredNorm translation > 1.0e-30<length^2>
-            && List.length leftPoints = List.length rightPoints
-            && List.forall2 (fun leftPoint rightPoint ->
-                abs (rightPoint.X - leftPoint.X - translation.X) <= 1.0e-14<length>
-                && abs (rightPoint.Y - leftPoint.Y - translation.Y) <= 1.0e-14<length>) leftPoints rightPoints
-            && (let axis = Point.create (-translation.Y) translation.X
-                let differences =
-                    leftPoints
-                    |> List.pairwise
-                    |> List.map (fun (first, second) -> Point.dot (Point.displacement first second) axis)
-                List.forall (fun value -> value > 1.0e-15<length^2>) differences
-                || List.forall (fun value -> value < -1.0e-15<length^2>) differences)
-        | _ -> false
-
-    let private circularRadius (radius: Point<length>) =
-        abs (abs radius.X - abs radius.Y) <= 1.0e-12<length>
-
-    let private positiveAngleRemainder (angle: float<degree>) =
-        let turns = floor (Degree.toFloat angle / 360.0)
-        angle - turns * 360.0<degree>
-
-    let private circularArcParameter (pointValue: Point<length>) (arc: CenterArcData) =
-        // StartAngle is expressed in the rotated local ellipse frame, even for circles.
-        let angle = Trig.atan2Degrees (pointValue.Y - arc.Center.Y) (pointValue.X - arc.Center.X) - arc.XAxisRotation
-        let progress =
-            if arc.DeltaAngle >= 0.0<degree> then
-                positiveAngleRemainder (angle - arc.StartAngle) / arc.DeltaAngle
-            else
-                positiveAngleRemainder (arc.StartAngle - angle) / -arc.DeltaAngle
-        if progress >= -1.0e-9 && progress <= 1.0 + 1.0e-9 then
-            Some(Parameter.fromFloat(max 0.0 (min 1.0 progress)))
-        else None
-
-    let private circularArcIntersections left right tolerance =
-        let endpointArc = function Arc endpoint -> endpoint | _ -> failwith "expected circular arc"
-        Ellipse.endpointToCenter (endpointArc left)
-        |> Result.mapError (fun _ -> DegenerateArc)
-        |> Result.bind (fun leftArc ->
-            Ellipse.endpointToCenter (endpointArc right)
-            |> Result.mapError (fun _ -> DegenerateArc)
-            |> Result.bind (fun rightArc ->
-                let displacement = Point.displacement leftArc.Center rightArc.Center
-                let distanceSquared = Point.squaredNorm displacement
-                let distance = sqrt (float distanceSquared) * 1.0<length>
-                let leftRadius = leftArc.Radius.X
-                let rightRadius = rightArc.Radius.X
-                let radiusDifference = abs (leftRadius - rightRadius)
-                if distance <= 1.0e-15<length> then endpointCandidates left right tolerance
-                elif distance > leftRadius + rightRadius + tolerance then Ok []
-                elif distance < radiusDifference - tolerance then Ok []
-                else
-                    let along =
-                        (leftRadius * leftRadius - rightRadius * rightRadius + distanceSquared)
-                        / (2.0 * distance)
-                    let heightSquared = leftRadius * leftRadius - along * along
-                    if heightSquared < -tolerance * 1.0<length> then Ok []
-                    else
-                        let height = if heightSquared <= 0.0<length^2> then 0.0<length> else sqrt (float heightSquared) * 1.0<length>
-                        let dx = displacement.X
-                        let dy = displacement.Y
-                        let basePoint =
-                            Point.create
-                                (leftArc.Center.X + along * dx / distance)
-                                (leftArc.Center.Y + along * dy / distance)
-                        let offset = Point.create (-dy * height / distance) (dx * height / distance)
-                        let candidates =
-                            if height <= tolerance then [ basePoint ]
-                            else [ Point.translate basePoint offset; Point.translate basePoint (Point.negate offset) ]
-                        candidates
-                        |> List.fold (fun found pointValue ->
-                            match circularArcParameter pointValue leftArc, circularArcParameter pointValue rightArc with
-                            | Some leftT, Some rightT ->
-                                insertWindowCandidate
-                                    { LeftT = leftT; RightT = rightT; Point = pointValue }
-                                    found
-                            | _ -> found) []
-                        |> Ok))
 
     let private elizabethParameterResolution = 1e-9<parameter>
     let private elizabethDedupeResolution = 1e-7<parameter>
@@ -1165,7 +850,7 @@ module Intersections =
         candidates |> elizabethTryMap (fun candidate ->
             Segment.point left candidate.LeftT |> Result.bind (fun a ->
                 Segment.point right candidate.RightT |> Result.map (fun b -> candidate, elizabethPointDistance a b))
-            |> Result.mapError ExperimentalPathError)
+            |> Result.mapError CurveSolverPathError)
         |> Result.map (List.sortBy (fun (candidate,residual) ->
             elizabethEndpointRank candidate,residual,candidate.LeftT,candidate.RightT) >> List.map fst)
 
@@ -1284,7 +969,7 @@ module Intersections =
             windows |> List.fold (fun state window -> state |> Result.bind (fun (scored,cache) ->
                 elizabethWindowScore left right window cache |> Result.map (fun (crossing,score,cache,best) ->
                     (window,crossing,score,best)::scored,cache))) (Ok([],cache))
-            |> Result.mapError ExperimentalPathError
+            |> Result.mapError CurveSolverPathError
             |> Result.map (fun (scored,cache) ->
                 let ranked = List.rev scored |> List.sortBy (fun (window,_,score,_) -> score,window.LeftFrom,window.RightFrom)
                 let crossings,others = ranked |> List.partition (fun (_,crossing,_,_) -> crossing)
@@ -1306,10 +991,10 @@ module Intersections =
         |> Result.map List.concat
 
     let internal elizabethBeamIntersections left right options =
-        validateOptions options |> Result.mapError ExperimentalPathError
+        validateOptions options |> Result.mapError CurveSolverPathError
         |> Result.bind (fun () ->
             let tolerance = min options.Tolerance 1e-13<length>
-            elizabethEndpointCandidates left right tolerance |> Result.mapError ExperimentalPathError
+            elizabethEndpointCandidates left right tolerance |> Result.mapError CurveSolverPathError
             |> Result.bind (fun endpoints ->
                 let rec generation pending report index decayStart cache =
                     match pending with
@@ -1319,7 +1004,7 @@ module Intersections =
                     | _ ->
                         pending |> elizabethTryMap (fun window ->
                             elizabethWindowOverlaps left right window |> Result.map (fun overlaps -> window,overlaps))
-                        |> Result.mapError ExperimentalPathError
+                        |> Result.mapError CurveSolverPathError
                         |> Result.bind (fun overlapping ->
                             let survivors = overlapping |> List.filter snd |> List.map fst
                             let decayStart = match decayStart with None when List.length survivors > 1000 || index >= 5 -> Some index | _ -> decayStart
@@ -1328,46 +1013,22 @@ module Intersections =
                                 let report = {report with Examined=report.Examined+List.length pending;DiscardedCrossing=report.DiscardedCrossing+crossingLost;DiscardedOther=report.DiscardedOther+otherLost;PeakRetained=max report.PeakRetained (List.length kept)}
                                 kept |> List.fold (fun state window -> state |> Result.bind (fun (next,candidates) ->
                                     if window.LeftTo-window.LeftFrom <= elizabethParameterResolution && window.RightTo-window.RightFrom <= elizabethParameterResolution then
-                                        elizabethTerminalCandidates left right window tolerance |> Result.mapError ExperimentalPathError
+                                        elizabethTerminalCandidates left right window tolerance |> Result.mapError CurveSolverPathError
                                         |> Result.map (fun found -> next,found @ candidates)
                                     else
                                         let children = splitNine window
-                                        if window.Depth <= 0 || List.isEmpty children then Error(ExperimentalDepthLimit(window.LeftFrom,window.LeftTo,window.RightFrom,window.RightTo))
+                                        if window.Depth <= 0 || List.isEmpty children then Error(CurveSolverDepthLimit(window.LeftFrom,window.LeftTo,window.RightFrom,window.RightTo))
                                         else Ok(List.fold (fun next child -> child::next) next children,candidates))) (Ok([],report.Intersections))
                                 |> Result.bind (fun (next,candidates) -> generation next {report with Intersections=candidates} (index+1) decayStart cache)))
                 generation (initialWindows options.MaxDepth)
                     {Intersections=endpoints;Examined=0;DiscardedCrossing=0;DiscardedOther=0;PeakRetained=0;DiscardedCandidates=0}
                     1 None {Samples=Map.empty;Lookups=0;Hits=0;LeftPoints=Map.empty;RightPoints=Map.empty}))
 
-    let private edwardCurveIntersections left right options =
-        match left,right with
-        | Arc leftArc, Arc rightArc when circularRadius leftArc.Radius && circularRadius rightArc.Radius ->
-            circularArcIntersections left right options.Tolerance
-        | _ ->
-            if certifiedDisjointTranslation left right then Ok []
-            else endpointCandidates left right options.Tolerance |> Result.bind (fun endpoints ->
-                sampledCrossingCandidates left right options.Tolerance |> Result.bind (fun crossings ->
-                    let initial = List.fold (fun found candidate -> insertWindowCandidate candidate found) endpoints crossings
-                    search left right options initial (initialWindows options.MaxDepth)))
-
-    let internal experimentalCurveIntersections left right solver options =
-        validateOptions options |> Result.mapError ExperimentalPathError |> Result.bind (fun () ->
-            match solver with
-            | Henry -> legacySearch left right options |> Result.mapError ExperimentalPathError
-            | Edward -> edwardCurveIntersections left right options |> Result.mapError ExperimentalPathError
-            | Elizabeth -> elizabethBeamIntersections left right options |> Result.map (fun report -> report.Intersections))
-
-    let private useElizabethBeam = true
     let private curveCurveIntersections left right options =
-        if useElizabethBeam then
-            elizabethBeamIntersections left right options |> Result.map (fun report -> report.Intersections)
-            |> Result.mapError (function
-                | ExperimentalPathError error -> error
-                | ExperimentalDepthLimit(a,b,c,d) -> IntersectionDepthLimitReached(a,b,c,d))
-        else
-            match edwardCurveIntersections left right options with
-            | Error(IntersectionTerminalWindowLimitExceeded _) -> legacySearch left right options
-            | result -> result
+        elizabethBeamIntersections left right options |> Result.map (fun report -> report.Intersections)
+        |> Result.mapError (function
+            | CurveSolverPathError error -> error
+            | CurveSolverDepthLimit(a,b,c,d) -> IntersectionDepthLimitReached(a,b,c,d))
 
     let private segmentIntersectionsValidOptions left right options =
         match left, right with

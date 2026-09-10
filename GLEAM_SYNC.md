@@ -585,4 +585,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   `scripts/test-fast`: 1795 passed, the same 5 historical assertions failed,
   1800 total. Slow profile not rerun at this checkpoint.
 
-Next: `18fc6f3` (retire alternative intersection solvers).
+- `18fc6f3` — remove Henry/Edward intersection routes and comparison switches;
+  retain projection's shared descent and terminal-grid helpers. Rename bounded
+  curve errors to CurveSolverError. `scripts/test-fast`: 1795 passed, the same
+  5 historical assertions failed, 1800 total.
+
+Next: `8ea88ff` (machinery documentation).

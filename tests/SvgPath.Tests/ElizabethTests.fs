@@ -42,7 +42,7 @@ let ``elizabeth_beam_simple_crossing_needs_no_culling_test`` () =
 [<Fact>]
 let ``elizabeth_beam_still_reports_depth_exhaustion_test`` () =
     match beam horizontal diagonal {options with MaxDepth=1} with
-    | Error(ExperimentalDepthLimit _) -> ()
+    | Error(CurveSolverDepthLimit _) -> ()
     | result -> failwithf "%A" result
 
 [<Fact>]

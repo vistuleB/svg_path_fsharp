@@ -136,4 +136,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   signs on .NET. Semantic no-op; no source tests added. Last unchanged-code
   `scripts/test-fast`: 1674 passed; `git diff --check` passes.
 
-Next: `5a1a9da` (hull zero predicates).
+- `5a1a9da` — hull arriving/leaving tangent and curvature quadratic-coefficient
+  predicates already use .NET signed-zero equality. Semantic no-op; no source
+  tests added. Last unchanged-code `scripts/test-fast`: 1674 passed;
+  `git diff --check` passes.
+
+Next: `75175fe` (cut boundary zero normalization).

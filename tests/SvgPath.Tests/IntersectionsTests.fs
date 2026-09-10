@@ -5,6 +5,20 @@ open Xunit
 
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
+[<Fact>]
+let ``circular arc intersections respect local axis rotation`` () =
+    for sweep in [false;true] do
+        for leftRotation in [0.0;30.0;90.0;-90.0] do
+            for rightRotation in [0.0;30.0;90.0;-90.0] do
+                let left = Arc {Start=point 1. 0.;Radius=point 1. 1.;XAxisRotation=Degree.fromFloat leftRotation;LargeArc=false;Sweep=sweep;End=point -1. 0.}
+                let right = Arc {Start=point 2. 0.;Radius=point 1. 1.;XAxisRotation=Degree.fromFloat rightRotation;LargeArc=false;Sweep=sweep;End=point 0. 0.}
+                let hit = Intersections.segment left right |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+                let a = Segment.point left hit.LeftT |> Result.defaultWith (failwithf "%A")
+                let b = Segment.point right hit.RightT |> Result.defaultWith (failwithf "%A")
+                Assert.True(Point.distance a b <= 1e-9<length>)
+                Assert.True(abs(a.X-0.5<length>)<=1e-9<length>)
+                Assert.True(abs(abs a.Y-0.8660254037844386<length>)<=1e-9<length>)
+
 let private assertParameterNear expected actual tolerance =
     Assert.True(abs (actual - expected) <= Parameter.fromFloat tolerance, $"expected {expected}, got {actual}")
 

@@ -995,7 +995,8 @@ module Intersections =
         angle - turns * 360.0<degree>
 
     let private circularArcParameter (pointValue: Point<length>) (arc: CenterArcData) =
-        let angle = Trig.atan2Degrees (pointValue.Y - arc.Center.Y) (pointValue.X - arc.Center.X)
+        // StartAngle is expressed in the rotated local ellipse frame, even for circles.
+        let angle = Trig.atan2Degrees (pointValue.Y - arc.Center.Y) (pointValue.X - arc.Center.X) - arc.XAxisRotation
         let progress =
             if arc.DeltaAngle >= 0.0<degree> then
                 positiveAngleRemainder (angle - arc.StartAngle) / arc.DeltaAngle

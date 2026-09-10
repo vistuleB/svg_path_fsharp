@@ -266,4 +266,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   the original Arc. Source regression and docs added. `scripts/test-fast`:
   1720 passed.
 
-Next: `1752c36` (local circular-arc intersection angles).
+- `1752c36` — subtract ellipse-axis rotation before recovering circular-arc
+  intersection parameters. Source regression added. `scripts/test-fast`:
+  1721 passed.
+
+Next: `787c6d7` (implicit clipping-region closure).

@@ -92,12 +92,14 @@
     <Compile Include="ArrangementParityTests.fs" />
     <Compile Include="CsgTests.fs" />
     <Compile Include="CsgParityTests.fs" />
+    <Compile Include="ClosedPathAssertions.fs" />
     <Compile Include="OffsetTests.fs" />
     <Compile Include="StrokeTests.fs" />
     <Compile Include="OffsetParityTests.fs" />
     <Compile Include="OffsetForcedParityTests.fs" />
     <Compile Include="CuspSmallLoopTests.fs" />
     <Compile Include="BandOrientationTests.fs" />
+    <Compile Include="BandFaceLoopsTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

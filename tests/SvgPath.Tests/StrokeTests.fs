@@ -63,7 +63,7 @@ let ``segment stroke with butt caps returns closed outline`` () =
     let path = Stroke.segment (Line(point 0.0 0.0, point 10.0 0.0)) 2.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
     let outline = List.exactlyOne path.Subpaths
     Assert.True outline.Closed
-    Assert.Equal("M 0 -1 H 10 V 1 H 0 Z", Serialize.subpath outline)
+    ClosedPathAssertions.equivalent (Path.ofSubpaths [outline]) "M 0 -1 H 10 V 1 H 0 Z"
 
 [<Fact>]
 let ``subpath stroke with round caps adds two cap arcs`` () =
@@ -74,7 +74,7 @@ let ``subpath stroke with round caps adds two cap arcs`` () =
 [<Fact>]
 let ``subpath stroke with round cap serializes semicircles`` () =
     let path = stroked (simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)) (Miter Offset.defaultMiterLimit) RoundCap { Stroke.defaultOptions with Width = 2.0<length> }
-    Assert.Equal("M 0 -1 H 10 A 1 1 0 0 1 10 1 H 0 A 1 1 0 0 1 0 -1 Z", Serialize.subpath (List.exactlyOne path.Subpaths))
+    ClosedPathAssertions.equivalent path "M 0 -1 H 10 A 1 1 0 0 1 10 1 H 0 A 1 1 0 0 1 0 -1 Z"
 
 [<Fact>]
 let ``round caps use normalized source endpoint directions`` () =
@@ -134,24 +134,24 @@ let ``zero length subpath stroke with round cap returns circle`` () =
 [<Fact>]
 let ``subpath stroke with square caps extends by half width`` () =
     let path = stroked (simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)) (Miter Offset.defaultMiterLimit) Square { Stroke.defaultOptions with Width = 2.0<length> }
-    Assert.Equal("M 0 -1 H 10 H 11 V 1 H 10 H 0 H -1 V -1 Z", Serialize.subpath (List.exactlyOne path.Subpaths))
+    ClosedPathAssertions.equivalent path "M 0 -1 H 10 H 11 V 1 H 10 H 0 H -1 V -1 Z"
 
 [<Fact>]
 let ``subpath stroke with bevel join keeps corner cut`` () =
     let options = { Stroke.defaultOptions with Width = 2.0<length> }
-    Assert.Equal("M 0 -1 H 10 L 11 0 V 10 H 9 V 1 H 0 Z", Serialize.subpath (stroked (rightAngle ()) Bevel Butt options |> _.Subpaths |> List.exactlyOne))
+    ClosedPathAssertions.equivalent (stroked (rightAngle ()) Bevel Butt options) "M 0 -1 H 10 L 11 0 V 10 H 9 V 1 H 0 Z"
 
 [<Fact>]
 let ``subpath stroke with round join adds join arcs`` () =
     let options = { Stroke.defaultOptions with Width = 2.0<length> }
     let outline = stroked (rightAngle ()) Round Butt options |> _.Subpaths |> List.exactlyOne
     Assert.Equal(1, outline.Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
-    Assert.Equal("M 0 -1 H 10 A 1 1 0 0 1 11 0 V 10 H 9 V 1 H 0 Z", Serialize.subpath outline)
+    ClosedPathAssertions.equivalent (Path.ofSubpaths [outline]) "M 0 -1 H 10 A 1 1 0 0 1 11 0 V 10 H 9 V 1 H 0 Z"
 
 [<Fact>]
 let ``subpath stroke with miter join extends to apex`` () =
     let options = { Stroke.defaultOptions with Width = 2.0<length> }
-    Assert.Equal("M 0 -1 H 10 H 11 V 0 V 10 H 9 V 1 H 0 Z", Serialize.subpath (stroked (rightAngle ()) (Miter 4.0) Butt options |> _.Subpaths |> List.exactlyOne))
+    ClosedPathAssertions.equivalent (stroked (rightAngle ()) (Miter 4.0) Butt options) "M 0 -1 H 10 H 11 V 0 V 10 H 9 V 1 H 0 Z"
 
 [<Fact>]
 let ``subpath stroke with low miter limit falls back to bevel`` () =
@@ -325,9 +325,7 @@ let ``subpath dashed strokes each dash`` () =
         Stroke.subpathDashed source 2.0<length> [ 3.0<length>; 2.0<length> ] 0.0<length> (Miter Offset.defaultMiterLimit) Butt
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, path.Subpaths.Length)
-    Assert.Equal<string list>(
-        [ "M 0 -1 H 3 V 1 H 0 Z"; "M 5 -1 H 8 V 1 H 5 Z" ],
-        path.Subpaths |> List.map Serialize.subpath)
+    ClosedPathAssertions.equivalent path "M 0 -1 H 3 V 1 H 0 Z M 5 -1 H 8 V 1 H 5 Z"
 
 [<Fact>]
 let ``subpath dashes rejects invalid pattern and offset`` () =

@@ -2,7 +2,7 @@
 
 Baseline: F# `c612b7b`, corresponding to Gleam `29ce1db` (curvature public
 diagnostics/docs). Work proceeds in `git log --reverse 29ce1db..a251698` order:
-109 source commits. Uncommitted Elizabeth experiments are not in this queue.
+109 source commits, followed by subsequent committed Gleam history as authorized.
 Do not substitute the final Gleam tree for the historical source commit.
 
 ## Progress
@@ -513,4 +513,12 @@ Do not substitute the final Gleam tree for the historical source commit.
   `scripts/test-fast`: 1789 passed, one unchanged obsolete nesting expectation
   failed. No additional failures.
 
-Next: `a251698` (filled-face boundary enumeration).
+- `a251698` — default final band enumeration follows filled-face boundary walks
+  with material on the right, preserving kissing seams and all residual even
+  multiplicity as retraces. Older orientator retained behind the private switch.
+  Nine source tests and closed-walk rotation-aware comparison helper ported.
+  `scripts/test-fast`: 1798 passed, one unchanged obsolete single-offset
+  nesting-orientation expectation failed. `scripts/generate-readme-figures`:
+  all nine generated. This completes the initial 109-commit source queue.
+
+Next: `f571cd7` (concurrent Gallery jobs), then committed Elizabeth integration.

@@ -1218,13 +1218,13 @@ let options =
 - `InBand` performs the final joint winding classification and parity-capacity
   reconstruction after the two sides are assembled.
 
-After final trimming, contour directions are chosen together using adjacent
-arrangement faces. The infinite face starts at zero; undecided contours choose
-zero to one or nonzero to zero. Decided contours propagate fixed signed winding
-changes. Values outside -1/0/1, contradictory assignments, and unsupported
-coincident ownership return `ConstructionFailed`. Decisions follow deterministic
-graph order without backtracking. Fully retraced unconstrained contours retain
-their traversal. This pass is skipped when `InBand = false`.
+After final trimming, boundaries are enumerated from even-odd-filled faces of
+the surviving outlines. Every repeated edge occurrence is preserved, including
+zero-area retraces; contour order and starting vertices may change. Walks keep
+filled material on the visual right, including around holes. For outer offset
+greater than inner offset, winding is one inside and zero outside. Opposite
+kissing-seam occurrences and retraces cancel. Reversing offset ordering reverses
+the band's orientation. This enumeration is skipped when `InBand = false`.
 
 The cusp switches act before joint band trimming. The four-concave-corner
 example below holds `InBand = true` while changing the two side-local switches:

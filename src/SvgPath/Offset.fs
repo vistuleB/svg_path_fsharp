@@ -4866,6 +4866,50 @@ module Offset =
             (subpath.Segments |> List.map (fun segment -> segment.Segment))
             subpath.Closed tolerance
 
+    // Consume every surviving occurrence; filled-face walks keep material on
+    // their visual right and residual even multiplicity becomes retraces.
+    let internal enumerateBandFaceLoops path =
+        let subpaths = Path.subpaths path
+        let rec tryMap f items =
+            match items with
+            | [] -> Ok []
+            | first :: rest -> f first |> Result.bind (fun first -> tryMap f rest |> Result.map (fun rest -> first :: rest))
+        if not (List.forall Subpath.isClosed subpaths) then Error InternalBandSubpathNotClosed
+        else
+            Arrangement.buildWith (List.collect Subpath.segments subpaths)
+                arrangementTolerance arrangementTolerance adjacentLoopEndpointParameterTolerance
+            |> Result.mapError (Arrangement.publicError >> InternalArrangementGraphError)
+            |> Result.bind (fun build ->
+                Arrangement.dual build.Graph |> Result.mapError InternalArrangementGraphError
+                |> Result.bind (fun dual ->
+                    let changes = build.Graph.Edges |> List.map (fun edge ->
+                        {EdgeId = edge.Id; RightMinusLeft = edge.ForwardMultiplicity - edge.ReverseMultiplicity})
+                    Arrangement.faceWindings dual changes |> Result.mapError InternalFaceWindingError
+                    |> Result.bind (fun windings ->
+                        let inside = windings |> List.map (fun face -> face.FaceId, face.Value % 2 <> 0) |> Map.ofList
+                        let walks = dual.Faces
+                                    |> List.filter (fun face -> Map.tryFind face.Id inside = Some true)
+                                    |> List.collect (fun face -> face.Walks |> List.map (fun walk ->
+                                        walk.Edges |> List.rev |> List.map (fun edge -> {edge with Left = not edge.Left})))
+                        let consumed = walks |> List.concat |> List.fold (fun counts edge ->
+                            Map.add edge.EdgeId (1 + (Map.tryFind edge.EdgeId counts |> Option.defaultValue 0)) counts) Map.empty
+                        build.Graph.Edges |> tryMap (fun edge ->
+                            let remaining = edge.ForwardMultiplicity + edge.ReverseMultiplicity - (Map.tryFind edge.Id consumed |> Option.defaultValue 0)
+                            if remaining < 0 || remaining % 2 <> 0 then Error(InternalSurvivorCapacityMismatch(edge.Id, remaining))
+                            else Ok(List.replicate (remaining / 2) [{EdgeId = edge.Id; Left = true}; {EdgeId = edge.Id; Left = false}]))
+                        |> Result.bind (fun retraces ->
+                            let edges = build.Graph.Edges |> List.map (fun edge -> edge.Id, edge) |> Map.ofList
+                            walks @ List.concat retraces |> tryMap (fun walk ->
+                                walk |> tryMap (fun reference ->
+                                    match Map.tryFind reference.EdgeId edges with
+                                    | None -> Error(InternalMissingEdgeImage reference.EdgeId)
+                                    | Some edge -> Ok(if reference.Left then edge.Segment else Segment.reverse edge.Segment))
+                                |> Result.bind (fun segments ->
+                                    Subpath.createWith (WiggleWith (2.0 * arrangementTolerance)) segments
+                                    |> Result.bind (Subpath.setClosedWith (WiggleWith (2.0 * arrangementTolerance)) true)
+                                    |> Result.mapError InternalPathError))
+                            |> Result.map Path.ofSubpaths))))
+
     type private BandOrientationEdge =
         { EdgeId: int; LeftFace: int; RightFace: int
           Source: (int * bool) option }
@@ -5000,17 +5044,24 @@ module Offset =
             trimBandArrangement
                 untrimmed bands winding (bandSubpathWindingOpinions bands) options)
 
+    type private FinalBandLoopEnumeration = SourceOrderLoops | EvenOddFaceLoops
+    let private finalBandLoopEnumeration = EvenOddFaceLoops
+
+    let private finalBandPath loops =
+        match finalBandLoopEnumeration with
+        | SourceOrderLoops -> orientBandPath (Path.ofSubpaths loops)
+        | EvenOddFaceLoops -> enumerateBandFaceLoops (Path.ofSubpaths loops)
+
     let internal topologicalBandPathWithOpinions
         untrimmed bands windingOpinions options =
         internalBandWindingFunction bands
         |> Result.bind (fun winding ->
             trimBandArrangement untrimmed bands winding windingOpinions options
-            |> Result.bind (fun loops ->
-                orientBandPath (Path.ofSubpaths loops)))
+            |> Result.bind finalBandPath)
 
     let internal topologicalBandPath untrimmed bands options =
         internalTopologicalBandLoops untrimmed bands options
-        |> Result.bind (fun loops -> orientBandPath (Path.ofSubpaths loops))
+        |> Result.bind finalBandPath
 
     let private trimBandSideCusps
         (subpath: ICulledOffsetSubpath)

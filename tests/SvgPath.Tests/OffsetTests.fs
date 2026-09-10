@@ -392,9 +392,8 @@ let ``subpath_stroke_closed_square_uses_band_test`` () =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
     let result = Offset.subpathBand source -2.0<length> 2.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(
-        "M 2 2 V 8 H 8 V 2 Z M 0 -2 H 10 H 12 V 0 V 10 V 12 H 10 H 0 H -2 V 10 V 0 V -2 Z",
-        Serialize.path result)
+    ClosedPathAssertions.equivalent result
+        "M 2 2 V 8 H 8 V 2 Z M 0 -2 H 10 H 12 V 0 V 10 V 12 H 10 H 0 H -2 V 10 V 0 V -2 Z"
 
 [<Fact>]
 let ``closed square stroke uses the same capless band`` () =
@@ -402,9 +401,8 @@ let ``closed square stroke uses the same capless band`` () =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
     let result = Stroke.subpath source 4.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(
-        "M 2 2 V 8 H 8 V 2 Z M 0 -2 H 10 H 12 V 0 V 10 V 12 H 10 H 0 H -2 V 10 V 0 V -2 Z",
-        Serialize.path result)
+    ClosedPathAssertions.equivalent result
+        "M 2 2 V 8 H 8 V 2 Z M 0 -2 H 10 H 12 V 0 V 10 V 12 H 10 H 0 H -2 V 10 V 0 V -2 Z"
 
 [<Fact>]
 let ``figure_eight_band_joins_reversed_outer_chunks_test`` () =
@@ -451,9 +449,8 @@ let ``subpath_stroke_open_line_with_square_cap_extends_ends_test`` () =
     let render cap =
         Stroke.subpathWith source (Miter Offset.defaultMiterLimit) cap { Stroke.defaultOptions with Width = 2.0<length> }
         |> Result.defaultWith (failwithf "%A")
-        |> Serialize.path
-    Assert.Equal("M 0 -1 H 10 V 1 H 0 Z", render Butt)
-    Assert.Equal("M 0 -1 H 10 H 11 V 1 H 10 H 0 H -1 V -1 Z", render Square)
+    ClosedPathAssertions.equivalent (render Butt) "M 0 -1 H 10 V 1 H 0 Z"
+    ClosedPathAssertions.equivalent (render Square) "M 0 -1 H 10 H 11 V 1 H 10 H 0 H -1 V -1 Z"
 
 [<Fact>]
 let ``subpath_stroke_open_line_with_butt_cap_returns_closed_outline_test`` () =
@@ -461,7 +458,7 @@ let ``subpath_stroke_open_line_with_butt_cap_returns_closed_outline_test`` () =
     let result = Stroke.subpathWith source (Miter Offset.defaultMiterLimit) Butt { Stroke.defaultOptions with Width = 2.0<length> } |> Result.defaultWith (failwithf "%A")
     Assert.Single(result.Subpaths) |> ignore
     Assert.True(result.Subpaths[0].Closed)
-    Assert.Equal("M 0 -1 H 10 V 1 H 0 Z", Serialize.path result)
+    ClosedPathAssertions.equivalent result "M 0 -1 H 10 V 1 H 0 Z"
 
 [<Fact>]
 let ``subpath_stroke_rejects_invalid_width_test`` () =

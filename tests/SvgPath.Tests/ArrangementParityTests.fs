@@ -8,6 +8,19 @@ let private minimumChord = 0.00001<length>
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private line ax ay bx by = Line(point ax ay, point bx by)
 
+[<Fact>]
+let ``annotated drawing uses requested winding tolerance`` () =
+    let source = Subpath.polyline [point 0. 0.;point 100. 0.;point 100. 100.;point 0. 100.;point 0. 0.]
+                 |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    let path = Path.singleton source
+    let build = Arrangement.build [path] 1e-12<length> 1e-8<length> |> Result.defaultWith (failwithf "%A")
+    let things = ArrangementDrawing.annotatedDrawing build.Graph path 1e-12<length> |> Result.defaultWith (failwithf "%A")
+    let labels = things |> List.choose (function
+        | RotatedText(label, style, _, _, _, _) when style="fill: #0f172a; font-family: ui-monospace, monospace; font-weight: 700; text-anchor: middle" -> Some label
+        | _ -> None)
+    Assert.Equal(4, List.length labels)
+    Assert.True(labels |> List.forall (fun label -> label="0/1" || label="1/0"))
+
 let private selfCrossingCubic () = CubicBezier(point 0. -0.09375,point (-1./3.) 0.13541666666666666,point (-1./3.) -0.13541666666666666,point 0. 0.09375)
 let private closedCubic () = CubicBezier(point 0. 0.,point 2. 2.,point -2. 2.,point 0. 0.)
 let private buildLoopFixture segments =

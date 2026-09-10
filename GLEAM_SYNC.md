@@ -330,4 +330,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `6679aa6` — retain retraced closed contours when no interior probe exists.
   Both exact C-shape source regressions ported. `scripts/test-fast`: 1741 passed.
 
-Next: `c2e8865` (arrangement drawing containment tolerance).
+- `c2e8865` — annotation containment uses its supplied tolerance, matching
+  side-probe displacement. Source regression ported. `scripts/test-fast`:
+  1742 passed.
+
+Next: `3bf9b2a` (allow empty cusp results after parity reduction).

@@ -92,7 +92,8 @@ module ArrangementDrawing =
         let rec edgeThings reversed = function
             | [] -> Ok(List.rev reversed |> List.concat)
             | edge :: rest ->
-                WindingField.segmentSideNonzeroLevels edge.Segment source (tolerance * 16.0) WindingField.defaultOptions
+                // The containment boundary tolerance must match the probe scale.
+                WindingField.segmentSideNonzeroLevels edge.Segment source (tolerance * 16.0) {WindingField.defaultOptions with Tolerance=tolerance}
                 |> Result.mapError ArrangementSegmentError
                 |> Result.bind (fun (leftWinding, rightWinding) ->
                     edgeAnnotationPose edge

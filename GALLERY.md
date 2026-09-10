@@ -5,9 +5,8 @@ source geometry. Run `scripts/generate-gallery-figures` from this repository.
 The generator is a non-packable project under `tools/GalleryFigures`; it requires
 no neighboring Gleam checkout. Panel framing is computed from F# geometry bounds.
 
-Twenty-eight figures are calculated by F#. The second-offset arrangement is
-an explicitly archived snapshot, marked below; it is not evidence of current
-F# computation.
+All twenty-nine figures are calculated by F#. The second-offset arrangement
+captures production calls in a diagnostic-only build; no alternate solver is used.
 
 ### Rounded Rectangle Union
 
@@ -125,11 +124,15 @@ single offset used to stress arrangement-based offset pruning.
 
 ![Package title second offset arrangement](docs/gallery/gallery-package-title-second-offset-arrangement.svg)
 
-Shows the second-offset arrangement graph for the package title stress fixture:
-red submerged edges, green non-submerged edges, yellow first-round dangling
-edges, and purple final survivor edges.
+Shows the full arrangement from two successive `1.05` offsets using `Miter(4)`.
+Only the second offset disables offside trimming. A diagnostic-only build
+captures the actual classification and parity-reduction calls.
 
-Archived snapshot, also loaded as a pre-rendered SVG by the Gleam generator.
+Red marks initially submerged offset edges; purple marks positive final
+capacity. Yellow marks deleted edges that were initially degree-one after
+submerged deletion. Green marks other initially retained edges later deleted;
+pale gray marks source-only graph edges. Original lettering is pale gray and
+its first offset is blue. The historical snapshot is retained under `archive`.
 
 ### Offset Text
 

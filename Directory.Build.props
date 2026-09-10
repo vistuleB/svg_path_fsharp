@@ -3,4 +3,9 @@
     <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(GalleryDiagnostics)' == 'true'">
+    <DefineConstants>$(DefineConstants);GALLERY_DIAGNOSTICS</DefineConstants>
+    <BaseOutputPath>bin/gallery-diagnostics/</BaseOutputPath>
+    <BaseIntermediateOutputPath>obj/gallery-diagnostics/</BaseIntermediateOutputPath>
+  </PropertyGroup>
 </Project>

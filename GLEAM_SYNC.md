@@ -392,13 +392,20 @@ Do not substitute the final Gleam tree for the historical source commit.
   All nine successive package-title offsets completed. Full log:
   `/tmp/fsharp-sync-gallery-refresh.log` (local diagnostic, not committed).
 
-## Paused for a decision
+- `95a29d2` — user approved a diagnostic-only instrumented build in place of
+  Erlang runtime tracing. Captures actual private production classification and
+  parity calls; no copied solver/pipeline. Observer storage/calls and friend
+  visibility are compiled out of normal builds; diagnostic output/intermediates
+  are isolated and packaging is rejected. Old SVG moved into the archive.
+  `scripts/generate-gallery-figures
+  gallery-package-title-second-offset-arrangement.svg`: succeeded, 907 vertices,
+  1181 graph edges, 783 eligible edges, 471 initially submerged, 312 retained,
+  185 positive final capacities. Ordinary `scripts/test-fast`: 1753 passed.
+  Diagnostic packaging guard tested with `dotnet msbuild
+  src/SvgPath/SvgPath.fsproj -t:RejectDiagnosticPackage
+  -p:GalleryDiagnostics=true -nologo` (expected rejection).
+  The three earlier full-Gallery failures remain recorded, not independently
+  repaired. Resume instruction: continue past non-catastrophic historical
+  failures toward the latest committed Gleam changes.
 
-Next source: `95a29d2` (production-traced second-offset Gallery fixture).
-Gleam uses Erlang private-function call/return tracing. There is no directly
-equivalent built-in .NET tracer available here. Faithful F# capture requires a
-choice: internal observation hooks or a diagnostic-only instrumented build.
-No observer, alternate solver, or manually duplicated pipeline has been added.
-Parent requested a stop at this boundary after the Gallery run completed.
-The three Gallery failures above also remain for diagnosis; do not describe
-this checkpoint as passing Gallery verification.
+Next: `527da80` (count only reconstructible offset preimages in capacities).

@@ -539,6 +539,12 @@ type internal OffsetCurvatureZone =
 /// the source traversal; negative offsets lie on its visual right.
 /// The separate Stroke module constructs strokes from these band operations.
 module Offset =
+#if GALLERY_DIAGNOSTICS
+    // Compile-time-only observers of the production calls. Normal assemblies
+    // contain neither this storage nor the recording calls below.
+    let internal diagnosticClassification = ResizeArray<OffsetArrangementBuild * OffsetTrimGraph * Result<OffsetTrimGraph,InternalError>>()
+    let internal diagnosticParity = ResizeArray<Result<OffsetTrimGraph,InternalError>>()
+#endif
     /// Convert internal offset failures at public API boundaries.
     let internal publicError (error: InternalError) =
         match error with
@@ -4051,6 +4057,9 @@ module Offset =
         deleteWindingMismatchedEdgesLoop
             build graph.Edges winding sideSamplingDistance []
         |> Result.map (fun retained -> { graph with Edges = retained })
+#if GALLERY_DIAGNOSTICS
+        |> fun result -> diagnosticClassification.Add(build,graph,result); result
+#endif
 
     let private protectedVertexParities vertices =
         vertices
@@ -4080,6 +4089,9 @@ module Offset =
             { Vertices = graph.Vertices
               Edges = edges
               EdgeCapacities = Some edgeCapacities })
+#if GALLERY_DIAGNOSTICS
+        |> fun result -> diagnosticParity.Add result; result
+#endif
 
     let rec private takeSegmentImages images count =
         if count <= 0 then Ok([], images)

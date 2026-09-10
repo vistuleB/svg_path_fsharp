@@ -56,4 +56,7 @@
     <Compile Include="Offset.fs" />
     <Compile Include="Stroke.fs" />
   </ItemGroup>
+  <Target Name="RejectDiagnosticPackage" BeforeTargets="GenerateNuspec;Pack" Condition="'$(GalleryDiagnostics)' == 'true'">
+    <Error Text="Gallery diagnostic builds must not be packaged. Use the ordinary production build." />
+  </Target>
 </Project>

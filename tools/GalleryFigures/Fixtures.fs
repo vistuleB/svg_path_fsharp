@@ -170,7 +170,7 @@ module Fixtures =
          "gallery-package-title-nine-offsets.svg",packageNine
          "gallery-crescent-hull.svg",crescent
          "gallery-cut-radiator.svg",radiator
+         "gallery-package-title-second-offset-arrangement.svg",ArrangementCapture.generate
          "gallery-lazy-dog-offset-coil.svg",OffsetText.generate false
          "gallery-lazy-dog-offset-decaying-spiral.svg",OffsetText.generate true] @ csgCases()
-    let snapshots =
-        ["gallery-package-title-second-offset-arrangement.svg"]
+    let snapshots : string list = []

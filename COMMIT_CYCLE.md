@@ -18,13 +18,16 @@ There is a dedicated audience distinction:
 
 ## Gallery Figures
 
-Run `scripts/generate-gallery-figures` to regenerate the calculated Gallery
-figures and copy the explicitly archived second-offset arrangement illustration.
+Run `scripts/generate-gallery-figures` to regenerate all Gallery figures.
+It enables `GalleryDiagnostics=true` for compile-time-only capture of actual
+private calls used by the second-offset fixture. Diagnostic outputs and
+intermediates are isolated under `bin/gallery-diagnostics` and
+`obj/gallery-diagnostics`; packaging such builds is prohibited.
 The self-contained, non-packable generator lives in `tools/GalleryFigures`.
 Use `--check` to compare outputs without rewriting them, or pass SVG filenames
 to run selected figures. Commit the generator, `GALLERY.md`, and `docs/gallery`
 changes together. See the generator README for its Gleam source mapping and
-the distinction between calculated figures and archived snapshots.
+the diagnostic capture contract and historical archive.
 
 ## Local Previews
 

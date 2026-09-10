@@ -217,4 +217,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   actual endpoints and the source's exact assertions. `scripts/test-fast`:
   1705 passed.
 
-Next: `2fd732c` (interior overlap endpoint addresses).
+- `2fd732c` — gather geometrically verified coordinate-root addresses and
+  explicit endpoints, retaining projection for approximate matches. Preserve
+  failures unless a coordinate exhausts its degree bound; require reciprocal
+  containment for rejected affine candidates. Source regression added.
+  `scripts/test-fast`: 1706 passed.
+
+Next: `cf70b23` (arc geometry in congruency fitting).

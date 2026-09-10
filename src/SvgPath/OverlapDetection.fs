@@ -97,18 +97,76 @@ module internal OverlapDetection =
         |> List.fold (fun state overlap -> state |> Result.bind (fun merged -> insert overlap merged [])) (Ok [])
         |> Result.map List.rev
 
-    let private endpointProjection source sourceT sample target =
-        Segment.projection target sample
-        |> Result.map (fun (targetT, _, distance) ->
-            [ { Source=source; SourceT=sourceT; TargetT=targetT; Distance=distance }
-              { Source=source; SourceT=sourceT; TargetT=0.0<parameter>; Distance=Point.distance sample (Segment.start target) }
-              { Source=source; SourceT=sourceT; TargetT=1.0<parameter>; Distance=Point.distance sample (Segment.finish target) } ])
+    // Deduplicate addresses, not positions; exact endpoints are supplied first.
+    let private matchingParameters segment at parameters tolerance =
+        parameters |> List.fold (fun state t ->
+            state |> Result.bind (fun found ->
+                Segment.point segment t |> Result.map (fun candidate ->
+                    if Point.distance at candidate <= tolerance
+                       && not(List.exists (fun previous -> abs(previous-t) <= 1e-9<parameter>) found)
+                    then found @ [t] else found))) (Ok [])
 
-    let private endpointProjections left right =
-        [ endpointProjection LeftEndpoint 0.0<parameter> (Segment.start left) right
-          endpointProjection LeftEndpoint 1.0<parameter> (Segment.finish left) right
-          endpointProjection RightEndpoint 0.0<parameter> (Segment.start right) left
-          endpointProjection RightEndpoint 1.0<parameter> (Segment.finish right) left ]
+    let rec private coordinateControlDegree values =
+        let differences = values |> List.pairwise |> List.map (fun (a,b) -> b-a)
+        if differences |> List.exists (fun value -> not(InternalNumber.isZero value))
+        then 1 + coordinateControlDegree differences else 0
+
+    let private coordinateDegree segment x =
+        let coordinate (p:Point<length>) = if x then p.X else p.Y
+        match segment with
+        | Line(a,b) -> if InternalNumber.isZero(coordinate b-coordinate a) then 0 else 1
+        | QuadraticBezier(a,b,c) -> coordinateControlDegree(List.map coordinate [a;b;c])
+        | CubicBezier(a,b,c,d) -> coordinateControlDegree(List.map coordinate [a;b;c;d])
+        | Arc _ -> -1 // No polynomial completeness claim for arcs.
+
+    let private coordinateMatches segment at x tolerance =
+        let degree = coordinateDegree segment x
+        if degree=0 then Ok([],0)
+        else
+            let options = { Segment.defaultCrossingOptions with SignedLineDistanceTolerance=max (tolerance*0.25) 1e-12<length> }
+            let direction = if x then Point.create 0.0 1.0 else Point.create 1.0 0.0
+            Segment.rayCrossingsWith segment at direction options
+            |> Result.bind (fun roots -> matchingParameters segment at ([0.0<parameter>;1.0<parameter>] @ List.map fst roots) tolerance)
+            |> Result.map (fun matches -> matches,degree)
+
+    let private completeCoordinate found =
+        // A degree-d coordinate has at most d distinct roots. Count only
+        // geometrically verified, deduplicated matches toward this bound.
+        match found with
+        | Ok(matches,degree) -> degree>0 && List.length matches=degree
+        | Error _ -> false
+
+    let private combineCoordinateMatches x y =
+        match x,y with
+        | Ok(xs,_),Ok(ys,_) -> Ok(xs@ys)
+        | Ok(xs,_),Error(CrossingMaxIterationsReached _ as error) -> if completeCoordinate x then Ok xs else Error error
+        | Error(CrossingMaxIterationsReached _ as error),Ok(ys,_) -> if completeCoordinate y then Ok ys else Error error
+        | Error error,_ | _,Error error -> Error error
+
+    let private endpointProjection source sourceT sample target tolerance =
+        // A complete coordinate inventory can replace failed projection;
+        // an arbitrary partial collection of geometric matches cannot.
+        let x = coordinateMatches target sample true tolerance
+        let y = coordinateMatches target sample false tolerance
+        combineCoordinateMatches x y |> Result.bind (fun coordinates ->
+            let projected =
+                match Segment.projection target sample with
+                | Ok(t,_,_) -> Ok[t]
+                | Error(DistanceMaxIterationsReached _ as error) ->
+                    if completeCoordinate x || completeCoordinate y then Ok[] else Error error
+                | Error error -> Error error
+            projected |> Result.bind (fun projected ->
+                matchingParameters target sample ([0.0<parameter>;1.0<parameter>] @ coordinates @ projected) tolerance)
+            |> Result.bind (fun matches ->
+                matches |> List.fold (fun state t -> state |> Result.bind (fun found ->
+                    Segment.point target t |> Result.map (fun at ->
+                        found @ [{Source=source;SourceT=sourceT;TargetT=t;Distance=Point.distance sample at}]))) (Ok [])))
+
+    let private endpointProjections left right tolerance =
+        [ endpointProjection LeftEndpoint 0.0<parameter> (Segment.start left) right tolerance
+          endpointProjection LeftEndpoint 1.0<parameter> (Segment.finish left) right tolerance
+          endpointProjection RightEndpoint 0.0<parameter> (Segment.start right) left tolerance
+          endpointProjection RightEndpoint 1.0<parameter> (Segment.finish right) left tolerance ]
         |> List.fold (fun state item ->
             match state, item with
             | Ok items, Ok item -> Ok(item :: items)
@@ -197,7 +255,7 @@ module internal OverlapDetection =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then Error(InvalidOverlapTolerance tolerance)
         elif samples <= 0 then Error(InvalidOverlapSamples samples)
         else
-            endpointProjections left right
+            endpointProjections left right tolerance
             |> Result.bind (fun projections ->
                 let close = projections |> List.filter (fun projection -> projection.Distance <= tolerance)
                 close
@@ -216,7 +274,14 @@ module internal OverlapDetection =
                                     else affineValid overlap left right tolerance samples
                                          |> Result.bind (fun affine ->
                                             if affine then Ok { candidates with Affine=overlap::candidates.Affine }
-                                            else Ok { candidates with NonAffine=overlap::candidates.NonAffine }))))) (Ok { Affine=[]; NonAffine=[] })
+                                            else
+                                                // A wrong pairing can contain an extra loop on one side.
+                                                // Require reciprocal containment before calling it non-affine.
+                                                let opposite = canonical { overlap with LeftFrom=overlap.RightFrom;LeftTo=overlap.RightTo;RightFrom=overlap.LeftFrom;RightTo=overlap.LeftTo }
+                                                sampledOverlapValid opposite right left tolerance samples
+                                                |> Result.map (fun reciprocal ->
+                                                    if reciprocal then { candidates with NonAffine=overlap::candidates.NonAffine }
+                                                    else candidates)))))) (Ok { Affine=[]; NonAffine=[] })
                 |> Result.bind (fun candidates ->
                     // A rejected orientation is not evidence of non-affinity if
                     // accepted alternatives cover both parameter domains.

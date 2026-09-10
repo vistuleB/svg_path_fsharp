@@ -176,6 +176,29 @@ let ``closed cubic identity overlap keeps endpoint alternatives`` () =
     Assert.Equal(2,List.length found.Intersections)
 
 [<Fact>]
+let ``overlap endpoints keep multiple interior addresses`` () =
+    let source = CubicBezier(point 0.0 0.0,point -13.0 -16.0,point -26.0 -16.0,point 9.0 0.0)
+    for fromT,toT in [parameter 0.25,parameter 0.75;parameter 0.75,parameter 1.0;parameter 0.0,parameter 0.75] do
+        let portion = Segment.between source fromT toT |> Result.defaultWith (failwithf "%A")
+        for part in [portion;Segment.reverse portion] do
+            for left,right in [source,part;part,source] do
+                let overlap = Overlaps.segment left right |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+                if left=source then
+                    assertParameterNear fromT overlap.LeftFrom
+                    assertParameterNear toT overlap.LeftTo
+                else
+                    Assert.Equal(parameter 0.0,overlap.LeftFrom)
+                    Assert.Equal(parameter 1.0,overlap.LeftTo)
+                if right=source then
+                    assertParameterNear fromT (min overlap.RightFrom overlap.RightTo)
+                    assertParameterNear toT (max overlap.RightFrom overlap.RightTo)
+                else
+                    Assert.True(overlap.RightFrom=parameter 0.0 || overlap.RightFrom=parameter 1.0)
+                    Assert.Equal(parameter 1.0 - overlap.RightFrom,overlap.RightTo)
+                let found = Overlaps.checkParameterCorrespondence left right overlap.LeftFrom overlap.LeftTo overlap.RightFrom overlap.RightTo 1e-6<length> 5 |> Result.defaultWith (failwithf "%A")
+                Assert.True(Option.isSome found)
+
+[<Fact>]
 let ``closed cubic reversed overlap keeps endpoint alternatives`` () =
     let curve = CubicBezier(point 0.0 0.0, point 3.0 4.0, point -3.0 4.0, point 0.0 0.0)
     let reversed = Segment.reverse curve

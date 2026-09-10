@@ -457,6 +457,7 @@ module Segment =
     let arcEndAngle segment = arcCenterData segment |> Result.map Ellipse.arcEndAngle
 
     let point segment t =
+        let t = InternalNumber.normalizeZero t
         if t = 0.0<parameter> then Ok(start segment)
         elif t = 1.0<parameter> then Ok(finish segment)
         else
@@ -492,6 +493,8 @@ module Segment =
         else splitUnchecked segment t
 
     let rec between segment fromParameter toParameter =
+        let fromParameter = InternalNumber.normalizeZero fromParameter
+        let toParameter = InternalNumber.normalizeZero toParameter
         if fromParameter > toParameter then
             between segment toParameter fromParameter |> Result.map reverse
         elif fromParameter = toParameter then
@@ -601,6 +604,7 @@ module Segment =
 
     /// Return singularity-safe unit traversal directions at a segment parameter.
     let directionsWith options segment t =
+        let t = InternalNumber.normalizeZero t
         validateDirectionOptions options
         |> Result.bind (fun () ->
             match segment with
@@ -2032,7 +2036,8 @@ module Subpath =
                     |> Result.bind (fun box ->
                         Segment.boundingBox segment
                         |> Result.map (BoundingBox.union box))) (Ok initial))
-    let parameterCanonicalize subpath parameter =
+    let parameterCanonicalize subpath (parameter: SubpathParameter) =
+        let parameter = { parameter with T = InternalNumber.normalizeZero parameter.T }
         let length = List.length subpath.segmentList
         if length = 0 then Error EmptySubpath
         elif parameter.SegmentIndex < 0 || parameter.SegmentIndex >= length

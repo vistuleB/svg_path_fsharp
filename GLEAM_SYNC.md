@@ -97,4 +97,7 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `1d32ade` — canonical signed-zero helper and Bezier split deduplication.
   Three source regressions added one-to-one. `scripts/test-fast`: 1658 passed.
 
-Next: `ba24ca4` (signed-zero segment and subpath parameters).
+- `ba24ca4` — canonical signed-zero segment parameters and subpath addresses.
+  Seven source regressions added one-to-one. `scripts/test-fast`: 1665 passed.
+
+Next: `8d3dd27` (signed-zero dash patterns).

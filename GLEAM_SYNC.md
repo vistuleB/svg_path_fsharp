@@ -239,4 +239,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   reject exactly singular input maps before rounded axis extraction. Both
   source regressions ported. `scripts/test-fast`: 1711 passed.
 
-Next: `7345278` (CSG closure and winding tolerances).
+- `7345278` — include implicit fill-closing lines in CSG arrangements and
+  pass arrangement tolerance into winding queries, including nested contours.
+  Three source regressions added. `scripts/test-fast`: 1714 passed.
+
+Next: `3351438` (unrounded rectangle start).

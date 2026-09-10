@@ -19,6 +19,8 @@ type CsgResult =
       Build: ArrangementSegmentBuild }
 
 /// Boolean operations on filled SVG paths.
+/// Open subpaths are implicitly closed by a line for filling; these closing
+/// lines are also included in the returned arrangement build.
 [<RequireQualifiedAccess>]
 module Csg =
     let defaultOptions =
@@ -47,7 +49,12 @@ module Csg =
         let segments =
             paths
             |> List.collect Path.subpaths
-            |> List.collect Subpath.segments
+            |> List.collect (fun subpath ->
+                let segments = Subpath.segments subpath
+                let start,finish = Subpath.start subpath,Subpath.finish subpath
+                // Include implicit fill closure in the arrangement inventory.
+                if List.isEmpty segments || Point.near 0.0<length> start finish then segments
+                else segments @ [Line(finish,start)])
         Arrangement.buildWith segments options.Tolerance options.MinimumChord 0.0<parameter>
         |> Result.mapError (fun _ -> CsgArrangementError)
 
@@ -74,10 +81,10 @@ module Csg =
         |> List.fold (fun state edge ->
             state
             |> Result.bind (fun boundary ->
-                WindingField.segmentSideNonzeroLevels edge.Segment leftPath (tolerance * 16.0) WindingField.defaultOptions
+                WindingField.segmentSideNonzeroLevels edge.Segment leftPath (tolerance * 16.0) { WindingField.defaultOptions with Tolerance=tolerance }
                 |> Result.mapError CsgPathError
                 |> Result.bind (fun (leftA, rightA) ->
-                    WindingField.segmentSideNonzeroLevels edge.Segment rightPath (tolerance * 16.0) WindingField.defaultOptions
+                    WindingField.segmentSideNonzeroLevels edge.Segment rightPath (tolerance * 16.0) { WindingField.defaultOptions with Tolerance=tolerance }
                     |> Result.mapError CsgPathError
                     |> Result.map (fun (leftB, rightB) ->
                         let activeLeft = combine operation (filled leftA fillRule) (filled leftB fillRule)

@@ -1245,7 +1245,7 @@ module Arrangement =
     let private nestedContourEdges
         (graph: ArrangementGraph)
         (path: Path)
-        (sideSamplingDistance: float<length>) =
+        (tolerance: float<length>) =
         graph.Edges
         |> List.fold (fun state edge ->
             state
@@ -1253,8 +1253,8 @@ module Arrangement =
                 WindingField.segmentSideNonzeroLevels
                     edge.Segment
                     path
-                    sideSamplingDistance
-                    WindingField.defaultOptions
+                    (tolerance * 16.0)
+                    { WindingField.defaultOptions with Tolerance=tolerance }
                 |> Result.mapError InternalArrangementSegmentError
                 |> Result.map (fun (left, right) -> classified @ [ edge, left, right ]))) (Ok [])
         |> Result.map (fun classified ->
@@ -1360,7 +1360,7 @@ module Arrangement =
         if tolerance <= 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
             Error(InternalInvalidArrangementTolerance tolerance)
         else
-            nestedContourEdges graph path (tolerance * 16.0)
+            nestedContourEdges graph path tolerance
             |> Result.bind (fun edges ->
                 nestedContourSuccessors edges
                 |> Result.bind (fun successors -> traceNestedContours edges successors tolerance))

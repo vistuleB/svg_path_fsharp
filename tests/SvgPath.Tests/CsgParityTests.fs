@@ -13,6 +13,32 @@ let private area path = Area.path path Nonzero |> Result.defaultWith (failwithf 
 let private containment path sample = Path.containment sample path Nonzero |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
+let ``open subpath fill closure is included in arrangement`` () =
+    let source = Subpath.polyline [point 0. 0.;point 10. 0.;point 0. 10.] |> Result.defaultWith (failwithf "%A") |> Path.singleton
+    let result = Csg.union source Path.empty Nonzero |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(50.0,float(area result.Path),6)
+    Assert.Single(Path.subpaths result.Path) |> ignore
+    Assert.Equal(3,List.length result.Build.Segments)
+    let reversed = Csg.union Path.empty (Path.reverse source) Nonzero |> output
+    Assert.Equal(50.0,float(area reversed),6)
+
+[<Fact>]
+let ``fine csg tolerance preserves square boundary`` () =
+    let square = rectangle 0. 0. 10. 10.
+    let options = {Csg.defaultOptions with Tolerance=1e-12<length>;MinimumChord=1e-5<length>}
+    let result = Csg.unionWith square Path.empty Nonzero options |> output
+    Assert.Equal(100.0,float(area result),6)
+    Assert.Single(Path.subpaths result) |> ignore
+    let intersection = Csg.intersectionWith square square Nonzero options |> output
+    Assert.Equal(100.0,float(area intersection),6)
+
+[<Fact>]
+let ``fine csg tolerance preserves nested contours`` () =
+    let result = Csg.nestedContoursWith (rectangle 0. 0. 10. 10.) {Csg.defaultOptions with Tolerance=1e-12<length>;MinimumChord=1e-5<length>} |> output
+    Assert.Equal(100.0,float(area result),6)
+    Assert.Single(Path.subpaths result) |> ignore
+
+[<Fact>]
 let ``csg result retains its arrangement build`` () =
     let result = Csg.union (rectangle 0.0 0.0 2.0 2.0) (rectangle 1.0 0.0 3.0 2.0) Nonzero |> Result.defaultWith (failwithf "%A")
     Assert.Equal(8, result.Build.Segments.Length)

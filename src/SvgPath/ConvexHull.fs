@@ -86,10 +86,7 @@ module ConvexHull =
         { From: WidthSample
           ``To``: WidthSample }
 
-    [<Struct>]
-    type private LoopParam =
-        { SegmentIndex: int
-          T: float<parameter> }
+    type private LoopParam = SubpathParameter
 
     [<Struct>]
     type private ConvexLoop =
@@ -120,11 +117,17 @@ module ConvexHull =
           From: LoopWinner
           ``To``: LoopWinner }
 
+    // Traversal intent is independent of cyclic address equality.
+    type private LoopPiece =
+        | FullLoop
+        | OnePoint of at: LoopParam
+        | Portion of fromParameter: LoopParam * toParameter: LoopParam
+
     type private UnionPiece =
         | HullLineAB of LoopParam * LoopParam
         | HullLineBA of LoopParam * LoopParam
-        | LoopPieceA of LoopParam * LoopParam
-        | LoopPieceB of LoopParam * LoopParam
+        | LoopPieceA of LoopPiece
+        | LoopPieceB of LoopPiece
 
     [<Struct>]
     type private TangentCandidate =
@@ -569,14 +572,25 @@ module ConvexHull =
             if left.Winner = right.Winner then None
             else Some(refineLoopBoundary loopA loopB left.Angle right.Angle left.Winner))
 
-    let private loopPiecesFromBoundaries boundaries =
+    let private normalizeLoopParam (loop: ConvexLoop) (parameter: LoopParam) =
+        if parameter.T = 1.0<parameter> then
+            { SegmentIndex = (parameter.SegmentIndex + 1) % loop.Segments.Length; T = 0.0<parameter> }
+        elif InternalNumber.isZero parameter.T then { parameter with T = 0.0<parameter> }
+        else parameter
+
+    let private loopPortion loop fromParameter toParameter =
+        let start = normalizeLoopParam loop fromParameter
+        let finish = normalizeLoopParam loop toParameter
+        if start = finish then OnePoint start else Portion(start,finish)
+
+    let private loopPiecesFromBoundaries boundaries loopA loopB =
         boundaries
         |> circularPairs
         |> List.collect (fun (startBoundary, endBoundary) ->
             let loopPiece =
                 match startBoundary.``To`` with
-                | LoopA -> LoopPieceA(startBoundary.A.Param, endBoundary.A.Param)
-                | LoopB -> LoopPieceB(startBoundary.B.Param, endBoundary.B.Param)
+                | LoopA -> LoopPieceA(loopPortion loopA startBoundary.A.Param endBoundary.A.Param)
+                | LoopB -> LoopPieceB(loopPortion loopB startBoundary.B.Param endBoundary.B.Param)
             let linePiece =
                 match endBoundary.From, endBoundary.``To`` with
                 | LoopA, LoopB -> HullLineAB(endBoundary.A.Param, endBoundary.B.Param)
@@ -593,8 +607,8 @@ module ConvexHull =
         | [] -> []
         | first :: _ ->
             match first.Winner with
-            | LoopA -> [ LoopPieceA(first.A.Param, first.A.Param) ]
-            | LoopB -> [ LoopPieceB(first.B.Param, first.B.Param) ]
+            | LoopA -> [ LoopPieceA FullLoop ]
+            | LoopB -> [ LoopPieceB FullLoop ]
 
     let private loopUnion loopA loopB seedAngles =
         let samples =
@@ -602,7 +616,7 @@ module ConvexHull =
             |> List.map (loopSample loopA loopB)
         match loopTransitionBoundaries loopA loopB samples with
         | [] -> allOneLoop samples
-        | boundaries -> loopPiecesFromBoundaries boundaries
+        | boundaries -> loopPiecesFromBoundaries boundaries loopA loopB
 
     let private nextIndex index count = if index + 1 >= count then 0 else index + 1
 
@@ -615,12 +629,11 @@ module ConvexHull =
     let private partialSegment segment fromT toT =
         Segment.betweenInside segment fromT toT |> Result.defaultWith (failwithf "%A")
 
-    let private loopPieceSegments (loop: ConvexLoop) fromParameter toParameter =
+    let private loopPortionSegments (loop: ConvexLoop) (fromParameter: LoopParam) (toParameter: LoopParam) =
         let segments = loop.Segments
         let fromIndex, toIndex = fromParameter.SegmentIndex, toParameter.SegmentIndex
         let fromT, toT = fromParameter.T, toParameter.T
-        if fromIndex = toIndex && abs (fromT - toT) <= sameT then segments
-        elif fromIndex = toIndex && fromT <= toT then [ partialSegment segments[fromIndex] fromT toT ]
+        if fromIndex = toIndex && fromT <= toT then [ partialSegment segments[fromIndex] fromT toT ]
         elif fromIndex = toIndex then
             let middle =
                 walkSegmentIndices (nextIndex fromIndex segments.Length) fromIndex segments.Length
@@ -635,11 +648,16 @@ module ConvexHull =
                 elif index = toIndex then partialSegment segments[index] 0.0<parameter> toT
                 else partialSegment segments[index] 0.0<parameter> 1.0<parameter>)
 
+    let private loopPieceSegments loop = function
+        | FullLoop -> loop.Segments
+        | OnePoint _ -> []
+        | Portion(fromParameter,toParameter) -> loopPortionSegments loop fromParameter toParameter
+
     let private unionPieceSegments loopA loopB pieces =
         pieces
         |> List.collect (function
-            | LoopPieceA(fromParameter, toParameter) -> loopPieceSegments loopA fromParameter toParameter
-            | LoopPieceB(fromParameter, toParameter) -> loopPieceSegments loopB fromParameter toParameter
+            | LoopPieceA piece -> loopPieceSegments loopA piece
+            | LoopPieceB piece -> loopPieceSegments loopB piece
             | HullLineAB(a, b) -> [ Line(loopPoint loopA a, loopPoint loopB b) ]
             | HullLineBA(b, a) -> [ Line(loopPoint loopB b, loopPoint loopA a) ])
         |> List.filter (segmentIsPointLike >> not)
@@ -1067,8 +1085,8 @@ module ConvexHull =
             | _ -> false
 
     let private loopTangentChainsToSubpaths loop first second point clockwise =
-        let firstSegments = loopPieceSegments loop first.Param second.Param
-        let secondSegments = loopPieceSegments loop second.Param first.Param
+        let firstSegments = loopPieceSegments loop (loopPortion loop first.Param second.Param)
+        let secondSegments = loopPieceSegments loop (loopPortion loop second.Param first.Param)
         buildOpenSubpathFromSegments firstSegments
         |> Result.bind (fun firstSubpath ->
             buildOpenSubpathFromSegments secondSegments

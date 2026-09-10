@@ -35,4 +35,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   decisions. All five source regressions added one-to-one. `scripts/test-fast`:
   1573 passed, the same 20 historical hull/downstream failures remain.
 
-Next: `21c8b7f` (full/point/portion hull repair).
+- `21c8b7f` — distinguish FullLoop, OnePoint, and Portion; reuse SubpathParameter
+  and normalize exact endpoint aliases without swallowing short portions.
+  All five source regressions added one-to-one. `scripts/test-fast`: 1598 passed;
+  `scripts/test-slow`: 26 passed. All 20 intermediate failures are resolved.
+
+Next: `8f8173d` (exact point interpolation endpoints).

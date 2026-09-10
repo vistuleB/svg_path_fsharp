@@ -58,6 +58,7 @@
     <Compile Include="DegeneracyProtrusionsTests.fs" />
     <Compile Include="VectorSupportTests.fs" />
     <Compile Include="SourceStripSeedTests.fs" />
+    <Compile Include="HullLoopPieceTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

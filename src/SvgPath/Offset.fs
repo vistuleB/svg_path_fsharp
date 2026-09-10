@@ -142,7 +142,6 @@ type internal SegmentEndpoint =
     | SegmentEnd
 
 type internal CubicEndpointFitPolicy =
-    | FitPositionOnly
     | FitPositionAndDirection of direction: Point<1>
     | FitPositionAndDirectionWithCollapsedHandle of direction: Point<1>
 
@@ -2074,42 +2073,6 @@ module Offset =
         stalledEndControl1 startPoint endPoint startDirection endDirection samples
         |> Result.map (fun control1 -> CubicBezierData(startPoint, control1, endPoint, endPoint))
 
-    let private fitOffsetCubicStartStalledEndPosition startPoint endPoint startDirection samples =
-        unitVector 0.0<parameter> startDirection
-        |> Result.bind (fun direction ->
-            fitStartTangentOneHandle startPoint endPoint direction endPoint samples
-            |> Result.bind (fun handle ->
-                validateReversalHandleScalar startPoint endPoint handle
-                |> Result.map (fun _ ->
-                    CubicBezierData(startPoint, startPoint, Point.translate (Point.scale handle direction) startPoint, endPoint))))
-
-    let private fitOffsetCubicStartPositionEndStalled startPoint endPoint endDirection samples =
-        unitVector 1.0<parameter> endDirection
-        |> Result.bind (fun direction ->
-            fitEndTangentOneHandle startPoint endPoint startPoint direction samples
-            |> Result.bind (fun handle ->
-                validateReversalHandleScalar startPoint endPoint handle
-                |> Result.map (fun _ ->
-                    CubicBezierData(startPoint, Point.translate (Point.scale -handle direction) endPoint, endPoint, endPoint))))
-
-    let private fitOffsetCubicStartTangentEndPosition startPoint endPoint startDirection samples =
-        unitVector 0.0<parameter> startDirection
-        |> Result.bind (fun direction ->
-            fitStartTangentOneHandle startPoint endPoint direction endPoint samples
-            |> Result.bind (fun handle ->
-                validateReversalHandleScalar startPoint endPoint handle
-                |> Result.map (fun _ ->
-                    CubicBezierData(startPoint, Point.translate (Point.scale handle direction) startPoint, endPoint, endPoint))))
-
-    let private fitOffsetCubicStartPositionEndTangent startPoint endPoint endDirection samples =
-        unitVector 1.0<parameter> endDirection
-        |> Result.bind (fun direction ->
-            fitEndTangentOneHandle startPoint endPoint startPoint direction samples
-            |> Result.bind (fun handle ->
-                validateReversalHandleScalar startPoint endPoint handle
-                |> Result.map (fun _ ->
-                    CubicBezierData(startPoint, startPoint, Point.translate (Point.scale -handle direction) endPoint, endPoint))))
-
     let rec private fitOffsetCubicDataWithEndpointPolicies
         startPoint
         endPoint
@@ -2123,10 +2086,6 @@ module Offset =
             |> Result.bind (fun (curve, report) ->
                 recoverCollapsedDirectionFit
                     curve report startPoint endPoint startDirection endDirection samples)
-        | FitPositionOnly, FitPositionOnly ->
-            Bezier.fitCubicWithEndpoints startPoint endPoint samples
-            |> Result.mapError cubicFitError
-            |> Result.map fst
         | FitPositionAndDirectionWithCollapsedHandle _,
           FitPositionAndDirectionWithCollapsedHandle _ -> Error InternalNonFinite
         | FitPositionAndDirectionWithCollapsedHandle startDirection,
@@ -2137,14 +2096,6 @@ module Offset =
           FitPositionAndDirectionWithCollapsedHandle endDirection ->
             fitOffsetCubicStartTangentEndStalled
                 startPoint endPoint startDirection endDirection samples
-        | FitPositionAndDirectionWithCollapsedHandle startDirection, FitPositionOnly ->
-            fitOffsetCubicStartStalledEndPosition startPoint endPoint startDirection samples
-        | FitPositionOnly, FitPositionAndDirectionWithCollapsedHandle endDirection ->
-            fitOffsetCubicStartPositionEndStalled startPoint endPoint endDirection samples
-        | FitPositionAndDirection startDirection, FitPositionOnly ->
-            fitOffsetCubicStartTangentEndPosition startPoint endPoint startDirection samples
-        | FitPositionOnly, FitPositionAndDirection endDirection ->
-            fitOffsetCubicStartPositionEndTangent startPoint endPoint endDirection samples
 
     and private recoverCollapsedDirectionFit
         curve
@@ -2197,7 +2148,6 @@ module Offset =
         | OffsetFromJoinFree joinFree ->
             eJoinFreeEndpointPolicy joinFree offset endpoint
             |> Result.bind (function
-                | FitPositionOnly -> unitTangentAtEndpoint offsetSegment endpoint
                 | FitPositionAndDirection direction
                 | FitPositionAndDirectionWithCollapsedHandle direction -> Ok direction)
         | OffsetFromStalledRun _ -> unitTangentAtEndpoint offsetSegment endpoint

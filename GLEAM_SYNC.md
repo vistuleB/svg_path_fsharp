@@ -341,4 +341,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   transform serialization. Source regression ported. `scripts/test-fast`:
   1743 passed.
 
-Next: `c91e527` (remove unreachable position-only offset fitting policies).
+- `c91e527` — remove unreachable position-only fit policy, its match cases,
+  and four unused fitting helpers. `scripts/test-fast`: 1743 passed.
+
+Next: `4ee430e` (Gleam audit issue record only).

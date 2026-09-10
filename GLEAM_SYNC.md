@@ -361,4 +361,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   portion closed; construct the closing correspondence even with one open
   portion. Exact source regression ported. `scripts/test-fast`: 1747 passed.
 
-Next: `f57dd01` (apply width-bound allowance before interval pruning).
+- `f57dd01` — apply the conservative width lower-bound allowance before
+  pruning optimization intervals. `scripts/test-fast`: 1747 passed.
+
+Next: `786d993` (increasing-parameter directions during extrapolation).

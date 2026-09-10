@@ -1595,7 +1595,8 @@ module ConvexHull =
                 extremum (Point.direction best.Angle) best.Support lowerBound best.Support.Width converged
             else
                 let active, discarded =
-                    bounds |> List.partition (fun (_, bound) -> bound < best.Support.Width - accuracy)
+                    // Use the same conservative bound as the convergence check.
+                    bounds |> List.partition (fun (_, bound) -> max 0.0<length> (bound - lowerBoundRoundoff) < best.Support.Width - accuracy)
                 match active with
                 | [] ->
                     extremum (Point.direction best.Angle) best.Support

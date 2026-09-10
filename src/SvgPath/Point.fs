@@ -26,8 +26,10 @@ module Point =
     /// Return the clockwise heading in the range [0, 360).
     /// The zero pair has heading zero.
     let heading (point: Point<'Unit>) : float<degree> =
-        let raw = Trig.atan2Degrees point.Y point.X
-        if raw < 0.0<degree> then raw + Degree.fromFloat 360.0 else raw
+        if InternalNumber.isZero point.X && InternalNumber.isZero point.Y then 0.0<degree>
+        else
+            let raw = Trig.atan2Degrees point.Y point.X
+            if raw < 0.0<degree> then raw + Degree.fromFloat 360.0 else raw
 
     /// Return the clockwise aperture from one coordinate pair to another in [0, 360).
     let clockwiseAperture (fromPoint: Point<'From>) (toPoint: Point<'To>) : float<degree> =

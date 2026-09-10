@@ -5,6 +5,10 @@ open System.Globalization
 
 [<RequireQualifiedAccess>]
 module InternalNumber =
+    /// Mathematical zero of either sign, without a tolerance. Unlike Erlang
+    /// exact equality, .NET equality already equates positive and negative zero.
+    let inline isZero (value: float<'Unit>) = value = 0.0<_>
+
     let hypot x y =
         let x, y = abs x, abs y
         let largest = max x y

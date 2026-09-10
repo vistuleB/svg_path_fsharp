@@ -408,4 +408,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   repaired. Resume instruction: continue past non-catastrophic historical
   failures toward the latest committed Gleam changes.
 
-Next: `527da80` (count only reconstructible offset preimages in capacities).
+- `527da80` — offset capacities count precisely the source-order reconstruction
+  preimages, excluding zero-source companions; parity reduction preserves those
+  explicit capacities. Added the three original zero-offset regressions.
+  `scripts/test-fast`: 1756 passed.
+
+Next: `0181593` (validate collapsed cubic endpoint directions).

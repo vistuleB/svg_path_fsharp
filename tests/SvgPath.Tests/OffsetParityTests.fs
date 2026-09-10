@@ -7,6 +7,33 @@ open Xunit
 
 module Subject = Offset
 
+[<Fact>]
+let ``zero offset preserves closed square without source capacity`` () =
+    let source = Parse.path "M 0 0 H 10 V 10 H 0 Z" |> Result.defaultWith (failwithf "%A") |> Path.subpaths |> List.exactlyOne
+    for source in [source; Subpath.reverse source] do
+        let result = Offset.subpath source 0.0<length> Round Butt |> Result.defaultWith (failwithf "%A")
+        let loop = result |> Path.subpaths |> List.exactlyOne
+        Assert.True(Subpath.isClosed loop)
+        let length = Subpath.length loop |> Result.defaultWith (failwithf "%A")
+        Assert.True(abs(length - 40.0<length>) < 0.000001<length>)
+
+[<Fact>]
+let ``zero offset preserves open line endpoint demands`` () =
+    let source = Parse.path "M 0 0 H 10" |> Result.defaultWith (failwithf "%A") |> Path.subpaths |> List.exactlyOne
+    let result = Offset.subpath source 0.0<length> Round Butt |> Result.defaultWith (failwithf "%A")
+    let line = result |> Path.subpaths |> List.exactlyOne
+    Assert.False(Subpath.isClosed line)
+    Assert.Equal(Subpath.start source, Subpath.start line)
+    Assert.Equal(Subpath.finish source, Subpath.finish line)
+
+[<Fact>]
+let ``zero offset preserves repeated eligible traversals`` () =
+    let source = Parse.path "M 0 0 H 10 V 10 H 0 Z M 0 0 H 10 V 10 H 0 Z" |> Result.defaultWith (failwithf "%A")
+    let result = Offset.path source 0.0<length> Round Butt |> Result.defaultWith (failwithf "%A")
+    let length = Path.length result |> Result.defaultWith (failwithf "%A")
+    Assert.True(abs(length - 80.0<length>) < 0.000001<length>)
+    Assert.True(result |> Path.subpaths |> List.forall Subpath.isClosed)
+
 let private point x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
 let private direction degrees = Point.direction (Degree.fromFloat degrees)
 

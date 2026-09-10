@@ -3671,16 +3671,30 @@ module Offset =
             |> List.exists (fun source ->
                 offsetSegmentIndexHasGroup build source.SegmentIndex group)
 
+    let private offsetReconstructionImages (build: OffsetArrangementBuild) =
+        build.SegmentImages
+        |> List.filter (fun image ->
+            offsetSegmentIndexHasGroup build image.SegmentIndex UntrimmedOffsetSegment)
+
     let private retainOffsetImageEdges
         (graph: ArrangementGraph)
         (build: OffsetArrangementBuild)
         : OffsetTrimGraph =
-        { Vertices = graph.Vertices
-          Edges =
+        let retained =
             graph.Edges
             |> List.filter (fun edge ->
                 arrangementEdgeHasGroup build edge.Id UntrimmedOffsetSegment)
-          EdgeCapacities = None }
+        // Count precisely the occurrences visited by source-order reconstruction.
+        // Source-only preimages define winding, but supply no offset capacity.
+        let occurrenceIds =
+            offsetReconstructionImages build
+            |> List.collect (fun image -> image.Edges |> List.map _.EdgeId)
+        let capacities =
+            retained |> List.map (fun edge ->
+                edge.Id, (occurrenceIds |> List.filter ((=) edge.Id) |> List.length))
+        { Vertices = graph.Vertices
+          Edges = retained
+          EdgeCapacities = Some capacities }
 
     let private offsetTrimGraph (graph: ArrangementGraph) : OffsetTrimGraph =
         { Vertices = graph.Vertices
@@ -4074,8 +4088,15 @@ module Offset =
             { Vertices = graph.Vertices
               Edges = graph.Edges
               CyclicOrders = [] }
-        forcedParityCapacities
-            arrangement (protectedVertexParities protectedVertices)
+        (match graph.EdgeCapacities with
+         | None -> forcedParityCapacities arrangement (protectedVertexParities protectedVertices)
+         | Some capacities ->
+             // Submerged edges are absent from this pruning view.
+             let initial =
+                 capacities
+                 |> List.filter (fun (id, _) -> graph.Edges |> List.exists (fun edge -> edge.Id = id))
+                 |> List.map (fun (id, capacity) -> { EdgeId = id; Capacity = capacity })
+             forcedParityCapacitiesWith arrangement initial (protectedVertexParities protectedVertices))
         |> Result.mapError InternalForcedParityPruningError
         |> Result.map (fun assignments ->
             let edgeCapacities =
@@ -4164,11 +4185,7 @@ module Offset =
         (graph: OffsetTrimGraph)
         protectedVertices
         (tolerance: float<length>) =
-        let segmentImages =
-            build.SegmentImages
-            |> List.filter (fun image ->
-                offsetSegmentIndexHasGroup
-                    build image.SegmentIndex UntrimmedOffsetSegment)
+        let segmentImages = offsetReconstructionImages build
         let available = arrangementEdgeCapacities graph
         sourceOrderSurvivorChainsLoop build segmentImages available []
         |> Result.bind (fun (chains, remaining) ->

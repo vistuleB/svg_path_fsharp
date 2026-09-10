@@ -243,4 +243,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   pass arrangement tolerance into winding queries, including nested contours.
   Three source regressions added. `scripts/test-fast`: 1714 passed.
 
-Next: `3351438` (unrounded rectangle start).
+- `3351438` — start unrounded rectangles at (x,y) when either effective
+  radius is zero. Source regression and docs ported. `scripts/test-fast`:
+  1715 passed.
+
+Next: `3c419ab` (minified numeric group boundaries).

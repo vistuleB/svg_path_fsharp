@@ -36,6 +36,8 @@ module BasicShapes =
         elif ry < 0.0<length> then Error(InvalidRectRadiusY ry)
         else Ok(min rx (width / 2.0), min ry (height / 2.0))
 
+    /// If either effective corner radius is zero, the rectangle is unrounded
+    /// and starts at (x,y), rather than (x+rx,y).
     let rect
         (x: float<length>)
         (y: float<length>)
@@ -50,7 +52,7 @@ module BasicShapes =
             radii width height rx ry
             |> Result.bind (fun (rx, ry) ->
                 let x2, y2 = x + width, y + height
-                let startPoint = Point.create (x + rx) y
+                let startPoint = Point.create (if rx>0.0<length> && ry>0.0<length> then x+rx else x) y
                 if rx > 0.0<length> && ry > 0.0<length> then
                     let radius = Point.create rx ry
                     [ Line(startPoint, Point.create (x2 - rx) y)

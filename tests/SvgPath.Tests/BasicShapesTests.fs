@@ -7,6 +7,13 @@ let private length value = Length.fromFloat value
 let private point x y = Point.create (length x) (length y)
 
 [<Fact>]
+let ``either zero corner radius preserves all rectangle corners`` () =
+    let expected = BasicShapes.rect (length 3.) (length 4.) (length 10.) (length 10.) None None
+    Assert.True(Result.isOk expected)
+    Assert.Equal(expected,BasicShapes.rect (length 3.) (length 4.) (length 10.) (length 10.) (Some(length 2.)) (Some(length 0.)))
+    Assert.Equal(expected,BasicShapes.rect (length 3.) (length 4.) (length 10.) (length 10.) (Some(length 0.)) (Some(length 2.)))
+
+[<Fact>]
 let ``rect converts to svg equivalent path`` () =
     let rectangle = BasicShapes.rect (length 10.0) (length 20.0) (length 100.0) (length 50.0) None None |> Result.defaultWith (failwithf "%A")
     Assert.True rectangle.Closed

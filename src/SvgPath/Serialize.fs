@@ -277,7 +277,9 @@ module Serialize =
                     let separator =
                         let name = commandName next
                         if name = "M" || name = "m" then "\n"
-                        elif format.Options.MinimizeWhitespace then "" else " "
+                        elif Set.contains name commandNames then
+                            if format.Options.MinimizeWhitespace then "" else " "
+                        else commandChunkSeparator next format.Options
                     joined + separator + next) first
 
     let private absoluteSubpath (subpath: Subpath) format =

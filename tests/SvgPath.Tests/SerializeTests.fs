@@ -13,6 +13,13 @@ let ``minified number groups preserve integer decimal boundaries`` () =
         Assert.Equal(Ok source,Parse.path encoded)
 
 [<Fact>]
+let ``minified subpath lines separate repeated command arguments`` () =
+    for points in [[point 0. 0.;point 1. 0.;point 2. 0.;point 3. 0.];[point 0. 0.;point 0. 1.;point 0. 2.;point 0. 3.];[point 0. 0.;point 1. 1.;point 2. 2.;point 3. 3.]] do
+        let source = Subpath.polyline points |> Result.defaultWith (failwithf "%A") |> Path.singleton
+        let options = {Serialize.minifyingOptions 5 with Newlines=AtSubpaths;ExplicitInitialLineto=true}
+        Assert.Equal(Ok source,Parse.path(Serialize.pathWith source options))
+
+[<Fact>]
 let ``empty path serializes to empty string`` () =
     Assert.Equal("", Serialize.path Path.empty)
 

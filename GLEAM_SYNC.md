@@ -251,4 +251,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   allowing only a leading sign to omit whitespace. Source regression added.
   `scripts/test-fast`: 1716 passed.
 
-Next: `3f1a135` (repeated arguments in subpath-line serialization).
+- `3f1a135` — separate repeated numeric arguments under AtSubpaths newline
+  mode. Source regression added. `scripts/test-fast`: 1717 passed.
+
+Next: `0b605ab` (coincident-endpoint arc serialization).

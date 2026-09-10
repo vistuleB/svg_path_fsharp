@@ -357,8 +357,7 @@ type internal OffsetArrangementBuild =
     { Graph: ArrangementGraph
       IndexedSegments: IndexedOffsetSegment list
       SegmentImages: ArrangementSourceSegmentImage list
-      EdgeImages: ArrangementEdgeImage list
-      EdgeWindings: (int * (int * int)) list option }
+      EdgeImages: ArrangementEdgeImage list }
 
 and internal OffsetArrangementSegmentGroup =
     | UntrimmedOffsetSegment
@@ -668,7 +667,6 @@ module Offset =
     let private directionDeterminantTolerance = 1.0e-9
     let private angleToleranceDegrees = 1.0e-9<degree>
     let private arrangementTolerance = 2.0e-9<length>
-    let private submergedSideSamplingDistance = 5.0e-8<length>
     let private curvatureParameterTolerance = 1.0e-6<parameter>
     let private curvatureValueTolerance = 1.0e-6<1 / length>
     let private curvatureRadiusTolerance = 1.0e-6<length>
@@ -3638,7 +3636,7 @@ module Offset =
               IndexedSegments = indexed
               SegmentImages = build.SegmentImages
               EdgeImages = build.EdgeImages
-              EdgeWindings = None })
+              })
 
     let rec private assignWindingOccurrence (indexed: IndexedOffsetSegment list) segment =
         match indexed with
@@ -4080,82 +4078,61 @@ module Offset =
             arrangementSourceWindingOpinions build image.Sources
                 { Left = 0; Right = 0 }
 
-    let private withFaceWindings (build: OffsetArrangementBuild) =
-        match build.EdgeWindings with
-        | Some _ -> Ok build
-        | None ->
-            Arrangement.dual build.Graph |> Result.mapError InternalArrangementGraphError
-            |> Result.bind (fun dual ->
-                build.EdgeImages |> List.fold (fun state image ->
-                    state |> Result.bind (fun changes ->
-                        image.Sources |> List.fold (fun state source ->
-                            state |> Result.bind (fun total ->
-                                match offsetIndexedSegmentAt build.IndexedSegments source.SegmentIndex with
-                                | None -> Error(InternalMissingIndexedSegment source.SegmentIndex)
-                                | Some indexed ->
-                                    let contribution = Option.defaultValue 0 indexed.WindingChange
-                                    Ok(total + if source.Reversed then -contribution else contribution))) (Ok 0)
-                        |> Result.map (fun sum -> {EdgeId=image.EdgeId;RightMinusLeft=sum}::changes))) (Ok [])
-                |> Result.bind (List.rev >> Arrangement.faceWindings dual >> Result.mapError InternalFaceWindingError)
-                |> Result.bind (fun values ->
-                    dual.EdgeFaces |> List.fold (fun state edge ->
-                        state |> Result.bind (fun pairs ->
-                            match values |> List.tryFind (fun f -> f.FaceId=edge.LeftFace), values |> List.tryFind (fun f -> f.FaceId=edge.RightFace) with
-                            | Some left,Some right -> Ok((edge.EdgeId,(left.Value,right.Value))::pairs)
-                            | _ -> Error(InternalMissingEdgeImage edge.EdgeId))) (Ok [])
-                    |> Result.map (fun pairs -> {build with EdgeWindings=Some(List.rev pairs)})))
-
-    let private arrangementEdgeSampledWindings
-        (edge: ArrangementEdge)
-        (winding: Point<length> -> Result<int, InternalError>)
-        (sideSamplingDistance: float<length>) =
-            Segment.point edge.Segment 0.5<parameter>
-            |> Result.mapError InternalPathError
-            |> Result.bind (fun point ->
-                unitNormal edge.Segment 0.5<parameter>
-                |> Result.bind (fun normal ->
-                    let leftPoint = Point.add point (Point.scale sideSamplingDistance normal)
-                    let rightPoint = Point.add point (Point.scale -sideSamplingDistance normal)
-                    match winding leftPoint, winding rightPoint with
-                    | Ok left, Ok right -> Ok(left,right)
-                    | Error error, _
-                    | _, Error error -> Error error))
+    // Compute once per classification pass; no displaced-point sampling fallback.
+    let private arrangementEdgeWindings (build: OffsetArrangementBuild) =
+        Arrangement.dual build.Graph |> Result.mapError InternalArrangementGraphError
+        |> Result.bind (fun dual ->
+            build.EdgeImages |> List.fold (fun state image ->
+                state |> Result.bind (fun changes ->
+                    image.Sources |> List.fold (fun state source ->
+                        state |> Result.bind (fun total ->
+                            match offsetIndexedSegmentAt build.IndexedSegments source.SegmentIndex with
+                            | None -> Error(InternalMissingIndexedSegment source.SegmentIndex)
+                            | Some indexed ->
+                                let contribution = Option.defaultValue 0 indexed.WindingChange
+                                Ok(total + if source.Reversed then -contribution else contribution))) (Ok 0)
+                    |> Result.map (fun sum -> {EdgeId=image.EdgeId;RightMinusLeft=sum}::changes))) (Ok [])
+            |> Result.bind (List.rev >> Arrangement.faceWindings dual >> Result.mapError InternalFaceWindingError)
+            |> Result.bind (fun values ->
+                let values = values |> List.map (fun face -> face.FaceId, face.Value) |> Map.ofList
+                dual.EdgeFaces |> List.fold (fun state edge ->
+                    state |> Result.bind (fun pairs ->
+                        match Map.tryFind edge.LeftFace values, Map.tryFind edge.RightFace values with
+                        | Some left,Some right -> Ok((edge.EdgeId,(left,right))::pairs)
+                        | _ -> Error(InternalMissingEdgeImage edge.EdgeId))) (Ok [])
+                |> Result.map (List.rev >> Map.ofList)))
 
     let private windingPairMatchesOpinion expected left right =
         let commonShift = expected.Left-left
         commonShift>=0 && expected.Right-right=commonShift && left+commonShift>=0 && right+commonShift>=0
 
-    let private arrangementEdgeWindingMatchesOpinion (build: OffsetArrangementBuild) (edge: ArrangementEdge) winding sideSamplingDistance =
+    let private arrangementEdgeWindingMatchesOpinion (build: OffsetArrangementBuild) (edge: ArrangementEdge) edgeWindings =
         arrangementEdgeWindingOpinion build edge.Id |> Result.bind (fun expected ->
             let measured =
-                match build.EdgeWindings with
-                | Some pairs ->
-                    match List.tryFind (fun (id,_) -> id=edge.Id) pairs with
-                    | Some(_,pair) -> Ok pair
-                    | None -> Error(InternalMissingEdgeImage edge.Id)
-                | None -> arrangementEdgeSampledWindings edge winding sideSamplingDistance
+                match Map.tryFind edge.Id edgeWindings with
+                | Some pair -> Ok pair
+                | None -> Error(InternalMissingEdgeImage edge.Id)
             measured |> Result.map (fun (left,right) -> windingPairMatchesOpinion expected left right))
 
     let rec private deleteWindingMismatchedEdgesLoop
         (build: OffsetArrangementBuild)
         (edges: ArrangementEdge list)
-        winding sideSamplingDistance
+        edgeWindings
         (retained: ArrangementEdge list) =
         match edges with
         | [] -> Ok(List.rev retained)
         | edge :: rest ->
-            arrangementEdgeWindingMatchesOpinion build edge winding sideSamplingDistance
+            arrangementEdgeWindingMatchesOpinion build edge edgeWindings
             |> Result.bind (fun matches ->
                 deleteWindingMismatchedEdgesLoop
-                    build rest winding sideSamplingDistance
+                    build rest edgeWindings
                     (if matches then edge :: retained else retained))
 
     let private deleteWindingMismatchedEdges
         (build: OffsetArrangementBuild)
-        (graph: OffsetTrimGraph)
-        winding sideSamplingDistance =
-        withFaceWindings build |> Result.bind (fun build ->
-            deleteWindingMismatchedEdgesLoop build graph.Edges winding sideSamplingDistance [])
+        (graph: OffsetTrimGraph) =
+        arrangementEdgeWindings build |> Result.bind (fun edgeWindings ->
+            deleteWindingMismatchedEdgesLoop build graph.Edges edgeWindings [])
         |> Result.map (fun retained -> { graph with Edges = retained })
 #if GALLERY_DIAGNOSTICS
         |> fun result -> diagnosticClassification.Add(build,graph,result); result
@@ -4357,16 +4334,6 @@ module Offset =
                 |> List.collect Path.subpaths
                 |> Path.ofSubpaths)
 
-    let private pathWindingFunction path =
-            fun point ->
-                WindingField.pathWinding point path
-                |> Result.mapError InternalPathError
-                |> Result.bind (function
-                    | Winding value -> Ok value
-                    | BoundaryWinding -> Error InternalInconsistentContainment)
-
-    let private internalBandWindingFunction bands =
-        bandWindingPath bands |> Result.map pathWindingFunction
 
     let private arrangementSplitSurvivorEdge
         (segment: ArrangementSplitTracedSegment) : SurvivorEdge =
@@ -4511,7 +4478,7 @@ module Offset =
         (source: ICulledOffsetSegment)
         (images: ArrangementSegmentEdgeImage list)
         (build: OffsetArrangementBuild)
-        winding
+        edgeWindings
         (split: ArrangementSplitTracedSegment list) =
         match images with
         | [] -> Ok(List.rev split)
@@ -4520,7 +4487,7 @@ module Offset =
             |> Result.mapError (Arrangement.publicError >> InternalArrangementGraphError)
             |> Result.bind (fun edge ->
                 arrangementEdgeWindingMatchesOpinion
-                    build edge winding submergedSideSamplingDistance
+                    build edge edgeWindings
                 |> Result.bind (fun matches ->
                     let segment, startVertex, endVertex =
                         if image.Reversed then
@@ -4537,35 +4504,35 @@ module Offset =
                           Reversed = hPreimageIsReversed source.Preimage
                           DeletionCandidate = not matches }
                     arrangementSplitSegmentsFromIEdgeImages
-                        source rest build winding (item :: split)))
+                        source rest build edgeWindings (item :: split)))
 
     let private arrangementSplitSegmentsFromIImage
-        source (image: ArrangementSourceSegmentImage) build winding =
-        arrangementSplitSegmentsFromIEdgeImages source image.Edges build winding []
+        source (image: ArrangementSourceSegmentImage) build edgeWindings =
+        arrangementSplitSegmentsFromIEdgeImages source image.Edges build edgeWindings []
 
     let rec private arrangementSplitSegmentsFromIImages
         (segments: ICulledOffsetSegment list)
         (images: ArrangementSourceSegmentImage list)
-        build winding
+        build edgeWindings
         (split: ArrangementSplitTracedSegment list) =
         match segments, images with
         | [], [] -> Ok(List.rev split)
         | segment :: remainingSegments, image :: remainingImages ->
-            arrangementSplitSegmentsFromIImage segment image build winding
+            arrangementSplitSegmentsFromIImage segment image build edgeWindings
             |> Result.bind (fun pieces ->
                 arrangementSplitSegmentsFromIImages
-                    remainingSegments remainingImages build winding
+                    remainingSegments remainingImages build edgeWindings
                     (List.rev pieces @ split))
         | _ -> Error InternalSegmentImageCountMismatch
 
     let private arrangementSplitSubpathFromIArrangement
         (subpath: ICulledOffsetSubpath)
         (build: OffsetArrangementBuild)
-        winding =
+        edgeWindings =
         takeSegmentImages build.SegmentImages (List.length subpath.Segments)
         |> Result.bind (fun (images, _) ->
             arrangementSplitSegmentsFromIImages
-                subpath.Segments images build winding []
+                subpath.Segments images build edgeWindings []
             |> Result.map (fun segments ->
                 { Segments = segments; Closed = subpath.Closed; Side = subpath.Side }))
 
@@ -4709,15 +4676,13 @@ module Offset =
                 // The cap requested for the final band must not affect this region.
                 bandFromSides zeroSource 0.0<length> geometry offset Butt
                 |> Result.bind (fun band ->
-                    internalBandWindingFunction [ band ]
-                    |> Result.bind (fun winding ->
-                        bandWindingPath [band] |> Result.bind (fun windingPath ->
+                    bandWindingPath [band] |> Result.bind (fun windingPath ->
                         singleOffsetSegmentArrangement
                             [ geometry ] (Subpath.segments zeroSource) offset windingPath
-                        |> Result.bind withFaceWindings
                         |> Result.bind (fun build ->
+                            arrangementEdgeWindings build |> Result.bind (fun edgeWindings ->
                             arrangementSplitSubpathFromIArrangement
-                                subpath build winding
+                                subpath build edgeWindings
                             |> Result.bind (fun split ->
                                 let rescued = rescueArrangementSplitSubmergedRuns split
                                 (match smallLoopCullingStage with
@@ -4910,13 +4875,13 @@ module Offset =
 
     let private trimSingleOffsetArrangement
         (build: OffsetArrangementBuild)
-        untrimmed winding
+        untrimmed
         (options: Options) =
         let trimGraph = retainOffsetImageEdges build.Graph build
         untrimmedOpenEndpointVertices build untrimmed
         |> Result.bind (fun protectedVertices ->
             deleteWindingMismatchedEdges
-                build trimGraph winding submergedSideSamplingDistance
+                build trimGraph
             |> Result.bind (fun withoutSubmerged ->
                 forcedParityReduceTrimGraph withoutSubmerged protectedVertices
                 |> Result.bind (fun parityReduced ->
@@ -4926,7 +4891,7 @@ module Offset =
                         closeSurvivorSubpaths subpaths options.Fitting.Tolerance))))
 
     let private trimBandArrangement
-        untrimmed bands winding windingOpinions
+        untrimmed bands windingOpinions
         (options: Options) =
         bandWindingPath bands |> Result.bind (bandSegmentArrangement untrimmed windingOpinions)
         |> Result.bind (fun build ->
@@ -4934,7 +4899,6 @@ module Offset =
             |> Result.bind (fun protectedVertices ->
                 deleteWindingMismatchedEdges
                     build (retainOffsetImageEdges build.Graph build)
-                    winding submergedSideSamplingDistance
                 |> Result.bind (fun withoutSubmerged ->
                     forcedParityReduceTrimGraph withoutSubmerged protectedVertices
                     |> Result.bind (fun parityReduced ->
@@ -4944,20 +4908,16 @@ module Offset =
                             closeSurvivorSubpaths subpaths options.Fitting.Tolerance)))))
 
     let internal internalTopologicalBandLoops untrimmed bands options =
-        internalBandWindingFunction bands
-        |> Result.bind (fun winding ->
-            trimBandArrangement
-                untrimmed bands winding (bandSubpathWindingOpinions bands) options)
+        trimBandArrangement
+            untrimmed bands (bandSubpathWindingOpinions bands) options
 
     let private finalBandPath loops =
         enumerateBandFaceLoops (Path.ofSubpaths loops)
 
     let internal topologicalBandPathWithOpinions
         untrimmed bands windingOpinions options =
-        internalBandWindingFunction bands
-        |> Result.bind (fun winding ->
-            trimBandArrangement untrimmed bands winding windingOpinions options
-            |> Result.bind finalBandPath)
+        trimBandArrangement untrimmed bands windingOpinions options
+        |> Result.bind finalBandPath
 
     let internal topologicalBandPath untrimmed bands options =
         internalTopologicalBandLoops untrimmed bands options
@@ -5292,7 +5252,6 @@ module Offset =
                 else bandWindingPath bands
             windingResult
             |> Result.bind (fun windingPath ->
-                let winding = pathWindingFunction windingPath
                 let arrangementResult =
                     if offside then
                         singleOffsetSegmentArrangement
@@ -5301,7 +5260,7 @@ module Offset =
                 arrangementResult
                 |> Result.bind (fun arrangement ->
                     trimSingleOffsetArrangement
-                        arrangement untrimmed winding options)))
+                        arrangement untrimmed options)))
 
     let private finalSingleOffsetSubpaths
         (builds: SingleOffsetUntrimmedBuild list)

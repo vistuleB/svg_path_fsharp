@@ -563,4 +563,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   `scripts/test-fast`: 1797 passed, the same 5 historical assertions failed,
   1802 total. No new failures.
 
-Next: `5f8609c` (require face winding data).
+- `5f8609c` — classification requires a complete dual-face winding map, computed
+  once per pass. Removed optional cache, sampled fallback and winding callbacks.
+  Diagnostic Gallery observations still capture actual production classification.
+  `scripts/test-fast`: 1797 passed, the same 5 historical assertions failed,
+  1802 total.
+
+Next: `6db0bf7` (obsolete cusp arguments and containment helpers).

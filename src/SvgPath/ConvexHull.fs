@@ -1148,7 +1148,7 @@ module ConvexHull =
             let s = Point.displacement point startPoint
             let a = Point.displacement startPoint control
             let b = Point.add (Point.subtract startPoint (Point.scale 2.0 control)) endPoint
-            Root.quadratic (Point.cross a b) (Point.cross s b) (Point.cross s a)
+            Root.parameterQuadratic (Point.cross a b) (Point.cross s b) (Point.cross s a)
             |> List.filter (fun t -> t >= 0.0<parameter> && t <= 1.0<parameter>)
             |> Ok
         | CubicBezier(startPoint, control1, control2, endPoint) ->

@@ -36,16 +36,10 @@ module internal ArcsJoin =
         | Some ra,None -> lineCircle b.Start b.Tangent (center a ra) ra
         | None,None -> [] // Caller delegates to MiterClip.
 
-    // Root.quadratic currently labels every root as a path parameter. Here
-    // the unknown is a length. Solve in units of one user-space length and
-    // restore that unit explicitly; do not pass dimensionally mixed coefficients.
-    let private lengthRoots (a: float) (b: float<length>) (c: float<length^2>) =
-        Root.quadratic a (b/1.0<length>) (c/1.0<length^2>)
-        |> List.map (fun t -> Parameter.ratio t * 1.0<length>)
     let private adjustCircleLine circle line r =
         let h = Point.cross (Point.subtract circle.Start line.Start) line.Tangent
         let s = Point.cross (normal circle) line.Tangent
-        lengthRoots (s*s-1.0) (2.0*h*s) (h*h)
+        Root.quadratic (s*s-1.0) (2.0*h*s) (h*h)
         |> List.filter (fun v -> System.Double.IsFinite(float v) && v*r > 0.0<_>)
         |> List.sortBy (fun v -> abs(v-r)) |> List.tryHead
         |> Option.map (fun v -> {circle with Radius=Some v})
@@ -63,7 +57,7 @@ module internal ArcsJoin =
             let v = Point.subtract (Point.scale (sign rb*db) (normal b)) (Point.scale (sign ra*da) (normal a))
             let target = if separate then ar+br else ar-br
             let slope = if separate then da+db else da-db
-            lengthRoots (Point.dot v v-slope*slope) (2.0*(Point.dot delta v-target*slope)) (Point.dot delta delta-target*target)
+            Root.quadratic (Point.dot v v-slope*slope) (2.0*(Point.dot delta v-target*slope)) (Point.dot delta delta-target*target)
             |> List.filter (fun x -> System.Double.IsFinite(float x) && x>=0.0<length> && ar+da*x>0.0<length> && br+db*x>0.0<length>)
             |> List.sort |> List.tryHead
             |> Option.map (fun amount -> {a with Radius=Some(sign ra*(ar+da*amount))},{b with Radius=Some(sign rb*(br+db*amount))})

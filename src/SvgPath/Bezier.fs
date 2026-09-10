@@ -110,7 +110,7 @@ module Bezier =
     let lineProjectionExtrema (_start: BezierPoint) (_end: BezierPoint) (_direction: Point<1>) = []
 
     let private tolerantQuadraticRoots a b c =
-        Root.quadraticWith
+        Root.parameterQuadraticWith
             { CoefficientTolerance = LanguagePrimitives.FloatWithMeasure 1.0e-12
               RepeatedRootPolicy = PreserveRepeatedRoot }
             a
@@ -241,7 +241,7 @@ module Bezier =
         let a = -startValue + 3.0 * control1 - 3.0 * control2 + endValue
         let b = 3.0 * startValue - 6.0 * control1 + 3.0 * control2
         let c = 3.0 * control1 - 3.0 * startValue
-        Root.quadratic (3.0 * a) (2.0 * b) c
+        Root.parameterQuadratic (3.0 * a) (2.0 * b) c
 
     let private axisExtrema curve =
         let roots =
@@ -299,7 +299,7 @@ module Bezier =
             if scale = 0.0<_> then
                 []
             else
-                Root.quadraticWith
+                Root.parameterQuadraticWith
                     { CoefficientTolerance = 1.0e-12
                       RepeatedRootPolicy = PreserveRepeatedRoot }
                     (quadratic / scale)
@@ -502,7 +502,7 @@ module Bezier =
             let xScale = abs a.X + abs b.X + abs c.X
             let yScale = abs a.Y + abs b.Y + abs c.Y
             let a,b,c = if xScale >= yScale then a.X,b.X,c.X else a.Y,b.Y,c.Y
-            Root.quadraticWith { CoefficientTolerance=0.0<length>; RepeatedRootPolicy=PreserveRepeatedRoot } a b c
+            Root.parameterQuadraticWith { CoefficientTolerance=0.0<length>; RepeatedRootPolicy=PreserveRepeatedRoot } a b c
             |> List.filter (fun t -> t > 0.0<parameter> && t < 1.0<parameter>)
 
     let private selfIntersectionCandidate curve =

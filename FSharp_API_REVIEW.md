@@ -1,12 +1,12 @@
 # F# public API / error-contract review — 2026-09-10
 
-This is an F#-first review, separate from the join parity changes. The public
-findings are tracked below. This is a first pass, not a completed
+This is an F#-first review, separate from the join parity changes. Its three
+findings are resolved below. This is a first pass, not a completed
 whole-library algorithm audit.
 
 ## Scope and reproducibility
 
-- Reflection over every exported error union: 37 unions. All payload fields
+- Reflection over every exported error union: 38 unions after the fixes. All payload fields
   have names; no Item/ItemN payloads found.
 - Focused inspection of Offset/Stroke join validation and public error mapping,
   Affine/Transform point-correspondence construction, TransformParse/Parse
@@ -44,16 +44,16 @@ their modules, including `Offset.Error`, `Offset.Options`, `Stroke.Error`,
 remain namespace-level. No compatibility aliases preserve the former root names.
 PublicTypeLayoutTests checks module ownership and the absence of obsolete aliases.
 
-## 3. Internal polynomial root units are too narrow for the new caller
+## 3. Internal polynomial root units are too narrow for the new caller — resolved
 
-Root.quadratic returns float<parameter>, while ArcsJoin solves for a radius
-adjustment with length units. The port explicitly expresses coefficients in
-one user-space length unit and restores the result's length. Same coefficients,
-same solver, same root selection as Gleam.
-
-Root is internal (confirmed by reflection); this is not a public API leak.
-Recommendation: a future scalar-unknown root API could avoid the conversion,
-but it does not require an immediate change to Gleam's unmeasured Float API.
+Root.quadratic now accepts coefficients measured as value/root², value/root,
+and value, returning roots in the inferred root unit. ArcsJoin passes its
+radius-equation coefficients directly, without conversion through parameter.
+Existing curve-polynomial callers use parameterQuadratic/parameterQuadraticWith
+to identify their implicit parameter-power convention. Both routes share the
+unchanged stable numeric kernel. Tests cover length, parameter, and unitless
+roots, linear fallback, repeated roots, and cancellation-resistant roots.
+Root remains internal; no change to Gleam's unmeasured Float API was needed.
 
 ## Checks without an issue found
 

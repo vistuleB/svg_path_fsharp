@@ -10,6 +10,27 @@ let private near expected actual = Assert.Equal(expected, rootFloat actual, 6)
 let private unwrap result = Result.defaultWith (fun error -> failwithf "%A" error) result
 
 [<Fact>]
+let ``quadratic supports length valued roots`` () =
+    let roots: float<length> list = Root.quadratic 1.0 -3.0<length> 2.0<length^2>
+    Assert.Equal<float<length> list>([1.0<length>; 2.0<length>], roots)
+    Assert.Equal<float<length> list>([0.5<length>], Root.quadratic 0.0 2.0<length> -1.0<length^2>)
+
+[<Fact>]
+let ``quadratic keeps value and unknown units independent`` () =
+    let roots: float<parameter> list =
+        Root.quadratic 1.0<length/parameter^2> -3.0<length/parameter> 2.0<length>
+    Assert.Equal<float<parameter> list>([1.0<parameter>; 2.0<parameter>], roots)
+    let scalars: float list = Root.quadratic 1.0 -3.0 2.0
+    Assert.Equal<float list>([1.0; 2.0], scalars)
+
+[<Fact>]
+let ``quadratic length roots preserve stable and repeated solutions`` () =
+    let roots: float<length> list = Root.quadratic 1.0 -1.0e16<length> 1.0<length^2>
+    Assert.Equal<float<length> list>([1.0e-16<length>; 1.0e16<length>], roots)
+    Assert.Equal<float<length> list>([1.0<length>], Root.quadratic 1.0 -2.0<length> 1.0<length^2>)
+    Assert.Empty(Root.quadratic 1.0 0.0<length> 1.0<length^2>)
+
+[<Fact>]
 let ``linear root`` () =
     Assert.Equal<float<parameter> list>([ parameter 0.5 ], Root.linear (coefficient 2.0) (coefficient -1.0))
     Assert.Empty(Root.linear (coefficient 0.0) (coefficient 1.0))
@@ -19,21 +40,21 @@ let ``linear root`` () =
 let ``quadratic real roots`` () =
     Assert.Equal<float<parameter> list>(
         [ parameter 1.0; parameter 2.0 ],
-        Root.quadratic (coefficient 1.0) (coefficient -3.0) (coefficient 2.0)
+        Root.parameterQuadratic (coefficient 1.0) (coefficient -3.0) (coefficient 2.0)
     )
 
 [<Fact>]
 let ``quadratic preserves small root under large scale separation`` () =
     Assert.Equal<float<parameter> list>(
         [ parameter 1.0e-16; parameter 1.0e16 ],
-        Root.quadratic (coefficient 1.0) (coefficient -1.0e16) (coefficient 1.0)
+        Root.parameterQuadratic (coefficient 1.0) (coefficient -1.0e16) (coefficient 1.0)
     )
 
 [<Fact>]
 let ``quadratic reduces to linear`` () =
     Assert.Equal<float<parameter> list>(
         [ parameter 0.5 ],
-        Root.quadratic (coefficient 0.0) (coefficient 2.0) (coefficient -1.0)
+        Root.parameterQuadratic (coefficient 0.0) (coefficient 2.0) (coefficient -1.0)
     )
 
 [<Fact>]
@@ -44,11 +65,11 @@ let ``quadratic repeated root policy`` () =
 
     Assert.Equal<float<parameter> list>(
         [ parameter 1.0 ],
-        Root.quadratic (coefficient 1.0) (coefficient -2.0) (coefficient 1.0)
+        Root.parameterQuadratic (coefficient 1.0) (coefficient -2.0) (coefficient 1.0)
     )
     Assert.Equal<float<parameter> list>(
         [ parameter 1.0; parameter 1.0 ],
-        Root.quadraticWith preserve (coefficient 1.0) (coefficient -2.0) (coefficient 1.0)
+        Root.parameterQuadraticWith preserve (coefficient 1.0) (coefficient -2.0) (coefficient 1.0)
     )
 
 [<Fact>]
@@ -59,7 +80,7 @@ let ``quadratic coefficient tolerance`` () =
 
     Assert.Equal<float<parameter> list>(
         [ parameter 0.5 ],
-        Root.quadraticWith tolerant (coefficient 1.0e-7) (coefficient 2.0) (coefficient -1.0)
+        Root.parameterQuadraticWith tolerant (coefficient 1.0e-7) (coefficient 2.0) (coefficient -1.0)
     )
 
 [<Fact>]

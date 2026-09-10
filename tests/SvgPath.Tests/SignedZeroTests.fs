@@ -114,10 +114,10 @@ let ``affine_rejects_negative_zero_determinants_test`` () =
 let ``roots_reduce_degree_for_both_signs_of_zero_test`` () =
     Assert.Empty(Root.linear -0.0 1.0)
     Assert.Empty(Root.linear -0.0 -0.0)
-    Assert.Equal<float<parameter> list>([1.0<parameter>], Root.quadratic -0.0 1.0 -1.0)
-    Assert.Empty(Root.quadratic -0.0 -0.0 1.0)
+    Assert.Equal<float<parameter> list>([1.0<parameter>], Root.parameterQuadratic -0.0 1.0 -1.0)
+    Assert.Empty(Root.parameterQuadratic -0.0 -0.0 1.0)
     let options = { CoefficientTolerance = -0.0; RepeatedRootPolicy = ConsolidateRepeatedRoot }
-    Assert.Equal<float<parameter> list>([1.0<parameter>], Root.quadraticWith options -0.0 1.0 -1.0)
+    Assert.Equal<float<parameter> list>([1.0<parameter>], Root.parameterQuadraticWith options -0.0 1.0 -1.0)
 
 [<Fact>]
 let ``bisection_accepts_negative_zero_at_endpoint_test`` () =

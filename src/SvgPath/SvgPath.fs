@@ -1558,7 +1558,7 @@ module Segment =
                 let a = -s + 3.0*c1 - 3.0*c2 + e
                 let b = 3.0*s - 6.0*c1 + 3.0*c2
                 let c = 3.0*c1 - 3.0*s
-                let breaks = Root.strictlyInside (Root.quadratic (3.0*a) (2.0*b) c) 0.0<parameter> 1.0<parameter> |> List.map Parameter.ratio
+                let breaks = Root.strictlyInside (Root.parameterQuadratic (3.0*a) (2.0*b) c) 0.0<parameter> 1.0<parameter> |> List.map Parameter.ratio
                 bezierResult points breaks
             | Arc endpoint when InternalNumber.isZero endpoint.Radius.X || InternalNumber.isZero endpoint.Radius.Y ->
                 if endpoint.Start = endpoint.End then Ok(Some []) else Ok(Some [ Line(endpoint.Start, endpoint.End) ])

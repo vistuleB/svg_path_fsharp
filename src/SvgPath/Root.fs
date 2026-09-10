@@ -68,29 +68,34 @@ module internal Root =
     let private coefficientIsZero (value: float<'Value>) (tolerance: float<'Value>) =
         if float tolerance = 0.0 then value = measured<'Value> 0.0 else abs value < tolerance
 
-    let private linearWithTolerance
+    let private scalarLinearWithTolerance
         (a: float<'Value>)
         (b: float<'Value>)
         (tolerance: float<'Value>)
-        : float<parameter> list =
+        : float list =
         if coefficientIsZero a tolerance then
             []
         else
-            [ Parameter.fromFloat (-float b / float a) ]
+            [ -float b / float a ]
+
+    let private linearWithTolerance a b tolerance =
+        scalarLinearWithTolerance a b tolerance |> List.map Parameter.fromFloat
 
     let linear (a: float<'Value>) (b: float<'Value>) : float<parameter> list =
         linearWithTolerance a b (measured<'Value> 0.0)
 
-    let quadraticWith
+    // Numeric kernel: coefficients are expressed in a common scalar basis.
+    // Unit-bearing callers below establish the meaning of the unknown.
+    let private scalarQuadraticWith
         (options: QuadraticOptions<'Value>)
         (a: float<'Value>)
         (b: float<'Value>)
         (c: float<'Value>)
-        : float<parameter> list =
+        : float list =
         let tolerance = max options.CoefficientTolerance (measured<'Value> 0.0)
 
         if coefficientIsZero a tolerance then
-            linearWithTolerance b c tolerance
+            scalarLinearWithTolerance b c tolerance
         else
             let discriminant = b * b - 4.0 * a * c
 
@@ -99,7 +104,7 @@ module internal Root =
             else
                 let rootDiscriminant = sqrt discriminant
                 let denominator = 2.0 * a
-                let repeatedRoot = Parameter.fromFloat (float (-b / denominator))
+                let repeatedRoot = float (-b / denominator)
 
                 if rootDiscriminant = 0.0<_> then
                     match options.RepeatedRootPolicy with
@@ -112,21 +117,39 @@ module internal Root =
                         else
                             -0.5 * (b - rootDiscriminant)
 
-                    let stableRoot = Parameter.fromFloat (float (q / a))
-                    let recoveredRoot = Parameter.fromFloat (float (c / q))
+                    let stableRoot = float (q / a)
+                    let recoveredRoot = float (c / q)
 
                     if b >= 0.0<_> then
                         [ stableRoot; recoveredRoot ]
                     else
                         [ recoveredRoot; stableRoot ]
 
-    let quadratic a b c =
-        quadraticWith
+    // Curve polynomials store coefficients in a common value unit, with their
+    // nominal parameter powers implicit. Keep that convention at this boundary.
+    let parameterQuadraticWith options a b c =
+        scalarQuadraticWith options a b c |> List.map Parameter.fromFloat
+
+    let parameterQuadratic a b c =
+        parameterQuadraticWith
             { CoefficientTolerance = measured<'Value> 0.0
               RepeatedRootPolicy = ConsolidateRepeatedRoot }
             a
             b
             c
+
+    /// Solve a*x² + b*x + c = 0 without prescribing the unknown's unit.
+    /// Coefficient magnitudes enter the same stable solver without rescaling.
+    let quadratic
+        (a: float<'Value / 'Root^2>)
+        (b: float<'Value / 'Root>)
+        (c: float<'Value>)
+        : float<'Root> list =
+        scalarQuadraticWith
+            { CoefficientTolerance = 0.0
+              RepeatedRootPolicy = ConsolidateRepeatedRoot }
+            (float a) (float b) (float c)
+        |> List.map measured<'Root>
 
     let strictlyInside roots lower upper =
         let lower, upper = orderedBracket lower upper
@@ -259,7 +282,7 @@ module internal Root =
             |> List.map (fun root -> { Isolation = { Lower = root; Estimate = root; Upper = root }; VanishingDerivatives = 0 })
             |> Ok
         | [ a; b; c ] ->
-            quadraticWith
+            parameterQuadraticWith
                 { CoefficientTolerance = polynomialCoefficientTolerance coefficients
                   RepeatedRootPolicy = ConsolidateRepeatedRoot }
                 a
@@ -469,7 +492,7 @@ module internal Root =
             | [ _ ] -> Ok []
             | [ linearA; linearB ] -> Ok(linear linearA linearB)
             | [ quadraticA; quadraticB; quadraticC ] ->
-                quadraticWith
+                parameterQuadraticWith
                     { CoefficientTolerance = polynomialCoefficientTolerance coefficients
                       RepeatedRootPolicy = ConsolidateRepeatedRoot }
                     quadraticA

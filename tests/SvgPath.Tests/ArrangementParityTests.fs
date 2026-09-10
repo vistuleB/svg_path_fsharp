@@ -15,6 +15,52 @@ let private buildLoopFixture segments =
     Assert.True(build.Graph.Edges |> List.forall (fun edge -> edge.StartVertex<>edge.EndVertex))
     build.Graph
 
+let private assertImageIntervals source (graph:ArrangementGraph) (images:ArrangementSegmentEdgeImage list) =
+    let mutable previous = 0.0<parameter>
+    for image in images do
+        Assert.Equal(previous,image.From)
+        Assert.True(image.To>image.From)
+        let edge = graph.Edges |> List.find (fun edge -> edge.Id=image.EdgeId)
+        for t in [0.0<parameter>;0.5<parameter>;1.0<parameter>] do
+            let sourceT = if t=0.0<parameter> then image.From elif t=1.0<parameter> then image.To else image.From+Parameter.ratio t*(image.To-image.From)
+            let expected = Segment.point source sourceT |> Result.defaultWith (failwithf "%A")
+            let edgeT = if image.Reversed then 1.0<parameter> - t else t
+            let actual = Segment.point edge.Segment edgeT |> Result.defaultWith (failwithf "%A")
+            Assert.True(Point.distance expected actual<1e-8<length>)
+        previous <- image.To
+    Assert.Equal(1.0<parameter>,previous)
+
+[<Fact>]
+let ``closed cubic source intervals preserve final endpoint`` () =
+    let build = Arrangement.buildWith [closedCubic()] 1e-9<length> 1e-8<length> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
+    let image = List.exactlyOne build.SegmentImages
+    Assert.Equal<(float<parameter>*float<parameter>) list>([0.0<parameter>,0.5<parameter>;0.5<parameter>,1.0<parameter>],image.Edges |> List.map(fun edge -> edge.From,edge.To))
+[<Fact>]
+let ``self crossing source intervals preserve each occurrence`` () =
+    let source = selfCrossingCubic()
+    let build = Arrangement.buildWith [source] 1e-9<length> 1e-8<length> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
+    assertImageIntervals source build.Graph (List.exactlyOne build.SegmentImages).Edges
+[<Fact>]
+let ``repeated graph edge splits compose reverse source intervals`` () =
+    let source = line 0. 0. 10. 0.
+    let reverse = Segment.reverse source
+    let build = Arrangement.buildWith [source;reverse;line 3. -1. 3. 1.;line 7. -1. 7. 1.] 1e-9<length> 1e-8<length> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
+    let forwardImage,reverseImage = build.SegmentImages[0],build.SegmentImages[1]
+    Assert.Equal(3,List.length forwardImage.Edges)
+    Assert.Equal(3,List.length reverseImage.Edges)
+    assertImageIntervals source build.Graph forwardImage.Edges
+    assertImageIntervals reverse build.Graph reverseImage.Edges
+[<Fact>]
+let ``closed curve duplicate intervals survive later graph cuts`` () =
+    let source = closedCubic()
+    let reverse = Segment.reverse source
+    let build = Arrangement.buildWith [source;reverse;line -2. 0.75 2. 0.75;line -2. 1. 2. 1.] 1e-9<length> 1e-8<length> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
+    let forwardImage,reverseImage = build.SegmentImages[0],build.SegmentImages[1]
+    Assert.Equal(6,List.length forwardImage.Edges)
+    Assert.Equal(6,List.length reverseImage.Edges)
+    assertImageIntervals source build.Graph forwardImage.Edges
+    assertImageIntervals reverse build.Graph reverseImage.Edges
+
 [<Fact>]
 let ``closed cubic is split instead of discarded`` () =
     let graph = buildLoopFixture [closedCubic()]

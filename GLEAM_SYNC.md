@@ -299,4 +299,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   reinserting both children with bounded subdivision depth. Four source
   regressions ported. `scripts/test-fast`: 1733 passed.
 
-Next: `af898f9` (source intervals through graph subdivision).
+- `af898f9` — retain source intervals on progressive images and compose them
+  through edge cuts (including reversed occurrences), replacing endpoint
+  projection bookkeeping. Four source regressions added. `scripts/test-fast`:
+  1737 passed.
+
+Next: `5e34eaa` (historical residual-window experiment, reverted by `e5f4a66`).

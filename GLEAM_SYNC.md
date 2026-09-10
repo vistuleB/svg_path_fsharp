@@ -55,4 +55,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   retain short nonconstant curves and arc errors. Three source regressions added
   one-to-one. `scripts/test-fast`: 1616 passed.
 
-Next: `0590b19` (Custom policy README clarification).
+- `0590b19` — README traversal flags, deletion behavior, and immediate replacement
+  validation clarified. Documentation-only; `git diff --check` passes.
+
+Next: `297fe29` (WiggleElseBridge rename).

@@ -277,6 +277,8 @@ Helper functions let users employ an `EndpointPolicy` option to specify how
 adjacent endpoints should be reconciled:
 
 ```fsharp
+type EndpointPolicyContext = { First: bool; Last: bool; Closing: bool }
+
 type EndpointPolicy =
     | Strict
     | Wiggle
@@ -307,6 +309,13 @@ both are true for a two-segment input. The separate last-to-first closing call
 has only `Closing = true`. A singleton has no forward pair and is passed twice
 to the closing call. Empty subpaths have no calls.
 
+These flags describe traversal of the input, not the changing output list.
+Replacement segments are not processed as fresh input: the last replacement
+becomes `previous` for the next input segment. If deletion leaves no preceding
+segment, the next input establishes a new starting segment without a callback;
+`First` does not become true again. Consequently, deleting a pair can also
+leave no pair on which to make a `Last = true` call.
+
 `Subpath.setClosedWith policy true subpath` applies the policy to the closing
 pair even if the subpath is already closed. It does not revisit interior pairs.
 Repeating it with a non-idempotent policy may change geometry again.
@@ -336,10 +345,11 @@ at the call site.
 adjacent pairs, its returned list replaces the pair. For the closing join from
 the last segment back to the first segment of a closed subpath, the returned
 list replaces only the last segment. An empty list deletes the replaced segment
-or pair. If the returned list is nonempty, its first segment must start where
-`previous` started; the constructor verifies the final subpath afterward. A
+or pair. If the returned list is nonempty, it must be internally continuous
+and its first segment must start where `previous` started. Each replacement
+is checked immediately; the constructor also verifies the final subpath. A
 custom policy can adjust, delete, replace, or insert bridge-like segments. It
-may be called even when the original adjacent endpoints already match, so it can
+is called even when the original adjacent endpoints already match, so it can
 also perform coalescing or cleanup effects.
 
 ### Joining Subpaths

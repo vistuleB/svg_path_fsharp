@@ -141,4 +141,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   tests added. Last unchanged-code `scripts/test-fast`: 1674 passed;
   `git diff --check` passes.
 
-Next: `75175fe` (cut boundary zero normalization).
+- `75175fe` — Cut.atParameters already canonicalizes every address through
+  Subpath.parameterCanonicalize before endpoint filtering, so the source's
+  additional local normalization is redundant here. Verified call chain;
+  semantic no-op. Last unchanged-code `scripts/test-fast`: 1674 passed;
+  `git diff --check` passes.
+
+Next: `078868f` (clip boundary zero normalization).

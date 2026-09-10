@@ -128,7 +128,6 @@ type FittingOptions =
 /// Join and cap styles are explicit operation arguments.
 type Options =
     { Fitting: FittingOptions
-      DistanceOptions: DistanceOptions
       StalledOffsetDiameter: float<length>
       TangentHealAngleDegrees: float<degree>
       SingleOffsetTrimming: SingleOffsetTrimming
@@ -658,7 +657,6 @@ module Offset =
     let private maximumRefinementGeneration = 5
     let private defaultMaxDepth = maximumRefinementGeneration
     let private defaultSamples = 10
-    let private defaultTrimmingSamples = 5
     let defaultMiterLimit = 4.0
     let inline private smallUnitDivisionTolerance<[<Measure>] 'Unit> () : float<'Unit> =
         LanguagePrimitives.FloatWithMeasure<'Unit> 1.0e-6
@@ -692,9 +690,6 @@ module Offset =
 
     let defaultOptions =
         { Fitting = defaultFittingOptions
-          // Projection options use the trimming pipeline's sampling budget.
-          DistanceOptions =
-            { Segment.defaultDistanceOptions with Samples = defaultTrimmingSamples }
           StalledOffsetDiameter = defaultStalledOffsetDiameter
           TangentHealAngleDegrees = defaultTangentHealAngleDegrees
           SingleOffsetTrimming =

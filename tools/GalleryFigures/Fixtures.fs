@@ -87,7 +87,7 @@ module Fixtures =
         |> List.map(fun (title,data) -> title,family (subpath data) [8.;16.;24.;32.;40.] [|"#5f4339";"#8a5a3c";"#a36a2d";"#7c6a3d";"#51633f"|]) |> panels 330 300
     let packageFirst () =
         let source=sourceFile "package_title.svg"
-        let options={Offset.defaultOptions with Fitting={Tolerance=0.01<length>;Samples=5;MaxDepth=12};DistanceOptions={Segment.defaultDistanceOptions with Tolerance=1e-9<length>}}
+        let options={Offset.defaultOptions with Fitting={Tolerance=0.01<length>;Samples=5;MaxDepth=12}}
         let raw=Offset.pathUntrimmedWith source 1.05<length> (Miter Offset.defaultMiterLimit) options |> require "title untrimmed"
         let result=Offset.pathWith source 1.05<length> (Miter Offset.defaultMiterLimit) Butt options |> require "title offset"
         panels 1800 430 ["Offset 1.05",[(source,"fill:#111827;opacity:.18");layer raw "none" "#9ca3af" 0.1;layer result "none" "#2563eb" 0.16]]

@@ -594,4 +594,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   describe the established sampled overlap detector without experimental wording.
   Comments only; last completed fast results remain recorded above.
 
-Next: `bc2396e` (remove unused offset distance options).
+- `bc2396e` — remove unused Offset.Options.DistanceOptions, fixture settings and
+  README claims. Remove the upstream-deleted projection-default test; correct
+  default_distance_options_test to the source's trimming-default assertions,
+  consolidating the existing duplicate F# case. `scripts/test-fast`: 1793 passed,
+  the same 5 historical assertions failed, 1798 total.
+
+Next: `7f7f241` (README contracts/navigation).

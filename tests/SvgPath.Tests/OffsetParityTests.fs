@@ -276,24 +276,10 @@ let private packageTitlePath () =
 
 let private packageTitleOptions () =
     { Subject.defaultOptions with
-        Fitting = { Tolerance = 0.01<length>; Samples = 5; MaxDepth = 12 }
-        DistanceOptions =
-            { Segment.defaultDistanceOptions with
-                Samples = 5
-                Tolerance = 0.000000001<length> } }
-
-[<Fact>]
-let ``default_offset_trimming_uses_precise_projection_test`` () =
-    Assert.Equal(5, Subject.defaultOptions.DistanceOptions.Samples)
-    Assert.Equal(Segment.defaultDistanceOptions.Tolerance, Subject.defaultOptions.DistanceOptions.Tolerance)
+        Fitting = { Tolerance = 0.01<length>; Samples = 5; MaxDepth = 12 } }
 
 [<Fact>]
 let ``default_distance_options_test`` () =
-    Assert.Equal(5, Subject.defaultOptions.DistanceOptions.Samples)
-    Assert.Equal(Segment.defaultDistanceOptions.Tolerance, Subject.defaultOptions.DistanceOptions.Tolerance)
-
-[<Fact>]
-let ``default_single_and_band_trimming_options_test`` () =
     Assert.Equal(
         { Offside = true
           FinalTrimming = InBandTrimming },

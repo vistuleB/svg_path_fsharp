@@ -1132,8 +1132,6 @@ add caps to the returned one-sided walk.
 The `With` variants additionally accept `SvgPath.Options` as the last argument.
 This record contains only technical controls, not styles. `Options.Fitting`
 controls fitted-curve accuracy and maximum subdivision depth.
-`Options.DistanceOptions` controls the projection and root-finding tolerances
-used during trimming; it is not a trimming-policy switch.
 
 Use `Offset.subpathUntrimmed`, `Offset.pathUntrimmed`, or their `With` variants
 to obtain the connected offset walks before topological trimming. These are

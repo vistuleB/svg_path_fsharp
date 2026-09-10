@@ -479,4 +479,13 @@ Do not substitute the final Gleam tree for the historical source commit.
   test failed; no additional failures. Diagnostic Gallery capture still observes
   the actual production classification, not a parallel display construction.
 
-Next: `f3e79ab` (Gallery refresh and recursive-dash investigation record).
+- `f3e79ab` — regenerated autonomous Gallery assets after the unified band
+  construction. Historical Erlang diagnostic captures remain in the Gleam
+  repository; no copied SVG is used as a substitute for F# computation.
+  `scripts/generate-gallery-figures`: 27 generated, two existing Boolean
+  circle/rectangle cases failed with `CsgArrangementError`. Recursive dashes
+  now generate successfully. The actual second-offset AG capture remains
+  907 vertices, 1181 edges, 783 eligible, 471 submerged, 185 final positive
+  capacities. Log: `/tmp/fsharp-sync-unified-gallery.log`.
+
+Next: `211076f` (optional cusp-stage small-loop culling).

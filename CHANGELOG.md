@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 - Synchronized core geometry with Gleam `svg_path` v0.46.0 (`ed94708`),
   preserving commit-by-commit traceability in `GLEAM_SYNC.md`.
@@ -26,8 +26,8 @@
   short-source normalization uses bounded balanced runs and length upper bounds.
 - Gallery generation now runs isolated workers concurrently, reports failures and
   timings, and captures the second-offset arrangement from production data.
-- Refreshed documentation and locally generated README/Gallery assets. Asset-tag
-  publication and a new F# package version remain release-preparation steps.
+- Refreshed documentation and independently generated README/Gallery assets;
+  README images are pinned to the immutable `assets-v0.6.0` asset tag.
 
 - Cusp discovery now partitions at curvature extrema and reports depth
   exhaustion with its remaining parameter bracket.

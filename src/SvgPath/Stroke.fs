@@ -144,11 +144,13 @@ module Stroke =
         |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError InternalPathError)
         |> Result.map Path.singleton
 
-    let private zeroLengthSquareStrokePath center radius =
-        let topLeft = Point.translate (Point.create -radius -radius) center
-        let topRight = Point.translate (Point.create radius -radius) center
-        let bottomRight = Point.translate (Point.create radius radius) center
-        let bottomLeft = Point.translate (Point.create -radius radius) center
+    let private zeroLengthSquareStrokePath center radius direction =
+        let along = Point.scale radius direction
+        let across = Point.create -along.Y along.X
+        let topLeft = Point.subtract (Point.subtract center along) across
+        let topRight = Point.subtract (Point.add center along) across
+        let bottomRight = Point.add (Point.add center along) across
+        let bottomLeft = Point.add (Point.subtract center along) across
         lineSegmentsBetween [ topLeft; topRight; bottomRight; bottomLeft; topLeft ]
         |> Subpath.create
         |> Result.mapError InternalPathError
@@ -160,7 +162,7 @@ module Stroke =
         match cap with
         | Butt -> Ok Path.empty
         | RoundCap -> zeroLengthRoundStrokePath center radius
-        | Square -> zeroLengthSquareStrokePath center radius
+        | Square -> zeroLengthSquareStrokePath center radius (Point.create 1.0 0.0)
 
     let private closedUntrimmedSideFromNormalizedSource source offset join options =
         Offset.buildSingleOffsetUntrimmed source offset join options
@@ -284,7 +286,8 @@ module Stroke =
         let rec loop index remainingOffset = function
             | [] -> 0, 0.0<length>
             | [ last ] -> index, last - remainingOffset
-            | first :: rest when remainingOffset < first -> index, first - remainingOffset
+            // Preserve phase-boundary zero entries for the interval walker.
+            | first :: rest when remainingOffset = 0.0<length> || remainingOffset < first -> index, first - remainingOffset
             | first :: rest -> loop (index + 1) (remainingOffset - first) rest
         loop 0 offset pattern
 
@@ -299,9 +302,11 @@ module Stroke =
         let patternLength = List.sum pattern
         let startIndex, startRemaining = dashStart pattern (positiveRemainder offset patternLength)
         let rec loop position index remaining reversed =
-            if position >= length then List.rev reversed
+            if position > length || (position = length && remaining > 0.0<length>) then List.rev reversed
             elif remaining <= 0.0<length> then
                 let next = nextDashIndex index pattern
+                let reversed = if index % 2 = 0 then (position, position) :: reversed else reversed
+                // Index advancement makes progress even at unchanged positions.
                 loop position next (dashLengthAt pattern next) reversed
             else
                 let distanceToEnd = length - position
@@ -312,7 +317,9 @@ module Stroke =
                     if index % 2 = 0 && step > 0.0<length> then (position, nextPosition) :: reversed
                     else reversed
                 let next = nextDashIndex index pattern
-                loop nextPosition next (dashLengthAt pattern next) reversed
+                // A clipped final interval is not an actual pattern boundary.
+                if remaining > distanceToEnd then List.rev reversed
+                else loop nextPosition next (dashLengthAt pattern next) reversed
         loop 0.0<length> startIndex startRemaining []
 
     let private openFullDash (subpath: Subpath) =
@@ -332,7 +339,10 @@ module Stroke =
             | pieces -> Ok(List.last pieces))
 
     let private dashPiece (subpath: Subpath) fromDistance toDistance length options =
-        if fromDistance = 0.0<length> && toDistance = length then openFullDash subpath
+        if fromDistance = toDistance then
+            Subpath.pointAtLengthWith subpath fromDistance options
+            |> Result.map (fun point -> Segment.asSubpath (Line(point, point)))
+        elif fromDistance = 0.0<length> && toDistance = length then openFullDash subpath
         elif subpath.Closed then Subpath.betweenLengthsWith subpath fromDistance toDistance options
         elif fromDistance = 0.0<length> then firstSplitPiece subpath toDistance options
         elif toDistance = length then lastSplitPiece subpath fromDistance options
@@ -344,10 +354,11 @@ module Stroke =
             state
             |> Result.bind (fun reversed ->
                 dashPiece subpath fromDistance toDistance length options
-                |> Result.map (fun piece -> piece :: reversed))) (Ok [])
+                |> Result.map (fun piece -> (piece, fromDistance) :: reversed))) (Ok [])
         |> Result.map List.rev
 
-    let subpathDashesWith (subpath: Subpath) dashOptions =
+    // Retain the source arc-length address for zero-length square-cap tangents.
+    let private locatedDashPieces (subpath: Subpath) dashOptions =
         validateDashOptions dashOptions
         |> Result.bind (fun () -> normalizeDashPattern dashOptions.Pattern)
         |> Result.bind (fun pattern ->
@@ -355,11 +366,15 @@ module Stroke =
             |> Result.mapError StrokePathError
             |> Result.bind (fun length ->
                 if length <= 0.0<length> then Ok []
-                elif List.isEmpty pattern then Ok [ subpath ]
+                elif List.isEmpty pattern then Ok [ subpath, 0.0<length> ]
                 else
                     dashIntervals length pattern dashOptions.Offset
                     |> fun intervals -> dashPieces intervals subpath length dashOptions.LengthOptions
                     |> Result.mapError StrokePathError))
+
+    /// Zero-length visible entries remain coincident-endpoint Lines.
+    let subpathDashesWith subpath dashOptions =
+        locatedDashPieces subpath dashOptions |> Result.map (List.map fst)
 
     let subpathDashes subpath pattern offset =
         subpathDashesWith subpath (defaultDashOptions pattern offset)
@@ -379,16 +394,39 @@ module Stroke =
 
     let subpathDashedWith subpath join cap options dashOptions =
         validateOptions options join
-        |> Result.bind (fun () -> subpathDashesWith subpath dashOptions)
-        |> Result.bind (fun dashes -> strokeSubpaths dashes join cap options [] |> Result.map Path.ofSubpaths)
+        |> Result.bind (fun () -> locatedDashPieces subpath dashOptions)
+        |> Result.bind (fun dashes ->
+            dashes |> List.fold (fun state (piece, at) ->
+                state |> Result.bind (fun paths ->
+                    let pointDash = match Subpath.segments piece with [Line(a,b)] -> a=b | _ -> false
+                    let stroked =
+                        if cap = Square && pointDash then
+                            Subpath.parameterAtLengthWith subpath at dashOptions.LengthOptions
+                            |> Result.bind (Subpath.directions subpath)
+                            |> Result.mapError StrokePathError
+                            |> Result.bind (fun directions ->
+                                let direction =
+                                    match directions.Outgoing, directions.Incoming with
+                                    | Some direction, _ | None, Some direction -> direction
+                                    | None, None -> Point.create 1.0 0.0
+                                zeroLengthSquareStrokePath (Subpath.start piece) (options.Width / 2.0) direction
+                                |> Result.mapError (Offset.publicError >> StrokeOffsetError))
+                        else subpathWith piece join cap options
+                    stroked |> Result.map (fun path -> path :: paths))) (Ok [])
+            |> Result.map (List.rev >> List.collect Path.subpaths >> Path.ofSubpaths))
 
     let subpathDashed subpath width pattern offset join cap =
         subpathDashedWith subpath join cap { defaultOptions with Width = width } (defaultDashOptions pattern offset)
 
     let pathDashedWith path join cap options dashOptions =
         validateOptions options join
-        |> Result.bind (fun () -> pathDashesWith path dashOptions)
-        |> Result.bind (fun dashes -> pathWith dashes join cap options)
+        |> Result.bind (fun () -> validateDashOptions dashOptions)
+        |> Result.bind (fun () ->
+            Path.subpaths path |> List.fold (fun state subpath ->
+                state |> Result.bind (fun paths ->
+                    subpathDashedWith subpath join cap options dashOptions
+                    |> Result.map (fun path -> path :: paths))) (Ok [])
+            |> Result.map (List.rev >> List.collect Path.subpaths >> Path.ofSubpaths))
 
     let pathDashed path width pattern offset join cap =
         pathDashedWith path join cap { defaultOptions with Width = width } (defaultDashOptions pattern offset)

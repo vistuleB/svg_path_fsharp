@@ -221,14 +221,51 @@ let ``subpath dashes duplicates odd patterns`` () =
         List.map bounds dashes)
 
 [<Fact>]
-let ``subpath dashes skips zero entries in nonzero patterns`` () =
+let ``subpath dashes preserves zero visible entries`` () =
     let source = lineSubpath [ point 0.0 0.0; point 8.0 0.0 ]
     let dashes =
         Stroke.subpathDashes source [ 0.0<length>; 2.0<length>; 3.0<length>; 2.0<length> ] 0.0<length>
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal<(Point<length> * Point<length>) list>(
-        [ point 2.0 0.0, point 5.0 0.0 ],
+        [ point 0.0 0.0, point 0.0 0.0; point 2.0 0.0, point 5.0 0.0; point 7.0 0.0, point 7.0 0.0 ],
         List.map bounds dashes)
+
+[<Fact>]
+let ``zero visible dashes keep caps and phase`` () =
+    let source = lineSubpath [point 0. 0.; point 4. 0.]
+    for phase, positions in [0., [0.;2.;4.]; 1., [1.;3.]; -1., [1.;3.]] do
+        let dashes = Stroke.subpathDashes source [0.0<length>;2.0<length>] (phase * 1.0<length>) |> Result.defaultWith (failwithf "%A")
+        Assert.Equal<float list>(positions, dashes |> List.map (Subpath.start >> fun p -> float p.X))
+        for cap in [Butt;RoundCap;Square] do
+            let result = Stroke.subpathDashed source 0.5<length> [0.0<length>;2.0<length>] (phase * 1.0<length>) Bevel cap |> Result.defaultWith (failwithf "%A")
+            Assert.Equal((if cap = Butt then 0 else positions.Length), (Path.subpaths result).Length)
+
+[<Fact>]
+let ``zero dash square cap uses source direction`` () =
+    let source = lineSubpath [point 0. 0.;point 3. 4.]
+    let result = Stroke.subpathDashed source 2.0<length> [0.0<length>;2.0<length>] 0.0<length> Bevel Square |> Result.defaultWith (failwithf "%A")
+    let corner = result |> Path.subpaths |> List.head |> Subpath.start
+    Assert.True(abs(corner.X-0.2<length>) < 1e-9<length>)
+    Assert.True(abs(corner.Y+1.4<length>) < 1e-9<length>)
+    Assert.Equal(Ok result, Stroke.pathDashed (Path.singleton source) 2.0<length> [0.0<length>;2.0<length>] 0.0<length> Bevel Square)
+
+[<Fact>]
+let ``zero visible dashes on closed source are points not full loops`` () =
+    let source = lineSubpath [point 0. 0.;point 2. 0.;point 2. 2.;point 0. 2.;point 0. 0.]
+                 |> Subpath.setClosedWith Strict true |> Result.defaultWith (failwithf "%A")
+    let dashes = Stroke.subpathDashes source [0.0<length>;3.0<length>] 0.0<length> |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(3, dashes.Length)
+    for dash in dashes do
+        Assert.False(Subpath.isClosed dash)
+        Assert.Equal(Ok 0.0<length>, Subpath.length dash)
+    let result = Stroke.subpathDashed source 0.5<length> [0.0<length>;3.0<length>] 0.0<length> Bevel RoundCap |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(3, (Path.subpaths result).Length)
+
+[<Fact>]
+let ``consecutive zero visible dashes advance pattern`` () =
+    let source = lineSubpath [point 0. 0.;point 4. 0.]
+    let dashes = Stroke.subpathDashes source [0.0<length>;0.0<length>;0.0<length>;2.0<length>] 0.0<length> |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<float list>([0.;0.;2.;2.;4.;4.], dashes |> List.map (Subpath.start >> fun p -> float p.X))
 
 [<Fact>]
 let ``subpath dashes treats empty pattern as none`` () =

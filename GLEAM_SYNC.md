@@ -427,4 +427,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   for smooth, aligned tangent branches; port the original swapped/reversed
   regression assertions. `scripts/test-fast`: 1758 passed.
 
-Next: `410ed0f` (zero-length visible dashes).
+- `410ed0f` — retain visible zero-length dash entries and source addresses;
+  generate their Round/Square caps, orienting squares from source tangents.
+  Ported the four new source tests and updated its existing zero-entry test.
+  `scripts/test-fast`: 1762 passed.
+
+Next: `4b11243` (propagate convex-hull tangent refinement errors).

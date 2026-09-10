@@ -10,6 +10,27 @@ let private assertPointNear expected actual =
     Assert.True(Point.distance expected actual <= 1.0e-8<length>, $"expected {expected}, got {actual}")
 
 [<Fact>]
+let ``graceful arc subpaths preserve exact noncardinal endpoints`` () =
+    let matrix = Transform.scaleXY 1.0 0.0
+    for largeArc in [false;true] do
+        let arc = Arc {Start=point 3. 4.;Radius=point 5. 5.;XAxisRotation=0.0<degree>;LargeArc=largeArc;Sweep=true;End=point -3. 4.}
+        let part = Transform.segmentToSubpathGracefully arc matrix |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(Affine.point matrix (Segment.start arc),Subpath.start part)
+        Assert.Equal(Affine.point matrix (Segment.finish arc),Subpath.finish part)
+        let source = Subpath.create [Line(point 10. 4.,Segment.start arc);arc;Line(Segment.finish arc,point 10. 4.)] |> Result.defaultWith (failwithf "%A")
+        let openResult = Transform.subpathGracefully source matrix |> Result.defaultWith (failwithf "%A")
+        Assert.False(Subpath.isClosed openResult)
+        let closedSource = Subpath.setClosed true source |> Result.defaultWith (failwithf "%A")
+        let closed = Transform.subpathGracefully closedSource matrix |> Result.defaultWith (failwithf "%A")
+        Assert.True(Subpath.isClosed closed)
+        Assert.Equal(Subpath.start closed,Subpath.finish closed)
+        Transform.pathGracefully (Path.ofSubpaths [source]) matrix |> Result.defaultWith (failwithf "%A") |> ignore
+        if largeArc then
+            let box = Subpath.boundingBox part |> Result.defaultWith (failwithf "%A")
+            Assert.True(abs(box.Min.X + 5.0<length>)<1e-6<length>)
+            Assert.True(abs(box.Max.X - 5.0<length>)<1e-6<length>)
+
+[<Fact>]
 let ``matrix coefficients transform points with measured translations`` () =
     let transform = Transform.matrix 2.0 3.0 5.0 7.0 11.0<length> 13.0<length>
     Assert.Equal(point 30.0 40.0, Transform.point transform (point 2.0 3.0))

@@ -184,6 +184,9 @@ module Transform =
             (fun segmentValue transform -> segment segmentValue transform |> Result.map List.singleton)
             input transform
 
+    /// Collapsed arcs retain directly transformed endpoints for continuity.
+    /// Reconstruction uses strict matching; semantically closed subpaths
+    /// alone have a final closure wiggle fallback.
     let subpathGracefully input transform =
         transformSubpathWith
             (fun segmentValue transform ->

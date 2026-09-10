@@ -379,12 +379,20 @@ module Ellipse =
                     | Ok axis ->
                         let center = transformedPoint transform arc.Center
                         let alpha, beta = Point.dot xAxis axis, Point.dot yAxis axis
-                        collapsedAngles arc alpha beta
-                        |> List.map (fun angle ->
-                            let scalar = alpha * Trig.cosDegrees angle + beta * Trig.sinDegrees angle
-                            Point.translate (Point.scale scalar axis) center)
+                        let angles = collapsedAngles arc alpha beta
+                        angles
+                        |> List.mapi (fun index angle ->
+                            // Neighboring segments use directly transformed endpoints;
+                            // trigonometric reconstruction can drift at shared points.
+                            if index=0 then transformedPoint transform startPoint
+                            elif index=List.length angles-1 then transformedPoint transform endPoint
+                            else
+                                let scalar = alpha * Trig.cosDegrees angle + beta * Trig.sinDegrees angle
+                                Point.translate (Point.scale scalar axis) center)
                         |> Ok
 
+    /// First and last points are directly transformed input endpoints;
+    /// only interior extrema use ellipse parameterization.
     let collapsedArcSubpath startPoint radius xAxisRotation largeArc sweep endPoint transform =
         collapsedArcPoints startPoint radius xAxisRotation largeArc sweep endPoint transform
 

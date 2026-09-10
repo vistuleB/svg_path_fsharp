@@ -228,4 +228,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   affine fitting only. Documentation and both source regressions ported.
   `scripts/test-fast`: 1708 passed.
 
-Next: `b5a6cab` (exact collapsed arc subpath endpoints).
+- `b5a6cab` — preserve directly transformed endpoints in collapsed arc
+  subpaths, reconstructing only interior extrema trigonometrically. Ported
+  documentation and source regression. `scripts/test-fast`: 1709 passed.
+
+Next: `d92b75e` (encounters documentation).

@@ -99,6 +99,8 @@ type SingleOffsetFinalTrimming =
 /// Trimming controls for single offsets.
 /// Offside trimming applies only to closed source subpaths. FinalTrimming
 /// selects cusp-only trimming, complete in-band trimming, or no final pass.
+/// Reconstructed traversal is returned without a final nesting-based reversal
+/// into clockwise exterior contours and counterclockwise holes.
 type SingleOffsetTrimming =
     { Offside: bool
       FinalTrimming: SingleOffsetFinalTrimming }
@@ -5270,7 +5272,8 @@ module Offset =
             options.SingleOffsetTrimming.Offside
             options.SingleOffsetTrimming.FinalTrimming
         |> Result.map (List.filter (fun subpath -> not (List.isEmpty (Subpath.segments subpath))))
-        |> Result.bind (Path.ofSubpaths >> orientOutlinePath)
+        // Single offsets preserve reconstructed traversal, not filled-outline orientation.
+        |> Result.map Path.ofSubpaths
 
     let internal internalSingleOffsetBandCandidate source offset join cap options =
         validateOptions options

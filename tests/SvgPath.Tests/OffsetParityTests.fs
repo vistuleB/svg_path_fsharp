@@ -8,6 +8,17 @@ open Xunit
 module Subject = Offset
 
 [<Fact>]
+let ``untrimmed single offset does not reorient nested contours`` () =
+    let source = Parse.path "M 0 0 V 10 H 10 V 0 Z M 3 3 V 7 H 7 V 3 Z" |> Result.defaultWith (failwithf "%A")
+    let options = {Offset.defaultOptions with SingleOffsetTrimming={Offside=false;FinalTrimming=NoTrimming}}
+    let result = Offset.pathWith source 0.25<length> (Miter Offset.defaultMiterLimit) Butt options |> Result.defaultWith (failwithf "%A")
+    let contours = Path.subpaths result
+    Assert.Equal(2,contours.Length)
+    for contour in contours do
+        Assert.True(Subpath.isClosed contour)
+        Assert.True(Area.signedSubpath contour < 0.0<length^2>)
+
+[<Fact>]
 let ``zero offset preserves closed square without source capacity`` () =
     let source = Parse.path "M 0 0 H 10 V 10 H 0 Z" |> Result.defaultWith (failwithf "%A") |> Path.subpaths |> List.exactlyOne
     for source in [source; Subpath.reverse source] do

@@ -19,6 +19,6 @@
   <path d="M 0 -1 L -0.86603 -0.5 L 0.86603 0.5 V -0.5 L -0.86603 0.5 L 0 1" style="fill:none;stroke:#94a3b8;stroke-width:.055;stroke-linejoin:round"/>
   </g>
   <g transform="translate(875 170) scale(90)">
-  <path d="M 0.4 0 L 0.66603 -0.15359 V 0.15359 Z" style="fill:none;stroke:#2563eb;stroke-width:.04;stroke-linecap:round;stroke-linejoin:round"/>
+  <path d="M 0.4 0 L 0.66603 0.15359 V -0.15359 Z" style="fill:none;stroke:#2563eb;stroke-width:.04;stroke-linecap:round;stroke-linejoin:round"/>
   </g>
 </svg>

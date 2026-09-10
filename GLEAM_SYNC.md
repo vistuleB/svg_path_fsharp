@@ -448,4 +448,12 @@ Do not substitute the final Gleam tree for the historical source commit.
   rejection and inseparable hits passed. Park-Miller uses Int64 so its product
   remains exact instead of overflowing F# Int32.
 
-Next: `8e3a44e` (remove final single-offset nesting orientation).
+- `8e3a44e` — remove final nesting-based single-offset orientation; port the
+  source preservation regression and regenerate autonomous README figures.
+  `scripts/test-fast`: 1767 passed, 1 failed. Failure is the F#-specific legacy
+  `OffsetTests.path offset orients nested closed contours by depth`, whose
+  expected orientation contradicts this deliberate upstream contract change.
+  Recorded for final test reconciliation, not repaired out of sequence.
+  `scripts/generate-readme-figures`: all nine figures generated successfully.
+
+Next: `506be97` (stroke uses band orientation directly).

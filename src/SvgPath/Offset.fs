@@ -4400,6 +4400,8 @@ module Offset =
                     if split.Closed then [] else [ expectedStart; expectedEnd ]
                 cuspTrimParitySurvivorChains retained build.Graph protectedVertices
                 |> Result.bind (function
+                    // Parity can erase the last retained segment too.
+                    | [] -> Ok None
                     | [ chain ] ->
                         cuspTrimSubpathFromChain
                             chain split.Closed expectedStart expectedEnd

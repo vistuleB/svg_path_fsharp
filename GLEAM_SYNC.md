@@ -334,4 +334,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   side-probe displacement. Source regression ported. `scripts/test-fast`:
   1742 passed.
 
-Next: `3bf9b2a` (allow empty cusp results after parity reduction).
+- `3bf9b2a` — parity-erased cusp results return None like initially empty
+  classifications. `scripts/test-fast`: 1742 passed.
+
+Next: `5ec5fd2` (rotation-scale reconstruction validation).

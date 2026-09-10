@@ -413,4 +413,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   explicit capacities. Added the three original zero-offset regressions.
   `scripts/test-fast`: 1756 passed.
 
-Next: `0181593` (validate collapsed cubic endpoint directions).
+- `0181593` — validate actual one-sided endpoint directions after either
+  tangent-line or bisection collapsed-control fitting; reject reversed rays.
+  `dotnet fsi examples/debug/collapsed_handle_rays.fsx`: the original 12 ray
+  cases passed. `scripts/test-fast`: 1756 passed.
+
+Next: `33f11eb` (intersection identity uses both parameter addresses).

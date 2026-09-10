@@ -1901,18 +1901,31 @@ module Offset =
                     validateReversalHandleScalar startPoint endPoint handle
                     |> Result.map (fun _ -> Point.translate (Point.scale handle startDirection) startPoint)))
 
+    let private validateCollapsedFitDirections segment startDirection endDirection =
+        // Tangent-line intersection does not establish ray orientation. Actual
+        // one-sided directions also handle collapsed controls via derivatives.
+        unitTangent segment 0.0<parameter>
+        |> Result.bind (fun start ->
+            unitTangent segment 1.0<parameter>
+            |> Result.bind (fun finish ->
+                if Point.dot start startDirection > 0.0 && Point.dot finish endDirection > 0.0 then Ok()
+                else Error InternalNonFinite))
+
     let private stalledStartControl2
         (startPoint: Point<length>)
         (endPoint: Point<length>)
         (startDirection: Point<1>)
         (endDirection: Point<1>)
         samples =
-        match directionLineIntersection startPoint startDirection endPoint (Point.negate endDirection) with
+        (match directionLineIntersection startPoint startDirection endPoint (Point.negate endDirection) with
         | Ok point when Point.distance endPoint point <= 2.0 * Point.distance startPoint endPoint -> Ok point
         | Ok _ -> stalledStartControl2ByBisection startPoint endPoint startDirection endDirection
         | Error _ ->
             stalledStartControl2ParallelOrBisection
-                startPoint endPoint startDirection endDirection samples
+                startPoint endPoint startDirection endDirection samples)
+        |> Result.bind (fun control2 ->
+            validateCollapsedFitDirections (CubicBezier(startPoint, startPoint, control2, endPoint)) startDirection endDirection
+            |> Result.map (fun () -> control2))
 
     let private stalledEndControl1
         (startPoint: Point<length>)
@@ -1920,12 +1933,15 @@ module Offset =
         (startDirection: Point<1>)
         (endDirection: Point<1>)
         samples =
-        match directionLineIntersection startPoint startDirection endPoint endDirection with
+        (match directionLineIntersection startPoint startDirection endPoint endDirection with
         | Ok point when Point.distance startPoint point <= 2.0 * Point.distance startPoint endPoint -> Ok point
         | Ok _ -> stalledEndControl1ByBisection startPoint endPoint startDirection endDirection
         | Error _ ->
             stalledEndControl1ParallelOrBisection
-                startPoint endPoint startDirection endDirection samples
+                startPoint endPoint startDirection endDirection samples)
+        |> Result.bind (fun control1 ->
+            validateCollapsedFitDirections (CubicBezier(startPoint, control1, endPoint, endPoint)) startDirection endDirection
+            |> Result.map (fun () -> control1))
 
     let private offsetDirectionFromCurvature tangent curvature offset t =
         let speedFactor = 1.0 - offset * curvature

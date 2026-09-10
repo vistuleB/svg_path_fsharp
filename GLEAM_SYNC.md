@@ -501,4 +501,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   No algorithm change in this checkpoint; the subsequent `6362abe` ports the
   endpoint candidate fix and exact source regression geometry.
 
-Next: `76ad87a` (signed-unit dual final orientation).
+- `76ad87a` — replace displaced final-orientation probes with deterministic
+  signed-unit dual propagation; retain same-loop retraces as unconstrained and
+  reject unsupported ownership/conflicting face values. All nine source tests
+  and README contracts ported. `scripts/test-fast`: 1788 passed, the same one
+  obsolete single-offset nesting-orientation expectation failed.
+
+Next: `6362abe` (stored curve endpoints in line intersections).

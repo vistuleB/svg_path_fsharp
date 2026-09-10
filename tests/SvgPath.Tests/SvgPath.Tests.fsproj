@@ -97,6 +97,7 @@
     <Compile Include="OffsetParityTests.fs" />
     <Compile Include="OffsetForcedParityTests.fs" />
     <Compile Include="CuspSmallLoopTests.fs" />
+    <Compile Include="BandOrientationTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

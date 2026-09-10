@@ -35,6 +35,9 @@ type internal InternalError =
     | InternalInvalidStalledOffsetDiameter of diameter: float<length>
     | InternalInvalidTangentHealAngleDegrees of angle: float<degree>
     | InternalBandSubpathNotClosed
+    | InternalBandOrientationUnexpectedEdge of edgeId: int * preimageCount: int
+    | InternalBandOrientationConflict of edgeId: int
+    | InternalBandOrientationUnreachableFace of faceId: int
     /// Carries the parameter where the tangent query failed.
     | InternalDegenerateTangent of t: float<parameter>
     /// Carries remaining geometric divergence, not recursion depth.
@@ -669,7 +672,6 @@ module Offset =
     let private angleToleranceDegrees = 1.0e-9<degree>
     let private arrangementTolerance = 2.0e-9<length>
     let private submergedSideSamplingDistance = 5.0e-8<length>
-    let private bandOrientationSideSamplingDistance = 1.0e-4<length>
     let private curvatureParameterTolerance = 1.0e-6<parameter>
     let private curvatureValueTolerance = 1.0e-6<1 / length>
     let private curvatureRadiusTolerance = 1.0e-6<length>
@@ -4864,47 +4866,98 @@ module Offset =
             (subpath.Segments |> List.map (fun segment -> segment.Segment))
             subpath.Closed tolerance
 
-    let rec private orientBandSubpath
-        (subpath: Subpath)
-        (segments: Segment list)
-        (winding: Point<length> -> Result<int, InternalError>) =
-        match segments with
-        | [] -> Ok subpath
-        | first :: rest ->
-            Segment.point first 0.5<parameter>
-            |> Result.mapError InternalPathError
-            |> Result.bind (fun point ->
-                match unitNormal first 0.5<parameter> with
-                | Error _ -> orientBandSubpath subpath rest winding
-                | Ok normal ->
-                    let leftPoint =
-                        Point.add point
-                            (Point.scale bandOrientationSideSamplingDistance normal)
-                    let rightPoint =
-                        Point.add point
-                            (Point.scale -bandOrientationSideSamplingDistance normal)
-                    match winding leftPoint, winding rightPoint with
-                    | Ok left, Ok right when right > left -> Ok subpath
-                    | Ok left, Ok right when left > right -> Ok(Subpath.reverse subpath)
-                    | Ok _, Ok _ -> orientBandSubpath subpath rest winding
-                    | Error error, _
-                    | _, Error error -> Error error)
+    type private BandOrientationEdge =
+        { EdgeId: int; LeftFace: int; RightFace: int
+          Source: (int * bool) option }
 
-    let rec private orientBandSubpaths subpaths winding oriented =
-        match subpaths with
-        | [] -> Ok(List.rev oriented)
-        | first :: rest ->
-            let orientedFirst =
-                if Subpath.isClosed first then
-                    orientBandSubpath first (Subpath.segments first) winding
-                else Ok first
-            orientedFirst
-            |> Result.bind (fun first ->
-                orientBandSubpaths rest winding (first :: oriented))
+    type private BandOrientationState =
+        { Faces: Map<int, int>; ReversedLoops: Map<int, bool>; Pending: int list }
 
-    let private orientBandPath path winding =
-        orientBandSubpaths (Path.subpaths path) winding []
-        |> Result.map Path.ofSubpaths
+    let private visitBandOrientationEdge (edge: BandOrientationEdge) fromFace state =
+        match Map.tryFind fromFace state.Faces with
+        | None -> Error(InternalBandOrientationUnreachableFace fromFace)
+        | Some value ->
+            let fromLeft = fromFace = edge.LeftFace
+            let destination = if fromLeft then edge.RightFace else edge.LeftFace
+            let required, state =
+                match edge.Source with
+                | None -> value, state
+                | Some (loopIndex, preimageReversed) ->
+                    match Map.tryFind loopIndex state.ReversedLoops with
+                    | Some reverseLoop ->
+                        let rightMinusLeft = if preimageReversed <> reverseLoop then -1 else 1
+                        value + (if fromLeft then rightMinusLeft else -rightMinusLeft), state
+                    | None ->
+                        let required = if value = 0 then 1 else 0
+                        let rightMinusLeft = if fromLeft then required - value else value - required
+                        let reverseLoop = preimageReversed <> (rightMinusLeft < 0)
+                        required, {state with ReversedLoops = Map.add loopIndex reverseLoop state.ReversedLoops}
+            if required < -1 || required > 1 then Error(InternalBandOrientationConflict edge.EdgeId)
+            else
+                match Map.tryFind destination state.Faces with
+                | Some previous when previous <> required -> Error(InternalBandOrientationConflict edge.EdgeId)
+                | Some _ -> Ok state
+                | None -> Ok {state with Faces = Map.add destination required state.Faces; Pending = destination :: state.Pending}
+
+    let rec private propagateBandOrientation adjacency state =
+        match state.Pending with
+        | [] -> Ok state
+        | face :: rest ->
+            Map.tryFind face adjacency |> Option.defaultValue []
+            |> List.fold (fun state edge -> state |> Result.bind (visitBandOrientationEdge edge face))
+                (Ok {state with Pending = rest})
+            |> Result.bind (propagateBandOrientation adjacency)
+
+    // Reverse whole contours using only their dual. Face values stay in -1/0/1;
+    // unconstrained same-loop retraces retain traversal. No backtracking.
+    let internal orientBandPath path =
+        let subpaths = Path.subpaths path
+        let rec tryMap f items =
+            match items with
+            | [] -> Ok []
+            | first :: rest -> f first |> Result.bind (fun first ->
+                tryMap f rest |> Result.map (fun rest -> first :: rest))
+        if not (List.forall Subpath.isClosed subpaths) then Error InternalBandSubpathNotClosed
+        else
+            let indexed = subpaths |> List.mapi (fun i s -> Subpath.segments s |> List.map (fun segment -> segment, i)) |> List.concat
+            let loopIndices = indexed |> List.mapi (fun i (_, owner) -> i, owner) |> Map.ofList
+            Arrangement.buildWith (List.map fst indexed) arrangementTolerance arrangementTolerance adjacentLoopEndpointParameterTolerance
+            |> Result.mapError (Arrangement.publicError >> InternalArrangementGraphError)
+            |> Result.bind (fun build ->
+                Arrangement.dual build.Graph |> Result.mapError InternalArrangementGraphError
+                |> Result.bind (fun dual ->
+                    let images = build.EdgeImages |> List.map (fun image -> image.EdgeId, image.Sources) |> Map.ofList
+                    dual.EdgeFaces |> tryMap (fun edge ->
+                        match Map.tryFind edge.EdgeId images with
+                        | None -> Error(InternalBandOrientationUnexpectedEdge(edge.EdgeId, 0))
+                        | Some sources ->
+                            sources |> tryMap (fun source ->
+                                match Map.tryFind source.SegmentIndex loopIndices with
+                                | None -> Error InternalSegmentImageCountMismatch
+                                | Some owner -> Ok(owner, source.Reversed))
+                            |> Result.bind (fun owners ->
+                                match owners with
+                                | [owner] -> Ok(Some owner)
+                                | [(a, reversedA); (b, reversedB)] when a = b && reversedA <> reversedB -> Ok None
+                                | _ -> Error(InternalBandOrientationUnexpectedEdge(edge.EdgeId, List.length owners)))
+                            |> Result.map (fun source ->
+                                {EdgeId = edge.EdgeId; LeftFace = edge.LeftFace; RightFace = edge.RightFace; Source = source}))
+                    |> Result.bind (fun constraints ->
+                        let add face edge map = Map.add face (edge :: (Map.tryFind face map |> Option.defaultValue [])) map
+                        let adjacency = constraints |> List.fold (fun map edge -> map |> add edge.LeftFace edge |> add edge.RightFace edge) Map.empty
+                        match dual.Faces |> List.tryFind (fun face -> face.Outer) with
+                        | None -> Error(InternalBandOrientationUnreachableFace -1)
+                        | Some outer ->
+                            propagateBandOrientation adjacency {Faces = Map.ofList [outer.Id, 0]; ReversedLoops = Map.empty; Pending = [outer.Id]}
+                            |> Result.bind (fun state ->
+                                match dual.Faces |> List.tryFind (fun face -> not (Map.containsKey face.Id state.Faces)) with
+                                | Some face -> Error(InternalBandOrientationUnreachableFace face.Id)
+                                | None ->
+                                    constraints |> List.fold (fun state edge -> state |> Result.bind (visitBandOrientationEdge edge edge.LeftFace)) (Ok state))
+                            |> Result.map (fun state ->
+                                subpaths |> List.mapi (fun i subpath ->
+                                    if Map.tryFind i state.ReversedLoops = Some true then Subpath.reverse subpath else subpath)
+                                |> Path.ofSubpaths))))
 
     let private trimSingleOffsetArrangement
         (build: OffsetArrangementBuild)
@@ -4953,14 +5006,11 @@ module Offset =
         |> Result.bind (fun winding ->
             trimBandArrangement untrimmed bands winding windingOpinions options
             |> Result.bind (fun loops ->
-                orientBandPath (Path.ofSubpaths loops) winding))
+                orientBandPath (Path.ofSubpaths loops)))
 
     let internal topologicalBandPath untrimmed bands options =
         internalTopologicalBandLoops untrimmed bands options
-        |> Result.bind (fun loops ->
-            internalBandWindingFunction bands
-            |> Result.bind (fun winding ->
-                orientBandPath (Path.ofSubpaths loops) winding))
+        |> Result.bind (fun loops -> orientBandPath (Path.ofSubpaths loops))
 
     let private trimBandSideCusps
         (subpath: ICulledOffsetSubpath)

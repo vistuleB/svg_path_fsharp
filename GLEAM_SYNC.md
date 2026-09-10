@@ -193,4 +193,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   uses defaultOptions and needs no constructor change. `scripts/test-fast`:
   1696 passed, the same historical zero-tolerance expectation fails.
 
-Next: `1045251` (zero-tolerance bracket regression).
+- `1045251` — replace zero-tolerance success expectation with validation of the
+  unresolved sign-changing bracket. `scripts/test-fast`: 1697 passed; the
+  historical intermediate failure is resolved.
+
+Next: `eda3e14` (area contract documentation).

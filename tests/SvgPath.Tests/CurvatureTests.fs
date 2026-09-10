@@ -77,12 +77,17 @@ let ``curvature options report offending values`` () =
         Curvature.segmentInflectionParameters upwardCubic { defaults with MaxDepth = 0 })
 
 [<Fact>]
-let ``zero curvature tolerance accepts cusp discovery`` () =
+let ``zero tolerance reports unconverged curvature bracket`` () =
     let options = { Curvature.defaultOptions with Tolerance = 0.0<parameter> }
-    let roots = Curvature.segmentLeftNormalCuspParameters upwardCubic 0.27<length> options |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(2, roots.Length)
-    Assert.Equal(0.4786978280544282, float roots[0], 9)
-    Assert.Equal(0.5213021719455719, float roots[1], 9)
+    // Valid zero tolerance does not promise an exact root within the budget.
+    match Curvature.segmentLeftNormalCuspParameters upwardCubic 0.27<length> options with
+    | Error(CurvatureMaxDepthReached(lower,upper)) ->
+        Assert.True(lower<upper)
+        Assert.True(upper-lower<1e-9<parameter>)
+        let a = Curvature.segmentLeftNormalCuspResidual upwardCubic 0.27<length> lower |> Result.defaultWith (failwithf "%A")
+        let b = Curvature.segmentLeftNormalCuspResidual upwardCubic 0.27<length> upper |> Result.defaultWith (failwithf "%A")
+        Assert.True(a*b<0.0<_>)
+    | other -> failwithf "Expected unconverged bracket, got %A" other
 
 [<Fact>]
 let ``radius proximity validates margin`` () =

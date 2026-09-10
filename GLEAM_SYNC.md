@@ -558,4 +558,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   change; F# verification remains recorded above rather than copying Gleam's
   successful test claims into this repository.
 
-Next: `caab926` (remove old orientator).
+- `caab926` — remove superseded whole-contour orientator, its errors/switch and
+  nine obsolete tests. Filled-face tests now exercise re-enumeration directly.
+  `scripts/test-fast`: 1797 passed, the same 5 historical assertions failed,
+  1802 total. No new failures.
+
+Next: `5f8609c` (require face winding data).

@@ -507,4 +507,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   and README contracts ported. `scripts/test-fast`: 1788 passed, the same one
   obsolete single-offset nesting-orientation expectation failed.
 
-Next: `6362abe` (stored curve endpoints in line intersections).
+- `6362abe` — independently seed both stored curve endpoints against the finite
+  line, retaining analytic candidates and endpoint-preferring deduplication.
+  Exact recursive-dash arc/line regression covers both reversals and swaps.
+  `scripts/test-fast`: 1789 passed, one unchanged obsolete nesting expectation
+  failed. No additional failures.
+
+Next: `a251698` (filled-face boundary enumeration).

@@ -6,6 +6,24 @@ open Xunit
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
 [<Fact>]
+let ``near_tangent_arc_line_keeps_exact_stored_endpoint_test`` () =
+    let arc = Arc {Start = point 430.66681589309076 178.69245771161582; Radius = point 3.0 3.0
+                   XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false
+                   End = point 430.670203101245 178.69477431938788}
+    let line = Line(Segment.finish arc, point 430.22232031893986 178.38890397610967)
+    for reverseArc in [false;true] do
+        for reverseLine in [false;true] do
+            let a = if reverseArc then Segment.reverse arc else arc
+            let b = if reverseLine then Segment.reverse line else line
+            let ta = if reverseArc then 0.0<parameter> else 1.0<parameter>
+            let tb = if reverseLine then 1.0<parameter> else 0.0<parameter>
+            let options = {Intersections.defaultOptions with Tolerance = 1e-9<length>; MaxDepth = 48; ParameterSnap = NoParameterSnap}
+            let found = Intersections.segmentWith a b options |> Result.defaultWith (failwithf "%A")
+            Assert.True(found |> List.exists (fun hit -> hit.LeftT = ta && hit.RightT = tb))
+            let swapped = Intersections.segmentWith b a options |> Result.defaultWith (failwithf "%A")
+            Assert.True(swapped |> List.exists (fun hit -> hit.LeftT = tb && hit.RightT = ta))
+
+[<Fact>]
 let ``coincident cubic endpoints keep both intersection addresses`` () =
     let cubic = CubicBezier(point 0. 0., point 1. 1., point -1. 1., point 0. 0.)
     let line = Line(point -2. 0., point 2. 0.)

@@ -997,6 +997,16 @@ module Intersections =
         if chord <= 0.0<length> then Ok []
         else
             let unitDirection = Point.scale (1.0 / chord) lineDirection
+            // Center/angle arithmetic can move an exact stored arc endpoint
+            // beyond its sweep near tangency. Seed both stored endpoints too.
+            let endpoints =
+                [0.0<parameter>, Segment.start segmentValue; 1.0<parameter>, Segment.finish segmentValue]
+                |> List.choose (fun (segmentT, pointValue) ->
+                    let lineT = lineProjectionT pointValue lineStart lineEnd |> clamp01
+                    let projected = Point.interpolate lineStart lineEnd lineT
+                    if Point.distance pointValue projected > options.Tolerance then None
+                    elif lineIsLeft then Some {LeftT = lineT; RightT = segmentT; Point = pointValue}
+                    else Some {LeftT = segmentT; RightT = lineT; Point = pointValue})
             Segment.rayCrossingsWith segmentValue lineStart unitDirection
                 { Segment.defaultCrossingOptions with
                     Samples = 1
@@ -1016,7 +1026,7 @@ module Intersections =
                                     { LeftT = clamp01 lineT; RightT = clamp01 segmentT; Point = pointValue }
                                 else
                                     { LeftT = clamp01 segmentT; RightT = clamp01 lineT; Point = pointValue }
-                            insert intersection found) []
+                            insert intersection found) endpoints
                 |> List.rev
                 |> Ok)
 

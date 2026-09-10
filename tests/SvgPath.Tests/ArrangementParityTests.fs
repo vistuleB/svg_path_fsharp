@@ -158,6 +158,51 @@ let private buildGraph subpaths =
     Arrangement.build (subpaths |> List.map Path.singleton) tolerance minimumChord
     |> Result.map _.Graph
 
+let private sourceWindingSetup subpaths =
+    let graph = buildGraph subpaths |> Result.defaultWith (failwithf "%A")
+    let dual = Arrangement.dual graph |> Result.defaultWith (failwithf "%A")
+    let changes = graph.Edges |> List.map (fun e -> {EdgeId=e.Id;RightMinusLeft=e.ForwardMultiplicity-e.ReverseMultiplicity})
+    dual,changes
+
+let private propagatedSourceWindings subpaths =
+    let dual,changes = sourceWindingSetup subpaths
+    Arrangement.faceWindings dual changes
+
+[<Fact>]
+let ``dual face windings follow signed nested sources`` () =
+    let outer,inner = square 0. 0. 10.,square 2. 2. 6.
+    for paths,expected in [[outer;inner],[0;1;2];[outer;Subpath.reverse inner],[0;0;1];[Subpath.reverse outer;Subpath.reverse inner],[-2;-1;0]] do
+        let actual = propagatedSourceWindings paths |> Result.defaultWith (failwithf "%A") |> List.map _.Value |> List.sort
+        Assert.Equal<int list>(expected,actual)
+
+[<Fact>]
+let ``dual face windings accumulate overlap and multiplicity`` () =
+    let a,b = square 0. 0. 10.,square 5. 5. 10.
+    let actual = propagatedSourceWindings [a;a;b] |> Result.defaultWith (failwithf "%A") |> List.map _.Value |> List.sort
+    Assert.Equal<int list>([0;1;2;3],actual)
+
+[<Fact>]
+let ``dual face windings reject open boundary but accept cancellation`` () =
+    let line = Segment.asSubpath(Line(point 0. 0.,point 10. 0.))
+    match propagatedSourceWindings [line] with
+    | Error(ContradictoryWinding _) -> ()
+    | result -> failwithf "%A" result
+    let values = propagatedSourceWindings [line;Subpath.reverse line] |> Result.defaultWith (failwithf "%A")
+    Assert.Equal<int list>([0],values |> List.map _.Value)
+
+[<Fact>]
+let ``dual face windings empty graph`` () =
+    Assert.Equal(Ok [{FaceId=0;Value=0}],propagatedSourceWindings [])
+
+[<Fact>]
+let ``dual face windings validate changes and detect cycle conflicts`` () =
+    let dual,changes = sourceWindingSetup [square 0. 0. 10.]
+    Assert.Equal(Error InvalidWindingChanges,Arrangement.faceWindings dual changes.Tail)
+    Assert.Equal(Error InvalidWindingChanges,Arrangement.faceWindings dual (changes.Head::changes))
+    match Arrangement.faceWindings dual ({changes.Head with RightMinusLeft=changes.Head.RightMinusLeft+1}::changes.Tail) with
+    | Error(ContradictoryWinding _) -> ()
+    | result -> failwithf "%A" result
+
 let private sweepGraph subpaths =
     Arrangement.build (subpaths |> List.map Path.singleton) 1e-9<length> 1e-9<length>
     |> Result.map _.Graph |> Result.defaultWith (failwithf "%A")

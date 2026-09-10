@@ -464,4 +464,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   `dotnet build src/SvgPath/SvgPath.fsproj --no-restore`: succeeded, zero
   warnings/errors. No behavioral change from the preceding tested checkpoint.
 
-Next: `ac5feb9` (signed dual-face winding propagation).
+- `ac5feb9` — signed winding propagation over an existing dual, with supplied
+  per-edge changes and validation/contradiction/unreachable errors. All five
+  source regressions ported. `scripts/test-fast`: 1772 passed, the same one
+  obsolete single-offset orientation expectation failed.
+
+Next: `0ec158b` (unified capped bands/strokes and face winding classification).

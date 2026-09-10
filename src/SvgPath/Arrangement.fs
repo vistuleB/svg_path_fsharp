@@ -48,6 +48,17 @@ type ArrangementEdgeFaces = { EdgeId: int; LeftFace: int; RightFace: int }
 /// Face decomposition and edge-to-face incidence for an arrangement graph.
 type DualArrangementGraph = { Faces: ArrangementFace list; EdgeFaces: ArrangementEdgeFaces list }
 
+/// Signed winding change from stored-edge visual left to visual right.
+/// Describes the winding boundary, not necessarily every geometric preimage.
+type internal EdgeWindingChange = { EdgeId: int; RightMinusLeft: int }
+type internal FaceWinding = { FaceId: int; Value: int }
+type internal WindingPropagationError =
+    | InvalidWindingDual
+    | InvalidWindingChanges
+    | MissingWindingChange of edgeId: int
+    | ContradictoryWinding of edgeId: int * faceId: int * assigned: int * required: int
+    | UnreachableWindingFace of faceId: int
+
 [<Struct>]
 /// One atomic graph edge traversed by an input segment.
 type DirectedEdgeReference = { EdgeId: int; Reversed: bool }
@@ -1368,6 +1379,62 @@ module Arrangement =
     let dual graph =
         dualInternal graph
         |> Result.mapError publicError
+
+    type private WindingNeighbor = { EdgeId: int; FaceId: int; Change: int }
+
+    let private addWindingNeighbor neighbors faceId neighbor =
+        Map.add faceId (neighbor :: (Map.tryFind faceId neighbors |> Option.defaultValue [])) neighbors
+
+    let private windingNeighbors (edges: ArrangementEdgeFaces list) faceIds changes =
+        edges |> List.fold (fun state edge ->
+            state |> Result.bind (fun neighbors ->
+                if not(Set.contains edge.LeftFace faceIds && Set.contains edge.RightFace faceIds) then Error InvalidWindingDual
+                else
+                    match Map.tryFind edge.EdgeId changes with
+                    | None -> Error(MissingWindingChange edge.EdgeId)
+                    | Some change ->
+                        let neighbors = addWindingNeighbor neighbors edge.LeftFace {EdgeId=edge.EdgeId;FaceId=edge.RightFace;Change=change}
+                        addWindingNeighbor neighbors edge.RightFace {EdgeId=edge.EdgeId;FaceId=edge.LeftFace;Change= -change} |> Ok)) (Ok Map.empty)
+
+    let rec private assignWindingNeighbors neighbors value pending assigned =
+        match neighbors with
+        | [] -> Ok(pending, assigned)
+        | neighbor::rest ->
+            let required = value + neighbor.Change
+            match Map.tryFind neighbor.FaceId assigned with
+            | Some existing when existing<>required -> Error(ContradictoryWinding(neighbor.EdgeId,neighbor.FaceId,existing,required))
+            | Some _ -> assignWindingNeighbors rest value pending assigned
+            | None -> assignWindingNeighbors rest value (neighbor.FaceId::pending) (Map.add neighbor.FaceId required assigned)
+
+    let rec private propagateFaceWindings pending neighbors assigned =
+        match pending with
+        | [] -> Ok assigned
+        | faceId::rest ->
+            let incident = Map.tryFind faceId neighbors |> Option.defaultValue []
+            assignWindingNeighbors incident (Map.find faceId assigned) rest assigned
+            |> Result.bind (fun (pending,assigned) -> propagateFaceWindings pending neighbors assigned)
+
+    /// Assign integer face windings from infinity=0. Every edge requires one
+    /// supplied change, including zero; callers sum opposite contributions.
+    /// Separate from dual construction: an open boundary can have a valid dual
+    /// without consistent winding. No geometry is sampled or changed.
+    let internal faceWindings (dual: DualArrangementGraph) (changes: EdgeWindingChange list) =
+        let faceIds = dual.Faces |> List.map _.Id |> Set.ofList
+        let changeMap = changes |> List.map (fun c -> c.EdgeId,c.RightMinusLeft) |> Map.ofList
+        let edgeIds = dual.EdgeFaces |> List.map _.EdgeId |> Set.ofList
+        if faceIds.Count<>dual.Faces.Length || edgeIds.Count<>dual.EdgeFaces.Length then Error InvalidWindingDual
+        elif changeMap.Count<>changes.Length || changeMap.Count<>edgeIds.Count then Error InvalidWindingChanges
+        else
+            match dual.Faces |> List.filter _.Outer with
+            | [outer] ->
+                windingNeighbors dual.EdgeFaces faceIds changeMap
+                |> Result.bind (fun neighbors -> propagateFaceWindings [outer.Id] neighbors (Map.ofList [outer.Id,0]))
+                |> Result.bind (fun assigned ->
+                    dual.Faces |> dualTryMap (fun face ->
+                        match Map.tryFind face.Id assigned with
+                        | None -> Error(UnreachableWindingFace face.Id)
+                        | Some value -> Ok {FaceId=face.Id;Value=value}))
+            | _ -> Error InvalidWindingDual
 
     let private nestedContourEdges
         (graph: ArrangementGraph)

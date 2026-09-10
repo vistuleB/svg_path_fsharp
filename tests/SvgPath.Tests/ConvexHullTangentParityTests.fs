@@ -196,20 +196,31 @@ let ``point exact loop tangent subpaths finds cubic interior tangencies`` () =
 [<Fact>]
 let ``cubic point tangent roots preserve non crossing root`` () =
     let segment = CubicBezier(point 0.0 0.0, point (1.0 / 3.0) 0.0, point (2.0 / 3.0) (1.0 / 3.0), point 1.0 1.0)
-    let root = ConvexHull.internalCubicPointTangentRoots segment (point 0.37 0.1369) |> List.exactlyOne
+    let root = ConvexHull.internalCubicPointTangentRoots segment (point 0.37 0.1369) |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.True(abs (Parameter.ratio root - 0.37) <= 1.0e-6)
+
+[<Fact>]
+let ``cubic tangent geometric refinement exhaustion returns error`` () =
+    let s = 1.329227995784916e36
+    let r = 7.006492321624085e-46
+    let segment = CubicBezier(point 0. 0., point s 0., point (2.*s) s, point (3.*s) (3.*s))
+    match ConvexHull.internalCubicPointTangentRoots segment (point 0. (-3.*s*r*r)) with
+    | Error(TangentRootFailure(MaxIterationsReached(estimate, value))) ->
+        Assert.True(float estimate > r && float estimate < 1e-9)
+        Assert.True(value > 0.0)
+    | result -> failwithf "Expected tangent root exhaustion, got %A" result
 
 [<Fact>]
 let ``cubic chord tangent refinement reaches interior tangency`` () =
     let segment = CubicBezier(point 0.0 0.0, point (1.0 / 3.0) 0.0, point (2.0 / 3.0) (-1.0 / 3.0), point 1.0 0.0)
-    let refined = ConvexHull.internalRefineChordTangent segment 0.47<parameter> 0.0<parameter>
+    let refined = ConvexHull.internalRefineChordTangent segment 0.47<parameter> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(abs (Parameter.ratio refined - 0.5) <= 1.0e-6)
 
 [<Fact>]
 let ``cubic chord tangent refinement certifies in geometry space`` () =
     let scale = 1.0e12
     let segment = CubicBezier(point 0.0 0.0, point (scale / 3.0) 0.0, point (2.0 * scale / 3.0) (-0.74 * scale / 3.0), point scale (0.26 * scale))
-    let refined = ConvexHull.internalRefineChordTangent segment 0.35<parameter> 0.0<parameter>
+    let refined = ConvexHull.internalRefineChordTangent segment 0.35<parameter> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(abs (Parameter.ratio refined - 0.37) <= 1.0e-15)
 
 [<Fact>]
@@ -217,17 +228,17 @@ let ``cubic chord polynomial refinement matches known family`` () =
     for expected in [ 0.12; 0.25; 0.37; 0.5; 0.73; 0.88 ] do
         for scale in [ 1.0e-6; 1.0; 1.0e12 ] do
             for delta in [ -0.05; 0.05 ] do
-                let refined = ConvexHull.internalRefineChordTangent (chordTangentFamily expected scale) (Parameter.fromFloat (expected + delta)) 0.0<parameter>
+                let refined = ConvexHull.internalRefineChordTangent (chordTangentFamily expected scale) (Parameter.fromFloat (expected + delta)) 0.0<parameter> |> Result.defaultWith (failwithf "%A")
                 Assert.True(abs (Parameter.ratio refined - expected) <= 1.0e-9)
 
 [<Fact>]
 let ``cubic chord refinement is scale independent`` () =
-    let refined = ConvexHull.internalRefineChordTangent (chordTangentFamily 0.37 1.0e-6) 0.32<parameter> 0.0<parameter>
+    let refined = ConvexHull.internalRefineChordTangent (chordTangentFamily 0.37 1.0e-6) 0.32<parameter> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(abs (Parameter.ratio refined - 0.37) <= 1.0e-9)
 
 [<Fact>]
 let ``cubic chord refinement ignores trivial endpoint root`` () =
-    let refined = ConvexHull.internalRefineChordTangent (chordTangentFamily 0.12 1.0) 0.05<parameter> 0.0<parameter>
+    let refined = ConvexHull.internalRefineChordTangent (chordTangentFamily 0.12 1.0) 0.05<parameter> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(abs (Parameter.ratio refined - 0.12) <= 1.0e-9)
 
 [<Fact>]

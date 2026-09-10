@@ -249,7 +249,7 @@ let ``cubic point tangent roots preserve a repeated root`` () =
             point (1.0 / 3.0) 0.0,
             point (2.0 / 3.0) (1.0 / 3.0),
             point 1.0 1.0)
-    let roots = ConvexHull.internalCubicPointTangentRoots segment (point 0.37 0.1369)
+    let roots = ConvexHull.internalCubicPointTangentRoots segment (point 0.37 0.1369) |> Result.defaultWith (failwithf "%A")
     Assert.Single roots |> ignore
     Assert.True(abs (Parameter.ratio (List.head roots) - 0.37) <= 1.0e-9)
 
@@ -269,6 +269,7 @@ let ``cubic chord tangent refinement is geometric and scale independent`` () =
                     (family expected scale)
                     (Parameter.fromFloat (expected + 0.05))
                     (Parameter.fromFloat 0.0)
+                |> Result.defaultWith (failwithf "%A")
             Assert.True(abs (Parameter.ratio refined - expected) <= 1.0e-9)
 
 [<Fact>]

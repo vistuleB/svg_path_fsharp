@@ -5,6 +5,7 @@ type ConvexHullError =
     | ConvexHullConstructionFailed
 
 type internal ConvexHullInternalError =
+    | TangentRootFailure of error: RootError<1>
     | InternalConstructionPathError of error: SegmentError
     | InternalHullPiecesDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
     | InternalConsecutiveCurves
@@ -385,31 +386,31 @@ module ConvexHull =
         else coefficients |> List.map (fun coefficient -> float (coefficient / scale))
 
     let private refineChordTangent source approximate other =
-        if approximate < 1.0e-6<parameter> || approximate > 1.0<parameter> - 1.0e-6<parameter> then approximate
+        if approximate < 1.0e-6<parameter> || approximate > 1.0<parameter> - 1.0e-6<parameter> then Ok approximate
         else
             match source with
             | CubicBezier(startPoint, control1, control2, endPoint) ->
                 match Segment.point source other with
-                | Error _ -> approximate
+                | Error error -> Error(InternalConstructionPathError error)
                 | Ok fixedPoint ->
                     let coefficients = cubicTangencyCoefficients startPoint control1 control2 endPoint fixedPoint
                     let options: PolynomialOptions = { MaxIterations = 100 }
                     match Root.polynomialRootIsolationsWith coefficients
                             (max 0.0<parameter> (approximate - 0.08<parameter>))
                             (min 1.0<parameter> (approximate + 0.08<parameter>)) options with
-                    | Error _ -> approximate
+                    | Error error -> Error(TangentRootFailure error)
                     | Ok isolations ->
                         isolations
                         |> List.filter (fun isolation -> abs (isolation.Estimate - other) > 1.0e-6<parameter>)
                         |> List.sortBy (fun isolation -> abs (isolation.Estimate - approximate))
                         |> List.tryHead
                         |> Option.map (fun isolation ->
-                            if isolation.Lower = isolation.Upper then isolation.Estimate
+                            if isolation.Lower = isolation.Upper then Ok isolation.Estimate
                             else
                                 let lowerValue = Root.evaluatePolynomial coefficients isolation.Lower
                                 let upperValue = Root.evaluatePolynomial coefficients isolation.Upper
                                 let sameSign a b = (a < 0.0 && b < 0.0) || (a > 0.0 && b > 0.0)
-                                if sameSign lowerValue upperValue then isolation.Estimate
+                                if sameSign lowerValue upperValue then Ok isolation.Estimate
                                 else
                                     Root.bisectIsolationUntil
                                         (Root.evaluatePolynomial coefficients)
@@ -424,31 +425,45 @@ module ConvexHull =
                                                 | Error _ -> false
                                                 | Ok bounds -> BoundingBox.diameter bounds <= pointTolerance)
                                     |> Result.map _.Estimate
-                                    |> Result.defaultValue isolation.Estimate)
-                        |> Option.defaultValue approximate
-            | _ -> approximate
+                                    |> Result.mapError TangentRootFailure)
+                        |> Option.defaultValue (Ok approximate)
+            | _ -> Ok approximate
 
     let private refineHullPieces source pieces =
         match pieces with
-        | [] | [ _ ] -> pieces
+        | [] | [ _ ] -> Ok pieces
         | _ ->
             let count = List.length pieces
             let at index = pieces[(index + count) % count]
-            let refinedCurves =
+            let refinedPieces =
                 pieces
                 |> List.mapi (fun index current ->
                     match current with
                     | HullCurve(fromT, toT) ->
-                        let fromT =
+                        let fromResult =
                             match at (index - 1) with
                             | HullLine(other, _) -> refineChordTangent source fromT other
-                            | _ -> fromT
-                        let toT =
+                            | _ -> Ok fromT
+                        let toResult =
                             match at (index + 1) with
                             | HullLine(_, other) -> refineChordTangent source toT other
-                            | _ -> toT
-                        HullCurve(fromT, toT)
-                    | line -> line)
+                            | _ -> Ok toT
+                        fromResult |> Result.bind (fun a -> toResult |> Result.map (fun b -> HullCurve(a,b)))
+                    | HullLine(fromT, toT) ->
+                        let fromResult =
+                            match at (index - 1) with
+                            | HullCurve _ -> refineChordTangent source fromT toT
+                            | _ -> Ok fromT
+                        fromResult |> Result.bind (fun fromT ->
+                            let toResult =
+                                match at (index + 1) with
+                                | HullCurve _ -> refineChordTangent source toT fromT
+                                | _ -> Ok toT
+                            toResult |> Result.map (fun toT -> HullLine(fromT,toT))))
+            refinedPieces
+            |> List.fold (fun state piece -> state |> Result.bind (fun acc -> piece |> Result.map (fun p -> p::acc))) (Ok [])
+            |> Result.map (fun reversed ->
+            let refinedCurves = List.rev reversed
             let refinedAt index = refinedCurves[(index + count) % count]
             refinedCurves
             |> List.mapi (fun index current ->
@@ -457,7 +472,7 @@ module ConvexHull =
                     let fromT = match refinedAt (index - 1) with HullCurve(_, value) -> value | _ -> fromT
                     let toT = match refinedAt (index + 1) with HullCurve(value, _) -> value | _ -> toT
                     HullLine(fromT, toT)
-                | curve -> curve)
+                | curve -> curve))
 
     let private pieceSegment source = function
         | HullCurve(fromT, toT) -> Segment.betweenInside source fromT toT
@@ -473,6 +488,7 @@ module ConvexHull =
                 Point.direction (Degree.fromFloat (float index / 10.0))
                 |> supportSample segment)
         let pieces = samples |> collapseSupportRuns |> piecesFromRuns |> refineHullPieces segment
+        pieces |> Result.bind (fun pieces ->
         pieces
         |> List.map (pieceSegment segment)
         |> List.fold
@@ -484,7 +500,7 @@ module ConvexHull =
         |> Result.bind (fun segments ->
             Subpath.createWith WiggleElseBridge segments
             |> Result.bind (Subpath.setClosedWith WiggleElseBridge true))
-        |> Result.mapError InternalConstructionPathError
+        |> Result.mapError InternalConstructionPathError)
 
     let private normalizeAngle (angle: float<degree>) =
         let value = Degree.toFloat angle
@@ -932,12 +948,12 @@ module ConvexHull =
             | Ok bounds -> BoundingBox.diameter bounds <= pointTolerance
 
     let private refinePolynomialTangentIsolation coefficients segment isolation =
-        if isolation.Lower = isolation.Upper then isolation.Estimate
+        if isolation.Lower = isolation.Upper then Ok isolation.Estimate
         else
             let lowerValue = Root.evaluatePolynomial coefficients isolation.Lower
             let upperValue = Root.evaluatePolynomial coefficients isolation.Upper
             let sameSign a b = (a < 0.0 && b < 0.0) || (a > 0.0 && b > 0.0)
-            if sameSign lowerValue upperValue then isolation.Estimate
+            if sameSign lowerValue upperValue then Ok isolation.Estimate
             else
                 Root.bisectIsolationUntil
                     (Root.evaluatePolynomial coefficients)
@@ -946,7 +962,7 @@ module ConvexHull =
                     100
                     (tangentWindowIsGeometricallySmall segment)
                 |> Result.map _.Estimate
-                |> Result.defaultValue isolation.Estimate
+                |> Result.mapError TangentRootFailure
 
     let private cubicPointTangentRoots startPoint control1 control2 endPoint point =
         let coefficients = cubicPointTangentCoefficients startPoint control1 control2 endPoint point
@@ -956,16 +972,21 @@ module ConvexHull =
             (Parameter.fromFloat 0.0)
             (Parameter.fromFloat 1.0)
             { MaxIterations = 100 }
-        |> Result.defaultValue []
-        |> List.map (refinePolynomialTangentIsolation coefficients segment)
+        |> Result.mapError TangentRootFailure
+        |> Result.bind (fun isolations ->
+            isolations |> List.fold (fun state isolation ->
+                state |> Result.bind (fun roots ->
+                    refinePolynomialTangentIsolation coefficients segment isolation
+                    |> Result.map (fun root -> root::roots))) (Ok [])
+            |> Result.map List.rev)
 
-    let internalCubicPointTangentRoots segment point =
+    let internal internalCubicPointTangentRoots segment point =
         match segment with
         | CubicBezier(startPoint, control1, control2, endPoint) ->
             cubicPointTangentRoots startPoint control1 control2 endPoint point
-        | _ -> []
+        | _ -> Ok []
 
-    let internalRefineChordTangent segment approximate other =
+    let internal internalRefineChordTangent segment approximate other =
         refineChordTangent segment approximate other
 
     let private orientationClockwise vertices =
@@ -1127,7 +1148,7 @@ module ConvexHull =
             |> List.filter (fun t -> t >= 0.0<parameter> && t <= 1.0<parameter>)
             |> Ok
         | CubicBezier(startPoint, control1, control2, endPoint) ->
-            Ok(cubicPointTangentRoots startPoint control1 control2 endPoint point)
+            cubicPointTangentRoots startPoint control1 control2 endPoint point
         | Arc data ->
             Ellipse.endpointToCenter data
             |> Result.mapError (fun _ -> InternalConstructionPathError DegenerateArc)

@@ -432,4 +432,11 @@ Do not substitute the final Gleam tree for the historical source commit.
   Ported the four new source tests and updated its existing zero-entry test.
   `scripts/test-fast`: 1762 passed.
 
-Next: `4b11243` (propagate convex-hull tangent refinement errors).
+- `4b11243` — propagate tangent polynomial isolation/geometric refinement
+  failures through hull construction; internal diagnostics now return Result.
+  Ported the source exhaustion regression and updated existing callers/tests.
+  Also restored the source's line-adjacent refinement calls before endpoint
+  synchronization rather than silently skipping their failures.
+  `scripts/test-fast`: 1763 passed.
+
+Next: `7a41f3e` (validated line sweeps for dual-face construction).

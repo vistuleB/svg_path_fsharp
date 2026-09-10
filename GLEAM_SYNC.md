@@ -128,4 +128,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   equality. Semantic no-op; no source tests added. Last unchanged-code
   `scripts/test-fast`: 1674 passed; `git diff --check` passes.
 
-Next: `b6655e5` (area zero denominator).
+- `b6655e5` — Area.edgeYAt already detects either signed-zero denominator
+  through .NET equality. Semantic no-op; source adds no tests. Last
+  unchanged-code `scripts/test-fast`: 1674 passed; `git diff --check` passes.
+
+Next: `aed3d23` (circumcircle zero determinant).

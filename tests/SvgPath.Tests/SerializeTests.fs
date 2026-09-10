@@ -402,13 +402,25 @@ let ``parser tracked relative lines preserve axis constraints`` () =
     Assert.Equal("m 0 0 l 0.3 0.3 h 0.4 v 0.4", Serialize.subpathWith subpath (Serialize.relativeDecimalOptions 1))
 
 [<Fact>]
-let ``parser tracked relative full arc is subdivided`` () =
+let ``parser tracked relative coincident arc does not invent geometry`` () =
     let anchor = point 0.34 0.0
     let arc = Arc { Start = anchor; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = anchor }
     let serialized = Serialize.segmentWith arc (Serialize.relativeDecimalOptions 1)
-    Assert.True((serialized |> Seq.filter ((=) 'a') |> Seq.length) = 2, serialized)
+    Assert.Equal("m 0.3 0 a 10 10 0 0 1 0 0",serialized)
     let parsed = Parse.path serialized |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(2, parsed.Subpaths[0].Segments.Length)
+    Assert.Equal<Subpath list>([Subpath.empty(point 0.3 0.0)],Path.subpaths parsed)
+
+[<Fact>]
+let ``relative coincident zero radius arc terminates`` () =
+    let anchor = point 0.0 0.0
+    for radius in [point 0.0 2.0;point 2.0 0.0] do
+        let arc = Arc {Start=anchor;Radius=radius;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=anchor}
+        let source = Subpath.ofSegment arc |> Path.singleton
+        let encoded = Serialize.pathWith source Serialize.relativeOptions
+        let parsed = Parse.path encoded |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(Ok parsed,Parse.path(Serialize.path source))
+        Assert.Equal(Path.singleton(Subpath.empty anchor),parsed)
+        Assert.Equal(1,encoded |> Seq.filter ((=) 'a') |> Seq.length)
 
 [<Fact>]
 let ``parser tracked relative close resets the parser current`` () =

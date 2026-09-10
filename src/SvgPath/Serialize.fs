@@ -367,28 +367,9 @@ module Serialize =
         let args = if smooth then [ pointValue d2 format; pointValue de format ] else [ pointValue d1 format; pointValue d2 format; pointValue de format ]
         [ command (if smooth then "s" else "c") (joinGroups args format) format ], { state with Current = add state.Current de; PreviousCurve = PreviousCubic(add state.Current d2) }
 
-    let rec private trackedSegment segment state format =
-        match segment with
-        | Line(startPoint, endPoint) -> trackedLine startPoint endPoint state format
-        | QuadraticBezier(startPoint, control, endPoint) -> trackedQuadratic startPoint control endPoint state format
-        | CubicBezier(startPoint, control1, control2, endPoint) -> trackedCubic startPoint control1 control2 endPoint state format
-        | Arc arc when arc.Start = arc.End ->
-            // A same-endpoint SVG arc command draws nothing. Match the Gleam
-            // serializer by replacing the library's full-arc representation
-            // with two ordinary endpoint arcs before writing relative data.
-            let radiusDirection =
-                Point.create
-                    (arc.Radius.X * Trig.cosDegrees arc.XAxisRotation)
-                    (arc.Radius.X * Trig.sinDegrees arc.XAxisRotation)
-            let midpoint = Point.add arc.Start radiusDirection
-            let first = Arc { arc with LargeArc = false; End = midpoint }
-            let second = Arc { arc with Start = midpoint; LargeArc = false }
-            let firstCommands, next = trackedSegment first state format
-            let secondCommands, finish = trackedSegment second next format
-            firstCommands @ secondCommands, finish
-        | Arc arc -> trackedArc arc state format
-
-    and private trackedArc arc state format =
+    let private trackedArc (arc:EndpointArcData) state format =
+        // Coincident endpoints are an SVG no-op, not an implicit ellipse.
+        // Serialize the endpoint form directly, even with a zero radius.
         let intended = quantizedPoint arc.End format
         let similarity = chordSimilarity arc.Start arc.End state.Current intended
         let radius, rotation =
@@ -399,6 +380,13 @@ module Serialize =
             | UnstableChord -> arc.Radius, arc.XAxisRotation
         let endDelta = delta state.Current intended |> fun point -> quantizedPoint point format
         [ command "a" (arcArguments radius rotation arc.LargeArc arc.Sweep endDelta format) format ], { state with Current = add state.Current endDelta; PreviousCurve = NoPreviousCurve }
+
+    let private trackedSegment segment state format =
+        match segment with
+        | Line(startPoint, endPoint) -> trackedLine startPoint endPoint state format
+        | QuadraticBezier(startPoint, control, endPoint) -> trackedQuadratic startPoint control endPoint state format
+        | CubicBezier(startPoint, control1, control2, endPoint) -> trackedCubic startPoint control1 control2 endPoint state format
+        | Arc arc -> trackedArc arc state format
 
     let private trackedSubpath (subpath: Subpath) (state: RelativeParserState) format =
         let sourceStart = subpath.Start

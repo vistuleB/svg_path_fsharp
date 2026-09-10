@@ -254,4 +254,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `3f1a135` — separate repeated numeric arguments under AtSubpaths newline
   mode. Source regression added. `scripts/test-fast`: 1717 passed.
 
-Next: `0b605ab` (coincident-endpoint arc serialization).
+- `0b605ab` — serialize coincident-endpoint arcs directly rather than
+  inventing full-loop geometry. Updated source regression and added zero-radius
+  termination regression. `scripts/test-fast`: 1718 passed.
+
+Next: `61bbbe3` (untouched corner-trim segments).

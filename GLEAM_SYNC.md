@@ -262,4 +262,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   inverse-length reconstruction. Source regression added. `scripts/test-fast`:
   1719 passed.
 
-Next: `fd9d26a` (empty endpoint arc splits).
+- `fd9d26a` — return usable empty Lines for endpoint Arc splits, retaining
+  the original Arc. Source regression and docs added. `scripts/test-fast`:
+  1720 passed.
+
+Next: `1752c36` (local circular-arc intersection angles).

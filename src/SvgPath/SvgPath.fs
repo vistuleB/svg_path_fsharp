@@ -477,17 +477,22 @@ module Segment =
             Ellipse.endpointToCenter endpoint
             |> Result.mapError (fun _ -> DegenerateArc)
             |> Result.map (fun arc ->
-                let leftArc, rightArc = Ellipse.splitArc arc t
-                let splitPoint = Ellipse.arcPoint arc t
-                let left = Arc(Ellipse.centerToEndpoint leftArc) |> withStart endpoint.Start |> withFinish splitPoint
-                let right = Arc(Ellipse.centerToEndpoint rightArc) |> withStart splitPoint |> withFinish endpoint.End
-                left, right)
+                if InternalNumber.isZero t then Line(endpoint.Start,endpoint.Start),segment
+                elif t=1.0<parameter> then segment,Line(endpoint.End,endpoint.End)
+                else
+                    let leftArc, rightArc = Ellipse.splitArc arc t
+                    let splitPoint = Ellipse.arcPoint arc t
+                    let left = Arc(Ellipse.centerToEndpoint leftArc) |> withStart endpoint.Start |> withFinish splitPoint
+                    let right = Arc(Ellipse.centerToEndpoint rightArc) |> withStart splitPoint |> withFinish endpoint.End
+                    left, right)
         | _ ->
             let left, right = Bezier.split (asBezier segment) t
             Ok(fromBezier left, fromBezier right)
 
     let split segment t = splitUnchecked segment t
 
+    /// Endpoint splits produce one empty segment. For arcs it is a Line,
+    /// retaining the original Arc on the other side: an empty arc has no ellipse.
     let splitInside segment t =
         if t < 0.0<parameter> || t > 1.0<parameter> then Error SplitOutsideSegment
         else splitUnchecked segment t

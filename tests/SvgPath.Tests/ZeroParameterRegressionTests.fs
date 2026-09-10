@@ -7,6 +7,19 @@ let private corner () = Subpath.create [Line(p 0. 0.,p 1. 0.);Line(p 1. 0.,p 1. 
 let private arc () = Arc { Start=p 0.1 0.2; Radius=p 3. 2.; XAxisRotation=17.0<degree>; LargeArc=false; Sweep=true; End=p 2. 3. }
 let private address index t = { SegmentIndex=index; T=t }
 [<Fact>]
+let ``endpoint arc splits return usable empty lines`` () =
+    let arc = Arc {Start=p 1. 0.;Radius=p 1. 1.;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=p 0. 1.}
+    for split in [Segment.split;Segment.splitInside] do
+        for t in [0.0<parameter>; -0.0<parameter>;1.0<parameter>] do
+            let left,right = split arc t |> get
+            let empty,retained,endpoint = if t=1.0<parameter> then right,left,Segment.finish arc else left,right,Segment.start arc
+            Assert.Equal(Line(endpoint,endpoint),empty)
+            Assert.Equal(arc,retained)
+            Assert.Equal(Ok 0.0<length>,Segment.length empty)
+            Assert.Equal(Ok endpoint,Segment.point empty 0.5<parameter>)
+            Assert.Equal(Segment.length arc,Segment.length retained)
+
+[<Fact>]
 let ``subpath canonicalization normalizes negative zero`` () =
     let result = Subpath.parameterCanonicalize (corner()) (address 1 -0.0<parameter>) |> get
     Assert.Equal(address 1 0.0<parameter>,result)

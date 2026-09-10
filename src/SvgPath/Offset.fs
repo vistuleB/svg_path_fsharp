@@ -305,6 +305,8 @@ type internal TracedOffsetSubpath =
       SourceSubpathIndex: int }
 
 [<Struct>]
+/// Initially follows the I traversal; reconstruction can reverse the segment,
+/// directed H interval, and endpoint vertices together. Its source stays immutable.
 type internal ArrangementSplitTracedSegment =
     { Segment: Segment
       Preimage: ICulledOffsetSegment
@@ -3786,7 +3788,12 @@ module Offset =
             Reversed = not edge.Reversed
             StartVertex = edge.EndVertex
             EndVertex = edge.StartVertex
-            Segment = Segment.reverse edge.Segment }
+            Segment = Segment.reverse edge.Segment
+            // Reverse the directed H interval along with traversal, not its immutable source.
+            ArrangementPreimage = edge.ArrangementPreimage |> Option.map (fun split ->
+                { split with Segment=Segment.reverse split.Segment
+                             StartVertex=split.EndVertex;EndVertex=split.StartVertex
+                             PreimageFrom=split.PreimageTo;PreimageTo=split.PreimageFrom }) }
 
     let private reverseSurvivorChain (chain: SurvivorChain) : SurvivorChain =
         { chain with

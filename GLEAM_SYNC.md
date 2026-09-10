@@ -62,4 +62,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   WiggleElseBridge throughout source, tests, and README. `scripts/test-fast`:
   1616 passed.
 
-Next: `ba7159d` (segment/subpath/path length upper bounds).
+- `ba7159d` — cheap segment/subpath/path length upper bounds, README docs, and
+  seven source regressions one-to-one. `scripts/test-fast`: 1623 passed.
+
+Next: `e341c79` (bounded and balanced short source runs).

@@ -516,6 +516,11 @@ appropriate.
 ### Segment and Subpath Lengths
 
 Use `Segment.length`, `Subpath.length`, or `Path.length` to measure geometry.
+For cheap upper bounds without numerical integration, use
+`Segment.lengthUpperBound`, `Subpath.lengthUpperBound`, or `Path.lengthUpperBound`.
+These use control-polygon lengths for Beziers and angular travel times the
+larger ellipse radius for arcs; they may overestimate substantially and use
+ordinary floating-point arithmetic.
 Lines are exact. Beziers and arcs use adaptive integration. Distances are true
 path-coordinate lengths, not normalized fractions.
 

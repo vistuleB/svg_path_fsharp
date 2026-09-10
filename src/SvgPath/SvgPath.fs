@@ -1148,6 +1148,17 @@ module Segment =
     let private derivativeScaleSquared segment =
         derivativeScale segment |> Result.map (fun scale -> scale * scale)
 
+    /// Cheap upper bound: chord for lines, control-polygon length for Beziers,
+    /// absolute angular travel times the larger corrected radius for arcs.
+    /// Uses ordinary floating-point arithmetic, not outward rounding; bounds
+    /// may substantially overestimate. Invalid arcs return DegenerateArc.
+    let lengthUpperBound segment =
+        match segment with
+        | Line(a,b) -> Ok(Point.distance a b)
+        | QuadraticBezier(a,b,c) -> Ok(Point.distance a b + Point.distance b c)
+        | CubicBezier(a,b,c,d) -> Ok(Point.distance a b + Point.distance b c + Point.distance c d)
+        | Arc _ -> derivativeScale segment
+
     let private tangentialErrorIsImproving segment previousT previousValue proposalT proposalValue =
         derivative segment previousT
         |> Result.bind (fun previousDerivative ->
@@ -2258,6 +2269,12 @@ module Subpath =
 
     let length subpath = lengthWith subpath Segment.defaultLengthOptions
 
+    /// Sum cheap segment length bounds. Empty subpaths return zero and the
+    /// closed flag adds no implicit segment. See Segment.lengthUpperBound.
+    let lengthUpperBound subpath =
+        subpath.segmentList |> List.fold (fun state segment ->
+            state |> Result.bind (fun total -> Segment.lengthUpperBound segment |> Result.map (fun bound -> total + bound))) (Ok 0.0<length>)
+
     let parameterAtLengthWith subpath distance (options: LengthOptions) =
         lengthWith subpath options
         |> Result.bind (fun total ->
@@ -2456,6 +2473,11 @@ module Path =
                     Subpath.lengthWith subpath options |> Result.map (fun value -> total + value))) (Ok 0.0<length>))
 
     let length path = lengthWith path Segment.defaultLengthOptions
+
+    /// Sum cheap subpath length bounds; empty paths and gaps contribute zero.
+    let lengthUpperBound path =
+        path.subpathList |> List.fold (fun state subpath ->
+            state |> Result.bind (fun total -> Subpath.lengthUpperBound subpath |> Result.map (fun bound -> total + bound))) (Ok 0.0<length>)
 
     let parameterAtLengthWith path distance (options: LengthOptions) =
         lengthWith path options

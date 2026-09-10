@@ -495,7 +495,13 @@ let ``tangential cubic crossing has same order on both sides`` () =
             point 1.0 1.0)
         |> Segment.asSubpath
     match Intersections.classifySubpathIntersection line cubic (at 0.5) (at 0.5) with
-    | Ok(Touching(SimilarlyDirected, ClockwiseFromFirstToSecond, ClockwiseFromFirstToSecond, _)) -> ()
+    | Ok(Crossing(Clockwise, _)) -> ()
+    | result -> failwithf "unexpected classification: %A" result
+    match Intersections.classifySubpathIntersection cubic line (at 0.5) (at 0.5) with
+    | Ok(Crossing(Counterclockwise, _)) -> ()
+    | result -> failwithf "unexpected classification: %A" result
+    match Intersections.classifySubpathIntersection line (Subpath.reverse cubic) (at 0.5) (at 0.5) with
+    | Ok(Crossing(Counterclockwise, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]

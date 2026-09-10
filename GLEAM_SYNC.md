@@ -423,4 +423,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   original closed-cubic/retraced-quadratic regressions ported one-to-one.
   `scripts/test-fast`: 1758 passed.
 
-Next: `11f9598` (smooth tangential crossings).
+- `11f9598` — classify equal sampled outward-ray orders as crossings only
+  for smooth, aligned tangent branches; port the original swapped/reversed
+  regression assertions. `scripts/test-fast`: 1758 passed.
+
+Next: `410ed0f` (zero-length visible dashes).

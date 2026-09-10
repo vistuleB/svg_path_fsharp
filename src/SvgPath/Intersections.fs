@@ -1893,6 +1893,10 @@ module Intersections =
                         | order -> Ok order))
         loop options.InitialArcLength options.MaxSamplingSteps
 
+    let private alignedDirections first second tolerance =
+        let angle = Point.clockwiseAperture first second
+        angle <= tolerance || 360.0<degree> - angle <= tolerance
+
     let classifySubpathIntersectionWith first second firstParameter secondParameter options =
         validateClassificationOptions options
         |> Result.bind (fun () ->
@@ -1944,7 +1948,20 @@ module Intersections =
                                                     |> Result.bind (fun incomingOrder ->
                                                         sampleTouchingOrder firstLocation secondLocation intersectionPoint firstOutgoing secondOutgoing options
                                                         |> Result.map (fun outgoingOrder ->
-                                                            Touching(direction, incomingOrder, outgoingOrder, apertures))))))
+                                                            // At a common smooth tangent equal outward-ray orders
+                                                            // imply alternating branches. Do not apply at corners/cusps.
+                                                            let smooth =
+                                                                alignedDirections leftIncoming leftOutgoing options.AngularTolerance
+                                                                && alignedDirections rightIncoming rightOutgoing options.AngularTolerance
+                                                                && alignedDirections leftOutgoing
+                                                                     (if direction = SimilarlyDirected then rightOutgoing else Point.negate rightOutgoing)
+                                                                     options.AngularTolerance
+                                                            match smooth, incomingOrder, outgoingOrder, direction with
+                                                            | true, ClockwiseFromFirstToSecond, ClockwiseFromFirstToSecond, SimilarlyDirected
+                                                            | true, ClockwiseFromSecondToFirst, ClockwiseFromSecondToFirst, OppositelyDirected -> Crossing(Clockwise, apertures)
+                                                            | true, ClockwiseFromFirstToSecond, ClockwiseFromFirstToSecond, OppositelyDirected
+                                                            | true, ClockwiseFromSecondToFirst, ClockwiseFromSecondToFirst, SimilarlyDirected -> Crossing(Counterclockwise, apertures)
+                                                            | _ -> Touching(direction, incomingOrder, outgoingOrder, apertures))))))
                                         |> Result.mapError ClassificationError.PathError
                                 | _ -> Ok Indeterminate)))))
 

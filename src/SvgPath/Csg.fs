@@ -1,30 +1,31 @@
 namespace SvgPath
 
-[<Struct>]
-/// Finite positive tolerances. MinimumChord is a historical name for the
-/// segment-length upper-bound threshold, not endpoint chord distance.
-type CsgOptions =
-    { Tolerance: float<length>
-      MinimumChord: float<length> }
-
-type BoundaryTopologyFailure =
-    | SectorMismatch
-    | TraceFailed
-
-type CsgError =
-    | CsgArrangementError
-    | CsgPathError of error: SegmentError
-    | InternalBoundaryTopologyError of vertex: int * reason: BoundaryTopologyFailure
-
-type CsgResult =
-    { Path: Path
-      Build: ArrangementSegmentBuild }
-
 /// Boolean operations on filled SVG paths.
 /// Open subpaths are implicitly closed by a line for filling; these closing
 /// lines are also included in the returned arrangement build.
 [<RequireQualifiedAccess>]
 module Csg =
+
+    [<Struct>]
+    /// Finite positive tolerances. MinimumChord is a historical name for the
+    /// segment-length upper-bound threshold, not endpoint chord distance.
+    type Options =
+        { Tolerance: float<length>
+          MinimumChord: float<length> }
+
+    type BoundaryTopologyFailure =
+        | SectorMismatch
+        | TraceFailed
+
+    type Error =
+        | CsgArrangementError
+        | CsgPathError of error: SegmentError
+        | InternalBoundaryTopologyError of vertex: int * reason: BoundaryTopologyFailure
+
+    type CsgResult =
+        { Path: Path
+          Build: Arrangement.ArrangementSegmentBuild }
+
     let defaultOptions =
         { Tolerance = 1.0e-6<length>
           MinimumChord = 1.0e-5<length> }
@@ -78,7 +79,7 @@ module Csg =
         (tolerance: float<length>)
         (leftPath: Path)
         (rightPath: Path)
-        (edges: ArrangementEdge list) : Result<BoundaryEdge list, CsgError> =
+        (edges: Arrangement.ArrangementEdge list) : Result<BoundaryEdge list, Error> =
         edges
         |> List.fold (fun state edge ->
             state
@@ -170,7 +171,7 @@ module Csg =
                         gather remaining (subpath :: contours)))
         gather (edges |> List.map _.Id |> Set.ofList) []
 
-    let private booleanFromBuild operation fillRule options left right build =
+    let private booleanFromBuild operation fillRule options left right (build: Arrangement.ArrangementSegmentBuild) =
         classify operation fillRule options.Tolerance left right build.Graph.Edges
         |> Result.bind (fun edges ->
             pairSectors edges

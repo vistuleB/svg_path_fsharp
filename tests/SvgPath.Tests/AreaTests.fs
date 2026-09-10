@@ -59,12 +59,12 @@ let ``signed bezier segments use exact line integrals`` () =
 let ``signed arc segment uses the ellipse integral`` () =
     let semicircle =
         Subpath.ofSegment (Arc
-            { Start = point -10.0 0.0
-              Radius = point 10.0 10.0
-              XAxisRotation = Degree.fromFloat 0.0
-              LargeArc = false
-              Sweep = true
-              End = point 10.0 0.0 })
+            ({ Start = point -10.0 0.0
+               Radius = point 10.0 10.0
+               XAxisRotation = Degree.fromFloat 0.0
+               LargeArc = false
+               Sweep = true
+               End = point 10.0 0.0 }: Ellipse.EndpointArcData))
     assertAreaNear 1.0e-10<length^2> 157.07963267948966<length^2> (abs (Area.signedSubpath semicircle))
 
 [<Fact>]

@@ -21,7 +21,7 @@ let curves =
       CubicBezier(p 0. 0.,p 3. -2.,p -4. 2.,p 1. 4.) ]
     @ [for sweep in [false;true] do
            for large in [false;true] do
-               yield Arc {Start=p 1. 2.;Radius=p 5. 3.;XAxisRotation=37.0<degree>;LargeArc=large;Sweep=sweep;End=p 4. -1.}]
+               yield Arc ({Start=p 1. 2.;Radius=p 5. 3.;XAxisRotation=37.0<degree>;LargeArc=large;Sweep=sweep;End=p 4. -1.}: Ellipse.EndpointArcData)]
 for curve in curves do
     for a,b in [0.,1.;0.2,0.8;0.5,0.50000001] do
         let points = (invoke "segmentEnclosingPoints" [|box curve;box a;box b|] :?> Result<Point<length> list,SegmentError>)

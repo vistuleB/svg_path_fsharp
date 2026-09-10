@@ -1,72 +1,73 @@
 namespace SvgPath
 
-type ConvexHullError =
-    | ConvexHullPathError of error: SegmentError
-    | ConvexHullConstructionFailed
-
-type internal ConvexHullInternalError =
-    | TangentRootFailure of error: RootError<1>
-    | InternalConstructionPathError of error: SegmentError
-    | InternalHullPiecesDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
-    | InternalConsecutiveCurves
-    | InternalDuplicateAdjacentTValues
-    | InternalRefinementReachedMaxIterations of maxIterations: int
-    | InternalPurificationReachedMaxIterations of maxIterations: int
-    | InternalLoopUnionCollapsed
-    | InternalTangentSearchDegenerateLoop
-    | InternalTangentSearchNonConvexVertex of vertexIndex: int
-    | InternalTangentSearchExpectedTwoTangencies of actualCount: int
-
-type internal PointLoopView =
-    | TangentPoint
-    | OutsidePoint
-    | InsidePoint
-
-// Internal comparison policies covered by the repair tests.
-type internal RepairMode = PointRepair | LoopRepair | NoRepair
-
-[<Struct>]
-type DirectionalExtent =
-    { LowerPoint: Point<length>
-      UpperPoint: Point<length>
-      Width: float<length> }
-
-[<Struct>]
-type WidthSearchOptions =
-    { Accuracy: float<length>
-      MaxDepth: int }
-
-[<Struct>]
-type WidthExtremum =
-    { Direction: Point<1>
-      LowerPoint: Point<length>
-      UpperPoint: Point<length>
-      Center: Point<length>
-      Width: float<length>
-      LowerBound: float<length>
-      UpperBound: float<length>
-      Converged: bool }
-
-[<Struct>]
-type internal MinimumWidthStrip =
-    { Width: float<length>
-      /// Unit normal pointing from lower support toward upper support.
-      Normal: Point<1>
-      LowerPoint: Point<length>
-      UpperPoint: Point<length>
-      LowerSupport: float<length>
-      UpperSupport: float<length> }
-
-type internal MinimumWidthDecision =
-    | MinimumWidthFits of MinimumWidthStrip
-    | MinimumWidthExceeds of lowerBound: float<length>
-    | MinimumWidthUnresolved of lowerBound: float<length> * bestWidth: float<length>
-
-type DirectionalSupport = DirectionalExtent
-
 /// Convex hulls, directional support, diameter, and minimum-width queries.
 [<RequireQualifiedAccess>]
 module ConvexHull =
+
+    type Error =
+        | ConvexHullPathError of error: SegmentError
+        | ConvexHullConstructionFailed
+
+    type internal ConvexHullInternalError =
+        | TangentRootFailure of error: RootError<1>
+        | InternalConstructionPathError of error: SegmentError
+        | InternalHullPiecesDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
+        | InternalConsecutiveCurves
+        | InternalDuplicateAdjacentTValues
+        | InternalRefinementReachedMaxIterations of maxIterations: int
+        | InternalPurificationReachedMaxIterations of maxIterations: int
+        | InternalLoopUnionCollapsed
+        | InternalTangentSearchDegenerateLoop
+        | InternalTangentSearchNonConvexVertex of vertexIndex: int
+        | InternalTangentSearchExpectedTwoTangencies of actualCount: int
+
+    type internal PointLoopView =
+        | TangentPoint
+        | OutsidePoint
+        | InsidePoint
+
+    // Internal comparison policies covered by the repair tests.
+    type internal RepairMode = PointRepair | LoopRepair | NoRepair
+
+    [<Struct>]
+    type DirectionalExtent =
+        { LowerPoint: Point<length>
+          UpperPoint: Point<length>
+          Width: float<length> }
+
+    [<Struct>]
+    type WidthSearchOptions =
+        { Accuracy: float<length>
+          MaxDepth: int }
+
+    [<Struct>]
+    type WidthExtremum =
+        { Direction: Point<1>
+          LowerPoint: Point<length>
+          UpperPoint: Point<length>
+          Center: Point<length>
+          Width: float<length>
+          LowerBound: float<length>
+          UpperBound: float<length>
+          Converged: bool }
+
+    [<Struct>]
+    type internal MinimumWidthStrip =
+        { Width: float<length>
+          /// Unit normal pointing from lower support toward upper support.
+          Normal: Point<1>
+          LowerPoint: Point<length>
+          UpperPoint: Point<length>
+          LowerSupport: float<length>
+          UpperSupport: float<length> }
+
+    type internal MinimumWidthDecision =
+        | MinimumWidthFits of MinimumWidthStrip
+        | MinimumWidthExceeds of lowerBound: float<length>
+        | MinimumWidthUnresolved of lowerBound: float<length> * bestWidth: float<length>
+
+    type DirectionalSupport = DirectionalExtent
+
     type private SupportSample =
         { T: float<parameter>
           Point: Point<length>
@@ -242,11 +243,11 @@ module ConvexHull =
     let private supportCandidates segment direction =
         match segment with
         | Line(startPoint, endPoint) ->
-            Bezier.projectionExtrema (LinearBezierData(startPoint, endPoint)) direction
+            Bezier.projectionExtrema (Bezier.LinearBezierData(startPoint, endPoint)) direction
         | QuadraticBezier(startPoint, control, endPoint) ->
-            Bezier.projectionExtrema (QuadraticBezierData(startPoint, control, endPoint)) direction
+            Bezier.projectionExtrema (Bezier.QuadraticBezierData(startPoint, control, endPoint)) direction
         | CubicBezier(startPoint, control1, control2, endPoint) ->
-            Bezier.projectionExtrema (CubicBezierData(startPoint, control1, control2, endPoint)) direction
+            Bezier.projectionExtrema (Bezier.CubicBezierData(startPoint, control1, control2, endPoint)) direction
         | Arc endpoint ->
             match Ellipse.endpointToCenter endpoint with
             | Ok arc -> Ellipse.arcProjectionExtrema arc direction

@@ -11,8 +11,8 @@ let private unwrap x = Result.defaultWith (failwithf "%A") x
 let ``subpath overlap accepts negative zero endpoint alias`` () =
     let left = Subpath.polyline [p 0. 0.;p 1. 0.;p 2. 0.] |> unwrap
     let right = Subpath.polyline [p 0.5 0.;p 1. 0.] |> unwrap
-    let correspondence: SegmentOverlap = { LeftFrom=0.5<parameter>; LeftTo=1.0<parameter>; RightFrom=0.0<parameter>; RightTo=1.0<parameter>; Start=p 0.5 0.; Finish=p 1. 0. }
-    let overlap: SubpathOverlap = { Start=correspondence.Start; Finish=correspondence.Finish; Pieces=[{ LeftSegmentIndex=0; RightSegmentIndex=0; Correspondence=correspondence }] }
+    let correspondence: Overlaps.SegmentOverlap = { LeftFrom=0.5<parameter>; LeftTo=1.0<parameter>; RightFrom=0.0<parameter>; RightTo=1.0<parameter>; Start=p 0.5 0.; Finish=p 1. 0. }
+    let overlap: Overlaps.SubpathOverlap = { Start=correspondence.Start; Finish=correspondence.Finish; Pieces=[({ LeftSegmentIndex=0; RightSegmentIndex=0; Correspondence=correspondence }: Overlaps.SubpathOverlapPiece)] }
     Assert.Equal(Ok(Some { SegmentIndex=0; T=1.0<parameter> }),Overlaps.subpathOverlapRightParameter overlap { SegmentIndex=1; T= -0.0<parameter> } left right)
 
 [<Fact>]
@@ -24,17 +24,17 @@ let ``signed zero matrix entries do not add operations`` () =
 [<Fact>]
 let ``reversed line still has infinite radius`` () =
     let line = Line(p 1. 0.,p 0. 0.)
-    Assert.Equal(Error InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadius line 0.5<parameter>)
-    Assert.Equal(Error InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadiusCloseTo line 1.0<length> 0.1<length> 0.5<parameter>)
-    Assert.Equal(Error InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadiusCloseTo (Segment.reverse line) 1.0<length> 0.1<length> 0.5<parameter>)
+    Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadius line 0.5<parameter>)
+    Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadiusCloseTo line 1.0<length> 0.1<length> 0.5<parameter>)
+    Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadiusCloseTo (Segment.reverse line) 1.0<length> 0.1<length> 0.5<parameter>)
 
 [<Fact>]
 let ``negative zero sizes disable rendering`` () =
-    Assert.Equal(Error DisabledRendering,BasicShapes.circle 0.0<length> 0.0<length> -0.0<length>)
-    Assert.Equal(Error DisabledRendering,BasicShapes.ellipse 0.0<length> 0.0<length> -0.0<length> 1.0<length>)
-    Assert.Equal(Error DisabledRendering,BasicShapes.ellipse 0.0<length> 0.0<length> 1.0<length> -0.0<length>)
-    Assert.Equal(Error DisabledRendering,BasicShapes.rect 0.0<length> 0.0<length> -0.0<length> 1.0<length> None None)
-    Assert.Equal(Error DisabledRendering,BasicShapes.rect 0.0<length> 0.0<length> 1.0<length> -0.0<length> None None)
+    Assert.Equal(Error BasicShapes.DisabledRendering,BasicShapes.circle 0.0<length> 0.0<length> -0.0<length>)
+    Assert.Equal(Error BasicShapes.DisabledRendering,BasicShapes.ellipse 0.0<length> 0.0<length> -0.0<length> 1.0<length>)
+    Assert.Equal(Error BasicShapes.DisabledRendering,BasicShapes.ellipse 0.0<length> 0.0<length> 1.0<length> -0.0<length>)
+    Assert.Equal(Error BasicShapes.DisabledRendering,BasicShapes.rect 0.0<length> 0.0<length> -0.0<length> 1.0<length> None None)
+    Assert.Equal(Error BasicShapes.DisabledRendering,BasicShapes.rect 0.0<length> 0.0<length> 1.0<length> -0.0<length> None None)
 
 [<Fact>]
 let ``negative zero length returns exact start parameter`` () =
@@ -45,7 +45,7 @@ let ``negative zero length returns exact start parameter`` () =
 [<Fact>]
 let ``negative zero radius degenerates to line`` () =
     let start,finish = p 1. 1.,p 2. 2.
-    let arc = Arc { Start=start; Radius=p -0. 1.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }
+    let arc = Arc ({ Start=start; Radius=p -0. 1.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }: Ellipse.EndpointArcData)
     Assert.Equal(Ok(Some [Line(start,finish)]),Segment.degenerateLines arc 0.0<length>)
 
 [<Fact>]
@@ -53,15 +53,15 @@ let ``negative zero endpoint has forward offset unit tangent`` () =
     Assert.Equal(Ok(Point.create 1.0 0.0),Offset.unitTangent (Line(p 0. 0.,p 1. 0.)) -0.0<parameter>)
 
 let private zeroTestArc =
-    { Center=p 0. 0.; Radius=p 1. 1.; XAxisRotation=0.0<degree>; StartAngle=0.0<degree>; DeltaAngle=360.0<degree> }
+    ({ Center=p 0. 0.; Radius=p 1. 1.; XAxisRotation=0.0<degree>; StartAngle=0.0<degree>; DeltaAngle=360.0<degree> }: Ellipse.CenterArcData)
 [<Fact>]
 let ``signed zero ellipse split parameters are canonical`` () =
     let arc = zeroTestArc
-    Assert.Equal<CenterArcData list>([arc],Ellipse.splitArcMany arc [-0.0<parameter>;0.0<parameter>])
+    Assert.Equal<Ellipse.CenterArcData list>([arc],Ellipse.splitArcMany arc [-0.0<parameter>;0.0<parameter>])
     Assert.Equal(Ok [arc],Ellipse.splitArcInsideMany arc [-0.0<parameter>;0.0<parameter>])
     let expected = Ellipse.splitArcMany arc [-0.5<parameter>;0.0<parameter>;0.5<parameter>]
     Assert.Equal(4,List.length expected)
-    Assert.Equal<CenterArcData list>(expected,Ellipse.splitArcMany arc [-0.5<parameter>;-0.0<parameter>;0.0<parameter>;0.5<parameter>])
+    Assert.Equal<Ellipse.CenterArcData list>(expected,Ellipse.splitArcMany arc [-0.5<parameter>;-0.0<parameter>;0.0<parameter>;0.5<parameter>])
 [<Fact>]
 let ``either zero direction has no ellipse projection extrema`` () =
     for x in [0.0;-0.0] do
@@ -106,7 +106,7 @@ let ``atan2_handles_signed_zero_axes_test`` () =
 
 [<Fact>]
 let ``affine_rejects_negative_zero_determinants_test`` () =
-    Assert.Equal(Error DegenerateSourceTriple,
+    Assert.Equal(Error Affine.DegenerateSourceTriple,
         Affine.pointTripleMap (p 0.0 0.0) (p -1.0 0.0) (p 1.0 0.0)
             (p 0.0 0.0) (p 1.0 0.0) (p 0.0 1.0))
 

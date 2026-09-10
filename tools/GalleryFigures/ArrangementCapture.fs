@@ -13,15 +13,15 @@ module ArrangementCapture =
         let document = XDocument.Load(System.IO.Path.Combine(__SOURCE_DIRECTORY__,"Inputs/package_title.svg"))
         let sourceNode = document.Descendants(XName.Get("path","http://www.w3.org/2000/svg")) |> Seq.head
         let source = parse (sourceNode.Attribute(XName.Get "d").Value)
-        let first = Offset.pathWith source 1.05<length> (Miter 4.0) Butt Offset.defaultOptions |> require "first offset"
-        let options = {Offset.defaultOptions with SingleOffsetTrimming={Offset.defaultOptions.SingleOffsetTrimming with Offside=false}}
+        let first = Offset.pathWith source 1.05<length> (Offset.Miter 4.0) Offset.Butt Offset.defaultOptions |> require "first offset"
+        let options = {Offset.defaultOptions with Offset.SingleOffsetTrimming={Offset.defaultOptions.SingleOffsetTrimming with Offside=false}}
         Offset.diagnosticClassification.Clear()
         Offset.diagnosticParity.Clear()
-        Offset.pathWith first 1.05<length> (Miter 4.0) Butt options |> require "second offset" |> ignore
+        Offset.pathWith first 1.05<length> (Offset.Miter 4.0) Offset.Butt options |> require "second offset" |> ignore
         let build,eligible,retainedResult = Offset.diagnosticClassification |> Seq.exactlyOne
         let retained = retainedResult |> require "captured classification"
         let reduced = Offset.diagnosticParity |> Seq.exactlyOne |> require "captured parity reduction"
-        let ids (graph:OffsetTrimGraph) = graph.Edges |> List.map _.Id |> Set.ofList
+        let ids (graph:Offset.OffsetTrimGraph) = graph.Edges |> List.map _.Id |> Set.ofList
         let eligibleIds,retainedIds,survivorIds = ids eligible,ids retained,ids reduced
         let incidences = retained.Edges |> List.collect (fun e -> [e.StartVertex;e.EndVertex])
         let firstDeleted = retained.Edges |> List.choose (fun e ->
@@ -29,7 +29,7 @@ module ArrangementCapture =
                && ([e.StartVertex;e.EndVertex] |> List.exists (fun vertex -> incidences |> List.filter ((=) vertex) |> List.length = 1))
             then Some e.Id else None) |> Set.ofList
         let layer geometry style = "<path d=\""+Serialize.path geometry+"\" style=\""+style+"\"/>"
-        let edge (e:ArrangementEdge) color =
+        let edge (e:Arrangement.ArrangementEdge) color =
             let width,opacity = match color with
                                 | "#facc15" -> "0.22","; opacity: 0.98"
                                 | "#7c3aed" -> "0.16","; opacity: 0.95"
@@ -38,7 +38,7 @@ module ArrangementCapture =
             "<g><title>edge "+string e.Id+"</title>"+
             layer (Path.singleton (Subpath.ofSegment e.Segment))
                 ("fill: none; stroke: "+color+"; stroke-width: "+width+"; stroke-linecap: round; stroke-linejoin: round"+opacity)+"</g>"
-        let label (e:ArrangementEdge) =
+        let label (e:Arrangement.ArrangementEdge) =
             let box = Segment.boundingBox e.Segment |> require "edge bounds"
             "<text x=\""+number(float((box.Min.X+box.Max.X)/2.0))+"\" y=\""+number(float((box.Min.Y+box.Max.Y)/2.0))+
             "\" font-size=\"0.3\" style=\"fill: #1e3a8a; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-anchor: middle; dominant-baseline: central\">"+string e.Id+"</text>"

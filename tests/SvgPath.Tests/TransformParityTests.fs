@@ -134,19 +134,19 @@ let ``path_about_point_transforms_path_about_point_test`` () =
 
 [<Fact>]
 let ``segment_about_anchor_transforms_segment_about_anchor_test`` () =
-    let transformed = Transform.segmentAboutAnchor (Line(point 0.0 0.0, point 10.0 0.0)) (Transform.rotate (degrees 90.0)) TopLeft |> Result.defaultWith (failwithf "%A")
+    let transformed = Transform.segmentAboutAnchor (Line(point 0.0 0.0, point 10.0 0.0)) (Transform.rotate (degrees 90.0)) Transform.TopLeft |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 V 10", Serialize.segment transformed)
 
 [<Fact>]
 let ``subpath_about_anchor_transforms_subpath_about_anchor_test`` () =
     let subpath = Subpath.create [ Line(point 0.0 0.0, point 0.0 10.0) ] |> Result.defaultWith (failwithf "%A")
-    let transformed = Transform.subpathAboutAnchor subpath (Transform.scaleXY 1.0 -1.0) Center |> Result.defaultWith (failwithf "%A")
+    let transformed = Transform.subpathAboutAnchor subpath (Transform.scaleXY 1.0 -1.0) Transform.Center |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 10 V 0", Serialize.subpath transformed)
 
 [<Fact>]
 let ``path_about_anchor_transforms_path_about_anchor_test`` () =
     let path = Path.ofSubpaths [ Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0) ] |> Result.defaultWith (failwithf "%A") ]
-    let transformed = Transform.pathAboutAnchor path (Transform.scaleXY -1.0 1.0) Center |> Result.defaultWith (failwithf "%A")
+    let transformed = Transform.pathAboutAnchor path (Transform.scaleXY -1.0 1.0) Transform.Center |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 10 0 H 0", Serialize.path transformed)
 
 [<Fact>]
@@ -217,56 +217,56 @@ let ``path_transform_test`` () =
 
 [<Fact>]
 let ``arc_identity_transform_preserves_arc_test`` () =
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 10.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let transformed = Transform.segment arc (Transform.identity ()) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 A 5 5 0 0 0 10 0", Serialize.segment transformed)
 
 [<Fact>]
 let ``arc_non_uniform_scale_transform_test`` () =
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 5.0 10.0; XAxisRotation = degrees 0.0; LargeArc = true; Sweep = false; End = point 5.0 10.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 5.0 10.0; XAxisRotation = degrees 0.0; LargeArc = true; Sweep = false; End = point 5.0 10.0 }: Ellipse.EndpointArcData)
     let matrix = Transform.matrix 2.0 0.0 0.0 3.0 0.0<length> 0.0<length>
     let transformed = Transform.segment arc matrix |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 A 10 30 0 1 0 10 30", Serialize.segment transformed)
 
 [<Fact>]
 let ``arc_shear_transform_test`` () =
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point 10.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let matrix = Transform.matrix 1.0 0.0 1.0 1.0 0.0<length> 0.0<length>
     let transformed = Transform.segment arc matrix |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 A 8.09 3.09 31.717 0 1 10 0", Serialize.segmentWith transformed (Serialize.decimalOptions 3))
 
 [<Fact>]
 let ``arc_reflection_flips_sweep_test`` () =
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point 10.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let transformed = Transform.segment arc (Transform.matrix -1.0 0.0 0.0 1.0 0.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 A 5 5 0 0 0 -10 0", Serialize.segment transformed)
 
 [<Fact>]
 let ``arc_degenerate_transform_errors_test`` () =
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 10.0 0.0 }
-    Assert.Equal(Error DegenerateArcTransform, Transform.segment arc (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>))
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
+    Assert.Equal(Error Transform.DegenerateArcTransform, Transform.segment arc (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>))
 
 [<Fact>]
 let ``strict_subpath_transform_errors_on_collapsed_arc_test`` () =
-    let subpath = Subpath.create [ Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 } ] |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.create [ Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData) ] |> Result.defaultWith (failwithf "%A")
     let matrix = Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>
-    Assert.Equal(Error DegenerateArcTransform, Transform.subpath subpath matrix)
+    Assert.Equal(Error Transform.DegenerateArcTransform, Transform.subpath subpath matrix)
 
 [<Fact>]
 let ``graceful_arc_transform_returns_collapsed_line_test`` () =
-    let arc = Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }
+    let arc = Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData)
     let segment = Transform.segmentGracefully arc (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 5 0 H -5", Serialize.segment segment)
 
 [<Fact>]
 let ``graceful_arc_transform_follows_full_collapse_to_point_test`` () =
-    let arc = Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }
+    let arc = Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData)
     let segment = Transform.segmentGracefully arc (Transform.matrix 0.0 0.0 0.0 0.0 7.0<length> 11.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 7 11 H 7", Serialize.segment segment)
 
 [<Fact>]
 let ``graceful2_arc_transform_preserves_transformed_endpoints_test`` () =
-    let arc = Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }
+    let arc = Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData)
     let subpath = Transform.segmentToSubpathGracefully arc (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 5 0 H -5", Serialize.subpath subpath)
 
@@ -277,13 +277,13 @@ let ``graceful2_line_transform_returns_single_segment_subpath_test`` () =
 
 [<Fact>]
 let ``graceful2_arc_transform_preserves_out_and_back_motion_test`` () =
-    let arc = Arc { Start = point 3.5355339059 -3.5355339059; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point 3.5355339059 3.5355339059 }
+    let arc = Arc ({ Start = point 3.5355339059 -3.5355339059; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point 3.5355339059 3.5355339059 }: Ellipse.EndpointArcData)
     let subpath = Transform.segmentToSubpathGracefully arc (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 3.53553 0 H 5 H 3.53553", Serialize.subpath subpath)
 
 [<Fact>]
 let ``graceful2_arc_transform_follows_full_collapse_to_point_test`` () =
-    let arc = Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }
+    let arc = Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData)
     let subpath = Transform.segmentToSubpathGracefully arc (Transform.matrix 0.0 0.0 0.0 0.0 7.0<length> 11.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 7 11 H 7", Serialize.subpath subpath)
 
@@ -292,7 +292,7 @@ let ``graceful_subpath_transform_keeps_surrounding_continuity_test`` () =
     let subpath =
         Subpath.create [
             Line(point -10.0 0.0, point 5.0 0.0)
-            Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }
+            Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData)
             Line(point -5.0 0.0, point -10.0 0.0)
         ] |> Result.defaultWith (failwithf "%A")
     let transformed = Transform.subpathGracefully subpath (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
@@ -302,7 +302,7 @@ let ``graceful_subpath_transform_keeps_surrounding_continuity_test`` () =
 let ``graceful_closed_subpath_transform_preserves_semantic_closure_test`` () =
     let subpath =
         Subpath.create [
-            Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }
+            Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData)
             Line(point -5.0 0.0, point 5.0 0.0)
         ] |> Result.defaultWith (failwithf "%A") |> setClosed
     let transformed = Transform.subpathGracefully subpath (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
@@ -311,19 +311,19 @@ let ``graceful_closed_subpath_transform_preserves_semantic_closure_test`` () =
 
 [<Fact>]
 let ``graceful_path_transform_converts_collapsed_arcs_in_each_subpath_test`` () =
-    let first = Subpath.create [ Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 } ] |> Result.defaultWith (failwithf "%A")
+    let first = Subpath.create [ Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData) ] |> Result.defaultWith (failwithf "%A")
     let second = Subpath.create [ Line(point 0.0 2.0, point 4.0 2.0) ] |> Result.defaultWith (failwithf "%A")
     let transformed = Transform.pathGracefully (Path.ofSubpaths [ first; second ]) (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 3.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 5 3 H -5 M 0 3 H 4", Serialize.path transformed)
 
 [<Fact>]
 let ``graceful_arc_transform_returns_vertical_collapsed_line_test`` () =
-    let arc = Arc { Start = point 0.0 5.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 0.0 -5.0 }
+    let arc = Arc ({ Start = point 0.0 5.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 0.0 -5.0 }: Ellipse.EndpointArcData)
     let segment = Transform.segmentGracefully arc (Transform.matrix 0.0 0.0 0.0 1.0 10.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 10 5 V -5", Serialize.segment segment)
 
 [<Fact>]
 let ``graceful_non_degenerate_arc_transform_returns_arc_test`` () =
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 10.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let segment = Transform.segmentGracefully arc (Transform.identity ()) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 A 5 5 0 0 0 10 0", Serialize.segment segment)

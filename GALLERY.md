@@ -57,6 +57,25 @@ nested fill-rule cases, mixed curves, and self-crossing input.
 
 Shows the same open cubic stroked with butt, square, and round caps.
 
+### Historical SVG 2 Join Comparisons
+
+Blue outlines are produced by the F# public stroke API, over unchanged
+[W3C reference illustrations](https://www.w3.org/TR/SVG2/painting.html#LineJoinShape).
+The MiterClip example asserts x=227.5 for its clipping plane. Arc reference
+outlines and construction guides have rounded, sometimes inconsistent
+coordinates and are visual checks, not exact numerical fixtures. Parallel
+tangents deliberately use our Round fallback rather than the proposal's rectangle.
+
+![Miter limit](docs/gallery/w3c-miter-limit.svg)
+
+![Nested circles](docs/gallery/w3c-linejoin-construction-fallback.svg)
+
+![Disjoint circles](docs/gallery/w3c-linejoin-construction-fallback2.svg)
+
+![Parallel tangents](docs/gallery/w3c-linejoin-construction-fallback3.svg)
+
+See the [reference notes](tools/GalleryFigures/w3c-join-reference/README.md).
+
 ### Dashed Strokes
 
 ![Dashed strokes](docs/gallery/gallery-dashed-strokes.svg)

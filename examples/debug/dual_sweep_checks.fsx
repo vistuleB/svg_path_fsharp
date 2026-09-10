@@ -29,9 +29,9 @@ let rec gather remaining found =
     match remaining with
     | [] -> List.rev found
     | first::_ ->
-        let edges = invoke "faceWalk" [|box graph;box first|] |> ok :?> ArrangementFaceEdge list
-        gather (remaining |> List.filter (fun e -> not(List.contains e edges))) ({Outer=false;Edges=edges}::found)
-let walks = gather (graph.Edges |> List.collect (fun e -> [{EdgeId=e.Id;Left=true};{EdgeId=e.Id;Left=false}])) []
+        let edges = invoke "faceWalk" [|box graph;box first|] |> ok :?> Arrangement.ArrangementFaceEdge list
+        gather (remaining |> List.filter (fun e -> not(List.contains e edges))) ({Offset.Outer=false;Edges=edges}::found)
+let walks = gather (graph.Edges |> List.collect (fun e -> [({EdgeId=e.Id;Left=true}: Arrangement.ArrangementFaceEdge);({EdgeId=e.Id;Left=false}: Arrangement.ArrangementFaceEdge)])) []
 let components = invoke "dualComponents" [|box graph.Edges|]
 let edges = invoke "dualSweepEdges" [|box graph.Edges;components;box walks|] |> ok
 let tolerance = invoke "dualSweepTolerance" [|box graph|]

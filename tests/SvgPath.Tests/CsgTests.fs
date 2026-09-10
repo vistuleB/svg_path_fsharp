@@ -16,7 +16,7 @@ module CsgAdditionalTests =
         |> Result.defaultWith (fun error -> failwithf "%A" error)
         |> fun subpath -> Path.ofSubpaths [ subpath ]
 
-    let result operation =
+    let result (operation: Result<Csg.CsgResult, Csg.Error>) =
         operation
         |> Result.defaultWith (fun error -> failwithf "%A" error)
         |> _.Path

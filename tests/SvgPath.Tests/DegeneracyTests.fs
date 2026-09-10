@@ -17,7 +17,7 @@ let ``zero tolerance is accepted`` () =
 let ``negative tolerance is rejected`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     Assert.Equal(
-        Error(DegeneracyInvalidTolerance -0.000001<length>),
+        Error(Degeneracy.DegeneracyInvalidTolerance -0.000001<length>),
         Degeneracy.normalizeDegenerateSegments source -0.000001<length>)
 
 [<Fact>]

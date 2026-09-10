@@ -160,6 +160,6 @@ module CutTests =
             { Intersections.defaultOptions with
                 Tolerance = 1.0e-6<length>
                 MaxDepth = 48
-                ParameterSnap = DecimalParameterSnap 7 }
+                ParameterSnap = Intersections.DecimalParameterSnap 7 }
         let result = Cut.pathWith (Path.singleton subjectSubpath) cutter options |> Result.defaultWith (failwithf "%A")
         Assert.Equal("M 0 0 H 10 M 10 0 H 20", Serialize.path result)

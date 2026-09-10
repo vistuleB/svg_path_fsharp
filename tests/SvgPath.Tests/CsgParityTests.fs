@@ -8,7 +8,7 @@ let private rectangleSubpath left top right bottom =
     Subpath.polygon [ point left top; point right top; point right bottom; point left bottom ]
     |> Result.defaultWith (failwithf "%A")
 let private rectangle left top right bottom = Path.singleton (rectangleSubpath left top right bottom)
-let private output result = result |> Result.defaultWith (failwithf "%A") |> _.Path
+let private output (result: Result<Csg.CsgResult, Csg.Error>) = result |> Result.defaultWith (failwithf "%A") |> _.Path
 let private area path = Area.path path Nonzero |> Result.defaultWith (failwithf "%A")
 let private containment path sample = Path.containment sample path Nonzero |> Result.defaultWith (failwithf "%A")
 
@@ -86,8 +86,8 @@ let ``three coincident contributors emit one boolean boundary`` () =
 let private circleSubpath radius =
     let left, right = point -radius 0.0, point radius 0.0
     Subpath.create
-        [ Arc { Start = right; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = left }
-          Arc { Start = left; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = right } ]
+        [ Arc ({ Start = right; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = left }: Ellipse.EndpointArcData)
+          Arc ({ Start = left; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = right }: Ellipse.EndpointArcData) ]
     |> Result.bind (Subpath.setClosed true)
     |> Result.defaultWith (failwithf "%A")
 

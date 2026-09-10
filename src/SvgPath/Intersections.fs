@@ -1,215 +1,216 @@
 namespace SvgPath
 
-[<Struct>]
-type SegmentIntersection =
-    { LeftT: float<parameter>
-      RightT: float<parameter>
-      Point: Point<length> }
-
-type internal CurveSolverError =
-    | CurveSolverPathError of error: SegmentError
-    | CurveSolverDepthLimit of leftFrom: float<parameter> * leftTo: float<parameter> * rightFrom: float<parameter> * rightTo: float<parameter>
-type internal ElizabethBeamReport =
-    { Intersections: SegmentIntersection list; Examined: int
-      DiscardedCrossing: int; DiscardedOther: int; PeakRetained: int; DiscardedCandidates: int }
-
-[<Struct>]
-type SubpathIntersection =
-    { Point: Point<length>
-      LeftParameters: SubpathParameter list
-      RightParameters: SubpathParameter list }
-
-[<Struct>]
-type PathIntersection =
-    { Point: Point<length>
-      LeftParameters: PathParameter list
-      RightParameters: PathParameter list }
-
-[<Struct>]
-type SelfIntersectionOptions =
-    { MinimumArcLengthSeparation: float<length>
-      DistanceTolerance: float<length> }
-
-[<Struct>]
-type SegmentSegmentProjection =
-    { LeftT: float<parameter>
-      RightT: float<parameter>
-      LeftPoint: Point<length>
-      RightPoint: Point<length>
-      Distance: float<length> }
-
-[<Struct>]
-type SegmentSubpathProjection =
-    { LeftT: float<parameter>
-      RightAt: SubpathParameter
-      LeftPoint: Point<length>
-      RightPoint: Point<length>
-      Distance: float<length> }
-
-[<Struct>]
-type SegmentPathProjection =
-    { LeftT: float<parameter>
-      RightAt: PathParameter
-      LeftPoint: Point<length>
-      RightPoint: Point<length>
-      Distance: float<length> }
-
-[<Struct>]
-type SubpathSubpathProjection =
-    { LeftAt: SubpathParameter
-      RightAt: SubpathParameter
-      LeftPoint: Point<length>
-      RightPoint: Point<length>
-      Distance: float<length> }
-
-[<Struct>]
-type SubpathPathProjection =
-    { LeftAt: SubpathParameter
-      RightAt: PathParameter
-      LeftPoint: Point<length>
-      RightPoint: Point<length>
-      Distance: float<length> }
-
-[<Struct>]
-type PathPathProjection =
-    { LeftAt: PathParameter
-      RightAt: PathParameter
-      LeftPoint: Point<length>
-      RightPoint: Point<length>
-      Distance: float<length> }
-
-[<Struct>]
-type SubpathSelfIntersection =
-    { Point: Point<length>
-      Parameters: SubpathParameter * SubpathParameter }
-
-[<Struct>]
-type PathSelfIntersection =
-    { Point: Point<length>
-      Parameters: PathParameter * PathParameter }
-
-type CrossingDirection =
-    | Clockwise
-    | Counterclockwise
-
-type TouchingDirection =
-    | SimilarlyDirected
-    | OppositelyDirected
-
-type TouchingOrder =
-    | ClockwiseFromFirstToSecond
-    | ClockwiseFromSecondToFirst
-    | IndeterminateTouchingOrder
-
-type SubpathEndpoint =
-    | StartEndpoint
-    | EndEndpoint
-
-type EndpointContact =
-    | FirstEndpointToSecondInterior of first: SubpathEndpoint
-    | FirstInteriorToSecondEndpoint of second: SubpathEndpoint
-    | EndpointToEndpoint of first: SubpathEndpoint * second: SubpathEndpoint
-
-[<Struct>]
-type IntersectionApertures =
-    { FirstIncomingToSecondIncoming: float<degree>
-      FirstIncomingToSecondOutgoing: float<degree>
-      FirstOutgoingToSecondIncoming: float<degree>
-      FirstOutgoingToSecondOutgoing: float<degree> }
-
-type IntersectionClassification =
-    | Crossing of direction: CrossingDirection * apertures: IntersectionApertures
-    | Touching of
-        direction: TouchingDirection *
-        incomingOrder: TouchingOrder *
-        outgoingOrder: TouchingOrder *
-        apertures: IntersectionApertures
-    | EndpointContact of EndpointContact
-    | Indeterminate
-
-[<Struct>]
-type ClassifiedSubpathIntersection =
-    { FirstParameter: SubpathParameter
-      SecondParameter: SubpathParameter
-      Classification: IntersectionClassification }
-
-type ParameterSnap =
-    | NoParameterSnap
-    | DecimalParameterSnap of exponent: int
-
-[<Struct>]
-type ClassificationOptions =
-    { DirectionOptions: DirectionOptions
-      AngularTolerance: float<degree>
-      DistanceTolerance: float<length>
-      LengthOptions: LengthOptions
-      InitialArcLength: float<length>
-      MaximumArcLength: float<length>
-      MaxSamplingSteps: int }
-
-[<RequireQualifiedAccess>]
-type ClassificationError =
-    | PathError of error: SegmentError
-    | InvalidAngularTolerance of tolerance: float<degree>
-    | InvalidClassificationDistanceTolerance of tolerance: float<length>
-    | InvalidClassificationInitialArcLength of initialArcLength: float<length>
-    | InvalidClassificationMaximumArcLength of maximumArcLength: float<length>
-    | InvalidClassificationMaxSamplingSteps of maxSamplingSteps: int
-
-[<Struct>]
-type IntersectionOptions =
-    { Tolerance: float<length>
-      MaxDepth: int
-      ParameterSnap: ParameterSnap }
-
-[<Struct>]
-type private IntersectionWindow =
-    { LeftFrom: float<parameter>
-      LeftTo: float<parameter>
-      RightFrom: float<parameter>
-      RightTo: float<parameter>
-      Depth: int }
-
-type private TraversalBranch = IncomingBranch | OutgoingBranch
-
-[<Struct>]
-type private ArcLengthLocation =
-    { Subpath: Subpath
-      At: float<length>
-      Total: float<length>
-      Closed: bool }
-
-[<Struct>]
-type private IntersectionPiece =
-    { Segment: Segment
-      From: float<parameter>
-      To: float<parameter> }
-
-[<Struct>]
-type private DistanceMinimum =
-    { LeftT: float<parameter>
-      RightT: float<parameter>
-      DistanceSquared: float<length^2> }
-
-[<Struct>]
-type private RawTerminalWindow =
-    { Left: IntersectionPiece
-      Right: IntersectionPiece
-      StartLeftT: float<parameter>
-      StartRightT: float<parameter> }
-
-[<Struct>]
-type private ProjectionWindow =
-    { Left: IntersectionPiece
-      Right: IntersectionPiece
-      RemainingDepth: int }
-
 /// Intersections, closest-point pairs, projections, and ray crossings.
 /// General curve-pair search is bounded and heuristic: acceptable candidates
 /// need not represent distinct mathematical roots, nor certify completeness.
 /// Continuous overlaps are errors here; Encounters combines both query kinds.
 [<RequireQualifiedAccess>]
 module Intersections =
+
+    [<Struct>]
+    type SegmentIntersection =
+        { LeftT: float<parameter>
+          RightT: float<parameter>
+          Point: Point<length> }
+
+    type internal CurveSolverError =
+        | CurveSolverPathError of error: SegmentError
+        | CurveSolverDepthLimit of leftFrom: float<parameter> * leftTo: float<parameter> * rightFrom: float<parameter> * rightTo: float<parameter>
+    type internal ElizabethBeamReport =
+        { Intersections: SegmentIntersection list; Examined: int
+          DiscardedCrossing: int; DiscardedOther: int; PeakRetained: int; DiscardedCandidates: int }
+
+    [<Struct>]
+    type SubpathIntersection =
+        { Point: Point<length>
+          LeftParameters: SubpathParameter list
+          RightParameters: SubpathParameter list }
+
+    [<Struct>]
+    type PathIntersection =
+        { Point: Point<length>
+          LeftParameters: PathParameter list
+          RightParameters: PathParameter list }
+
+    [<Struct>]
+    type SelfIntersectionOptions =
+        { MinimumArcLengthSeparation: float<length>
+          DistanceTolerance: float<length> }
+
+    [<Struct>]
+    type SegmentSegmentProjection =
+        { LeftT: float<parameter>
+          RightT: float<parameter>
+          LeftPoint: Point<length>
+          RightPoint: Point<length>
+          Distance: float<length> }
+
+    [<Struct>]
+    type SegmentSubpathProjection =
+        { LeftT: float<parameter>
+          RightAt: SubpathParameter
+          LeftPoint: Point<length>
+          RightPoint: Point<length>
+          Distance: float<length> }
+
+    [<Struct>]
+    type SegmentPathProjection =
+        { LeftT: float<parameter>
+          RightAt: PathParameter
+          LeftPoint: Point<length>
+          RightPoint: Point<length>
+          Distance: float<length> }
+
+    [<Struct>]
+    type SubpathSubpathProjection =
+        { LeftAt: SubpathParameter
+          RightAt: SubpathParameter
+          LeftPoint: Point<length>
+          RightPoint: Point<length>
+          Distance: float<length> }
+
+    [<Struct>]
+    type SubpathPathProjection =
+        { LeftAt: SubpathParameter
+          RightAt: PathParameter
+          LeftPoint: Point<length>
+          RightPoint: Point<length>
+          Distance: float<length> }
+
+    [<Struct>]
+    type PathPathProjection =
+        { LeftAt: PathParameter
+          RightAt: PathParameter
+          LeftPoint: Point<length>
+          RightPoint: Point<length>
+          Distance: float<length> }
+
+    [<Struct>]
+    type SubpathSelfIntersection =
+        { Point: Point<length>
+          Parameters: SubpathParameter * SubpathParameter }
+
+    [<Struct>]
+    type PathSelfIntersection =
+        { Point: Point<length>
+          Parameters: PathParameter * PathParameter }
+
+    type CrossingDirection =
+        | Clockwise
+        | Counterclockwise
+
+    type TouchingDirection =
+        | SimilarlyDirected
+        | OppositelyDirected
+
+    type TouchingOrder =
+        | ClockwiseFromFirstToSecond
+        | ClockwiseFromSecondToFirst
+        | IndeterminateTouchingOrder
+
+    type SubpathEndpoint =
+        | StartEndpoint
+        | EndEndpoint
+
+    type EndpointContact =
+        | FirstEndpointToSecondInterior of first: SubpathEndpoint
+        | FirstInteriorToSecondEndpoint of second: SubpathEndpoint
+        | EndpointToEndpoint of first: SubpathEndpoint * second: SubpathEndpoint
+
+    [<Struct>]
+    type IntersectionApertures =
+        { FirstIncomingToSecondIncoming: float<degree>
+          FirstIncomingToSecondOutgoing: float<degree>
+          FirstOutgoingToSecondIncoming: float<degree>
+          FirstOutgoingToSecondOutgoing: float<degree> }
+
+    type IntersectionClassification =
+        | Crossing of direction: CrossingDirection * apertures: IntersectionApertures
+        | Touching of
+            direction: TouchingDirection *
+            incomingOrder: TouchingOrder *
+            outgoingOrder: TouchingOrder *
+            apertures: IntersectionApertures
+        | EndpointContact of EndpointContact
+        | Indeterminate
+
+    [<Struct>]
+    type ClassifiedSubpathIntersection =
+        { FirstParameter: SubpathParameter
+          SecondParameter: SubpathParameter
+          Classification: IntersectionClassification }
+
+    type ParameterSnap =
+        | NoParameterSnap
+        | DecimalParameterSnap of exponent: int
+
+    [<Struct>]
+    type ClassificationOptions =
+        { DirectionOptions: DirectionOptions
+          AngularTolerance: float<degree>
+          DistanceTolerance: float<length>
+          LengthOptions: LengthOptions
+          InitialArcLength: float<length>
+          MaximumArcLength: float<length>
+          MaxSamplingSteps: int }
+
+    [<RequireQualifiedAccess>]
+    type Error =
+        | PathError of error: SegmentError
+        | InvalidAngularTolerance of tolerance: float<degree>
+        | InvalidClassificationDistanceTolerance of tolerance: float<length>
+        | InvalidClassificationInitialArcLength of initialArcLength: float<length>
+        | InvalidClassificationMaximumArcLength of maximumArcLength: float<length>
+        | InvalidClassificationMaxSamplingSteps of maxSamplingSteps: int
+
+    [<Struct>]
+    type IntersectionOptions =
+        { Tolerance: float<length>
+          MaxDepth: int
+          ParameterSnap: ParameterSnap }
+
+    [<Struct>]
+    type private IntersectionWindow =
+        { LeftFrom: float<parameter>
+          LeftTo: float<parameter>
+          RightFrom: float<parameter>
+          RightTo: float<parameter>
+          Depth: int }
+
+    type private TraversalBranch = IncomingBranch | OutgoingBranch
+
+    [<Struct>]
+    type private ArcLengthLocation =
+        { Subpath: Subpath
+          At: float<length>
+          Total: float<length>
+          Closed: bool }
+
+    [<Struct>]
+    type private IntersectionPiece =
+        { Segment: Segment
+          From: float<parameter>
+          To: float<parameter> }
+
+    [<Struct>]
+    type private DistanceMinimum =
+        { LeftT: float<parameter>
+          RightT: float<parameter>
+          DistanceSquared: float<length^2> }
+
+    [<Struct>]
+    type private RawTerminalWindow =
+        { Left: IntersectionPiece
+          Right: IntersectionPiece
+          StartLeftT: float<parameter>
+          StartRightT: float<parameter> }
+
+    [<Struct>]
+    type private ProjectionWindow =
+        { Left: IntersectionPiece
+          Right: IntersectionPiece
+          RemainingDepth: int }
+
     let defaultOptions =
         { Tolerance = 1.0e-9<length>
           MaxDepth = 48
@@ -1277,19 +1278,19 @@ module Intersections =
         else Ok()
 
     let private bezierSelfIntersectionError = function
-        | InvalidCubicSelfIntersectionMinimumArcLengthSeparation value ->
+        | Bezier.InvalidCubicSelfIntersectionMinimumArcLengthSeparation value ->
             InvalidSelfIntersectionMinimumArcLengthSeparation value
-        | InvalidCubicSelfIntersectionDistanceTolerance value ->
+        | Bezier.InvalidCubicSelfIntersectionDistanceTolerance value ->
             InvalidSelfIntersectionDistanceTolerance value
-        | BezierError.SplitOutsideBezier -> SegmentError.SplitOutsideSegment
-        | BezierError.DegenerateTangent -> SegmentError.DegenerateCubicFitTangent
-        | BezierError.UnderdeterminedCubicFit -> SegmentError.UnderdeterminedCubicFit
+        | Bezier.Error.SplitOutsideBezier -> SegmentError.SplitOutsideSegment
+        | Bezier.Error.DegenerateTangent -> SegmentError.DegenerateCubicFitTangent
+        | Bezier.Error.UnderdeterminedCubicFit -> SegmentError.UnderdeterminedCubicFit
 
     let private segmentSelfValid segmentValue options =
         match segmentValue with
         | CubicBezier(startPoint, control1, control2, endPoint) ->
             Bezier.cubicSelfIntersectionsWith
-                (CubicBezierData(startPoint, control1, control2, endPoint))
+                (Bezier.CubicBezierData(startPoint, control1, control2, endPoint))
                 { MinimumArcLengthSeparation = options.MinimumArcLengthSeparation
                   DistanceTolerance = options.DistanceTolerance }
             |> Result.mapError bezierSelfIntersectionError
@@ -1668,23 +1669,23 @@ module Intersections =
         if options.AngularTolerance < 0.0<degree>
            || options.AngularTolerance >= 180.0<degree>
            || not (System.Double.IsFinite(float options.AngularTolerance)) then
-            Error(ClassificationError.InvalidAngularTolerance options.AngularTolerance)
+            Error(Error.InvalidAngularTolerance options.AngularTolerance)
         elif options.DistanceTolerance < 0.0<length>
              || not (System.Double.IsFinite(float options.DistanceTolerance)) then
-            Error(ClassificationError.InvalidClassificationDistanceTolerance options.DistanceTolerance)
+            Error(Error.InvalidClassificationDistanceTolerance options.DistanceTolerance)
         elif options.LengthOptions.Tolerance <= 0.0<length>
              || not (System.Double.IsFinite(float options.LengthOptions.Tolerance)) then
-            Error(ClassificationError.PathError(InvalidLengthTolerance options.LengthOptions.Tolerance))
+            Error(Error.PathError(InvalidLengthTolerance options.LengthOptions.Tolerance))
         elif options.LengthOptions.MaxDepth < 0 then
-            Error(ClassificationError.PathError(InvalidLengthMaxDepth options.LengthOptions.MaxDepth))
+            Error(Error.PathError(InvalidLengthMaxDepth options.LengthOptions.MaxDepth))
         elif options.InitialArcLength <= 0.0<length>
              || not (System.Double.IsFinite(float options.InitialArcLength)) then
-            Error(ClassificationError.InvalidClassificationInitialArcLength options.InitialArcLength)
+            Error(Error.InvalidClassificationInitialArcLength options.InitialArcLength)
         elif options.MaximumArcLength < options.InitialArcLength
              || not (System.Double.IsFinite(float options.MaximumArcLength)) then
-            Error(ClassificationError.InvalidClassificationMaximumArcLength options.MaximumArcLength)
+            Error(Error.InvalidClassificationMaximumArcLength options.MaximumArcLength)
         elif options.MaxSamplingSteps <= 0 then
-            Error(ClassificationError.InvalidClassificationMaxSamplingSteps options.MaxSamplingSteps)
+            Error(Error.InvalidClassificationMaxSamplingSteps options.MaxSamplingSteps)
         else Ok()
 
     let private subpathEndpoint (subpathValue: Subpath) parameterValue =
@@ -1782,10 +1783,10 @@ module Intersections =
         validateClassificationOptions options
         |> Result.bind (fun () ->
             subpathEndpoint first firstParameter
-            |> Result.mapError ClassificationError.PathError
+            |> Result.mapError Error.PathError
             |> Result.bind (fun firstEndpoint ->
                 subpathEndpoint second secondParameter
-                |> Result.mapError ClassificationError.PathError
+                |> Result.mapError Error.PathError
                 |> Result.bind (fun secondEndpoint ->
                     match firstEndpoint, secondEndpoint with
                     | Some firstEndpoint, Some secondEndpoint ->
@@ -1796,10 +1797,10 @@ module Intersections =
                         Ok(EndpointContact(FirstInteriorToSecondEndpoint secondEndpoint))
                     | None, None ->
                         Subpath.directionsWith first firstParameter options.DirectionOptions
-                        |> Result.mapError ClassificationError.PathError
+                        |> Result.mapError Error.PathError
                         |> Result.bind (fun left ->
                             Subpath.directionsWith second secondParameter options.DirectionOptions
-                            |> Result.mapError ClassificationError.PathError
+                            |> Result.mapError Error.PathError
                             |> Result.bind (fun right ->
                                 match left.Incoming, left.Outgoing, right.Incoming, right.Outgoing with
                                 | Some leftIncoming, Some leftOutgoing, Some rightIncoming, Some rightOutgoing ->
@@ -1843,7 +1844,7 @@ module Intersections =
                                                             | true, ClockwiseFromFirstToSecond, ClockwiseFromFirstToSecond, OppositelyDirected
                                                             | true, ClockwiseFromSecondToFirst, ClockwiseFromSecondToFirst, SimilarlyDirected -> Crossing(Counterclockwise, apertures)
                                                             | _ -> Touching(direction, incomingOrder, outgoingOrder, apertures))))))
-                                        |> Result.mapError ClassificationError.PathError
+                                        |> Result.mapError Error.PathError
                                 | _ -> Ok Indeterminate)))))
 
     let classifySubpathIntersection first second firstParameter secondParameter =

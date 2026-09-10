@@ -4,11 +4,11 @@ open Xunit
 let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private get result = result |> Result.defaultWith (failwithf "%A")
 let private corner () = Subpath.create [Line(p 0. 0.,p 1. 0.);Line(p 1. 0.,p 1. 1.)] |> get
-let private arc () = Arc { Start=p 0.1 0.2; Radius=p 3. 2.; XAxisRotation=17.0<degree>; LargeArc=false; Sweep=true; End=p 2. 3. }
+let private arc () = Arc ({ Start=p 0.1 0.2; Radius=p 3. 2.; XAxisRotation=17.0<degree>; LargeArc=false; Sweep=true; End=p 2. 3. }: Ellipse.EndpointArcData)
 let private address index t = { SegmentIndex=index; T=t }
 [<Fact>]
 let ``endpoint arc splits return usable empty lines`` () =
-    let arc = Arc {Start=p 1. 0.;Radius=p 1. 1.;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=p 0. 1.}
+    let arc = Arc ({Start=p 1. 0.;Radius=p 1. 1.;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=p 0. 1.}: Ellipse.EndpointArcData)
     for split in [Segment.split;Segment.splitInside] do
         for t in [0.0<parameter>; -0.0<parameter>;1.0<parameter>] do
             let left,right = split arc t |> get

@@ -18,12 +18,12 @@ let private narrowArcLoop () =
     let startPoint = point 999.94340504 7.63106966
     let endPoint = point 999.92428935 9.82151131
     [ Arc
-        { Start = startPoint
-          Radius = point 30.0 30.0
-          XAxisRotation = 0.0<degree>
-          LargeArc = false
-          Sweep = true
-          End = endPoint }
+        ({ Start = startPoint
+           Radius = point 30.0 30.0
+           XAxisRotation = 0.0<degree>
+           LargeArc = false
+           Sweep = true
+           End = endPoint }: Ellipse.EndpointArcData)
       Line(endPoint, startPoint) ]
 
 let private squareLoop () =
@@ -45,7 +45,7 @@ let private conflictingTangentLineLikeLoop () =
 
 [<Fact>]
 let ``point hull rejects an empty collection`` () =
-    Assert.Equal(Error(ConvexHullPathError EmptyPath), ConvexHull.pointsHull [])
+    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.pointsHull [])
 
 [<Fact>]
 let ``point hull removes interior points`` () =
@@ -79,10 +79,10 @@ let ``directional support API keeps width units`` () =
     let support direction =
         let lower = point 0.0 0.0
         let upper = Point.scale (2.0<length>) direction
-        { LowerPoint = lower; UpperPoint = upper; Width = 2.0<length> }
+        ({ LowerPoint = lower; UpperPoint = upper; Width = 2.0<length> }: ConvexHull.DirectionalExtent)
     let result =
         ConvexHull.minimumWidthWith support 2.0<length>
-            { Accuracy = 0.01<length>; MaxDepth = 4 }
+            ({ Accuracy = 0.01<length>; MaxDepth = 4 }: ConvexHull.WidthSearchOptions)
     near 2.0<length> result.Width
 
 [<Fact>]
@@ -96,12 +96,12 @@ let ``quadratic hull preserves the curve and closes with its chord`` () =
 let ``arc hull preserves the arc and closes with its chord`` () =
     let arc =
         Arc
-            { Start = point -2.0 0.0
-              Radius = point 2.0 2.0
-              XAxisRotation = Degree.fromFloat 0.0
-              LargeArc = false
-              Sweep = true
-              End = point 2.0 0.0 }
+            ({ Start = point -2.0 0.0
+               Radius = point 2.0 2.0
+               XAxisRotation = Degree.fromFloat 0.0
+               LargeArc = false
+               Sweep = true
+               End = point 2.0 0.0 }: Ellipse.EndpointArcData)
     let hull = ConvexHull.segmentHull arc |> Result.defaultWith (failwithf "%A")
     Assert.Equal(arc, List.head hull.Segments)
     Assert.Equal(Line(point 2.0 0.0, point -2.0 0.0), List.last hull.Segments)
@@ -134,12 +134,12 @@ let ``adaptive search converges on a rotated rectangle`` () =
     let vertices = [ corner -1.0 -1.0; corner 1.0 -1.0; corner 1.0 1.0; corner -1.0 1.0 ]
     let support direction =
         let ordered = vertices |> List.sortBy (fun vertex -> Point.dot vertex direction)
-        { LowerPoint = List.head ordered
-          UpperPoint = List.last ordered
-          Width = Point.dot (List.last ordered) direction - Point.dot (List.head ordered) direction }
+        ({ LowerPoint = List.head ordered
+           UpperPoint = List.last ordered
+           Width = Point.dot (List.last ordered) direction - Point.dot (List.head ordered) direction }: ConvexHull.DirectionalExtent)
     let result =
         ConvexHull.minimumWidthWith support 13.0<length>
-            { Accuracy = 1.0e-6<length>; MaxDepth = 12 }
+            ({ Accuracy = 1.0e-6<length>; MaxDepth = 12 }: ConvexHull.WidthSearchOptions)
     Assert.True(result.Converged)
     Assert.True(abs (result.Width - 0.4<length>) <= 1.0e-6<length>)
     Assert.True(result.LowerBound <= 0.400001<length>)
@@ -203,22 +203,22 @@ let ``ambitious repair preserves a narrow exposed arc slice`` () =
 [<Fact>]
 let ``point loop view follows loop orientation`` () =
     Assert.Equal(
-        OutsidePoint,
+        ConvexHull.OutsidePoint,
         ConvexHull.internalPointLoopView
             (point 15.0 5.0) (point 10.0 5.0) (Point.create 0.0<length> 1.0<length>)
             (Point.create 0.0<length> 1.0<length>) true)
     Assert.Equal(
-        InsidePoint,
+        ConvexHull.InsidePoint,
         ConvexHull.internalPointLoopView
             (point 15.0 5.0) (point 0.0 5.0) (Point.create 0.0<length> -1.0<length>)
             (Point.create 0.0<length> -1.0<length>) true)
     Assert.Equal(
-        TangentPoint,
+        ConvexHull.TangentPoint,
         ConvexHull.internalPointLoopView
             (point 15.0 5.0) (point 10.0 10.0) (Point.create 0.0<length> 1.0<length>)
             (Point.create -1.0<length> 0.0<length>) false)
     Assert.Equal(
-        OutsidePoint,
+        ConvexHull.OutsidePoint,
         ConvexHull.internalPointLoopView
             (point 15.0 5.0) (point 10.0 5.0) (Point.create 0.0<length> -1.0<length>)
             (Point.create 0.0<length> -1.0<length>) false)
@@ -229,12 +229,12 @@ let ``segment tangent monotonicity handles every segment kind`` () =
     let clockwiseQuadratic = QuadraticBezier(point 0.0 0.0, point 1.0 0.0, point 1.0 1.0)
     let clockwiseArc =
         Arc
-            { Start = point 0.0 0.0
-              Radius = point 1.0 1.0
-              XAxisRotation = 0.0<degree>
-              LargeArc = false
-              Sweep = true
-              End = point 1.0 1.0 }
+            ({ Start = point 0.0 0.0
+               Radius = point 1.0 1.0
+               XAxisRotation = 0.0<degree>
+               LargeArc = false
+               Sweep = true
+               End = point 1.0 1.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Ok(), ConvexHull.internalSegmentTangentMonotone line true)
     Assert.Equal(Ok(), ConvexHull.internalSegmentTangentMonotone clockwiseQuadratic true)
     Assert.True(Result.isError (ConvexHull.internalSegmentTangentMonotone clockwiseQuadratic false))
@@ -308,7 +308,7 @@ let ``exact point tangent split finds quadratic interior tangencies`` () =
 [<Fact>]
 let ``exact tangent search rejects conflicting line-like orientation`` () =
     Assert.Equal(
-        Error InternalTangentSearchDegenerateLoop,
+        Error ConvexHull.InternalTangentSearchDegenerateLoop,
         ConvexHull.internalLoopPlusPointHull (conflictingTangentLineLikeLoop ()) (point 5.0 4.0))
 
 [<Fact>]

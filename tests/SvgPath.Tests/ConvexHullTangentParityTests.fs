@@ -74,19 +74,19 @@ let ``point chord polygon loop separation handles line like loop`` () =
 
 [<Fact>]
 let ``point loop view classifies clockwise outside arc point`` () =
-    Assert.Equal(OutsidePoint, ConvexHull.internalPointLoopView (point 15.0 5.0) (point 10.0 5.0) (point 0.0 1.0) (point 0.0 1.0) true)
+    Assert.Equal(ConvexHull.OutsidePoint, ConvexHull.internalPointLoopView (point 15.0 5.0) (point 10.0 5.0) (point 0.0 1.0) (point 0.0 1.0) true)
 
 [<Fact>]
 let ``point loop view classifies clockwise inside arc point`` () =
-    Assert.Equal(InsidePoint, ConvexHull.internalPointLoopView (point 15.0 5.0) (point 0.0 5.0) (point 0.0 -1.0) (point 0.0 -1.0) true)
+    Assert.Equal(ConvexHull.InsidePoint, ConvexHull.internalPointLoopView (point 15.0 5.0) (point 0.0 5.0) (point 0.0 -1.0) (point 0.0 -1.0) true)
 
 [<Fact>]
 let ``point loop view classifies ccw tangent corner`` () =
-    Assert.Equal(TangentPoint, ConvexHull.internalPointLoopView (point 15.0 5.0) (point 10.0 10.0) (point 0.0 1.0) (point -1.0 0.0) false)
+    Assert.Equal(ConvexHull.TangentPoint, ConvexHull.internalPointLoopView (point 15.0 5.0) (point 10.0 10.0) (point 0.0 1.0) (point -1.0 0.0) false)
 
 [<Fact>]
 let ``point loop view classifies counterclockwise outside arc point`` () =
-    Assert.Equal(OutsidePoint, ConvexHull.internalPointLoopView (point 15.0 5.0) (point 10.0 5.0) (point 0.0 -1.0) (point 0.0 -1.0) false)
+    Assert.Equal(ConvexHull.OutsidePoint, ConvexHull.internalPointLoopView (point 15.0 5.0) (point 10.0 5.0) (point 0.0 -1.0) (point 0.0 -1.0) false)
 
 [<Fact>]
 let ``point chord polygon tangent subpaths split square`` () =
@@ -106,7 +106,7 @@ let ``point chord polygon tangent subpaths reject nonconvex loop`` () =
           Line(point 5.0 5.0, point 10.0 10.0)
           Line(point 10.0 10.0, point 0.0 10.0)
           Line(point 0.0 10.0, point 0.0 0.0) ]
-    Assert.Equal(Error(InternalTangentSearchNonConvexVertex 2), ConvexHull.internalPointChordPolygonTangentSubpaths loop (point 15.0 5.0))
+    Assert.Equal(Error(ConvexHull.InternalTangentSearchNonConvexVertex 2), ConvexHull.internalPointChordPolygonTangentSubpaths loop (point 15.0 5.0))
 
 [<Fact>]
 let ``point exact loop tangent subpaths split square`` () =
@@ -180,7 +180,7 @@ let ``loop plus point hull handles line like loop`` () =
 
 [<Fact>]
 let ``loop plus point hull rejects conflicting tangent orientation`` () =
-    Assert.Equal(Error InternalTangentSearchDegenerateLoop, ConvexHull.internalLoopPlusPointHull (conflictingTangentLineLikeLoop ()) (point 5.0 4.0))
+    Assert.Equal(Error ConvexHull.InternalTangentSearchDegenerateLoop, ConvexHull.internalLoopPlusPointHull (conflictingTangentLineLikeLoop ()) (point 5.0 4.0))
 
 [<Fact>]
 let ``point exact loop tangent subpaths finds cubic interior tangencies`` () =
@@ -205,7 +205,7 @@ let ``cubic tangent geometric refinement exhaustion returns error`` () =
     let r = 7.006492321624085e-46
     let segment = CubicBezier(point 0. 0., point s 0., point (2.*s) s, point (3.*s) (3.*s))
     match ConvexHull.internalCubicPointTangentRoots segment (point 0. (-3.*s*r*r)) with
-    | Error(TangentRootFailure(MaxIterationsReached(estimate, value))) ->
+    | Error(ConvexHull.TangentRootFailure(MaxIterationsReached(estimate, value))) ->
         Assert.True(float estimate > r && float estimate < 1e-9)
         Assert.True(value > 0.0)
     | result -> failwithf "Expected tangent root exhaustion, got %A" result
@@ -245,7 +245,7 @@ let ``cubic chord refinement ignores trivial endpoint root`` () =
 let ``point exact loop tangent subpaths finds arc interior tangencies`` () =
     let loop =
         [ Line(point 0.0 0.0, point 10.0 0.0)
-          Arc { Start = point 10.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 10.0 10.0 }
+          Arc ({ Start = point 10.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 10.0 10.0 }: Ellipse.EndpointArcData)
           Line(point 10.0 10.0, point 0.0 0.0) ]
     let rootOffset = sqrt 18.75
     assertSplit (point 12.5 (5.0 - rootOffset)) (point 12.5 (5.0 + rootOffset)) 1 4 loop (point 20.0 5.0)
@@ -279,8 +279,8 @@ let ``segment tangent monotone rejects sign changing cubic`` () =
 
 [<Fact>]
 let ``segment tangent monotone checks arc sweep`` () =
-    let clockwise = Arc { Start = point 1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 0.0 1.0 }
-    let counterclockwise = Arc { Start = point 1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 0.0 -1.0 }
+    let clockwise = Arc ({ Start = point 1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 0.0 1.0 }: Ellipse.EndpointArcData)
+    let counterclockwise = Arc ({ Start = point 1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 0.0 -1.0 }: Ellipse.EndpointArcData)
     assertMonotone clockwise true
     assertNotMonotone clockwise false 1.0
     assertMonotone counterclockwise false

@@ -1,52 +1,53 @@
 namespace SvgPath
 
-open System
-open System.Globalization
-
-type PathNewlines =
-    | OneLine
-    | AtSubpaths
-    | AtSegments
-
-[<Struct>]
-type PathSerializeOptions =
-    { LeftDecimals: LeftDecimalOptions
-      RightDecimals: RightDecimalOptions
-      Relative: bool
-      MinimizeWhitespace: bool
-      Commas: bool
-      RepeatCommands: bool
-      ExplicitInitialLineto: bool
-      UseHorizontalVertical: bool
-      UseSmoothCurves: bool
-      Newlines: PathNewlines }
-
-type private PreviousCurve =
-    | NoPreviousCurve
-    | PreviousCubic of Point<length>
-    | PreviousQuadratic of Point<length>
-
-[<Struct>]
-type private SerializationFormat =
-    { Options: PathSerializeOptions
-      NumberFormat: NumberFormat }
-
-[<Struct>]
-type private RelativeParserState =
-    { Current: Point<length>
-      SubpathStart: Point<length>
-      PreviousCurve: PreviousCurve }
-
-type private ChordSimilarity =
-    | StableChord of sourceStart: Point<length> * parserStart: Point<length> * scaleCos: float * scaleSin: float
-    | UnstableChord
-
 /// Serialization and minification of SVG path data.
 [<RequireQualifiedAccess>]
 module Serialize =
+
+    open System
+    open System.Globalization
+
+    type Newlines =
+        | OneLine
+        | AtSubpaths
+        | AtSegments
+
+    [<Struct>]
+    type Options =
+        { LeftDecimals: NumberFormat.LeftDecimalOptions
+          RightDecimals: NumberFormat.RightDecimalOptions
+          Relative: bool
+          MinimizeWhitespace: bool
+          Commas: bool
+          RepeatCommands: bool
+          ExplicitInitialLineto: bool
+          UseHorizontalVertical: bool
+          UseSmoothCurves: bool
+          Newlines: Newlines }
+
+    type private PreviousCurve =
+        | NoPreviousCurve
+        | PreviousCubic of Point<length>
+        | PreviousQuadratic of Point<length>
+
+    [<Struct>]
+    type private SerializationFormat =
+        { Options: Options
+          NumberFormat: NumberFormat.NumberFormat }
+
+    [<Struct>]
+    type private RelativeParserState =
+        { Current: Point<length>
+          SubpathStart: Point<length>
+          PreviousCurve: PreviousCurve }
+
+    type private ChordSimilarity =
+        | StableChord of sourceStart: Point<length> * parserStart: Point<length> * scaleCos: float * scaleSin: float
+        | UnstableChord
+
     let defaultOptions =
-        { LeftDecimals = Succinct
-          RightDecimals = AtMost 5
+        { LeftDecimals = NumberFormat.Succinct
+          RightDecimals = NumberFormat.AtMost 5
           Relative = false
           MinimizeWhitespace = false
           Commas = false
@@ -56,20 +57,20 @@ module Serialize =
           UseSmoothCurves = true
           Newlines = OneLine }
 
-    let decimalOptions decimalPlaces = { defaultOptions with RightDecimals = AtMost decimalPlaces }
-    let fixedDecimalOptions decimalPlaces = { defaultOptions with RightDecimals = RightDecimalOptions.Fixed decimalPlaces }
+    let decimalOptions decimalPlaces = { defaultOptions with RightDecimals = NumberFormat.AtMost decimalPlaces }
+    let fixedDecimalOptions decimalPlaces = { defaultOptions with RightDecimals = NumberFormat.RightDecimalOptions.Fixed decimalPlaces }
     let relativeOptions = { defaultOptions with Relative = true }
-    let relativeDecimalOptions decimalPlaces = { relativeOptions with RightDecimals = AtMost decimalPlaces }
-    let relativeFixedDecimalOptions decimalPlaces = { relativeOptions with RightDecimals = RightDecimalOptions.Fixed decimalPlaces }
-    let minimizeWhitespace (options: PathSerializeOptions) = { options with MinimizeWhitespace = true }
-    let withCommas commas (options: PathSerializeOptions) = { options with Commas = commas }
-    let repeatCommands repeat (options: PathSerializeOptions) = { options with RepeatCommands = repeat }
-    let explicitInitialLineto explicit (options: PathSerializeOptions) = { options with ExplicitInitialLineto = explicit }
-    let useHorizontalVertical useIt (options: PathSerializeOptions) = { options with UseHorizontalVertical = useIt }
-    let useSmoothCurves useIt (options: PathSerializeOptions) = { options with UseSmoothCurves = useIt }
-    let withNewlines newlines (options: PathSerializeOptions) = { options with Newlines = newlines }
-    let withLeftDecimals left (options: PathSerializeOptions) = { options with LeftDecimals = left }
-    let withRightDecimals right (options: PathSerializeOptions) = { options with RightDecimals = right }
+    let relativeDecimalOptions decimalPlaces = { relativeOptions with RightDecimals = NumberFormat.AtMost decimalPlaces }
+    let relativeFixedDecimalOptions decimalPlaces = { relativeOptions with RightDecimals = NumberFormat.RightDecimalOptions.Fixed decimalPlaces }
+    let minimizeWhitespace (options: Options) = { options with MinimizeWhitespace = true }
+    let withCommas commas (options: Options) = { options with Commas = commas }
+    let repeatCommands repeat (options: Options) = { options with RepeatCommands = repeat }
+    let explicitInitialLineto explicit (options: Options) = { options with ExplicitInitialLineto = explicit }
+    let useHorizontalVertical useIt (options: Options) = { options with UseHorizontalVertical = useIt }
+    let useSmoothCurves useIt (options: Options) = { options with UseSmoothCurves = useIt }
+    let withNewlines newlines (options: Options) = { options with Newlines = newlines }
+    let withLeftDecimals left (options: Options) = { options with LeftDecimals = left }
+    let withRightDecimals right (options: Options) = { options with RightDecimals = right }
     let withLeftPadding left options = withLeftDecimals left options
 
     let minifyingOptions decimalPlaces =
@@ -78,7 +79,7 @@ module Serialize =
         |> repeatCommands false
         |> explicitInitialLineto false
 
-    let private numberOptions (options: PathSerializeOptions) : NumberFormatOptions =
+    let private numberOptions (options: Options) : NumberFormat.Options =
         { LeftDecimals = options.LeftDecimals; RightDecimals = options.RightDecimals }
 
     let private serializationFormat options numbers =
@@ -94,7 +95,7 @@ module Serialize =
         let formatted = NumberFormat.number (float value) format.NumberFormat
         if format.Options.MinimizeWhitespace then minimizeLeadingZero formatted else formatted
 
-    let private rawNumber (value: float<'Unit>) (options: PathSerializeOptions) = NumberFormat.rawNumber (float value) (numberOptions options)
+    let private rawNumber (value: float<'Unit>) (options: Options) = NumberFormat.rawNumber (float value) (numberOptions options)
     let private quantizedNumber (value: float<length>) (format: SerializationFormat) =
         let raw = NumberFormat.codeNumber (float value) format.NumberFormat |> fun value -> value.Trim()
         match Double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture) with
@@ -111,7 +112,7 @@ module Serialize =
         elif right.StartsWith(".", StringComparison.Ordinal) && left.Contains(".", StringComparison.Ordinal) then ""
         else " "
 
-    let private commandChunkSeparator (right: string) (options: PathSerializeOptions) =
+    let private commandChunkSeparator (right: string) (options: Options) =
         if options.MinimizeWhitespace && (right.StartsWith("-") || right.StartsWith("+")) then "" else " "
 
     let private groupSeparator _left right options =
@@ -212,7 +213,7 @@ module Serialize =
             | _ -> segments
 
     let private commandName (value: string) = if value.Length = 0 then "" else value.Substring(0, 1)
-    let private commandArguments (value: string) (options: PathSerializeOptions) =
+    let private commandArguments (value: string) (options: Options) =
         let arguments = value.Substring 1
         if options.MinimizeWhitespace || arguments.Length = 0 then arguments
         else arguments.Substring 1
@@ -367,7 +368,7 @@ module Serialize =
         let args = if smooth then [ pointValue d2 format; pointValue de format ] else [ pointValue d1 format; pointValue d2 format; pointValue de format ]
         [ command (if smooth then "s" else "c") (joinGroups args format) format ], { state with Current = add state.Current de; PreviousCurve = PreviousCubic(add state.Current d2) }
 
-    let private trackedArc (arc:EndpointArcData) state format =
+    let private trackedArc (arc:Ellipse.EndpointArcData) state format =
         // Coincident endpoints are an SVG no-op, not an implicit ellipse.
         // Serialize the endpoint form directly, even with a zero radius.
         let intended = quantizedPoint arc.End format
@@ -425,10 +426,10 @@ module Serialize =
             state <- next
         joinCommands (chunks |> Seq.toList) format
 
-    let private formatForPath (path: Path) (options: PathSerializeOptions) =
+    let private formatForPath (path: Path) (options: Options) =
         match options.LeftDecimals with
-        | AutoLeftPadding _ ->
-            let prepassOptions = { options with LeftDecimals = Succinct; MinimizeWhitespace = false; Commas = false; RepeatCommands = true; Newlines = OneLine }
+        | NumberFormat.AutoLeftPadding _ ->
+            let prepassOptions = { options with LeftDecimals = NumberFormat.Succinct; MinimizeWhitespace = false; Commas = false; RepeatCommands = true; Newlines = OneLine }
             let prepassFormat = serializationFormat prepassOptions []
             let prepass =
                 if options.Relative then trackedPath path prepassFormat

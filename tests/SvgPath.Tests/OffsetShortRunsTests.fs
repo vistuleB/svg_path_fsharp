@@ -59,4 +59,4 @@ let ``zero length run is handled without division by zero`` () =
     Assert.Equal(2.0<length>,Subpath.length (normalize source) |> get)
 [<Fact>]
 let ``short run rejects invalid tolerance`` () =
-    Assert.Equal(Error(InternalInvalidTolerance 0.0<length>),Offset.normalizeShortSourceRuns (Subpath.empty (p 0.)) 0.0<length>)
+    Assert.Equal(Error(Offset.InternalInvalidTolerance 0.0<length>),Offset.normalizeShortSourceRuns (Subpath.empty (p 0.)) 0.0<length>)

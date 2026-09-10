@@ -10,12 +10,12 @@ let private line () = Line(point 0.0 0.0, point 10.0 0.0)
 
 let private arc () =
     Arc
-        { Start = point 0.0 0.0
-          Radius = point 5.0 5.0
-          XAxisRotation = Degree.fromFloat 0.0
-          LargeArc = false
-          Sweep = true
-          End = point 10.0 0.0 }
+        ({ Start = point 0.0 0.0
+           Radius = point 5.0 5.0
+           XAxisRotation = Degree.fromFloat 0.0
+           LargeArc = false
+           Sweep = true
+           End = point 10.0 0.0 }: Ellipse.EndpointArcData)
 
 let private assertParameterNear expected actual =
     Assert.True(abs (expected - actual) <= 1.0e-9<parameter>, $"expected {expected}, got {actual}")
@@ -36,7 +36,7 @@ let private intersectionOptions tolerance =
     { Intersections.defaultOptions with
         Tolerance = tolerance
         MaxDepth = 48
-        ParameterSnap = DecimalParameterSnap 7 }
+        ParameterSnap = Intersections.DecimalParameterSnap 7 }
 
 let private assertOverlapContract left right expectedOverlap =
     let overlaps =
@@ -55,12 +55,12 @@ let ``segment overlap and intersection agree on partial line`` () =
 let ``segment overlap and intersection agree on semantic arc`` () =
     let sameGeometry =
         Arc
-            { Start = point 0.0 0.0
-              Radius = point 5.0 5.0
-              XAxisRotation = Degree.fromFloat 0.0
-              LargeArc = true
-              Sweep = true
-              End = point 10.0 0.0 }
+            ({ Start = point 0.0 0.0
+               Radius = point 5.0 5.0
+               XAxisRotation = Degree.fromFloat 0.0
+               LargeArc = true
+               Sweep = true
+               End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     assertOverlapContract (arc ()) sameGeometry true
 
 [<Fact>]
@@ -68,12 +68,12 @@ let ``semantic arc overlap survives nine decimal tolerance`` () =
     let strictTolerance = 1.0e-9<length>
     let sameGeometry =
         Arc
-            { Start = point 0.0 0.0
-              Radius = point 5.0 5.0
-              XAxisRotation = Degree.fromFloat 0.0
-              LargeArc = true
-              Sweep = true
-              End = point 10.0 0.0 }
+            ({ Start = point 0.0 0.0
+               Radius = point 5.0 5.0
+               XAxisRotation = Degree.fromFloat 0.0
+               LargeArc = true
+               Sweep = true
+               End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let overlaps =
         OverlapDetection.detect (arc ()) sameGeometry strictTolerance
         |> Result.defaultWith (failwithf "%A")
@@ -187,12 +187,12 @@ let ``reversed cubic is one full overlap`` () =
 let ``identical arc is one full overlap`` () =
     let sameGeometry =
         Arc
-            { Start = point 0.0 0.0
-              Radius = point 5.0 5.0
-              XAxisRotation = Degree.fromFloat 0.0
-              LargeArc = true
-              Sweep = true
-              End = point 10.0 0.0 }
+            ({ Start = point 0.0 0.0
+               Radius = point 5.0 5.0
+               XAxisRotation = Degree.fromFloat 0.0
+               LargeArc = true
+               Sweep = true
+               End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     assertFullOverlap (arc ()) sameGeometry 0.0<parameter> 1.0<parameter>
 
 [<Fact>]
@@ -203,12 +203,12 @@ let ``reversed arc is one full overlap`` () =
 let ``opposite semicircles do not overlap`` () =
     let opposite =
         Arc
-            { Start = point 0.0 0.0
-              Radius = point 5.0 5.0
-              XAxisRotation = Degree.fromFloat 0.0
-              LargeArc = false
-              Sweep = false
-              End = point 10.0 0.0 }
+            ({ Start = point 0.0 0.0
+               Radius = point 5.0 5.0
+               XAxisRotation = Degree.fromFloat 0.0
+               LargeArc = false
+               Sweep = false
+               End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Ok [], OverlapDetection.detectWithSamples (arc ()) opposite tolerance 9)
 
 [<Fact>]

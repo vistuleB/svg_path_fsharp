@@ -24,7 +24,7 @@ let ``close resets smooth curve controls before continuation`` () =
 [<Fact>]
 let ``repeated close does not duplicate completed subpath`` () =
     Assert.Equal(parsed "M10 20L30 40Z M10 20l5 5z",parsed "M10 20L30 40ZzZl5 5z")
-    Assert.Equal(Error(ParseError(ExpectedMove,"Z")),Parse.path "Z")
+    Assert.Equal(Error(Parse.ParseError(Parse.ExpectedMove,"Z")),Parse.path "Z")
 
 [<Fact>]
 let ``quadratic cubic and smooth controls reflect`` () =
@@ -44,9 +44,9 @@ let ``close inserts bridge and preserves semantic closure`` () =
 
 [<Fact>]
 let ``invalid flags commands and separators report exact suffixes`` () =
-    Assert.Equal(Error(ParseError(ExpectedArcFlag, "2 1 10 20")), Parse.path "M0 0 A1 1 0 2 1 10 20")
-    Assert.Equal(Error(ParseError(UnsupportedCommand "X", "X 1 2")), Parse.path "M0 0 X 1 2")
-    Assert.Equal(Error(ParseError(InvalidSeparator, ",0 0")), Parse.path "M,0 0")
+    Assert.Equal(Error(Parse.ParseError(Parse.ExpectedArcFlag, "2 1 10 20")), Parse.path "M0 0 A1 1 0 2 1 10 20")
+    Assert.Equal(Error(Parse.ParseError(Parse.UnsupportedCommand "X", "X 1 2")), Parse.path "M0 0 X 1 2")
+    Assert.Equal(Error(Parse.ParseError(Parse.InvalidSeparator, ",0 0")), Parse.path "M,0 0")
 
 [<Fact>]
 let ``move-only subpaths are retained`` () =

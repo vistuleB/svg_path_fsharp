@@ -1,63 +1,64 @@
 namespace SvgPath
 
-type MarkerError =
-    | EmptyMarkerSubpath
-    | DegenerateMarkerTangent
-    | MarkerPathError of error: SegmentError
-    | InvalidMarkerWidth of width: float<length>
-    | InvalidMarkerHeight of height: float<length>
-    | InvalidMarkerStrokeWidth of width: float<length>
-    | InvalidMarkerViewBox of viewBox: BoundingBox
-
-type MarkerKind =
-    | MarkerStart
-    | MarkerMid
-    | MarkerEnd
-
-[<Struct>]
-type MarkerPose =
-    { Kind: MarkerKind
-      Point: Point<length>
-      Angle: float<degree> }
-
-type MarkerOrient =
-    | Auto
-    | AutoStartReverse
-    | Fixed of float<degree>
-
-type MarkerUnits =
-    | StrokeWidth
-    | UserSpaceOnUse
-
-type AspectAlign =
-    | XMinYMin
-    | XMidYMin
-    | XMaxYMin
-    | XMinYMid
-    | XMidYMid
-    | XMaxYMid
-    | XMinYMax
-    | XMidYMax
-    | XMaxYMax
-
-type PreserveAspectRatio =
-    | Stretch
-    | Meet of AspectAlign
-    | Slice of AspectAlign
-
-[<Struct>]
-type MarkerLayout =
-    { Reference: Point<length>
-      MarkerWidth: float<length>
-      MarkerHeight: float<length>
-      MarkerUnits: MarkerUnits
-      StrokeWidth: float<length>
-      ViewBox: BoundingBox option
-      PreserveAspectRatio: PreserveAspectRatio }
-
 /// Placement and transformation of SVG markers along path geometry.
 [<RequireQualifiedAccess>]
 module Marker =
+
+    type Error =
+        | EmptyMarkerSubpath
+        | DegenerateMarkerTangent
+        | MarkerPathError of error: SegmentError
+        | InvalidMarkerWidth of width: float<length>
+        | InvalidMarkerHeight of height: float<length>
+        | InvalidMarkerStrokeWidth of width: float<length>
+        | InvalidMarkerViewBox of viewBox: BoundingBox
+
+    type MarkerKind =
+        | MarkerStart
+        | MarkerMid
+        | MarkerEnd
+
+    [<Struct>]
+    type MarkerPose =
+        { Kind: MarkerKind
+          Point: Point<length>
+          Angle: float<degree> }
+
+    type MarkerOrient =
+        | Auto
+        | AutoStartReverse
+        | Fixed of float<degree>
+
+    type MarkerUnits =
+        | StrokeWidth
+        | UserSpaceOnUse
+
+    type AspectAlign =
+        | XMinYMin
+        | XMidYMin
+        | XMaxYMin
+        | XMinYMid
+        | XMidYMid
+        | XMaxYMid
+        | XMinYMax
+        | XMidYMax
+        | XMaxYMax
+
+    type PreserveAspectRatio =
+        | Stretch
+        | Meet of AspectAlign
+        | Slice of AspectAlign
+
+    [<Struct>]
+    type MarkerLayout =
+        { Reference: Point<length>
+          MarkerWidth: float<length>
+          MarkerHeight: float<length>
+          MarkerUnits: MarkerUnits
+          StrokeWidth: float<length>
+          ViewBox: BoundingBox option
+          PreserveAspectRatio: PreserveAspectRatio }
+
     let private incomingDirection segments =
         let rec loop remaining =
             match remaining with

@@ -1,26 +1,27 @@
 namespace SvgPath
 
-type InspectOptions =
-    { LeftDecimals: LeftDecimalOptions
-      RightDecimals: RightDecimalOptions }
-
 /// Human-readable structural inspection for path values.
 [<RequireQualifiedAccess>]
 module Inspect =
+
+    type Options =
+        { LeftDecimals: NumberFormat.LeftDecimalOptions
+          RightDecimals: NumberFormat.RightDecimalOptions }
+
     let defaultOptions () =
-        { LeftDecimals = Succinct
-          RightDecimals = System }
+        { LeftDecimals = NumberFormat.Succinct
+          RightDecimals = NumberFormat.System }
 
     let decimalOptions decimalPlaces =
-        { LeftDecimals = Succinct
-          RightDecimals = AtMost decimalPlaces }
+        { LeftDecimals = NumberFormat.Succinct
+          RightDecimals = NumberFormat.AtMost decimalPlaces }
 
     let fixedDecimalOptions decimalPlaces =
-        { LeftDecimals = Succinct
-          RightDecimals = Fixed decimalPlaces }
+        { LeftDecimals = NumberFormat.Succinct
+          RightDecimals = NumberFormat.Fixed decimalPlaces }
 
-    let withLeftDecimals leftDecimals (options: InspectOptions) = { options with LeftDecimals = leftDecimals }
-    let withRightDecimals rightDecimals (options: InspectOptions) = { options with RightDecimals = rightDecimals }
+    let withLeftDecimals leftDecimals (options: Options) = { options with LeftDecimals = leftDecimals }
+    let withRightDecimals rightDecimals (options: Options) = { options with RightDecimals = rightDecimals }
     let withLeftPadding leftPadding options = withLeftDecimals leftPadding options
 
     let private numberFormat options numbers =

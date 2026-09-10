@@ -9,7 +9,7 @@ let private tolerance = 1.0e-6<length>
 let private supportUnitDiameterTolerance = 2.0e-8
 let private smartSupportBaseTolerance = 1.0e-9<length>
 let private smartSupportUnitDiameterTolerance = 1.0e-9
-let private repairModesToCheck = [ PointRepair; LoopRepair ]
+let private repairModesToCheck = [ ConvexHull.PointRepair; ConvexHull.LoopRepair ]
 let private scaleCovarianceRelativeTolerance = 1.0e-7
 
 let private directionOf angle = angleDirection angle
@@ -292,30 +292,30 @@ let private leftHookCubic () =
 
 let private halfCircleArc sweep =
     Arc
-        { Start = point 20.0 80.0
-          Radius = point 40.0 40.0
-          XAxisRotation = Degree.fromFloat 0.0
-          LargeArc = false
-          Sweep = sweep
-          End = point 100.0 80.0 }
+        ({ Start = point 20.0 80.0
+           Radius = point 40.0 40.0
+           XAxisRotation = Degree.fromFloat 0.0
+           LargeArc = false
+           Sweep = sweep
+           End = point 100.0 80.0 }: Ellipse.EndpointArcData)
 
 let private rotatedArc sweep =
     Arc
-        { Start = point 30.0 80.0
-          Radius = point 55.0 25.0
-          XAxisRotation = Degree.fromFloat 30.0
-          LargeArc = false
-          Sweep = sweep
-          End = point 120.0 40.0 }
+        ({ Start = point 30.0 80.0
+           Radius = point 55.0 25.0
+           XAxisRotation = Degree.fromFloat 30.0
+           LargeArc = false
+           Sweep = sweep
+           End = point 120.0 40.0 }: Ellipse.EndpointArcData)
 
 let private largeArc sweep =
     Arc
-        { Start = point 20.0 70.0
-          Radius = point 50.0 35.0
-          XAxisRotation = Degree.fromFloat 0.0
-          LargeArc = true
-          Sweep = sweep
-          End = point 100.0 70.0 }
+        ({ Start = point 20.0 70.0
+           Radius = point 50.0 35.0
+           XAxisRotation = Degree.fromFloat 0.0
+           LargeArc = true
+           Sweep = sweep
+           End = point 100.0 70.0 }: Ellipse.EndpointArcData)
 
 let private tinyLine () =
     Line(point 0.0 0.0, point 0.00001 0.00001)
@@ -355,39 +355,39 @@ let private narrowLoopCubic () =
 
 let private flatArc sweep =
     Arc
-        { Start = point -100.0 0.0
-          Radius = point 120.0 1.0
-          XAxisRotation = Degree.fromFloat 0.0
-          LargeArc = false
-          Sweep = sweep
-          End = point 100.0 0.0 }
+        ({ Start = point -100.0 0.0
+           Radius = point 120.0 1.0
+           XAxisRotation = Degree.fromFloat 0.0
+           LargeArc = false
+           Sweep = sweep
+           End = point 100.0 0.0 }: Ellipse.EndpointArcData)
 
 let private tallArc sweep =
     Arc
-        { Start = point 0.0 -100.0
-          Radius = point 1.0 120.0
-          XAxisRotation = Degree.fromFloat 0.0
-          LargeArc = false
-          Sweep = sweep
-          End = point 0.0 100.0 }
+        ({ Start = point 0.0 -100.0
+           Radius = point 1.0 120.0
+           XAxisRotation = Degree.fromFloat 0.0
+           LargeArc = false
+           Sweep = sweep
+           End = point 0.0 100.0 }: Ellipse.EndpointArcData)
 
 let private rotatedLargeArc sweep =
     Arc
-        { Start = point -70.0 20.0
-          Radius = point 95.0 20.0
-          XAxisRotation = Degree.fromFloat 73.0
-          LargeArc = true
-          Sweep = sweep
-          End = point 80.0 -10.0 }
+        ({ Start = point -70.0 20.0
+           Radius = point 95.0 20.0
+           XAxisRotation = Degree.fromFloat 73.0
+           LargeArc = true
+           Sweep = sweep
+           End = point 80.0 -10.0 }: Ellipse.EndpointArcData)
 
 let private nearEndpointArc sweep =
     Arc
-        { Start = point 10.0 10.0
-          Radius = point 40.0 30.0
-          XAxisRotation = Degree.fromFloat 15.0
-          LargeArc = false
-          Sweep = sweep
-          End = point 10.0001 10.0001 }
+        ({ Start = point 10.0 10.0
+           Radius = point 40.0 30.0
+           XAxisRotation = Degree.fromFloat 15.0
+           LargeArc = false
+           Sweep = sweep
+           End = point 10.0001 10.0001 }: Ellipse.EndpointArcData)
 
 let private wave value salt = System.Math.Sin (value * salt * 12.9898) * 50.0
 
@@ -419,12 +419,12 @@ let private generatedArc i =
         | 2 -> 40.0
         | _ -> 8.0
     Arc
-        { Start = point (scale * wave x 5.0) (scale * wave x 7.0)
-          Radius = point (1.0 + scale * abs (wave x 11.0)) (1.0 + scale * abs (wave x 13.0))
-          XAxisRotation = Degree.fromFloat (normalizeDegreesFloat (wave x 17.0))
-          LargeArc = i % 3 = 0
-          Sweep = i % 2 = 0
-          End = point (scale * (wave x 19.0 + 0.5)) (scale * (wave x 23.0 - 0.5)) }
+        ({ Start = point (scale * wave x 5.0) (scale * wave x 7.0)
+           Radius = point (1.0 + scale * abs (wave x 11.0)) (1.0 + scale * abs (wave x 13.0))
+           XAxisRotation = Degree.fromFloat (normalizeDegreesFloat (wave x 17.0))
+           LargeArc = i % 3 = 0
+           Sweep = i % 2 = 0
+           End = point (scale * (wave x 19.0 + 0.5)) (scale * (wave x 23.0 - 0.5)) }: Ellipse.EndpointArcData)
 
 let private generatedCubicSpecimens () =
     [ 0 .. 35 ]
@@ -694,10 +694,10 @@ let private representativeGeometryIsCovariantAtScale scale =
         Transform.scaleSegment crossingLeft scale |> Result.defaultWith (failwithf "%A")
     let scaledCrossingRight =
         Transform.scaleSegment crossingRight scale |> Result.defaultWith (failwithf "%A")
-    let intersectionOptions =
+    let intersectionOptions: Intersections.IntersectionOptions =
         { Tolerance = Length.fromFloat (1.0e-9 * scale)
           MaxDepth = 48
-          ParameterSnap = NoParameterSnap }
+          ParameterSnap = Intersections.NoParameterSnap }
     let intersectionsResult =
         Intersections.segmentWith scaledCrossingLeft scaledCrossingRight intersectionOptions
         |> Result.defaultWith (failwithf "%A")
@@ -723,8 +723,8 @@ let private representativeGeometryIsCovariantAtScale scale =
             scaledLeftPath
             scaledRightPath
             Nonzero
-            { Tolerance = Length.fromFloat (1.0e-6 * scale)
-              MinimumChord = Length.fromFloat (1.0e-5 * scale) }
+            ({ Tolerance = Length.fromFloat (1.0e-6 * scale)
+               MinimumChord = Length.fromFloat (1.0e-5 * scale) }: Csg.Options)
         |> Result.defaultWith (failwithf "%A")
     let unionBox = Path.boundingBox unionResult.Path |> Result.defaultWith (failwithf "%A")
 

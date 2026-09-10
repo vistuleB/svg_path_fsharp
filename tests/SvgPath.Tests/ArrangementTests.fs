@@ -107,7 +107,7 @@ module ArrangementTests =
     let ``open_chain_fails_final_even_degree_invariant_test`` () =
         let graph = graphWithEdges [ line 0.0 0.0 1.0 0.0 ] |> Result.defaultWith (fun error -> failwithf "%A" error)
         match Arrangement.validate graph 1.0e-9<length> 1.0e-12<length> with
-        | Error ConstructionFailed -> ()
+        | Error Arrangement.ConstructionFailed -> ()
         | other -> failwithf "unexpected result: %A" other
 
     [<Fact>]
@@ -180,24 +180,24 @@ module ArrangementTests =
                 Assert.Equal(4, result.Segments.Length))
 
     let private drawingEdge segment =
-        { Id = 0
-          Segment = segment
-          Bounds = Segment.boundingBox segment |> Result.defaultWith (failwithf "%A")
-          StartVertex = 0
-          EndVertex = 1
-          ForwardMultiplicity = 1
-          ReverseMultiplicity = 0 }
+        ({ Id = 0
+           Segment = segment
+           Bounds = Segment.boundingBox segment |> Result.defaultWith (failwithf "%A")
+           StartVertex = 0
+           EndVertex = 1
+           ForwardMultiplicity = 1
+           ReverseMultiplicity = 0 }: Arrangement.ArrangementEdge)
 
     [<Fact>]
     let ``edge_annotation_pose_comes_from_segment_midpoint_and_tangent_test`` () =
         let pose = ArrangementDrawing.edgeAnnotationPose (drawingEdge (line 0.0 0.0 10.0 0.0))
-        Assert.Equal(Ok { Point = point 5.0 0.0; Rotation = 90.0<degree> }, pose)
+        Assert.Equal(Ok ({ Point = point 5.0 0.0; Rotation = 90.0<degree> }: ArrangementDrawing.EdgeAnnotationPose), pose)
 
     [<Fact>]
     let ``edge annotation pose uses incoming direction at stationary reversal`` () =
         let segment = QuadraticBezier(point 1.0 0.0, point -1.0 0.0, point 1.0 0.0)
         let pose = ArrangementDrawing.edgeAnnotationPose (drawingEdge segment)
-        Assert.Equal(Ok { Point = point 0.0 0.0; Rotation = 270.0<degree> }, pose)
+        Assert.Equal(Ok ({ Point = point 0.0 0.0; Rotation = 270.0<degree> }: ArrangementDrawing.EdgeAnnotationPose), pose)
 
     [<Fact>]
     let ``edge_annotation_pose_rejects_directionless_segment_test`` () =

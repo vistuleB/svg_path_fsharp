@@ -19,6 +19,9 @@ There is a dedicated audience distinction:
 ## Gallery Figures
 
 Run `scripts/generate-gallery-figures` to regenerate all Gallery figures.
+This includes the four W3C join comparisons, bringing the registry to 33.
+The README generator also includes four join strips (13 figures total), with
+the same source geometry as Gleam but computed by F# public stroke calls.
 The build completes once, then figure jobs run concurrently in isolated worker
 processes. START/DONE/FAILED and ten-second RUNNING messages identify each file.
 `docs/gallery/timings.tsv` records status and elapsed milliseconds; .NET has no

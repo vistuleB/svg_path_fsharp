@@ -1,547 +1,567 @@
 namespace SvgPath
 
-[<Struct>]
-type internal EdgeCapacityAssignment = { EdgeId: int; Capacity: int }
-
-type internal VertexParityRequest =
-    | RequiredVertexParity of vertex: int * parity: int
-    | PreferredVertexParity of vertex: int * parity: int
-
-/// Failures from parity-capacity pruning.
-type internal ForcedParityError =
-    | ForcedParityMissingVertex of vertex: int
-    | ForcedParityDuplicateVertex of vertex: int
-    | ForcedParityInvalidVertexParity of vertex: int * parity: int
-    | ForcedParityMissingEdgeCapacity of edgeId: int
-    | ForcedParityDuplicateEdgeCapacity of edgeId: int
-    | ForcedParityUnknownEdgeCapacity of edgeId: int
-    | ForcedParityInvalidEdgeCapacity of edge: int * capacity: int
-    | ForcedParityInfeasible of vertex: int
-    | ForcedParityAmbiguous of vertices: int list
-
-/// Detailed internal offset construction failures. These cross every internal
-/// pipeline boundary; stable caller-facing variants are narrowed by `publicError`.
-type internal InternalError =
-    /// Preserve the fitting cause without inventing a parameter or non-finite value.
-    | InternalBezierFitError of error: BezierError
-    | InternalPathError of error: SegmentError
-    | InternalArrangementGraphError of error: ArrangementError
-    | InternalForcedParityPruningError of error: ForcedParityError
-    | InternalSourceNormalizationError of error: DegeneracyError
-    | InternalInvalidTolerance of tolerance: float<length>
-    | InternalInvalidSamples of samples: int
-    | InternalInvalidMaxDepth of maxDepth: int
-    | InternalInvalidMiterLimit of miterLimit: float
-    | InternalInvalidStalledOffsetDiameter of diameter: float<length>
-    | InternalInvalidTangentHealAngleDegrees of angle: float<degree>
-    | InternalBandSubpathNotClosed
-    /// Carries the parameter where the tangent query failed.
-    | InternalDegenerateTangent of t: float<parameter>
-    /// Carries remaining geometric divergence, not recursion depth.
-    | InternalMaxDepthReached of divergence: float<length>
-    | InternalNonFinite
-    | InternalSegmentImageCountMismatch
-    | InternalEmptySegmentImage of segmentIndex: int
-    | InternalMissingEdgeImage of edgeId: int
-    | InternalMissingIndexedSegment of segmentIndex: int
-    | InternalMissingWindingOpinion of segmentIndex: int
-    | InternalFaceWindingError of error: WindingPropagationError
-    | InternalSurvivorCapacityMismatch of edgeId: int * remaining: int
-    | InternalForcedParityOpenChain of startVertex: int * endVertex: int
-    | InternalIToKSubpathCount of actual: int
-    | InternalIToKExpectedClosedSubpath
-    | InternalIToKEndpointMismatch of expectedStart: int * actualStart: int * expectedEnd: int * actualEnd: int
-    | InternalIToKMissingJPreimage of edgeId: int
-    | InternalSurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
-    | InternalInconsistentContainment
-    | InternalEmptyArrangementSplitWalk
-    | InternalInvalidOffsetMapDistance of distance: float<length> * length: float<length>
-
-/// Errors returned by offset construction.
-type Error =
-    | InvalidOffsetMapDistance of distance: float<length> * length: float<length>
-    | PathError of error: SegmentError
-    | InvalidTolerance of tolerance: float<length>
-    | InvalidSamples of samples: int
-    | InvalidMaxDepth of maxDepth: int
-    | InvalidMiterLimit of miterLimit: float
-    | InvalidStalledOffsetDiameter of diameter: float<length>
-    | InvalidTangentHealAngleDegrees of angle: float<degree>
-    /// Carries the parameter where the tangent query failed.
-    | DegenerateTangent of t: float<parameter>
-    /// Carries remaining geometric divergence, not recursion depth.
-    | MaxDepthReached of divergence: float<length>
-    | NonFinite
-    | ConstructionFailed
-
-/// Join geometry inserted between adjacent offset segments.
-type Join =
-    | Bevel
-    | Miter of miterLimit: float
-    | Round
-
-/// End-cap geometry for open strokes and internal open-source winding bands.
-type Cap =
-    | Butt
-    | Square
-    | RoundCap
-
-type internal OneSubpathBand =
-    | OpenSubpathBand of outline: Subpath
-    | ClosedSubpathBand of exterior: Subpath * interior: Subpath
-
-/// Final trimming applied after optional offside trimming of a single offset.
-type SingleOffsetFinalTrimming =
-    | CuspTrimming
-    | InBandTrimming
-    | NoTrimming
-
-[<Struct>]
-/// Trimming controls for single offsets.
-/// Offside trimming applies only to closed source subpaths. FinalTrimming
-/// selects cusp-only trimming, complete in-band trimming, or no final pass.
-/// Reconstructed traversal is returned without a final nesting-based reversal
-/// into clockwise exterior contours and counterclockwise holes.
-type SingleOffsetTrimming =
-    { Offside: bool
-      FinalTrimming: SingleOffsetFinalTrimming }
-
-[<Struct>]
-/// Trimming controls for a two-sided offset band.
-/// InnerCusps and OuterCusps independently trim reversed submerged runs before
-/// the sides are assembled. InBand applies the final band-wide trimming pass.
-type BandTrimming =
-    { InnerCusps: bool
-      OuterCusps: bool
-      InBand: bool }
-
-[<Struct>]
-/// Accuracy and recursion controls for fitting offset curves.
-type FittingOptions =
-    { Tolerance: float<length>
-      Samples: int
-      MaxDepth: int }
-
-[<Struct>]
-/// Technical options shared by offset, band, and stroke construction.
-/// Join and cap styles are explicit operation arguments.
-type Options =
-    { Fitting: FittingOptions
-      StalledOffsetDiameter: float<length>
-      TangentHealAngleDegrees: float<degree>
-      SingleOffsetTrimming: SingleOffsetTrimming
-      BandTrimming: BandTrimming }
-
-[<Struct>]
-type internal LengthSpan =
-    { Segment: Segment
-      StartDistance: float<length>
-      Length: float<length> }
-
-type internal SegmentEndpoint =
-    | SegmentStart
-    | SegmentEnd
-
-type internal CubicEndpointFitPolicy =
-    | FitPositionAndDirection of direction: Point<1>
-    | FitPositionAndDirectionWithCollapsedHandle of direction: Point<1>
-
-type internal TangentTurn =
-    | Clockwise
-    | CounterClockwise
-    | Straight
-    | CouldNotMeasure
-
-[<Struct>]
-type internal ReversalTangentAdjustment =
-    { IncomingDegrees: float<degree>
-      OutgoingDegrees: float<degree> }
-
-type internal BoundaryKind =
-    | Ordinary
-    | ReversalBoundary of leftNormalCurvature: float<1 / length> option
-    | Inflection
-    | NonReversalBoundaryTouch
-
-[<Struct>]
-type internal APreparedSegment =
-    { SourceSubpathIndex: int
-      SourceSegmentIndex: int
-      Segment: Segment }
-
-[<Struct>]
-type internal CStalledSegment =
-    { Prepared: APreparedSegment
-      PreparedFrom: float<parameter>
-      PreparedTo: float<parameter>
-      Segment: Segment }
-
-[<Struct>]
-type internal DRefinedSegment =
-    { Prepared: APreparedSegment
-      PreparedFrom: float<parameter>
-      PreparedTo: float<parameter>
-      Segment: Segment
-      StartBoundary: BoundaryKind
-      EndBoundary: BoundaryKind }
-
-[<Struct>]
-type internal EJoinFreeSegment =
-    { PortionIndex: int
-      SegmentIndex: int
-      Generation: int
-      Refined: DRefinedSegment
-      RefinedFrom: float<parameter>
-      RefinedTo: float<parameter>
-      Segment: Segment
-      StartBoundary: BoundaryKind
-      EndBoundary: BoundaryKind }
-
-type internal OffsetSegmentSource =
-    | OffsetFromJoinFree of EJoinFreeSegment
-    | OffsetFromStalledRun of CStalledSegment list
-
-[<Struct>]
-type internal FUnhealedOffsetSegment =
-    { Segment: Segment
-      Source: OffsetSegmentSource
-      NudgedStartTangentDirection: Point<1>
-      NudgedEndTangentDirection: Point<1> }
-
-[<Struct>]
-type internal GHealedOffsetSegment =
-    { Segment: Segment
-      Source: OffsetSegmentSource
-      NudgedStartTangentDirection: Point<1>
-      NudgedEndTangentDirection: Point<1> }
-
-type internal OffsetSourceTracePiece =
-    | OffsetSourceTraceDRefined of
-        sourceSegmentIndex: int *
-        refinedPieceIndex: int *
-        sourceFrom: float<parameter> *
-        sourceTo: float<parameter> *
-        segment: Segment *
-        startBoundary: BoundaryKind *
-        endBoundary: BoundaryKind *
-        startIsReversal: bool *
-        endIsReversal: bool
-    | OffsetSourceTraceStalled of sourceSegmentIndex: int * segment: Segment
-
-[<Struct>]
-type internal OffsetSourceTracePortion =
-    { Index: int
-      Subpath: Subpath
-      Pieces: OffsetSourceTracePiece list }
-
-[<Struct>]
-type internal SynchronizedOffsetTraceLeaf =
-    { SourceSegmentIndex: int
-      PreparedFrom: float<parameter>
-      PreparedTo: float<parameter>
-      Generation: int }
-
-[<Struct>]
-type internal SynchronizedOffsetTraceCorrespondence =
-    { PortionIndex: int
-      CorrespondenceIndex: int
-      InnerStalled: bool
-      OuterStalled: bool
-      InnerLeaves: SynchronizedOffsetTraceLeaf list
-      OuterLeaves: SynchronizedOffsetTraceLeaf list }
-
-[<Struct>]
-type internal SynchronizedOffsetTraceJoin =
-    { AfterPortionIndex: int
-      InnerSegments: Segment list
-      OuterSegments: Segment list
-      InnerReversed: bool
-      OuterReversed: bool }
-
-type internal BandSide =
-    | Inner
-    | Outer
-
-type internal HPreimageSource =
-    | HealedPreimage of GHealedOffsetSegment
-    | JoinPreimage of afterPortionIndex: int * side: BandSide * joinSegmentIndex: int * reversed: bool
-
-[<Struct>]
-type internal HPreimageSegment =
-    { Segment: Segment
-      Source: HPreimageSource }
-
-[<Struct>]
-type internal HPreimageSubpath =
-    { Segments: HPreimageSegment list
-      Closed: bool
-      Side: BandSide }
-
-[<Struct>]
-type internal ICulledOffsetSegment =
-    { Segment: Segment
-      Preimage: HPreimageSegment
-      PreimageFrom: float<parameter>
-      PreimageTo: float<parameter> }
-
-[<Struct>]
-type internal ICulledOffsetSubpath =
-    { Segments: ICulledOffsetSegment list
-      Closed: bool
-      Side: BandSide }
-
-[<Struct>]
-type internal TracedOffsetSegment =
-    { Segment: Segment
-      Preimage: HPreimageSegment
-      PreimageFrom: float<parameter>
-      PreimageTo: float<parameter>
-      Reversed: bool }
-
-[<Struct>]
-type internal TracedOffsetSubpath =
-    { Segments: TracedOffsetSegment list
-      Closed: bool
-      Side: BandSide
-      SourceSubpathIndex: int }
-
-[<Struct>]
-/// Initially follows the I traversal; reconstruction can reverse the segment,
-/// directed H interval, and endpoint vertices together. Its source stays immutable.
-type internal ArrangementSplitTracedSegment =
-    { Segment: Segment
-      Preimage: ICulledOffsetSegment
-      PreimageFrom: float<parameter>
-      PreimageTo: float<parameter>
-      EdgeId: int
-      StartVertex: int
-      EndVertex: int
-      Reversed: bool
-      DeletionCandidate: bool }
-
-[<Struct>]
-type internal ArrangementSplitTracedSubpath =
-    { Segments: ArrangementSplitTracedSegment list
-      Closed: bool
-      Side: BandSide }
-
-[<Struct>]
-type internal ArrangementSplitRun =
-    { Segments: ArrangementSplitTracedSegment list
-      Submerged: bool }
-
-[<Struct>]
-type internal OffsideClosedWalkState =
-    { FirstStartVertex: int
-      EndVertex: int
-      LastIndex: int
-      RetainedSpan: float<parameter>
-      SkippedRuns: int
-      IndicesReversed: int list
-      SegmentsReversed: ArrangementSplitTracedSegment list }
-
-[<Struct>]
-type internal CuspTrimmedSegment =
-    { Segment: Segment
-      ArrangementPreimage: ArrangementSplitTracedSegment }
-
-[<Struct>]
-type internal CuspTrimmedSubpath =
-    { Segments: CuspTrimmedSegment list
-      Closed: bool }
-
-[<Struct>]
-type internal OffsetArrangementBuild =
-    { Graph: ArrangementGraph
-      IndexedSegments: IndexedOffsetSegment list
-      SegmentImages: ArrangementSourceSegmentImage list
-      EdgeImages: ArrangementEdgeImage list }
-
-and internal OffsetArrangementSegmentGroup =
-    | UntrimmedOffsetSegment
-    | ZeroOffsetSourceSegment
-    | WindingClosureSegment
-
-and internal IndexedOffsetSegment =
-    { Group: OffsetArrangementSegmentGroup
-      SubpathIndex: int
-      Segment: Segment
-      WindingOpinion: WindingSideOpinion option
-      WindingChange: int option }
-
-and internal WindingSideOpinion =
-    { Left: int
-      Right: int }
-
-[<Struct>]
-type internal OffsetTrimGraph =
-    { Vertices: ArrangementVertex list
-      Edges: ArrangementEdge list
-      EdgeCapacities: (int * int) list option }
-
-[<Struct>]
-type internal OffsetDistances =
-    { Inner: float<length>
-      Outer: float<length> }
-
-[<Struct>]
-type internal BoundaryPair =
-    { Inner: BoundaryKind
-      Outer: BoundaryKind }
-
-type internal SideStalledStatus =
-    | SideStalled
-    | SideNotStalled
-
-[<Struct>]
-type internal SynchronizedClassifiedSegment =
-    { Prepared: APreparedSegment
-      InnerStatus: SideStalledStatus
-      OuterStatus: SideStalledStatus
-      StartBoundary: BoundaryPair
-      EndBoundary: BoundaryPair }
-
-[<Struct>]
-type internal SynchronizedSourceSegment =
-    { Prepared: APreparedSegment
-      PreparedFrom: float<parameter>
-      PreparedTo: float<parameter>
-      Segment: Segment
-      InnerStatus: SideStalledStatus
-      OuterStatus: SideStalledStatus
-      StartBoundary: BoundaryPair
-      EndBoundary: BoundaryPair }
-
-type internal SynchronizedSideSource =
-    | RefinableSideSource of EJoinFreeSegment
-    | StalledSideSource of CStalledSegment list
-    | SplitSideSource of left: SynchronizedSideSource * right: SynchronizedSideSource
-
-[<Struct>]
-type internal OffsetCorrespondence =
-    { PortionIndex: int
-      CorrespondenceIndex: int
-      Sources: SynchronizedSourceSegment list
-      Inner: SynchronizedSideSource
-      Outer: SynchronizedSideSource
-      InnerOffsetCount: int
-      OuterOffsetCount: int }
-
-[<Struct>]
-type internal OffsetJoinCorrespondence =
-    { AfterPortionIndex: int
-      Inner: Segment list
-      Outer: Segment list
-      InnerReversed: bool
-      OuterReversed: bool
-      InnerStart: Point<length>
-      InnerEnd: Point<length>
-      OuterStart: Point<length>
-      OuterEnd: Point<length> }
-
-[<Struct>]
-type internal SynchronizedHealedPortion =
-    { PortionIndex: int
-      Inner: GHealedOffsetSegment list
-      Outer: GHealedOffsetSegment list }
-
-[<Struct>]
-type internal SynchronizedOffsetSegmentsBuild =
-    { InnerOffsets: GHealedOffsetSegment list
-      OuterOffsets: GHealedOffsetSegment list
-      Correspondences: OffsetCorrespondence list
-      Portions: SynchronizedHealedPortion list }
-
-[<Struct>]
-type internal SynchronizedUntrimmedBuild =
-    { Inner: Subpath
-      Outer: Subpath
-      InnerCulled: ICulledOffsetSubpath
-      OuterCulled: ICulledOffsetSubpath
-      Correspondences: OffsetCorrespondence list
-      Portions: SynchronizedHealedPortion list
-      JoinCorrespondences: OffsetJoinCorrespondence list }
-
-[<Struct>]
-type internal SingleOffsetUntrimmedBuild =
-    { Subpath: Subpath
-      ZeroSource: Subpath
-      Culled: ICulledOffsetSubpath
-      Correspondences: OffsetCorrespondence list
-      Portions: SynchronizedHealedPortion list
-      JoinCorrespondences: OffsetJoinCorrespondence list }
-
-type internal OffsetAttempt =
-    | OffsetAccepted of FUnhealedOffsetSegment
-    | OffsetNeedsRefinement of divergence: float<length>
-
-[<Struct>]
-type internal SynchronizedUnhealedResult =
-    { InnerOffsets: FUnhealedOffsetSegment list
-      OuterOffsets: FUnhealedOffsetSegment list
-      InnerSource: SynchronizedSideSource
-      OuterSource: SynchronizedSideSource }
-
-[<Struct>]
-type internal SynchronizedPortionUnhealedBuild =
-    { InnerOffsets: FUnhealedOffsetSegment list
-      OuterOffsets: FUnhealedOffsetSegment list
-      Correspondences: OffsetCorrespondence list }
-
-[<Struct>]
-type internal SurvivorEdge =
-    { EdgeId: int
-      Reversed: bool
-      StartVertex: int
-      EndVertex: int
-      Segment: Segment
-      ArrangementPreimage: ArrangementSplitTracedSegment option }
-
-[<Struct>]
-type internal SurvivorChain =
-    { StartVertex: int
-      EndVertex: int
-      Edges: SurvivorEdge list
-      Closed: bool }
-
-[<Struct>]
-type internal AvailableEdgeCapacity =
-    { EdgeId: int
-      Remaining: int }
-
-[<Struct>]
-type internal JoinFreePortion =
-    { Index: int
-      Subpath: Subpath
-      Closed: bool }
-
-type internal CurvatureSplitKind =
-    | OrdinarySplit
-    | CuspSplit
-    | InflectionSplit
-
-[<Struct>]
-type internal CurvatureSplitParameter =
-    { T: float<parameter>
-      Kind: CurvatureSplitKind }
-
-[<Struct>]
-type internal CurvatureBoundary =
-    { T: float<parameter>
-      Boundary: BoundaryKind }
-
-type internal OffsetCurvatureZone =
-    | OutsideOffsetRadius
-    | InsideOffsetRadius
-    | Opposite
-    | UnknownCurvatureZone
-
 [<RequireQualifiedAccess>]
 /// Construction of signed left-normal offsets, two-sided bands, and
 /// local offset coordinate maps. Positive offsets lie on the visual left of
 /// the source traversal; negative offsets lie on its visual right.
 /// The separate Stroke module constructs strokes from these band operations.
 module Offset =
+
+    [<Struct>]
+    type internal EdgeCapacityAssignment = { EdgeId: int; Capacity: int }
+
+    type internal VertexParityRequest =
+        | RequiredVertexParity of vertex: int * parity: int
+        | PreferredVertexParity of vertex: int * parity: int
+
+    /// Failures from parity-capacity pruning.
+    type internal ForcedParityError =
+        | ForcedParityMissingVertex of vertex: int
+        | ForcedParityDuplicateVertex of vertex: int
+        | ForcedParityInvalidVertexParity of vertex: int * parity: int
+        | ForcedParityMissingEdgeCapacity of edgeId: int
+        | ForcedParityDuplicateEdgeCapacity of edgeId: int
+        | ForcedParityUnknownEdgeCapacity of edgeId: int
+        | ForcedParityInvalidEdgeCapacity of edge: int * capacity: int
+        | ForcedParityInfeasible of vertex: int
+        | ForcedParityAmbiguous of vertices: int list
+
+    /// Detailed internal offset construction failures. These cross every internal
+    /// pipeline boundary; stable caller-facing variants are narrowed by `publicError`.
+    type internal InternalError =
+        | InternalArcsJoinConstructionFailed
+        /// Preserve the fitting cause without inventing a parameter or non-finite value.
+        | InternalBezierFitError of error: Bezier.Error
+        | InternalPathError of error: SegmentError
+        | InternalArrangementGraphError of error: Arrangement.Error
+        | InternalForcedParityPruningError of error: ForcedParityError
+        | InternalSourceNormalizationError of error: Degeneracy.Error
+        | InternalInvalidTolerance of tolerance: float<length>
+        | InternalInvalidSamples of samples: int
+        | InternalInvalidMaxDepth of maxDepth: int
+        | InternalInvalidMiterLimit of miterLimit: float
+        | InternalInvalidStalledOffsetDiameter of diameter: float<length>
+        | InternalInvalidTangentHealAngleDegrees of angle: float<degree>
+        | InternalBandSubpathNotClosed
+        /// Carries the parameter where the tangent query failed.
+        | InternalDegenerateTangent of t: float<parameter>
+        /// Carries remaining geometric divergence, not recursion depth.
+        | InternalMaxDepthReached of divergence: float<length>
+        | InternalNonFinite
+        | InternalSegmentImageCountMismatch
+        | InternalEmptySegmentImage of segmentIndex: int
+        | InternalMissingEdgeImage of edgeId: int
+        | InternalMissingIndexedSegment of segmentIndex: int
+        | InternalMissingWindingOpinion of segmentIndex: int
+        | InternalFaceWindingError of error: Arrangement.WindingPropagationError
+        | InternalSurvivorCapacityMismatch of edgeId: int * remaining: int
+        | InternalForcedParityOpenChain of startVertex: int * endVertex: int
+        | InternalIToKSubpathCount of actual: int
+        | InternalIToKExpectedClosedSubpath
+        | InternalIToKEndpointMismatch of expectedStart: int * actualStart: int * expectedEnd: int * actualEnd: int
+        | InternalIToKMissingJPreimage of edgeId: int
+        | InternalSurvivorChainDiscontinuous of previousIndex: int * nextIndex: int * expected: Point<length> * actual: Point<length> * distance: float<length>
+        | InternalInconsistentContainment
+        | InternalEmptyArrangementSplitWalk
+        | InternalInvalidOffsetMapDistance of distance: float<length> * length: float<length>
+
+    /// Errors returned by offset construction.
+    type Error =
+        | InvalidOffsetMapDistance of distance: float<length> * length: float<length>
+        | PathError of error: SegmentError
+        | InvalidTolerance of tolerance: float<length>
+        | InvalidSamples of samples: int
+        | InvalidMaxDepth of maxDepth: int
+        | InvalidMiterLimit of miterLimit: float
+        | InvalidStalledOffsetDiameter of diameter: float<length>
+        | InvalidTangentHealAngleDegrees of angle: float<degree>
+        /// Carries the parameter where the tangent query failed.
+        | DegenerateTangent of t: float<parameter>
+        /// Carries remaining geometric divergence, not recursion depth.
+        | MaxDepthReached of divergence: float<length>
+        | NonFinite
+        | ConstructionFailed
+
+    /// Join geometry inserted between adjacent offset segments.
+    type Join =
+        /// Continue source curvature with tangent circles, clipped at the limit.
+        /// On the outer side, diverging rays and reversed endpoints use Round.
+        /// Straight pairs use MiterClip. The limit must be finite and positive.
+        | Arcs of miterLimit: float
+        | Bevel
+        | Miter of miterLimit: float
+        /// Clip at miterLimit * abs(offset) from the pivot. Fall back to Bevel
+        /// for divergent extensions or clipping behind either endpoint.
+        /// The limit must be finite and positive; adjacent segments are not trimmed.
+        | MiterClip of miterLimit: float
+        | Round
+
+    /// Join construction on the inner side of a local source corner, independent
+    /// of the caller-designated inner/outer offsets of a band.
+    type InnerJoin = InnerBevel | InnerRound
+
+    let private defaultInnerJoin = function Round -> InnerRound | _ -> InnerBevel
+
+    /// End-cap geometry for open strokes and internal open-source winding bands.
+    type Cap =
+        | Butt
+        | Square
+        | RoundCap
+
+    type internal OneSubpathBand =
+        | OpenSubpathBand of outline: Subpath
+        | ClosedSubpathBand of exterior: Subpath * interior: Subpath
+
+    /// Final trimming applied after optional offside trimming of a single offset.
+    type SingleOffsetFinalTrimming =
+        | CuspTrimming
+        | InBandTrimming
+        | NoTrimming
+
+    [<Struct>]
+    /// Trimming controls for single offsets.
+    /// Offside trimming applies only to closed source subpaths. FinalTrimming
+    /// selects cusp-only trimming, complete in-band trimming, or no final pass.
+    /// Reconstructed traversal is returned without a final nesting-based reversal
+    /// into clockwise exterior contours and counterclockwise holes.
+    type SingleOffsetTrimming =
+        { Offside: bool
+          FinalTrimming: SingleOffsetFinalTrimming }
+
+    [<Struct>]
+    /// Trimming controls for a two-sided offset band.
+    /// InnerCusps and OuterCusps independently trim reversed submerged runs before
+    /// the sides are assembled. InBand applies the final band-wide trimming pass.
+    type BandTrimming =
+        { InnerCusps: bool
+          OuterCusps: bool
+          InBand: bool }
+
+    [<Struct>]
+    /// Accuracy and recursion controls for fitting offset curves.
+    type FittingOptions =
+        { Tolerance: float<length>
+          Samples: int
+          MaxDepth: int }
+
+    [<Struct>]
+    /// Technical options shared by offset, band, and stroke construction.
+    /// Main join and cap styles are explicit operation arguments; InnerJoin
+    /// optionally overrides the local inner-corner style.
+    type Options =
+        { Fitting: FittingOptions
+          StalledOffsetDiameter: float<length>
+          TangentHealAngleDegrees: float<degree>
+          /// None chooses InnerRound for Round, InnerBevel for every other style.
+          /// Applies independently to each band side and to single offsets.
+          InnerJoin: InnerJoin option
+          SingleOffsetTrimming: SingleOffsetTrimming
+          BandTrimming: BandTrimming }
+
+    [<Struct>]
+    type internal LengthSpan =
+        { Segment: Segment
+          StartDistance: float<length>
+          Length: float<length> }
+
+    type internal SegmentEndpoint =
+        | SegmentStart
+        | SegmentEnd
+
+    type internal CubicEndpointFitPolicy =
+        | FitPositionAndDirection of direction: Point<1>
+        | FitPositionAndDirectionWithCollapsedHandle of direction: Point<1>
+
+    type internal TangentTurn =
+        | Clockwise
+        | CounterClockwise
+        | Straight
+        | CouldNotMeasure
+
+    [<Struct>]
+    type internal ReversalTangentAdjustment =
+        { IncomingDegrees: float<degree>
+          OutgoingDegrees: float<degree> }
+
+    type internal BoundaryKind =
+        | Ordinary
+        | ReversalBoundary of leftNormalCurvature: float<1 / length> option
+        | Inflection
+        | NonReversalBoundaryTouch
+
+    [<Struct>]
+    type internal APreparedSegment =
+        { SourceSubpathIndex: int
+          SourceSegmentIndex: int
+          Segment: Segment }
+
+    [<Struct>]
+    type internal CStalledSegment =
+        { Prepared: APreparedSegment
+          PreparedFrom: float<parameter>
+          PreparedTo: float<parameter>
+          Segment: Segment }
+
+    [<Struct>]
+    type internal DRefinedSegment =
+        { Prepared: APreparedSegment
+          PreparedFrom: float<parameter>
+          PreparedTo: float<parameter>
+          Segment: Segment
+          StartBoundary: BoundaryKind
+          EndBoundary: BoundaryKind }
+
+    [<Struct>]
+    type internal EJoinFreeSegment =
+        { PortionIndex: int
+          SegmentIndex: int
+          Generation: int
+          Refined: DRefinedSegment
+          RefinedFrom: float<parameter>
+          RefinedTo: float<parameter>
+          Segment: Segment
+          StartBoundary: BoundaryKind
+          EndBoundary: BoundaryKind }
+
+    type internal OffsetSegmentSource =
+        | OffsetFromJoinFree of EJoinFreeSegment
+        | OffsetFromStalledRun of CStalledSegment list
+
+    [<Struct>]
+    type internal FUnhealedOffsetSegment =
+        { Segment: Segment
+          Source: OffsetSegmentSource
+          NudgedStartTangentDirection: Point<1>
+          NudgedEndTangentDirection: Point<1> }
+
+    [<Struct>]
+    type internal GHealedOffsetSegment =
+        { Segment: Segment
+          Source: OffsetSegmentSource
+          NudgedStartTangentDirection: Point<1>
+          NudgedEndTangentDirection: Point<1> }
+
+    type internal OffsetSourceTracePiece =
+        | OffsetSourceTraceDRefined of
+            sourceSegmentIndex: int *
+            refinedPieceIndex: int *
+            sourceFrom: float<parameter> *
+            sourceTo: float<parameter> *
+            segment: Segment *
+            startBoundary: BoundaryKind *
+            endBoundary: BoundaryKind *
+            startIsReversal: bool *
+            endIsReversal: bool
+        | OffsetSourceTraceStalled of sourceSegmentIndex: int * segment: Segment
+
+    [<Struct>]
+    type internal OffsetSourceTracePortion =
+        { Index: int
+          Subpath: Subpath
+          Pieces: OffsetSourceTracePiece list }
+
+    [<Struct>]
+    type internal SynchronizedOffsetTraceLeaf =
+        { SourceSegmentIndex: int
+          PreparedFrom: float<parameter>
+          PreparedTo: float<parameter>
+          Generation: int }
+
+    [<Struct>]
+    type internal SynchronizedOffsetTraceCorrespondence =
+        { PortionIndex: int
+          CorrespondenceIndex: int
+          InnerStalled: bool
+          OuterStalled: bool
+          InnerLeaves: SynchronizedOffsetTraceLeaf list
+          OuterLeaves: SynchronizedOffsetTraceLeaf list }
+
+    [<Struct>]
+    type internal SynchronizedOffsetTraceJoin =
+        { AfterPortionIndex: int
+          InnerSegments: Segment list
+          OuterSegments: Segment list
+          InnerReversed: bool
+          OuterReversed: bool }
+
+    type internal BandSide =
+        | Inner
+        | Outer
+
+    type internal HPreimageSource =
+        | HealedPreimage of GHealedOffsetSegment
+        | JoinPreimage of afterPortionIndex: int * side: BandSide * joinSegmentIndex: int * reversed: bool
+
+    [<Struct>]
+    type internal HPreimageSegment =
+        { Segment: Segment
+          Source: HPreimageSource }
+
+    [<Struct>]
+    type internal HPreimageSubpath =
+        { Segments: HPreimageSegment list
+          Closed: bool
+          Side: BandSide }
+
+    [<Struct>]
+    type internal ICulledOffsetSegment =
+        { Segment: Segment
+          Preimage: HPreimageSegment
+          PreimageFrom: float<parameter>
+          PreimageTo: float<parameter> }
+
+    [<Struct>]
+    type internal ICulledOffsetSubpath =
+        { Segments: ICulledOffsetSegment list
+          Closed: bool
+          Side: BandSide }
+
+    [<Struct>]
+    type internal TracedOffsetSegment =
+        { Segment: Segment
+          Preimage: HPreimageSegment
+          PreimageFrom: float<parameter>
+          PreimageTo: float<parameter>
+          Reversed: bool }
+
+    [<Struct>]
+    type internal TracedOffsetSubpath =
+        { Segments: TracedOffsetSegment list
+          Closed: bool
+          Side: BandSide
+          SourceSubpathIndex: int }
+
+    [<Struct>]
+    /// Initially follows the I traversal; reconstruction can reverse the segment,
+    /// directed H interval, and endpoint vertices together. Its source stays immutable.
+    type internal ArrangementSplitTracedSegment =
+        { Segment: Segment
+          Preimage: ICulledOffsetSegment
+          PreimageFrom: float<parameter>
+          PreimageTo: float<parameter>
+          EdgeId: int
+          StartVertex: int
+          EndVertex: int
+          Reversed: bool
+          DeletionCandidate: bool }
+
+    [<Struct>]
+    type internal ArrangementSplitTracedSubpath =
+        { Segments: ArrangementSplitTracedSegment list
+          Closed: bool
+          Side: BandSide }
+
+    [<Struct>]
+    type internal ArrangementSplitRun =
+        { Segments: ArrangementSplitTracedSegment list
+          Submerged: bool }
+
+    [<Struct>]
+    type internal OffsideClosedWalkState =
+        { FirstStartVertex: int
+          EndVertex: int
+          LastIndex: int
+          RetainedSpan: float<parameter>
+          SkippedRuns: int
+          IndicesReversed: int list
+          SegmentsReversed: ArrangementSplitTracedSegment list }
+
+    [<Struct>]
+    type internal CuspTrimmedSegment =
+        { Segment: Segment
+          ArrangementPreimage: ArrangementSplitTracedSegment }
+
+    [<Struct>]
+    type internal CuspTrimmedSubpath =
+        { Segments: CuspTrimmedSegment list
+          Closed: bool }
+
+    [<Struct>]
+    type internal OffsetArrangementBuild =
+        { Graph: Arrangement.ArrangementGraph
+          IndexedSegments: IndexedOffsetSegment list
+          SegmentImages: Arrangement.ArrangementSourceSegmentImage list
+          EdgeImages: Arrangement.ArrangementEdgeImage list }
+
+    and internal OffsetArrangementSegmentGroup =
+        | UntrimmedOffsetSegment
+        | ZeroOffsetSourceSegment
+        | WindingClosureSegment
+
+    and internal IndexedOffsetSegment =
+        { Group: OffsetArrangementSegmentGroup
+          SubpathIndex: int
+          Segment: Segment
+          WindingOpinion: WindingSideOpinion option
+          WindingChange: int option }
+
+    and internal WindingSideOpinion =
+        { Left: int
+          Right: int }
+
+    [<Struct>]
+    type internal OffsetTrimGraph =
+        { Vertices: Arrangement.ArrangementVertex list
+          Edges: Arrangement.ArrangementEdge list
+          EdgeCapacities: (int * int) list option }
+
+    [<Struct>]
+    type internal OffsetDistances =
+        { Inner: float<length>
+          Outer: float<length> }
+
+    [<Struct>]
+    type internal BoundaryPair =
+        { Inner: BoundaryKind
+          Outer: BoundaryKind }
+
+    type internal SideStalledStatus =
+        | SideStalled
+        | SideNotStalled
+
+    [<Struct>]
+    type internal SynchronizedClassifiedSegment =
+        { Prepared: APreparedSegment
+          InnerStatus: SideStalledStatus
+          OuterStatus: SideStalledStatus
+          StartBoundary: BoundaryPair
+          EndBoundary: BoundaryPair }
+
+    [<Struct>]
+    type internal SynchronizedSourceSegment =
+        { Prepared: APreparedSegment
+          PreparedFrom: float<parameter>
+          PreparedTo: float<parameter>
+          Segment: Segment
+          InnerStatus: SideStalledStatus
+          OuterStatus: SideStalledStatus
+          StartBoundary: BoundaryPair
+          EndBoundary: BoundaryPair }
+
+    type internal SynchronizedSideSource =
+        | RefinableSideSource of EJoinFreeSegment
+        | StalledSideSource of CStalledSegment list
+        | SplitSideSource of left: SynchronizedSideSource * right: SynchronizedSideSource
+
+    [<Struct>]
+    type internal OffsetCorrespondence =
+        { PortionIndex: int
+          CorrespondenceIndex: int
+          Sources: SynchronizedSourceSegment list
+          Inner: SynchronizedSideSource
+          Outer: SynchronizedSideSource
+          InnerOffsetCount: int
+          OuterOffsetCount: int }
+
+    [<Struct>]
+    type internal OffsetJoinCorrespondence =
+        { AfterPortionIndex: int
+          Inner: Segment list
+          Outer: Segment list
+          InnerReversed: bool
+          OuterReversed: bool
+          InnerStart: Point<length>
+          InnerEnd: Point<length>
+          OuterStart: Point<length>
+          OuterEnd: Point<length> }
+
+    [<Struct>]
+    type internal SynchronizedHealedPortion =
+        { PortionIndex: int
+          Inner: GHealedOffsetSegment list
+          Outer: GHealedOffsetSegment list }
+
+    [<Struct>]
+    type internal SynchronizedOffsetSegmentsBuild =
+        { InnerOffsets: GHealedOffsetSegment list
+          OuterOffsets: GHealedOffsetSegment list
+          Correspondences: OffsetCorrespondence list
+          Portions: SynchronizedHealedPortion list }
+
+    [<Struct>]
+    type internal SynchronizedUntrimmedBuild =
+        { Inner: Subpath
+          Outer: Subpath
+          InnerCulled: ICulledOffsetSubpath
+          OuterCulled: ICulledOffsetSubpath
+          Correspondences: OffsetCorrespondence list
+          Portions: SynchronizedHealedPortion list
+          JoinCorrespondences: OffsetJoinCorrespondence list }
+
+    [<Struct>]
+    type internal SingleOffsetUntrimmedBuild =
+        { Subpath: Subpath
+          ZeroSource: Subpath
+          Culled: ICulledOffsetSubpath
+          Correspondences: OffsetCorrespondence list
+          Portions: SynchronizedHealedPortion list
+          JoinCorrespondences: OffsetJoinCorrespondence list }
+
+    type internal OffsetAttempt =
+        | OffsetAccepted of FUnhealedOffsetSegment
+        | OffsetNeedsRefinement of divergence: float<length>
+
+    [<Struct>]
+    type internal SynchronizedUnhealedResult =
+        { InnerOffsets: FUnhealedOffsetSegment list
+          OuterOffsets: FUnhealedOffsetSegment list
+          InnerSource: SynchronizedSideSource
+          OuterSource: SynchronizedSideSource }
+
+    [<Struct>]
+    type internal SynchronizedPortionUnhealedBuild =
+        { InnerOffsets: FUnhealedOffsetSegment list
+          OuterOffsets: FUnhealedOffsetSegment list
+          Correspondences: OffsetCorrespondence list }
+
+    [<Struct>]
+    type internal SurvivorEdge =
+        { EdgeId: int
+          Reversed: bool
+          StartVertex: int
+          EndVertex: int
+          Segment: Segment
+          ArrangementPreimage: ArrangementSplitTracedSegment option }
+
+    [<Struct>]
+    type internal SurvivorChain =
+        { StartVertex: int
+          EndVertex: int
+          Edges: SurvivorEdge list
+          Closed: bool }
+
+    [<Struct>]
+    type internal AvailableEdgeCapacity =
+        { EdgeId: int
+          Remaining: int }
+
+    [<Struct>]
+    type internal JoinFreePortion =
+        { Index: int
+          Subpath: Subpath
+          Closed: bool }
+
+    type internal CurvatureSplitKind =
+        | OrdinarySplit
+        | CuspSplit
+        | InflectionSplit
+
+    [<Struct>]
+    type internal CurvatureSplitParameter =
+        { T: float<parameter>
+          Kind: CurvatureSplitKind }
+
+    [<Struct>]
+    type internal CurvatureBoundary =
+        { T: float<parameter>
+          Boundary: BoundaryKind }
+
+    type internal OffsetCurvatureZone =
+        | OutsideOffsetRadius
+        | InsideOffsetRadius
+        | Opposite
+        | UnknownCurvatureZone
+
 #if GALLERY_DIAGNOSTICS
     // Compile-time-only observers of the production calls. Normal assemblies
     // contain neither this storage nor the recording calls below.
@@ -568,7 +588,7 @@ module Offset =
         | RequiredVertexParity(vertex, parity) -> vertex, parity, false
         | PreferredVertexParity(vertex, parity) -> vertex, parity, true
 
-    let private validateParityRequests (graph: ArrangementGraph) requests =
+    let private validateParityRequests (graph: Arrangement.ArrangementGraph) requests =
         let rec loop seen = function
             | [] -> Ok ()
             | request :: rest ->
@@ -580,7 +600,7 @@ module Offset =
                 else loop (Set.add vertex seen) rest
         loop Set.empty requests
 
-    let private validateCapacities (graph: ArrangementGraph) (assignments: EdgeCapacityAssignment list) =
+    let private validateCapacities (graph: Arrangement.ArrangementGraph) (assignments: EdgeCapacityAssignment list) =
         let ids = graph.Edges |> List.map _.Id |> Set.ofList
         let rec loop seen = function
             | [] ->
@@ -598,7 +618,7 @@ module Offset =
             | assignment :: rest -> loop (Set.add assignment.EdgeId seen) rest
         loop Set.empty assignments
 
-    let internal forcedParityCapacitiesWith (graph: ArrangementGraph) (initialCapacities: EdgeCapacityAssignment list) vertexParities =
+    let internal forcedParityCapacitiesWith (graph: Arrangement.ArrangementGraph) (initialCapacities: EdgeCapacityAssignment list) vertexParities =
         validateParityRequests graph vertexParities
         |> Result.bind (fun () -> validateCapacities graph initialCapacities)
         |> Result.bind (fun () ->
@@ -645,9 +665,9 @@ module Offset =
                     | None -> Error(ForcedParityAmbiguous(mismatched |> List.map (fun (vertex, _, _, _, _) -> vertex)))
             reduce initialCapacities)
 
-    let internal forcedParityCapacities (graph: ArrangementGraph) vertexParities =
+    let internal forcedParityCapacities (graph: Arrangement.ArrangementGraph) vertexParities =
         graph.Edges
-        |> List.map (fun (edge: ArrangementEdge) ->
+        |> List.map (fun (edge: Arrangement.ArrangementEdge) ->
             { EdgeId = edge.Id
               Capacity = edge.ForwardMultiplicity + edge.ReverseMultiplicity })
         |> fun capacities -> forcedParityCapacitiesWith graph capacities vertexParities
@@ -693,6 +713,7 @@ module Offset =
         { Fitting = defaultFittingOptions
           StalledOffsetDiameter = defaultStalledOffsetDiameter
           TangentHealAngleDegrees = defaultTangentHealAngleDegrees
+          InnerJoin = None
           SingleOffsetTrimming =
             { Offside = true
               FinalTrimming = InBandTrimming }
@@ -705,7 +726,7 @@ module Offset =
 
     let internal validateJoin join =
         match join with
-        | Miter miterLimit when miterLimit <= 0.0 || not (System.Double.IsFinite miterLimit) ->
+        | Miter miterLimit | MiterClip miterLimit | Arcs miterLimit when miterLimit <= 0.0 || not (System.Double.IsFinite miterLimit) ->
             Error(InternalInvalidMiterLimit miterLimit)
         | _ -> Ok()
 
@@ -1637,7 +1658,7 @@ module Offset =
 
     let private fittedCurveToSegment curve =
         match curve with
-        | CubicBezierData(startPoint, control1, control2, endPoint) ->
+        | Bezier.CubicBezierData(startPoint, control1, control2, endPoint) ->
             Ok(CubicBezier(startPoint, control1, control2, endPoint))
         | _ -> Error InternalNonFinite
 
@@ -2111,11 +2132,11 @@ module Offset =
 
     let private fitOffsetCubicStartStalledEndTangent startPoint endPoint startDirection endDirection samples =
         stalledStartControl2 startPoint endPoint startDirection endDirection samples
-        |> Result.map (fun control2 -> CubicBezierData(startPoint, startPoint, control2, endPoint))
+        |> Result.map (fun control2 -> Bezier.CubicBezierData(startPoint, startPoint, control2, endPoint))
 
     let private fitOffsetCubicStartTangentEndStalled startPoint endPoint startDirection endDirection samples =
         stalledEndControl1 startPoint endPoint startDirection endDirection samples
-        |> Result.map (fun control1 -> CubicBezierData(startPoint, control1, endPoint, endPoint))
+        |> Result.map (fun control1 -> Bezier.CubicBezierData(startPoint, control1, endPoint, endPoint))
 
     let rec private fitOffsetCubicDataWithEndpointPolicies
         startPoint
@@ -2150,22 +2171,22 @@ module Offset =
         endDirection
         samples =
         match report.StartHandle, report.EndHandle with
-        | CollapsedHandle, CollapsedHandle -> Error InternalNonFinite
-        | CollapsedHandle, PositiveHandle ->
+        | Bezier.CollapsedHandle, Bezier.CollapsedHandle -> Error InternalNonFinite
+        | Bezier.CollapsedHandle, Bezier.PositiveHandle ->
             fitOffsetCubicDataWithEndpointPolicies
                 startPoint endPoint
                 (FitPositionAndDirectionWithCollapsedHandle startDirection)
                 (FitPositionAndDirection endDirection)
                 samples
-        | PositiveHandle, CollapsedHandle ->
+        | Bezier.PositiveHandle, Bezier.CollapsedHandle ->
             fitOffsetCubicDataWithEndpointPolicies
                 startPoint endPoint
                 (FitPositionAndDirection startDirection)
                 (FitPositionAndDirectionWithCollapsedHandle endDirection)
                 samples
-        | PositiveHandle, PositiveHandle -> Ok curve
-        | UnconstrainedHandle, _
-        | _, UnconstrainedHandle -> Error InternalNonFinite
+        | Bezier.PositiveHandle, Bezier.PositiveHandle -> Ok curve
+        | Bezier.UnconstrainedHandle, _
+        | _, Bezier.UnconstrainedHandle -> Error InternalNonFinite
 
     let private fitOffsetCubicWithNonBothStalledEndpointPolicies
         startPoint endPoint startPolicy endPolicy samples =
@@ -2792,9 +2813,27 @@ module Offset =
             if Point.near pointTolerance first second then tail
             else Line(first, second) :: tail
 
+    let private clippedMiterJoin startPoint finish pivot apex limit =
+        let bevel = lineSegmentsBetween [startPoint; finish]
+        match Point.normalize (Point.subtract apex pivot) with
+        | None -> bevel
+        | Some axis ->
+            let tip = Point.dot (Point.subtract apex pivot) axis
+            let a = Point.dot (Point.subtract startPoint pivot) axis
+            let b = Point.dot (Point.subtract finish pivot) axis
+            // Interpolate from each endpoint, accounting for its projection;
+            // limit/tip alone would place the clipping plane incorrectly.
+            if a > limit || b > limit || tip <= limit then bevel
+            else
+                let p = Point.interpolate startPoint apex (Parameter.fromFloat ((limit-a)/(tip-a)))
+                let q = Point.interpolate finish apex (Parameter.fromFloat ((limit-b)/(tip-b)))
+                if pointIsFinite p && pointIsFinite q then
+                    lineSegmentsBetween [startPoint; p; q; finish]
+                else bevel
+
     let private directedMiterJoin
         (left: GHealedOffsetSegment) (right: GHealedOffsetSegment)
-        startPoint finish offset miterLimit =
+        startPoint finish offset miterLimit clip =
         match directedLineIntersection
                 startPoint left.NudgedEndTangentDirection
                 finish right.NudgedStartTangentDirection with
@@ -2807,6 +2846,8 @@ module Offset =
                 offsetDistance <= pointTolerance || miterLength / offsetDistance <= miterLimit
             if withinLimit && pointIsFinite apex then
                 Ok(lineSegmentsBetween [ startPoint; apex; finish ])
+            elif clip && pointIsFinite apex then
+                Ok(clippedMiterJoin startPoint finish corner apex (miterLimit * offsetDistance))
             else Ok(lineSegmentsBetween [ startPoint; finish ])
 
     let private roundJoin
@@ -3039,17 +3080,42 @@ module Offset =
         |> Result.bind (fun portions ->
             buildSynchronizedOffsetPortionsLoop portions distances options [] [] [] [])
 
-    let private parametricJoinSegments
-        (left: GHealedOffsetSegment) (right: GHealedOffsetSegment) offset join =
-        let startPoint = Segment.finish left.Segment
-        let finish = Segment.start right.Segment
-        if Point.near pointTolerance startPoint finish then Ok []
-        else
-            match join with
-            | Bevel -> Ok(lineSegmentsBetween [ startPoint; finish ])
-            | Miter miterLimit ->
-                directedMiterJoin left right startPoint finish offset miterLimit
-            | Round -> roundJoin left right startPoint finish offset
+    let private joinSourceCurvature source endpoint =
+        match source with
+        | OffsetFromJoinFree source -> eJoinFreeSourceEndpointCurvature source endpoint
+        | OffsetFromStalledRun _ -> None
+
+    let private arcsJoinSegments (left: GHealedOffsetSegment) (right: GHealedOffsetSegment) startPoint finish offset limit =
+        let lt,rt = left.NudgedEndTangentDirection,right.NudgedStartTangentDirection
+        match directedLineIntersection startPoint lt finish rt with
+        | Error _ -> roundJoin left right startPoint finish offset
+        | Ok apex ->
+            let lk = joinSourceCurvature left.Source SegmentEnd |> Option.defaultValue 0.0<1/length>
+            let rk = joinSourceCurvature right.Source SegmentStart |> Option.defaultValue 0.0<1/length>
+            if 1.0-offset*lk<=0.0 || 1.0-offset*rk<=0.0 then roundJoin left right startPoint finish offset
+            elif lk=0.0<_> && rk=0.0<_> then directedMiterJoin left right startPoint finish offset limit true
+            else
+                let pivot = offsetSegmentSourceEnd left.Source
+                match Point.normalize (Point.subtract lt rt) with
+                | None -> Error InternalArcsJoinConstructionFailed
+                | Some axis ->
+                    let axis = if Point.dot axis (Point.subtract apex pivot)<0.0<length> then Point.scale -1.0 axis else axis
+                    let radius k = if k=0.0<_> then None else Some(1.0/k-offset)
+                    let a: ArcsJoin.Continuation = {Start=Point.subtract startPoint pivot; Tangent=lt; Radius=radius lk}
+                    let b: ArcsJoin.Continuation = {Start=Point.subtract finish pivot; Tangent=rt; Radius=radius rk}
+                    match ArcsJoin.join a b axis (limit*abs offset) with
+                    | None -> Error InternalArcsJoinConstructionFailed
+                    | Some segments ->
+                        let last = segments.Length-1
+                        let translated = segments |> List.mapi (fun i segment ->
+                            let segment =
+                                match segment with
+                                | Line(a,b) -> Line(Point.add a pivot,Point.add b pivot)
+                                | Arc arc -> Arc {arc with Start=Point.add arc.Start pivot; End=Point.add arc.End pivot}
+                                | _ -> segment
+                            let segment = if i=0 then Segment.withStart startPoint segment else segment
+                            if i=last then Segment.withFinish finish segment else segment)
+                        if List.forall segmentIsFinite translated then Ok translated else Error InternalNonFinite
 
     let private offsetSourceEndpointUnitTangent source endpoint =
         match source with
@@ -3060,6 +3126,34 @@ module Offset =
             | SegmentEnd, _ :: _ -> unitTangentAtEndpoint (List.last run).Segment endpoint
             | _ -> Error(InternalDegenerateTangent 0.0<parameter>)
 
+    let private parametricJoinSegments
+        (left: GHealedOffsetSegment) (right: GHealedOffsetSegment) offset join innerJoin =
+        let startPoint = Segment.finish left.Segment
+        let finish = Segment.start right.Segment
+        if Point.near pointTolerance startPoint finish then Ok []
+        else
+            offsetSourceEndpointUnitTangent left.Source SegmentEnd
+            |> Result.bind (fun incoming ->
+                offsetSourceEndpointUnitTangent right.Source SegmentStart
+                |> Result.bind (fun outgoing ->
+                    // SVG clockwise turns have positive cross product. Positive
+                    // offsets lie on the visual left. Use source tangents, not
+                    // potentially reversed offset tangents; collinear corners
+                    // retain their ordinary join policy.
+                    let turn = Point.cross incoming outgoing
+                    let isInner = (turn < 0.0 && offset > 0.0<length>) || (turn > 0.0 && offset < 0.0<length>)
+                    let selected =
+                        match isInner, innerJoin with
+                        | true, InnerRound -> Round
+                        | true, InnerBevel -> Bevel
+                        | false, _ -> join
+                    match selected with
+                    | Arcs limit -> arcsJoinSegments left right startPoint finish offset limit
+                    | Bevel -> Ok(lineSegmentsBetween [ startPoint; finish ])
+                    | Miter limit -> directedMiterJoin left right startPoint finish offset limit false
+                    | MiterClip limit -> directedMiterJoin left right startPoint finish offset limit true
+                    | Round -> roundJoin left right startPoint finish offset))
+
     let private offsetPortionJoinBoundary
         (left: GHealedOffsetSegment list) (right: GHealedOffsetSegment list) =
         match List.tryLast left, right with
@@ -3069,9 +3163,9 @@ module Offset =
 
     let private joinBetweenOffsetPortions
         (left: GHealedOffsetSegment list) (right: GHealedOffsetSegment list)
-        offset join =
+        offset join innerJoin =
         match List.tryLast left, right with
-        | Some previous, next :: _ -> parametricJoinSegments previous next offset join
+        | Some previous, next :: _ -> parametricJoinSegments previous next offset join innerJoin
         | _ -> Ok []
 
     let private joinIsGeometricallyReversed
@@ -3092,9 +3186,9 @@ module Offset =
     let private synchronizedJoinCorrespondence
         (left: SynchronizedHealedPortion)
         (right: SynchronizedHealedPortion)
-        (distances: OffsetDistances) join =
-        match joinBetweenOffsetPortions left.Inner right.Inner distances.Inner join,
-              joinBetweenOffsetPortions left.Outer right.Outer distances.Outer join,
+        (distances: OffsetDistances) join innerJoinStyle =
+        match joinBetweenOffsetPortions left.Inner right.Inner distances.Inner join innerJoinStyle,
+              joinBetweenOffsetPortions left.Outer right.Outer distances.Outer join innerJoinStyle,
               offsetPortionJoinBoundary left.Inner right.Inner,
               offsetPortionJoinBoundary left.Outer right.Outer with
         | Ok innerJoin, Ok outerJoin, Ok(innerStart, innerEnd), Ok(outerStart, outerEnd) ->
@@ -3119,34 +3213,34 @@ module Offset =
         | _, _, _, Error error -> Error error
 
     let rec private synchronizedJoinCorrespondencesLoop
-        first previous rest distances join closedValue joined =
+        first previous rest distances join innerJoin closedValue joined =
         match rest with
         | [] ->
             if closedValue then
-                synchronizedJoinCorrespondence previous first distances join
+                synchronizedJoinCorrespondence previous first distances join innerJoin
                 |> Result.map (fun closing -> List.rev (closing :: joined))
             else Ok(List.rev joined)
         | next :: remaining ->
-            synchronizedJoinCorrespondence previous next distances join
+            synchronizedJoinCorrespondence previous next distances join innerJoin
             |> Result.bind (fun correspondence ->
                 synchronizedJoinCorrespondencesLoop
-                    first next remaining distances join closedValue
+                    first next remaining distances join innerJoin closedValue
                     (correspondence :: joined))
 
-    let private synchronizedJoinCorrespondences portions distances join closedValue =
+    let private synchronizedJoinCorrespondences portions distances join innerJoin closedValue =
         match portions with
         | [] -> Ok []
         | first :: rest ->
             synchronizedJoinCorrespondencesLoop
-                first first rest distances join closedValue []
+                first first rest distances join innerJoin closedValue []
 
     let private segmentWithStart segment startPoint = Segment.withStart startPoint segment
 
     let private segmentWithEnd segment finish = Segment.withFinish finish segment
 
     let rec private earliestInteriorAdjacentIntersection
-        (intersections: SegmentIntersection list)
-        (best: SegmentIntersection option) =
+        (intersections: Intersections.SegmentIntersection list)
+        (best: Intersections.SegmentIntersection option) =
         match intersections with
         | [] -> best
         | intersection :: rest ->
@@ -3547,7 +3641,7 @@ module Offset =
             buildSynchronizedOffsetSegments subpath distances options
             |> Result.bind (fun (build: SynchronizedOffsetSegmentsBuild) ->
                 synchronizedJoinCorrespondences
-                    build.Portions distances join closedValue
+                    build.Portions distances join (Option.defaultValue (defaultInnerJoin join) options.InnerJoin) closedValue
                 |> Result.bind (fun (joinCorrespondences: OffsetJoinCorrespondence list) ->
                     let innerPreimage =
                         assemblePreimageSubpath
@@ -3686,17 +3780,17 @@ module Offset =
         offsetSegmentArrangement (includeWindingBoundary indexed windingPath)
 
     let rec private arrangementEdgeById
-        (edges: ArrangementEdge list) id
-        : Result<ArrangementEdge, ArrangementInternalError> =
+        (edges: Arrangement.ArrangementEdge list) id
+        : Result<Arrangement.ArrangementEdge, Arrangement.ArrangementInternalError> =
         match edges with
-        | [] -> Error(InternalMissingArrangementEdge id)
+        | [] -> Error(Arrangement.InternalMissingArrangementEdge id)
         | first :: rest ->
             if first.Id = id then Ok first
             else arrangementEdgeById rest id
 
     let private sourceSegmentImageEdges
         (build: OffsetArrangementBuild)
-        (image: ArrangementSourceSegmentImage) =
+        (image: Arrangement.ArrangementSourceSegmentImage) =
         image.Edges
         |> List.fold (fun state reference ->
             state
@@ -3716,7 +3810,7 @@ module Offset =
         | None -> false
 
     let private arrangementEdgeImageById
-        (images: ArrangementEdgeImage list) edgeId =
+        (images: Arrangement.ArrangementEdgeImage list) edgeId =
         images |> List.tryFind (fun image -> image.EdgeId = edgeId)
 
     let private arrangementEdgeHasGroup
@@ -3734,7 +3828,7 @@ module Offset =
             offsetSegmentIndexHasGroup build image.SegmentIndex UntrimmedOffsetSegment)
 
     let private retainOffsetImageEdges
-        (graph: ArrangementGraph)
+        (graph: Arrangement.ArrangementGraph)
         (build: OffsetArrangementBuild)
         : OffsetTrimGraph =
         let retained =
@@ -3955,12 +4049,12 @@ module Offset =
         edges |> List.fold (fun openChains edge -> appendSourceOrderEdge edge openChains) openChains
 
     let rec private sourceOrderSurvivorDirectedEdges
-        (directedEdges: (ArrangementEdge * bool) list)
+        (directedEdges: (Arrangement.ArrangementEdge * bool) list)
         (available: AvailableEdgeCapacity list)
         (edges: SurvivorEdge list) =
         match directedEdges with
         | [] -> List.rev edges, available
-        | (edge: ArrangementEdge, reversedValue) :: rest ->
+        | (edge: Arrangement.ArrangementEdge, reversedValue) :: rest ->
             match takeEdgeCapacity edge.Id available with
             | None -> sourceOrderSurvivorDirectedEdges rest available edges
             | Some available ->
@@ -3979,7 +4073,7 @@ module Offset =
 
     let private sourceOrderSurvivorImageEdges
         (build: OffsetArrangementBuild)
-        (image: ArrangementSourceSegmentImage)
+        (image: Arrangement.ArrangementSourceSegmentImage)
         (available: AvailableEdgeCapacity list) =
         sourceSegmentImageEdges build image
         |> Result.map (fun directed ->
@@ -3987,7 +4081,7 @@ module Offset =
 
     let rec private sourceOrderSurvivorChainsLoop
         (build: OffsetArrangementBuild)
-        (images: ArrangementSourceSegmentImage list)
+        (images: Arrangement.ArrangementSourceSegmentImage list)
         (available: AvailableEdgeCapacity list)
         (openChains: SurvivorChain list) =
         match images with
@@ -4054,7 +4148,7 @@ module Offset =
 
     let rec private arrangementSourceWindingOpinions
         (build: OffsetArrangementBuild)
-        (sources: ArrangementEdgeSourceImage list)
+        (sources: Arrangement.ArrangementEdgeSourceImage list)
         (opinion: WindingSideOpinion)
         : Result<WindingSideOpinion, InternalError> =
         match sources with
@@ -4078,7 +4172,7 @@ module Offset =
         (build: OffsetArrangementBuild) edgeId =
         match arrangementEdgeImageById build.EdgeImages edgeId with
         | None -> Error(InternalMissingEdgeImage edgeId)
-        | Some (image: ArrangementEdgeImage) ->
+        | Some (image: Arrangement.ArrangementEdgeImage) ->
             arrangementSourceWindingOpinions build image.Sources
                 { Left = 0; Right = 0 }
 
@@ -4095,7 +4189,7 @@ module Offset =
                             | Some indexed ->
                                 let contribution = Option.defaultValue 0 indexed.WindingChange
                                 Ok(total + if source.Reversed then -contribution else contribution))) (Ok 0)
-                    |> Result.map (fun sum -> {EdgeId=image.EdgeId;RightMinusLeft=sum}::changes))) (Ok [])
+                    |> Result.map (fun sum -> ({EdgeId=image.EdgeId;RightMinusLeft=sum}: Arrangement.EdgeWindingChange)::changes))) (Ok [])
             |> Result.bind (List.rev >> Arrangement.faceWindings dual >> Result.mapError InternalFaceWindingError)
             |> Result.bind (fun values ->
                 let values = values |> List.map (fun face -> face.FaceId, face.Value) |> Map.ofList
@@ -4110,7 +4204,7 @@ module Offset =
         let commonShift = expected.Left-left
         commonShift>=0 && expected.Right-right=commonShift && left+commonShift>=0 && right+commonShift>=0
 
-    let private arrangementEdgeWindingMatchesOpinion (build: OffsetArrangementBuild) (edge: ArrangementEdge) edgeWindings =
+    let private arrangementEdgeWindingMatchesOpinion (build: OffsetArrangementBuild) (edge: Arrangement.ArrangementEdge) edgeWindings =
         arrangementEdgeWindingOpinion build edge.Id |> Result.bind (fun expected ->
             let measured =
                 match Map.tryFind edge.Id edgeWindings with
@@ -4120,9 +4214,9 @@ module Offset =
 
     let rec private deleteWindingMismatchedEdgesLoop
         (build: OffsetArrangementBuild)
-        (edges: ArrangementEdge list)
+        (edges: Arrangement.ArrangementEdge list)
         edgeWindings
-        (retained: ArrangementEdge list) =
+        (retained: Arrangement.ArrangementEdge list) =
         match edges with
         | [] -> Ok(List.rev retained)
         | edge :: rest ->
@@ -4151,7 +4245,7 @@ module Offset =
             else None)
 
     let private forcedParityReduceTrimGraph graph protectedVertices =
-        let arrangement =
+        let arrangement: Arrangement.ArrangementGraph =
             { Vertices = graph.Vertices
               Edges = graph.Edges
               CyclicOrders = [] }
@@ -4377,7 +4471,7 @@ module Offset =
             else Ok(first.StartVertex, last.EndVertex)
 
     let private arrangementSplitEdgeCapacities
-        (graph: ArrangementGraph)
+        (graph: Arrangement.ArrangementGraph)
         (retained: ArrangementSplitTracedSegment list) =
         graph.Edges
         |> List.map (fun edge ->
@@ -4416,7 +4510,7 @@ module Offset =
 
     let private cuspTrimParitySurvivorChains
         (segments: ArrangementSplitTracedSegment list)
-        (graph: ArrangementGraph)
+        (graph: Arrangement.ArrangementGraph)
         protectedVertices =
         let retained = segments |> List.filter (fun segment -> not segment.DeletionCandidate)
         match retained with
@@ -4480,7 +4574,7 @@ module Offset =
 
     let rec private arrangementSplitSegmentsFromIEdgeImages
         (source: ICulledOffsetSegment)
-        (images: ArrangementSegmentEdgeImage list)
+        (images: Arrangement.ArrangementSegmentEdgeImage list)
         (build: OffsetArrangementBuild)
         edgeWindings
         (split: ArrangementSplitTracedSegment list) =
@@ -4511,12 +4605,12 @@ module Offset =
                         source rest build edgeWindings (item :: split)))
 
     let private arrangementSplitSegmentsFromIImage
-        source (image: ArrangementSourceSegmentImage) build edgeWindings =
+        source (image: Arrangement.ArrangementSourceSegmentImage) build edgeWindings =
         arrangementSplitSegmentsFromIEdgeImages source image.Edges build edgeWindings []
 
     let rec private arrangementSplitSegmentsFromIImages
         (segments: ICulledOffsetSegment list)
-        (images: ArrangementSourceSegmentImage list)
+        (images: Arrangement.ArrangementSourceSegmentImage list)
         build edgeWindings
         (split: ArrangementSplitTracedSegment list) =
         match segments, images with
@@ -4622,8 +4716,8 @@ module Offset =
     // Source-ordered arrangement images own all geometry and noding. Select
     // the earliest previous start and latest next end at a common vertex.
     let internal cuspSmallLoopEdges
-        (graph: ArrangementGraph)
-        (images: ArrangementSourceSegmentImage list)
+        (graph: Arrangement.ArrangementGraph)
+        (images: Arrangement.ArrangementSourceSegmentImage list)
         (reversed: bool list) closedValue =
         let rec sequenceResults results =
             match results with
@@ -4847,7 +4941,7 @@ module Offset =
             |> Result.bind (fun build ->
                 Arrangement.dual build.Graph |> Result.mapError InternalArrangementGraphError
                 |> Result.bind (fun dual ->
-                    let changes = build.Graph.Edges |> List.map (fun edge ->
+                    let changes: Arrangement.EdgeWindingChange list = build.Graph.Edges |> List.map (fun edge ->
                         {EdgeId = edge.Id; RightMinusLeft = edge.ForwardMultiplicity - edge.ReverseMultiplicity})
                     Arrangement.faceWindings dual changes |> Result.mapError InternalFaceWindingError
                     |> Result.bind (fun windings ->
@@ -4861,7 +4955,7 @@ module Offset =
                         build.Graph.Edges |> tryMap (fun edge ->
                             let remaining = edge.ForwardMultiplicity + edge.ReverseMultiplicity - (Map.tryFind edge.Id consumed |> Option.defaultValue 0)
                             if remaining < 0 || remaining % 2 <> 0 then Error(InternalSurvivorCapacityMismatch(edge.Id, remaining))
-                            else Ok(List.replicate (remaining / 2) [{EdgeId = edge.Id; Left = true}; {EdgeId = edge.Id; Left = false}]))
+                            else Ok(List.replicate (remaining / 2) ([{EdgeId = edge.Id; Left = true}; {EdgeId = edge.Id; Left = false}]: Arrangement.ArrangementFaceEdge list)))
                         |> Result.bind (fun retraces ->
                             let edges = build.Graph.Edges |> List.map (fun edge -> edge.Id, edge) |> Map.ofList
                             walks @ List.concat retraces |> tryMap (fun walk ->
@@ -4960,7 +5054,7 @@ module Offset =
         | first :: rest -> uniqueInts rest (first :: unique)
 
     let rec private segmentImageEdgeIds
-        (images: ArrangementSourceSegmentImage list)
+        (images: Arrangement.ArrangementSourceSegmentImage list)
         ids =
         match images with
         | [] -> ids
@@ -4972,16 +5066,16 @@ module Offset =
                     else image.EdgeId :: ids) ids
             segmentImageEdgeIds rest ids
 
-    let private dualEdgeFaces (dual: DualArrangementGraph) edgeId =
+    let private dualEdgeFaces (dual: Arrangement.DualArrangementGraph) edgeId =
         dual.EdgeFaces
         |> List.tryFind (fun edge -> edge.EdgeId = edgeId)
         |> function
             | Some edge -> Ok edge
-            | None -> Error(InternalArrangementGraphError(Arrangement.publicError (InternalMissingArrangementEdge edgeId)))
+            | None -> Error(InternalArrangementGraphError(Arrangement.publicError (Arrangement.InternalMissingArrangementEdge edgeId)))
 
     let rec private contaminationSeedFaces
-        (images: ArrangementSourceSegmentImage list)
-        (dual: DualArrangementGraph)
+        (images: Arrangement.ArrangementSourceSegmentImage list)
+        (dual: Arrangement.DualArrangementGraph)
         (offset: float<length>)
         seeded =
         match images with
@@ -5002,7 +5096,7 @@ module Offset =
                 contaminationSeedFaces rest dual offset seeded)
 
     let rec private propagateContaminatedFaces
-        (dual: DualArrangementGraph)
+        (dual: Arrangement.DualArrangementGraph)
         barriers contaminated =
         let expanded =
             dual.EdgeFaces
@@ -5021,9 +5115,9 @@ module Offset =
 
     let rec private arrangementSplitSegmentsFromIContaminationEdges
         (source: ICulledOffsetSegment)
-        (images: ArrangementSegmentEdgeImage list)
+        (images: Arrangement.ArrangementSegmentEdgeImage list)
         (build: OffsetArrangementBuild)
-        (dual: DualArrangementGraph)
+        (dual: Arrangement.DualArrangementGraph)
         contaminated
         (split: ArrangementSplitTracedSegment list) =
         match images with
@@ -5055,14 +5149,14 @@ module Offset =
             | _, Error error -> Error error
 
     let private arrangementSplitSegmentsFromIContaminationImage
-        source (image: ArrangementSourceSegmentImage)
+        source (image: Arrangement.ArrangementSourceSegmentImage)
         build dual contaminated =
         arrangementSplitSegmentsFromIContaminationEdges
             source image.Edges build dual contaminated []
 
     let rec private arrangementSplitSegmentsFromIContaminationImages
         (segments: ICulledOffsetSegment list)
-        (images: ArrangementSourceSegmentImage list)
+        (images: Arrangement.ArrangementSourceSegmentImage list)
         build dual contaminated
         (split: ArrangementSplitTracedSegment list) =
         match segments, images with

@@ -4,14 +4,14 @@ open Xunit
 let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private curves =
     let start,finish = p 1. -0.,p 0.1 0.2
-    [LinearBezierData(start,finish)
-     QuadraticBezierData(start,p 0.3 1.,finish)
-     CubicBezierData(start,p 0.3 1.,p -1. 0.7,finish)]
+    [Bezier.LinearBezierData(start,finish)
+     Bezier.QuadraticBezierData(start,p 0.3 1.,finish)
+     Bezier.CubicBezierData(start,p 0.3 1.,p -1. 0.7,finish)]
 
 [<Fact>]
 let ``tangent fit rejects endpoint only samples`` () =
     let start,finish = p 0. 0.,p 3. 0.
-    Assert.Equal(Error UnderdeterminedCubicFit,
+    Assert.Equal(Error Bezier.UnderdeterminedCubicFit,
         Bezier.fitCubicWithEndpointTangents start finish (Point.create 1.0 1.0) (Point.create 1.0 -1.0)
             [0.0<parameter>,start; -0.0<parameter>,start; 1.0<parameter>,finish])
 [<Fact>]
@@ -33,14 +33,14 @@ let ``endpoint splits preserve whole curve and collapse all controls`` () =
 
 [<Fact>]
 let ``split many trims both signed zero boundaries`` () =
-    let curve = LinearBezierData(p 1. 0.,p 0.1 0.2)
-    Assert.Equal<BezierData list>([curve],Bezier.splitMany curve [-0.0<parameter>])
-    Assert.Equal<BezierData list>([curve],Bezier.splitMany curve [0.0<parameter>;-0.0<parameter>;0.0<parameter>;1.0<parameter>])
+    let curve = Bezier.LinearBezierData(p 1. 0.,p 0.1 0.2)
+    Assert.Equal<Bezier.BezierData list>([curve],Bezier.splitMany curve [-0.0<parameter>])
+    Assert.Equal<Bezier.BezierData list>([curve],Bezier.splitMany curve [0.0<parameter>;-0.0<parameter>;0.0<parameter>;1.0<parameter>])
     Assert.Equal(Ok [curve],Bezier.splitInsideMany curve [-0.0<parameter>;0.0<parameter>;-0.0<parameter>;1.0<parameter>])
 
 [<Fact>]
 let ``split many deduplicates signed zero inside extrapolated range`` () =
-    let curve = LinearBezierData(p 0. 0.,p 1. 0.)
+    let curve = Bezier.LinearBezierData(p 0. 0.,p 1. 0.)
     let expected = Bezier.splitMany curve [-0.5<parameter>;0.0<parameter>;0.5<parameter>]
     Assert.Equal(4,List.length expected)
-    Assert.Equal<BezierData list>(expected,Bezier.splitMany curve [0.5<parameter>;-0.0<parameter>;-0.5<parameter>;0.0<parameter>;-0.0<parameter>])
+    Assert.Equal<Bezier.BezierData list>(expected,Bezier.splitMany curve [0.5<parameter>;-0.0<parameter>;-0.5<parameter>;0.0<parameter>;-0.0<parameter>])

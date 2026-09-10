@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- Added `Offset.InnerJoin` and the optional `Offset.Options.InnerJoin` override,
+  matching Gleam's local inner-corner policy: Round for Round joins, Bevel for
+  every other style by default. Explicit InnerRound/InnerBevel overrides apply
+  to both band sides and single offsets, including through stroke options.
+
+- Breaking: moved operation-specific public types into their owning modules,
+  following Gleam's qualification style (`Offset.Error`, `Stroke.Options`,
+  `Arrangement.Error`, etc.). Shared geometry types remain in `SvgPath`.
+  Updated tests, README examples, and figure generators; no compatibility aliases
+  retain the old root-level operation names.
+
+- Added `MiterClip` and `Arcs` joins, matching Gleam commits `411c34a` and
+  `71b05d1`, including their signed-offset fallback and clipping contracts.
+- Added the 23 corresponding regression tests one-to-one and four independently
+  generated README comparison strips (`9789684`).
+
 ## 0.6.0
 
 - Synchronized core geometry with Gleam `svg_path` v0.46.0 (`ed94708`),

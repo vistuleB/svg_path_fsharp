@@ -3,7 +3,7 @@ open SvgPath
 open Xunit
 let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private get result = result |> Result.defaultWith (failwithf "%A")
-let private arc start radius finish = Arc { Start=start; Radius=radius; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }
+let private arc start radius finish = Arc ({ Start=start; Radius=radius; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }: Ellipse.EndpointArcData)
 [<Fact>]
 let ``line length upper bound is chord`` () = Assert.Equal(Ok 5.0<length>,Segment.lengthUpperBound (Line(p 0. 0.,p 3. 4.)))
 [<Fact>]

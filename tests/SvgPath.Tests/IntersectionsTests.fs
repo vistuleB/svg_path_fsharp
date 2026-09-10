@@ -7,9 +7,9 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
 [<Fact>]
 let ``near_tangent_arc_line_keeps_exact_stored_endpoint_test`` () =
-    let arc = Arc {Start = point 430.66681589309076 178.69245771161582; Radius = point 3.0 3.0
-                   XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false
-                   End = point 430.670203101245 178.69477431938788}
+    let arc = Arc ({Start = point 430.66681589309076 178.69245771161582; Radius = point 3.0 3.0
+                    XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false
+                    End = point 430.670203101245 178.69477431938788}: Ellipse.EndpointArcData)
     let line = Line(Segment.finish arc, point 430.22232031893986 178.38890397610967)
     for reverseArc in [false;true] do
         for reverseLine in [false;true] do
@@ -17,7 +17,7 @@ let ``near_tangent_arc_line_keeps_exact_stored_endpoint_test`` () =
             let b = if reverseLine then Segment.reverse line else line
             let ta = if reverseArc then 0.0<parameter> else 1.0<parameter>
             let tb = if reverseLine then 1.0<parameter> else 0.0<parameter>
-            let options = {Intersections.defaultOptions with Tolerance = 1e-9<length>; MaxDepth = 48; ParameterSnap = NoParameterSnap}
+            let options = {Intersections.defaultOptions with Tolerance = 1e-9<length>; MaxDepth = 48; ParameterSnap = Intersections.NoParameterSnap}
             let found = Intersections.segmentWith a b options |> Result.defaultWith (failwithf "%A")
             Assert.True(found |> List.exists (fun hit -> hit.LeftT = ta && hit.RightT = tb))
             let swapped = Intersections.segmentWith b a options |> Result.defaultWith (failwithf "%A")
@@ -51,8 +51,8 @@ let ``arc window subdivision preserves original ellipse`` () =
     let curve = CubicBezier(point -100.9882874507623 -19.817662984205167,
                             point -98.39429354181092 -11.553611592855663,
                             point -94.47604615998095 -2.517586549964266, finish)
-    let arc = Arc {Start=finish; Radius=point 16.0 16.0; XAxisRotation=0.0<degree>;
-                   LargeArc=false; Sweep=true; End=point -89.11764705882354 -7.529411764705882}
+    let arc = Arc ({Start=finish; Radius=point 16.0 16.0; XAxisRotation=0.0<degree>;
+                    LargeArc=false; Sweep=true; End=point -89.11764705882354 -7.529411764705882}: Ellipse.EndpointArcData)
     let found = Intersections.segment curve arc |> Result.defaultWith (failwithf "%A")
     Assert.True(found |> List.exists (fun hit -> hit.LeftT=1.0<parameter> && hit.RightT=0.0<parameter>))
 
@@ -72,8 +72,8 @@ let ``circular arc intersections respect local axis rotation`` () =
     for sweep in [false;true] do
         for leftRotation in [0.0;30.0;90.0;-90.0] do
             for rightRotation in [0.0;30.0;90.0;-90.0] do
-                let left = Arc {Start=point 1. 0.;Radius=point 1. 1.;XAxisRotation=Degree.fromFloat leftRotation;LargeArc=false;Sweep=sweep;End=point -1. 0.}
-                let right = Arc {Start=point 2. 0.;Radius=point 1. 1.;XAxisRotation=Degree.fromFloat rightRotation;LargeArc=false;Sweep=sweep;End=point 0. 0.}
+                let left = Arc ({Start=point 1. 0.;Radius=point 1. 1.;XAxisRotation=Degree.fromFloat leftRotation;LargeArc=false;Sweep=sweep;End=point -1. 0.}: Ellipse.EndpointArcData)
+                let right = Arc ({Start=point 2. 0.;Radius=point 1. 1.;XAxisRotation=Degree.fromFloat rightRotation;LargeArc=false;Sweep=sweep;End=point 0. 0.}: Ellipse.EndpointArcData)
                 let hit = Intersections.segment left right |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
                 let a = Segment.point left hit.LeftT |> Result.defaultWith (failwithf "%A")
                 let b = Segment.point right hit.RightT |> Result.defaultWith (failwithf "%A")
@@ -109,20 +109,20 @@ let ``cubic line crossing is polished to geometric tolerance`` () =
 let private arcPair () =
     let left =
         Arc
-            { Start = point 82.60920101224798 220.34092587189474
-              Radius = point 20.01 20.01
-              XAxisRotation = 0.0<degree>
-              LargeArc = false
-              Sweep = true
-              End = point 43.21295323581002 213.39430445023285 }
+            ({ Start = point 82.60920101224798 220.34092587189474
+               Radius = point 20.01 20.01
+               XAxisRotation = 0.0<degree>
+               LargeArc = false
+               Sweep = true
+               End = point 43.21295323581002 213.39430445023285 }: Ellipse.EndpointArcData)
     let right =
         Arc
-            { Start = point 43.190371867436326 213.5338826899446
-              Radius = point 210.0 210.0
-              XAxisRotation = 0.0<degree>
-              LargeArc = false
-              Sweep = true
-              End = point 454.61771360489934 202.76027858778826 }
+            ({ Start = point 43.190371867436326 213.5338826899446
+               Radius = point 210.0 210.0
+               XAxisRotation = 0.0<degree>
+               LargeArc = false
+               Sweep = true
+               End = point 454.61771360489934 202.76027858778826 }: Ellipse.EndpointArcData)
     left, right
 
 [<Fact>]
@@ -312,18 +312,18 @@ let ``segment self intersections finds cubic crossing`` () =
 let ``segment self intersections reports same endpoint arc`` () =
     let arc =
         Arc
-            { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>
-              LargeArc = true; Sweep = true; End = point 0.0 0.0 }
+            ({ Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>
+               LargeArc = true; Sweep = true; End = point 0.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(
-        Ok [ { LeftT = 0.0<parameter>; RightT = 1.0<parameter>; Point = point 0.0 0.0 } ],
+        Ok [ ({ LeftT = 0.0<parameter>; RightT = 1.0<parameter>; Point = point 0.0 0.0 }: Intersections.SegmentIntersection) ],
         Intersections.segmentSelf arc)
 
 [<Fact>]
 let ``segment self intersections ignores same endpoint zero radius arc`` () =
     let arc =
         Arc
-            { Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>
-              LargeArc = true; Sweep = true; End = point 0.0 0.0 }
+            ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>
+               LargeArc = true; Sweep = true; End = point 0.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Ok [], Intersections.segmentSelf arc)
 
 [<Fact>]
@@ -381,11 +381,11 @@ let ``subpath self intersections respects minimum arc length separation`` () =
 [<Fact>]
 let ``subpath self intersections rejects semantic arc overlap`` () =
     let left =
-        Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
-              LargeArc = false; Sweep = true; End = point 10.0 0.0 }
+        Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
+               LargeArc = false; Sweep = true; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let sameGeometry =
-        Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
-              LargeArc = true; Sweep = true; End = point 10.0 0.0 }
+        Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
+               LargeArc = true; Sweep = true; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Error OverlappingSegments, Intersections.subpathSelf (subpath [ left; Segment.reverse sameGeometry ]))
 
 [<Fact>]
@@ -407,9 +407,9 @@ let ``subpath self intersections finds cubic self intersection`` () =
 [<Fact>]
 let ``subpath self intersections rejects invalid options`` () =
     let value = subpath [ Line(point 0.0 0.0, point 1.0 0.0) ]
-    let invalidSeparation: SelfIntersectionOptions =
+    let invalidSeparation: Intersections.SelfIntersectionOptions =
         { MinimumArcLengthSeparation = 0.0<length>; DistanceTolerance = 1.0e-6<length> }
-    let invalidDistance: SelfIntersectionOptions =
+    let invalidDistance: Intersections.SelfIntersectionOptions =
         { MinimumArcLengthSeparation = 1.0e-6<length>; DistanceTolerance = 0.0<length> }
     Assert.Equal(Error(InvalidSelfIntersectionMinimumArcLengthSeparation 0.0<length>), Intersections.subpathSelfWith value invalidSeparation)
     Assert.Equal(Error(InvalidSelfIntersectionDistanceTolerance 0.0<length>), Intersections.subpathSelfWith value invalidDistance)
@@ -442,7 +442,7 @@ let ``path self intersections includes single subpath crossings`` () =
 
 [<Fact>]
 let ``path self intersections rejects invalid options`` () =
-    let options: SelfIntersectionOptions =
+    let options: Intersections.SelfIntersectionOptions =
         { MinimumArcLengthSeparation = 0.0<length>; DistanceTolerance = 1.0e-6<length> }
     Assert.Equal(
         Error(InvalidSelfIntersectionMinimumArcLengthSeparation 0.0<length>),
@@ -451,11 +451,11 @@ let ``path self intersections rejects invalid options`` () =
 [<Fact>]
 let ``path self intersections rejects semantic arc overlap`` () =
     let left =
-        Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
-              LargeArc = false; Sweep = true; End = point 10.0 0.0 }
+        Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
+               LargeArc = false; Sweep = true; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let right =
-        Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
-              LargeArc = true; Sweep = true; End = point 10.0 0.0 }
+        Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>
+               LargeArc = true; Sweep = true; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let value = Path.ofSubpaths [ subpath [ left ]; subpath [ right ] ]
     Assert.Equal(Error OverlappingSegments, Intersections.pathSelf value)
 
@@ -477,12 +477,12 @@ let private quarterArcCircle center radius startOnRight sweep =
     |> List.pairwise
     |> List.map (fun (startPoint, endPoint) ->
         Arc
-            { Start = startPoint
-              Radius = point radius radius
-              XAxisRotation = 0.0<degree>
-              LargeArc = false
-              Sweep = sweep
-              End = endPoint })
+            ({ Start = startPoint
+               Radius = point radius radius
+               XAxisRotation = 0.0<degree>
+               LargeArc = false
+               Sweep = sweep
+               End = endPoint }: Ellipse.EndpointArcData))
     |> Subpath.create
     |> Result.bind (Subpath.setClosed true)
     |> Result.defaultWith (failwithf "%A")
@@ -492,7 +492,7 @@ let ``transverse lines classify clockwise crossing`` () =
     let left = lineSubpath (point -1.0 0.0) (point 1.0 0.0)
     let clockwise = lineSubpath (point 0.0 -1.0) (point 0.0 1.0)
     match Intersections.classifySubpathIntersection left clockwise (at 0.5) (at 0.5) with
-    | Ok(Crossing(Clockwise, apertures)) ->
+    | Ok(Intersections.Crossing(Intersections.Clockwise, apertures)) ->
         Assert.Equal(90.0<degree>, apertures.FirstIncomingToSecondIncoming)
         Assert.Equal(90.0<degree>, apertures.FirstIncomingToSecondOutgoing)
         Assert.Equal(90.0<degree>, apertures.FirstOutgoingToSecondIncoming)
@@ -504,7 +504,7 @@ let ``reversing right traversal reverses crossing direction`` () =
     let left = lineSubpath (point -1.0 0.0) (point 1.0 0.0)
     let right = lineSubpath (point 0.0 1.0) (point 0.0 -1.0)
     match Intersections.classifySubpathIntersection left right (at 0.5) (at 0.5) with
-    | Ok(Crossing(Counterclockwise, _)) -> ()
+    | Ok(Intersections.Crossing(Intersections.Counterclockwise, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]
@@ -513,7 +513,7 @@ let ``tangent parabola and line classify touching`` () =
         subpath [ QuadraticBezier(point -1.0 1.0, point 0.0 -1.0, point 1.0 1.0) ]
     let line = lineSubpath (point -1.0 0.0) (point 1.0 0.0)
     match Intersections.classifySubpathIntersection parabola line (at 0.5) (at 0.5) with
-    | Ok(Touching(SimilarlyDirected, ClockwiseFromFirstToSecond, ClockwiseFromSecondToFirst, _)) -> ()
+    | Ok(Intersections.Touching(Intersections.SimilarlyDirected, Intersections.ClockwiseFromFirstToSecond, Intersections.ClockwiseFromSecondToFirst, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]
@@ -527,13 +527,13 @@ let ``tangential cubic crossing has same order on both sides`` () =
             point 1.0 1.0)
         |> Segment.asSubpath
     match Intersections.classifySubpathIntersection line cubic (at 0.5) (at 0.5) with
-    | Ok(Crossing(Clockwise, _)) -> ()
+    | Ok(Intersections.Crossing(Intersections.Clockwise, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
     match Intersections.classifySubpathIntersection cubic line (at 0.5) (at 0.5) with
-    | Ok(Crossing(Counterclockwise, _)) -> ()
+    | Ok(Intersections.Crossing(Intersections.Counterclockwise, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
     match Intersections.classifySubpathIntersection line (Subpath.reverse cubic) (at 0.5) (at 0.5) with
-    | Ok(Crossing(Counterclockwise, _)) -> ()
+    | Ok(Intersections.Crossing(Intersections.Counterclockwise, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]
@@ -542,7 +542,7 @@ let ``opposite tangent traversals classify oppositely directed`` () =
         subpath [ QuadraticBezier(point -1.0 1.0, point 0.0 -1.0, point 1.0 1.0) ]
     let line = lineSubpath (point 1.0 0.0) (point -1.0 0.0)
     match Intersections.classifySubpathIntersection parabola line (at 0.5) (at 0.5) with
-    | Ok(Touching(OppositelyDirected, _, _, _)) -> ()
+    | Ok(Intersections.Touching(Intersections.OppositelyDirected, _, _, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]
@@ -551,7 +551,7 @@ let ``unequal externally kissing quarter arc circles report orders`` () =
         let first = quarterArcCircle (point 0.0 0.0) firstRadius true true
         let second = quarterArcCircle (point (firstRadius + secondRadius) 0.0) secondRadius false false
         match Intersections.classifySubpathIntersection first second (at 0.0) (at 0.0) with
-        | Ok(Touching(SimilarlyDirected, ClockwiseFromFirstToSecond, ClockwiseFromSecondToFirst, _)) -> ()
+        | Ok(Intersections.Touching(Intersections.SimilarlyDirected, Intersections.ClockwiseFromFirstToSecond, Intersections.ClockwiseFromSecondToFirst, _)) -> ()
         | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]
@@ -560,7 +560,7 @@ let ``swapping kissing quarter arc arguments reverses orders`` () =
     let first = quarterArcCircle (point 0.0 0.0) firstRadius true true
     let second = quarterArcCircle (point (firstRadius + secondRadius) 0.0) secondRadius false false
     match Intersections.classifySubpathIntersection second first (at 0.0) (at 0.0) with
-    | Ok(Touching(_, ClockwiseFromSecondToFirst, ClockwiseFromFirstToSecond, _)) -> ()
+    | Ok(Intersections.Touching(_, Intersections.ClockwiseFromSecondToFirst, Intersections.ClockwiseFromFirstToSecond, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]
@@ -569,7 +569,7 @@ let ``oppositely traversed kissing quarter arcs pair geometric sides`` () =
     let first = quarterArcCircle (point 0.0 0.0) firstRadius true true
     let second = quarterArcCircle (point (firstRadius + secondRadius) 0.0) secondRadius false true
     match Intersections.classifySubpathIntersection first second (at 0.0) (at 0.0) with
-    | Ok(Touching(OppositelyDirected, ClockwiseFromFirstToSecond, ClockwiseFromSecondToFirst, _)) -> ()
+    | Ok(Intersections.Touching(Intersections.OppositelyDirected, Intersections.ClockwiseFromFirstToSecond, Intersections.ClockwiseFromSecondToFirst, _)) -> ()
     | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]
@@ -578,7 +578,7 @@ let ``unequal internally kissing quarter arc circles need equal chords`` () =
         let outer = quarterArcCircle (point 0.0 0.0) outerRadius true true
         let inner = quarterArcCircle (point (outerRadius - innerRadius) 0.0) innerRadius true true
         match Intersections.classifySubpathIntersection outer inner (at 0.0) (at 0.0) with
-        | Ok(Touching(SimilarlyDirected, ClockwiseFromSecondToFirst, ClockwiseFromFirstToSecond, _)) -> ()
+        | Ok(Intersections.Touching(Intersections.SimilarlyDirected, Intersections.ClockwiseFromSecondToFirst, Intersections.ClockwiseFromFirstToSecond, _)) -> ()
         | result -> failwithf "unexpected classification: %A" result
 
 [<Fact>]
@@ -586,7 +586,7 @@ let ``open endpoint to interior is reported before direction topology`` () =
     let first = lineSubpath (point 0.0 0.0) (point 1.0 0.0)
     let second = lineSubpath (point 0.0 -1.0) (point 0.0 1.0)
     Assert.Equal(
-        Ok(EndpointContact(FirstEndpointToSecondInterior StartEndpoint)),
+        Ok(Intersections.EndpointContact(Intersections.FirstEndpointToSecondInterior Intersections.StartEndpoint)),
         Intersections.classifySubpathIntersection first second (at 0.0) (at 0.5))
 
 [<Fact>]
@@ -594,13 +594,13 @@ let ``directionless interior is indeterminate`` () =
     let origin = point 0.0 0.0
     let left = Subpath.ofSegment (Line(origin, origin))
     let right = lineSubpath (point 0.0 -1.0) (point 0.0 1.0)
-    Assert.Equal(Ok Indeterminate, Intersections.classifySubpathIntersection left right (at 0.5) (at 0.5))
+    Assert.Equal(Ok Intersections.Indeterminate, Intersections.classifySubpathIntersection left right (at 0.5) (at 0.5))
 
 [<Fact>]
 let ``grouped intersection expands parameter cartesian product`` () =
     let horizontal = lineSubpath (point -1.0 0.0) (point 1.0 0.0)
     let vertical = lineSubpath (point 0.0 -1.0) (point 0.0 1.0)
-    let intersection: SubpathIntersection =
+    let intersection: Intersections.SubpathIntersection =
         { Point = point 0.0 0.0
           LeftParameters = [ at 0.25; at 0.75 ]
           RightParameters = [ at 0.25; at 0.75 ] }
@@ -614,7 +614,7 @@ let ``classification rejects out of range angular tolerance`` () =
     let line = lineSubpath (point 0.0 0.0) (point 1.0 0.0)
     let options = { Intersections.defaultClassificationOptions with AngularTolerance = 180.0<degree> }
     Assert.Equal(
-        Error(ClassificationError.InvalidAngularTolerance 180.0<degree>),
+        Error(Intersections.Error.InvalidAngularTolerance 180.0<degree>),
         Intersections.classifySubpathIntersectionWith line line (at 0.5) (at 0.5) options)
 
 [<Fact>]
@@ -641,7 +641,7 @@ let ``path intersections canonicalize near boundary aliases after snapping`` () 
         Intersections.pathWith left right
             { Intersections.defaultOptions with
                 Tolerance = 1.0e-6<length>
-                ParameterSnap = DecimalParameterSnap 7 }
+                ParameterSnap = Intersections.DecimalParameterSnap 7 }
         |> Result.defaultWith (failwithf "%A")
     let intersection = result |> List.exactlyOne
     let expected = [ { SubpathIndex = 0; At = { SegmentIndex = 1; T = 0.0<parameter> } } ]

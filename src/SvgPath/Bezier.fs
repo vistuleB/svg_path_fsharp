@@ -1,55 +1,56 @@
 namespace SvgPath
 
-type BezierPoint = Point<length>
-
-[<Struct>]
-type BezierBoundingBox =
-    { Min: BezierPoint
-      Max: BezierPoint }
-
-type CubicFitHandleState =
-    | UnconstrainedHandle
-    | PositiveHandle
-    | CollapsedHandle
-
-[<Struct>]
-type CubicFitReport =
-    { RootSumSquare: float<length>
-      RootMeanSquare: float<length>
-      Max: float<length>
-      StartHandle: CubicFitHandleState
-      EndHandle: CubicFitHandleState }
-
-[<Struct>]
-type CubicSelfIntersectionOptions =
-    { MinimumArcLengthSeparation: float<length>
-      DistanceTolerance: float<length> }
-
-[<Struct>]
-type CubicSelfIntersection =
-    { S: float<parameter>
-      T: float<parameter>
-      Point: BezierPoint }
-
-type BezierData =
-    | LinearBezierData of startPoint: BezierPoint * endPoint: BezierPoint
-    | QuadraticBezierData of startPoint: BezierPoint * control: BezierPoint * endPoint: BezierPoint
-    | CubicBezierData of
-        startPoint: BezierPoint *
-        control1: BezierPoint *
-        control2: BezierPoint *
-        endPoint: BezierPoint
-
-type BezierError =
-    | SplitOutsideBezier
-    | DegenerateTangent
-    | UnderdeterminedCubicFit
-    | InvalidCubicSelfIntersectionMinimumArcLengthSeparation of minimumArcLengthSeparation: float<length>
-    | InvalidCubicSelfIntersectionDistanceTolerance of distanceTolerance: float<length>
-
 /// Evaluation, subdivision, fitting, bounds, and intersections for Bézier curves.
 [<RequireQualifiedAccess>]
 module Bezier =
+
+    type BezierPoint = Point<length>
+
+    [<Struct>]
+    type BoundingBox =
+        { Min: BezierPoint
+          Max: BezierPoint }
+
+    type CubicFitHandleState =
+        | UnconstrainedHandle
+        | PositiveHandle
+        | CollapsedHandle
+
+    [<Struct>]
+    type CubicFitReport =
+        { RootSumSquare: float<length>
+          RootMeanSquare: float<length>
+          Max: float<length>
+          StartHandle: CubicFitHandleState
+          EndHandle: CubicFitHandleState }
+
+    [<Struct>]
+    type CubicSelfIntersectionOptions =
+        { MinimumArcLengthSeparation: float<length>
+          DistanceTolerance: float<length> }
+
+    [<Struct>]
+    type CubicSelfIntersection =
+        { S: float<parameter>
+          T: float<parameter>
+          Point: BezierPoint }
+
+    type BezierData =
+        | LinearBezierData of startPoint: BezierPoint * endPoint: BezierPoint
+        | QuadraticBezierData of startPoint: BezierPoint * control: BezierPoint * endPoint: BezierPoint
+        | CubicBezierData of
+            startPoint: BezierPoint *
+            control1: BezierPoint *
+            control2: BezierPoint *
+            endPoint: BezierPoint
+
+    type Error =
+        | SplitOutsideBezier
+        | DegenerateTangent
+        | UnderdeterminedCubicFit
+        | InvalidCubicSelfIntersectionMinimumArcLengthSeparation of minimumArcLengthSeparation: float<length>
+        | InvalidCubicSelfIntersectionDistanceTolerance of distanceTolerance: float<length>
+
     let private parameter value = Parameter.fromFloat value
     let private ratio value = Parameter.ratio value
 

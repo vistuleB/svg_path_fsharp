@@ -26,8 +26,8 @@ let ``forced_parity_reduces_unique_edge_without_mutating_graph_test`` () =
     let capacities =
         Offset.forcedParityCapacities
             graph
-            [ RequiredVertexParity(startVertex.Id, 1)
-              RequiredVertexParity(endVertex.Id, 1) ]
+            [ Offset.RequiredVertexParity(startVertex.Id, 1)
+              Offset.RequiredVertexParity(endVertex.Id, 1) ]
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, (Assert.Single capacities).Capacity)
     Assert.Equal(2, originalEdge.ForwardMultiplicity)
@@ -35,9 +35,9 @@ let ``forced_parity_reduces_unique_edge_without_mutating_graph_test`` () =
 [<Fact>]
 let ``forced_parity_reports_capacity_infeasibility_test`` () =
     let graph = buildSegments [ line 0.0 0.0 1.0 0.0 ] |> _.Graph
-    let capacities = graph.Edges |> List.map (fun edge -> { EdgeId = edge.Id; Capacity = 0 })
-    match Offset.forcedParityCapacitiesWith graph capacities [ RequiredVertexParity(0, 1) ] with
-    | Error(ForcedParityInfeasible 0) -> ()
+    let capacities = graph.Edges |> List.map (fun edge -> ({ EdgeId = edge.Id; Capacity = 0 }: Offset.EdgeCapacityAssignment))
+    match Offset.forcedParityCapacitiesWith graph capacities [ Offset.RequiredVertexParity(0, 1) ] with
+    | Error(Offset.ForcedParityInfeasible 0) -> ()
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
@@ -49,8 +49,8 @@ let ``forced_parity_reports_unresolved_diamond_choice_test`` () =
     let build = buildSegments [ Line(source, upper); Line(upper, sink); Line(source, lower); Line(lower, sink) ]
     let sourceVertex = build.Graph.Vertices |> List.find (fun vertex -> vertex.Point = source)
     let sinkVertex = build.Graph.Vertices |> List.find (fun vertex -> vertex.Point = sink)
-    match Offset.forcedParityCapacities build.Graph [ RequiredVertexParity(sourceVertex.Id, 1); RequiredVertexParity(sinkVertex.Id, 1) ] with
-    | Error(ForcedParityAmbiguous vertices) -> Assert.Equal(2, vertices.Length)
+    match Offset.forcedParityCapacities build.Graph [ Offset.RequiredVertexParity(sourceVertex.Id, 1); Offset.RequiredVertexParity(sinkVertex.Id, 1) ] with
+    | Error(Offset.ForcedParityAmbiguous vertices) -> Assert.Equal(2, vertices.Length)
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
@@ -60,7 +60,7 @@ let ``forced_parity_reduces_unique_edge_at_higher_threshold_test`` () =
     let reduced =
         Offset.forcedParityCapacitiesWith
             build.Graph
-            [ { EdgeId = first.Id; Capacity = 2 }; { EdgeId = second.Id; Capacity = 3 }; { EdgeId = third.Id; Capacity = 2 } ]
+            [ ({ EdgeId = first.Id; Capacity = 2 }: Offset.EdgeCapacityAssignment); ({ EdgeId = second.Id; Capacity = 3 }: Offset.EdgeCapacityAssignment); ({ EdgeId = third.Id; Capacity = 2 }: Offset.EdgeCapacityAssignment) ]
             []
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal<int list>([ 2; 2; 2 ], reduced |> List.map _.Capacity)
@@ -71,14 +71,14 @@ let ``preferred_parity_guides_reduction_but_allows_isolation_test`` () =
     let first = buildSegments [ line ]
     let startVertex, endVertex = first.Graph.Vertices[0], first.Graph.Vertices[1]
     let isolated =
-        Offset.forcedParityCapacities first.Graph [ RequiredVertexParity(startVertex.Id, 0); PreferredVertexParity(endVertex.Id, 1) ]
+        Offset.forcedParityCapacities first.Graph [ Offset.RequiredVertexParity(startVertex.Id, 0); Offset.PreferredVertexParity(endVertex.Id, 1) ]
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(0, isolated.Head.Capacity)
 
     let doubled = buildSegments [ line; line ]
     let startVertex, endVertex = doubled.Graph.Vertices[0], doubled.Graph.Vertices[1]
     let preserved =
-        Offset.forcedParityCapacities doubled.Graph [ PreferredVertexParity(startVertex.Id, 1); PreferredVertexParity(endVertex.Id, 1) ]
+        Offset.forcedParityCapacities doubled.Graph [ Offset.PreferredVertexParity(startVertex.Id, 1); Offset.PreferredVertexParity(endVertex.Id, 1) ]
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, preserved.Head.Capacity)
 
@@ -93,7 +93,7 @@ let ``forced_parity_accepts_explicit_initial_capacities_test`` () =
     let build = buildSegments [ line 0.0 0.0 10.0 0.0; line 0.0 0.0 10.0 0.0 ]
     let edge = build.Graph.Edges.Head
     let zero =
-        Offset.forcedParityCapacitiesWith build.Graph [ { EdgeId = edge.Id; Capacity = 0 } ] []
+        Offset.forcedParityCapacitiesWith build.Graph [ ({ EdgeId = edge.Id; Capacity = 0 }: Offset.EdgeCapacityAssignment) ] []
         |> Result.defaultWith (failwithf "%A")
         |> List.exactlyOne
     Assert.Equal(0, zero.Capacity)
@@ -102,8 +102,8 @@ let ``forced_parity_accepts_explicit_initial_capacities_test`` () =
     let reduced =
         Offset.forcedParityCapacitiesWith
             build.Graph
-            [ { EdgeId = edge.Id; Capacity = 2 } ]
-            [ RequiredVertexParity(startVertex.Id, 1); RequiredVertexParity(endVertex.Id, 1) ]
+            [ ({ EdgeId = edge.Id; Capacity = 2 }: Offset.EdgeCapacityAssignment) ]
+            [ Offset.RequiredVertexParity(startVertex.Id, 1); Offset.RequiredVertexParity(endVertex.Id, 1) ]
         |> Result.defaultWith (failwithf "%A")
         |> List.exactlyOne
     Assert.Equal(1, reduced.Capacity)
@@ -113,7 +113,7 @@ let ``forced_parity_rejects_invalid_vertex_parities_test`` () =
     let build = buildSegments [ line 0.0 0.0 10.0 0.0 ]
     let vertex = build.Graph.Vertices.Head
     Assert.Equal(
-        Error(ForcedParityDuplicateVertex vertex.Id),
-        Offset.forcedParityCapacities build.Graph [ RequiredVertexParity(vertex.Id, 0); RequiredVertexParity(vertex.Id, 1) ])
-    Assert.Equal(Error(ForcedParityMissingVertex 999), Offset.forcedParityCapacities build.Graph [ RequiredVertexParity(999, 0) ])
-    Assert.Equal(Error(ForcedParityInvalidVertexParity(vertex.Id, 2)), Offset.forcedParityCapacities build.Graph [ RequiredVertexParity(vertex.Id, 2) ])
+        Error(Offset.ForcedParityDuplicateVertex vertex.Id),
+        Offset.forcedParityCapacities build.Graph [ Offset.RequiredVertexParity(vertex.Id, 0); Offset.RequiredVertexParity(vertex.Id, 1) ])
+    Assert.Equal(Error(Offset.ForcedParityMissingVertex 999), Offset.forcedParityCapacities build.Graph [ Offset.RequiredVertexParity(999, 0) ])
+    Assert.Equal(Error(Offset.ForcedParityInvalidVertexParity(vertex.Id, 2)), Offset.forcedParityCapacities build.Graph [ Offset.RequiredVertexParity(vertex.Id, 2) ])

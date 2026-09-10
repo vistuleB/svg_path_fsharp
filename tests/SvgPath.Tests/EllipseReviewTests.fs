@@ -10,7 +10,7 @@ let ``transformed axes preserves small nonsingular eigenvalue`` () =
 let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 [<Fact>]
 let ``collapsed quarter preserves direction and endpoints`` () =
-    let arc = Arc { Start=p 1. 0.; Radius=p 1. 1.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=p 0. 1. }
+    let arc = Arc ({ Start=p 1. 0.; Radius=p 1. 1.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=p 0. 1. }: Ellipse.EndpointArcData)
     Assert.Equal(Ok(Line(p 1. 0.,p 0. 0.)),Transform.segmentGracefully arc (Transform.scaleXY 1.0 0.0))
     Assert.Equal(Ok(Line(p -1. 0.,p 0. 0.)),Transform.segmentGracefully arc (Transform.scaleXY -1.0 0.0))
 [<Fact>]
@@ -21,8 +21,8 @@ let ``small rotated ellipse identity preserves axes`` () =
     Assert.True(abs(angle-17.0<degree>)<1e-9<degree>)
 [<Fact>]
 let ``coincident signed zero endpoints are degenerate`` () =
-    Assert.Equal(Error DegenerateInputArc,Ellipse.endpointToCenter { Start=p 0. 0.; Radius=p 10. 10.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=p -0. 0. })
-let private quarter = { Center=p 0. 0.; Radius=p 1. 1.; XAxisRotation=0.0<degree>; StartAngle=0.0<degree>; DeltaAngle=90.0<degree> }
+    Assert.Equal(Error Ellipse.DegenerateInputArc,Ellipse.endpointToCenter ({ Start=p 0. 0.; Radius=p 10. 10.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=p -0. 0. }: Ellipse.EndpointArcData))
+let private quarter = ({ Center=p 0. 0.; Radius=p 1. 1.; XAxisRotation=0.0<degree>; StartAngle=0.0<degree>; DeltaAngle=90.0<degree> }: Ellipse.CenterArcData)
 [<Fact>]
 let ``multi turn projection extrema include each visit`` () =
     for t in [8.0<parameter>;-8.0<parameter>] do

@@ -13,7 +13,7 @@ let private assertPointNear expected actual =
 let ``graceful arc subpaths preserve exact noncardinal endpoints`` () =
     let matrix = Transform.scaleXY 1.0 0.0
     for largeArc in [false;true] do
-        let arc = Arc {Start=point 3. 4.;Radius=point 5. 5.;XAxisRotation=0.0<degree>;LargeArc=largeArc;Sweep=true;End=point -3. 4.}
+        let arc = Arc ({Start=point 3. 4.;Radius=point 5. 5.;XAxisRotation=0.0<degree>;LargeArc=largeArc;Sweep=true;End=point -3. 4.}: Ellipse.EndpointArcData)
         let part = Transform.segmentToSubpathGracefully arc matrix |> Result.defaultWith (failwithf "%A")
         Assert.Equal(Affine.point matrix (Segment.start arc),Subpath.start part)
         Assert.Equal(Affine.point matrix (Segment.finish arc),Subpath.finish part)
@@ -32,9 +32,9 @@ let ``graceful arc subpaths preserve exact noncardinal endpoints`` () =
 
 [<Fact>]
 let ``singular oblique arc transform uses graceful collapse`` () =
-    let arc = Arc {Start=point 3. 4.;Radius=point 3. 2.;XAxisRotation=2.0<degree>;LargeArc=false;Sweep=true;End=point -3. 4.}
+    let arc = Arc ({Start=point 3. 4.;Radius=point 3. 2.;XAxisRotation=2.0<degree>;LargeArc=false;Sweep=true;End=point -3. 4.}: Ellipse.EndpointArcData)
     let matrix = Affine.fromTuple(1.,2.,0.,0.,0.0<length>,0.0<length>)
-    Assert.Equal(Error DegenerateArcTransform,Transform.segment arc matrix)
+    Assert.Equal(Error Transform.DegenerateArcTransform,Transform.segment arc matrix)
     match Transform.segmentGracefully arc matrix with
     | Ok(Line _) -> ()
     | other -> failwithf "%A" other
@@ -82,12 +82,12 @@ let ``line and Bezier segments transform control geometry`` () =
 let ``arc reflection reverses sweep`` () =
     let arc =
         Arc
-            { Start = point 0.0 0.0
-              Radius = point 5.0 3.0
-              XAxisRotation = degrees 20.0
-              LargeArc = false
-              Sweep = true
-              End = point 8.0 2.0 }
+            ({ Start = point 0.0 0.0
+               Radius = point 5.0 3.0
+               XAxisRotation = degrees 20.0
+               LargeArc = false
+               Sweep = true
+               End = point 8.0 2.0 }: Ellipse.EndpointArcData)
     let transformed =
         Transform.segment arc (Transform.scaleXY -1.0 1.0)
         |> Result.defaultWith (failwithf "%A")
@@ -102,14 +102,14 @@ let ``arc reflection reverses sweep`` () =
 let ``collapsed arc can be handled strictly or gracefully`` () =
     let arc =
         Arc
-            { Start = point 0.0 0.0
-              Radius = point 5.0 5.0
-              XAxisRotation = 0.0<degree>
-              LargeArc = false
-              Sweep = true
-              End = point 10.0 0.0 }
+            ({ Start = point 0.0 0.0
+               Radius = point 5.0 5.0
+               XAxisRotation = 0.0<degree>
+               LargeArc = false
+               Sweep = true
+               End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let collapse = Transform.scaleXY 1.0 0.0
-    Assert.Equal(Error DegenerateArcTransform, Transform.segment arc collapse)
+    Assert.Equal(Error Transform.DegenerateArcTransform, Transform.segment arc collapse)
     match Transform.segmentToSubpathGracefully arc collapse with
     | Ok subpath ->
         Assert.False(List.isEmpty subpath.Segments)
@@ -136,7 +136,7 @@ let ``subpath and path transforms preserve closure and ordering`` () =
 let ``anchor transforms use geometry bounding boxes`` () =
     let line = Line(point 2.0 3.0, point 6.0 7.0)
     let rotated =
-        Transform.segmentAboutAnchor line (Transform.rotate (degrees 180.0)) Center
+        Transform.segmentAboutAnchor line (Transform.rotate (degrees 180.0)) Transform.Center
         |> Result.defaultWith (failwithf "%A")
     match rotated with
     | Line(startPoint, endPoint) ->
@@ -148,4 +148,4 @@ let ``anchor transforms use geometry bounding boxes`` () =
 let ``invalid matrices are rejected before geometry transformation`` () =
     let invalid = Transform.scale infinity
     let line = Line(point 0.0 0.0, point 1.0 1.0)
-    Assert.Equal(Error InvalidMatrix, Transform.segment line invalid)
+    Assert.Equal(Error Transform.InvalidMatrix, Transform.segment line invalid)

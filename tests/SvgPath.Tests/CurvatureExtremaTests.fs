@@ -3,13 +3,13 @@ open SvgPath
 open Xunit
 let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private get result = result |> Result.defaultWith (failwithf "%A")
-let private options tolerance : CurvatureOptions = { Tolerance=Parameter.fromFloat tolerance; MaxDepth=48 }
+let private options tolerance : Curvature.Options = { Tolerance=Parameter.fromFloat tolerance; MaxDepth=48 }
 let private arch = CubicBezier(p 0. 0.,p 1. 0.,p 1. 0.,p 1. -1.)
 let private near tolerance expected actual = Assert.True(abs(actual-expected)<Parameter.fromFloat tolerance)
 let private parabola = QuadraticBezier(p 0. 0.,p 0.5 0.,p 1. 1.)
 [<Fact>]
 let ``cusp depth exhaustion reports remaining bracket`` () =
-    Assert.Equal(Error(CurvatureMaxDepthReached(0.0<parameter>,0.5<parameter>)),
+    Assert.Equal(Error(Curvature.CurvatureMaxDepthReached(0.0<parameter>,0.5<parameter>)),
         Curvature.segmentLeftNormalCuspParameters parabola -1.0<length> { Tolerance=1e-12<parameter>; MaxDepth=1 })
 [<Fact>]
 let ``cusp exact root at depth limit succeeds`` () =
@@ -61,7 +61,7 @@ let ``stationary interior is not a cusp root`` () =
     Assert.True(roots[0]<0.5<parameter> && roots[1]>0.5<parameter>)
     near 1e-8 1.0<parameter> (roots[0]+roots[1])
     Assert.Equal(Ok [],Curvature.segmentLeftNormalCuspParameters curve 0.0<length> Curvature.defaultOptions)
-let private arc radius finish = Arc { Start=p 4. 0.; Radius=radius; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }
+let private arc radius finish = Arc ({ Start=p 4. 0.; Radius=radius; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }: Ellipse.EndpointArcData)
 [<Fact>]
 let ``circle constant cusp returns interval endpoints`` () =
     let curve = arc (p 4. 4.) (p 0. 4.)

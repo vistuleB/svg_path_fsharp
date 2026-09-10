@@ -1,26 +1,27 @@
 namespace SvgPath
 
-open System
-
-/// One item rendered inside a generated SVG document.
-type ThingToDraw =
-    | StyledPath of Path * style: string
-    | Rectangle of topLeft: Point<length> * width: float<length> * height: float<length> * style: string
-    | RotatedRectangle of topLeft: Point<length> * width: float<length> * height: float<length> * style: string * rotation: float<degree> * origin: Point<length>
-    | Circle of center: Point<length> * radius: float<length> * style: string
-    | Ellipse of center: Point<length> * radius: Point<length> * style: string
-    | Text of label: string * style: string * point: Point<length> * fontSize: float<length>
-    | RotatedText of label: string * style: string * point: Point<length> * fontSize: float<length> * rotation: float<degree> * origin: Point<length>
-
-type ThingsToDraw = ThingToDraw list
-
 /// Helpers for reading and writing SVG elements that contain path geometry.
 [<RequireQualifiedAccess>]
 module Svg =
+
+    open System
+
+    /// One item rendered inside a generated SVG document.
+    type ThingToDraw =
+        | StyledPath of Path * style: string
+        | Rectangle of topLeft: Point<length> * width: float<length> * height: float<length> * style: string
+        | RotatedRectangle of topLeft: Point<length> * width: float<length> * height: float<length> * style: string * rotation: float<degree> * origin: Point<length>
+        | Circle of center: Point<length> * radius: float<length> * style: string
+        | Ellipse of center: Point<length> * radius: Point<length> * style: string
+        | Text of label: string * style: string * point: Point<length> * fontSize: float<length>
+        | RotatedText of label: string * style: string * point: Point<length> * fontSize: float<length> * rotation: float<degree> * origin: Point<length>
+
+    type ThingsToDraw = ThingToDraw list
+
     let private numberFormat numbers =
         NumberFormat.prepare
-            { LeftDecimals = Succinct
-              RightDecimals = AtMost 5 }
+            { LeftDecimals = NumberFormat.Succinct
+              RightDecimals = NumberFormat.AtMost 5 }
             numbers
 
     let private number (value: float<'unit>) format = NumberFormat.number (float value) format

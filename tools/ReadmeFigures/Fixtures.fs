@@ -18,10 +18,10 @@ module Fixtures =
 
     let singleOffsetFinalTrimming () =
         let source = parse "M0 -1L-.8660254 -.5L.8660254 .5L.8660254 -.5L-.8660254 .5L0 1"
-        [ NoTrimming,"No final trimming"; CuspTrimming,"Cusp trimming"; InBandTrimming,"In-band trimming" ]
+        [ Offset.NoTrimming,"No final trimming"; Offset.CuspTrimming,"Cusp trimming"; Offset.InBandTrimming,"In-band trimming" ]
         |> List.mapi (fun i (finish,title) ->
-            let options = { Offset.defaultOptions with SingleOffsetTrimming={Offside=false;FinalTrimming=finish} }
-            let answer = offset options 0.2<length> Round Butt source
+            let options = { Offset.defaultOptions with Offset.SingleOffsetTrimming=({Offside=false;FinalTrimming=finish}: Offset.SingleOffsetTrimming) }
+            let answer = offset options 0.2<length> Offset.Round Offset.Butt source
             let x = 175 + i*350
             String.concat "\n" [label x 30 title; panelPath x 170 90.0 source sourceStyle; panelPath x 170 90.0 answer resultStyle])
         |> String.concat "\n" |> document 1050 320
@@ -30,8 +30,8 @@ module Fixtures =
         let source = parse "M-2 -1.5H2V1.5H-2ZM-1 -.5V.5H1V-.5Z"
         [false,"offside: False";true,"offside: True"]
         |> List.mapi (fun i (offside,title) ->
-            let options = {Offset.defaultOptions with SingleOffsetTrimming={Offside=offside;FinalTrimming=NoTrimming}}
-            let answer = offset options 1.2<length> Round Butt source
+            let options = {Offset.defaultOptions with Offset.SingleOffsetTrimming=({Offside=offside;FinalTrimming=Offset.NoTrimming}: Offset.SingleOffsetTrimming)}
+            let answer = offset options 1.2<length> Offset.Round Offset.Butt source
             let x=300+i*600
             String.concat "\n" [label x 32 title;panelPath x 190 75.0 source sourceStyle;panelPath x 190 75.0 answer resultStyle])
         |> String.concat "\n" |> document 1200 380
@@ -40,8 +40,8 @@ module Fixtures =
     let bandCuspTrimming () =
         [true,true,"inner_cusps: True · outer_cusps: True";false,true,"inner_cusps: False · outer_cusps: True";false,false,"inner_cusps: False · outer_cusps: False"]
         |> List.mapi(fun i (inner,outer,title) ->
-            let options={Offset.defaultOptions with BandTrimming={InnerCusps=inner;OuterCusps=outer;InBand=true}}
-            let answer=band options 1.7<length> 1.8<length> Round Butt concaveSquare
+            let options={Offset.defaultOptions with Offset.BandTrimming=({InnerCusps=inner;OuterCusps=outer;InBand=true}: Offset.BandTrimming)}
+            let answer=band options 1.7<length> 1.8<length> Offset.Round Offset.Butt concaveSquare
             let x=70+i*420
             String.concat "\n" [label (x+140) 30 title;panelPath x 95 65.0 answer "fill:#fdba74;fill-opacity:.55;stroke:#c2410c;stroke-width:.025";panelPath x 95 65.0 (Path.ofSubpaths[concaveSquare]) sourceStyle])
         |> String.concat "\n" |> document 1260 390
@@ -50,8 +50,8 @@ module Fixtures =
     let bandInBandTrimming () =
         [false,"in_band: False";true,"in_band: True"]
         |> List.mapi(fun i (inBand,title) ->
-            let options={Offset.defaultOptions with BandTrimming={InnerCusps=true;OuterCusps=true;InBand=inBand}}
-            let answer=band options 18.0<length> 34.0<length> Round Butt figureEight
+            let options={Offset.defaultOptions with Offset.BandTrimming=({InnerCusps=true;OuterCusps=true;InBand=inBand}: Offset.BandTrimming)}
+            let answer=band options 18.0<length> 34.0<length> Offset.Round Offset.Butt figureEight
             let x=320+i*640
             String.concat "\n" [label x 32 title;panelPath x 220 0.78 answer "fill:#bbf7d0;stroke:#14532d;stroke-width:2.2";panelPath x 220 0.78 (Path.ofSubpaths[figureEight]) "fill:none;stroke:#be123c;stroke-width:2;stroke-dasharray:7 6"])
         |> String.concat "\n" |> document 1280 440
@@ -59,7 +59,7 @@ module Fixtures =
     let private arrangementFigure source =
         let built=Arrangement.build [source] 1e-6<length> 1e-5<length> |> require "arrangement"
         let box: BoundingBox={ Min=Point.create -10.0<length> -10.0<length>; Max=Point.create 410.0<length> 310.0<length> }
-        Svg.document (Rectangle(Point.create -10.0<length> -10.0<length>,420.0<length>,320.0<length>,"fill:white")::ArrangementDrawing.drawing built.Graph) box
+        Svg.document (Svg.Rectangle(Point.create -10.0<length> -10.0<length>,420.0<length>,320.0<length>,"fill:white")::ArrangementDrawing.drawing built.Graph) box
     let arrangementOverlappingSquares () = arrangementFigure(parse "M30 30H230V230H30ZM150 80H350V280H150Z")
     let arrangementSemanticCircleOverlap () = arrangementFigure(parse "M210 60A100 100 0 1 1 209.999 60ZM240 60A100 100 0 1 1 239.999 60Z")
 

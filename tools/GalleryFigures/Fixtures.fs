@@ -17,25 +17,25 @@ module Fixtures =
     let only (p: Path) = match p.Subpaths with [s] -> s | _ -> failwith "expected one subpath"
     let sourceStyle s = layer (path s) "none" "#be123c" 1.5
     let green p = layer p "#bbf7d0" "#14532d" 1.5
-    let band s inner outer = Offset.subpathBand s (inner*1.0<length>) (outer*1.0<length>) Round Butt |> require "band"
+    let band s inner outer = Offset.subpathBand s (inner*1.0<length>) (outer*1.0<length>) Offset.Round Offset.Butt |> require "band"
     let figureEight = subpath "M0 0C-336 -234 -336 234 0 0C336 -234 336 234 0 0Z"
     let figureBand = lazy (band figureEight 18.0 34.0)
     let rect x y xx yy = parse (sprintf "M%g %gH%gV%gH%gZ" x y xx yy x)
     let roundedRectangles () =
         let rectangles = [rect 0.0 22.0 96.0 118.0; rect 42.0 0.0 150.0 64.0; rect 118.0 38.0 210.0 118.0; rect 24.0 88.0 146.0 146.0; rect 152.0 86.0 226.0 152.0]
         let union = rectangles |> List.fold (fun p next -> (Csg.union p next Nonzero |> require "union").Path) Path.empty
-        let rounded = Effects.roundCornersWith union 8.0<length> {Effects.defaultRoundCornerOptions with Failure=AdaptRadius} |> require "round corners"
+        let rounded = Effects.roundCornersWith union 8.0<length> {Effects.defaultRoundCornerOptions with Failure=Effects.AdaptRadius} |> require "round corners"
         panels 330 300 ["Rectangles",[layer (combine rectangles) "#d9f99d" "#365314" 2.0]; "Union",[layer union "#bfdbfe" "#1f2937" 3.0]; "Rounded union",[green rounded]]
     let strokeCaps () =
         let s = subpath "M0 20C40 -58 100 78 150 0"
-        ["Butt",Butt;"Square",Square;"Round",RoundCap]
-        |> List.map(fun (name,cap) -> name,[layer (Stroke.subpath s 28.0<length> Round cap |> require "stroke") "#fed7aa" "#7c2d12" 2.5;sourceStyle s])
+        ["Butt",Offset.Butt;"Square",Offset.Square;"Round",Offset.RoundCap]
+        |> List.map(fun (name,cap) -> name,[layer (Stroke.subpath s 28.0<length> Offset.Round cap |> require "stroke") "#fed7aa" "#7c2d12" 2.5;sourceStyle s])
         |> panels 330 280
     let dashSource = subpath "M0 28C48 -62 112 88 154 16C194 -52 218 70 188 42"
     let dashedStrokes () =
         ["Short dashes",[18.;12.],0.,"#fecaca","#7f1d1d";"Offset pattern",[26.;12.;8.;12.],18.,"#fde68a","#854d0e";"Round caps",[34.;18.],9.,"#bbf7d0","#14532d"]
         |> List.map(fun (title,pattern,phase,fill,color) ->
-            let result = Stroke.subpathDashed dashSource 16.0<length> (List.map (fun x -> x*1.0<length>) pattern) (phase*1.0<length>) Round RoundCap |> require "dashed stroke"
+            let result = Stroke.subpathDashed dashSource 16.0<length> (List.map (fun x -> x*1.0<length>) pattern) (phase*1.0<length>) Offset.Round Offset.RoundCap |> require "dashed stroke"
             title,[layer result fill color 2.2;sourceStyle dashSource]) |> panels 330 300
     let recursiveDashes () =
         let s = subpath "M0 34C88 -112 180 146 270 10C344 -98 418 138 520 22"
@@ -49,11 +49,11 @@ module Fixtures =
                 lastOn finish (if on then 48. else 112.) (not on) (if on then finish else last)
         let ending = lastOn 0. 102. true 0.
         let s = Subpath.betweenLengths s 0.0<length> (ending*1.0<length>) |> require "truncate dash source"
-        let first = Stroke.subpathDashed s 58.0<length> [112.0<length>;48.0<length>] 10.0<length> Round RoundCap |> require "first dash stroke"
+        let first = Stroke.subpathDashed s 58.0<length> [112.0<length>;48.0<length>] 10.0<length> Offset.Round Offset.RoundCap |> require "first dash stroke"
         let second = first.Subpaths |> List.collect(fun outline ->
             Stroke.subpathDashes outline [17.0<length>;9.0<length>] 3.0<length> |> require "second dashes"
             |> List.filter(fun dash -> (Subpath.length dash |> require "dash length") > 0.1<length>)
-            |> List.map(fun dash -> Stroke.subpath dash 6.0<length> Round RoundCap |> require "second dash stroke")) |> combine
+            |> List.map(fun dash -> Stroke.subpath dash 6.0<length> Offset.Round Offset.RoundCap |> require "second dash stroke")) |> combine
         panels 1000 450 ["Recursive dashes",[(first,"fill:#fed7aa;stroke:#9a3412;stroke-width:1.4;opacity:.42");layer second "#fee2e2" "#7f1d1d" 1.7;sourceStyle s]]
     let figureEightBand () = panels 900 420 ["Offsets +18 / +34",[green figureBand.Value;sourceStyle figureEight]]
     let symmetricBands () =
@@ -61,7 +61,7 @@ module Fixtures =
         [10.,20.; -5.,25.] |> List.map(fun (a,b) -> sprintf "Offsets %g / %g" a b,[green (band s a b);sourceStyle s]) |> panels 500 470
     let colors = [|"#ef4444";"#3b82f6";"#22c55e";"#f59e0b";"#a855f7";"#06b6d4";"#ec4899";"#84cc16"|]
     let correspondence () =
-        let untrimmed = Offset.subpathBandUntrimmed figureEight 18.0<length> 34.0<length> Round |> require "untrimmed band"
+        let untrimmed = Offset.subpathBandUntrimmed figureEight 18.0<length> 34.0<length> Offset.Round |> require "untrimmed band"
         let blocks =
             match untrimmed.Subpaths with
             | [inner;outer] ->
@@ -79,7 +79,7 @@ module Fixtures =
     let trackSource = subpath "M0 32C82 -108 150 142 232 12C300 -92 414 118 532 -16"
     let family s offsets (palette: string array) =
         (offsets |> List.mapi(fun i d ->
-            let result=Offset.subpathUntrimmed s (d*1.0<length>) Round |> require "untrimmed offset"
+            let result=Offset.subpathUntrimmed s (d*1.0<length>) Offset.Round |> require "untrimmed offset"
             layer (path result) "none" palette[i % Array.length palette] 2.8)) @ [sourceStyle s]
     let tracks () = panels 1000 350 ["Untrimmed offset tracks",family trackSource [-42.;-28.;-14.;14.;28.;42.] [|"#7f1d1d";"#c2410c";"#b45309";"#047857";"#0369a1";"#6d28d9"|]]
     let earth () =
@@ -87,15 +87,15 @@ module Fixtures =
         |> List.map(fun (title,data) -> title,family (subpath data) [8.;16.;24.;32.;40.] [|"#5f4339";"#8a5a3c";"#a36a2d";"#7c6a3d";"#51633f"|]) |> panels 330 300
     let packageFirst () =
         let source=sourceFile "package_title.svg"
-        let options={Offset.defaultOptions with Fitting={Tolerance=0.01<length>;Samples=5;MaxDepth=12}}
-        let raw=Offset.pathUntrimmedWith source 1.05<length> (Miter Offset.defaultMiterLimit) options |> require "title untrimmed"
-        let result=Offset.pathWith source 1.05<length> (Miter Offset.defaultMiterLimit) Butt options |> require "title offset"
+        let options={Offset.defaultOptions with Fitting=({Tolerance=0.01<length>;Samples=5;MaxDepth=12}: Offset.FittingOptions)}
+        let raw=Offset.pathUntrimmedWith source 1.05<length> (Offset.Miter Offset.defaultMiterLimit) options |> require "title untrimmed"
+        let result=Offset.pathWith source 1.05<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt options |> require "title offset"
         panels 1800 430 ["Offset 1.05",[(source,"fill:#111827;opacity:.18");layer raw "none" "#9ca3af" 0.1;layer result "none" "#2563eb" 0.16]]
     let packageNine () =
         let source=sourceFile "package_title.svg"
         let levels=[1..9] |> List.scan(fun p level ->
             printfn "  title offset %d/9" level
-            Offset.path p 1.04<length> (Miter Offset.defaultMiterLimit) Butt |> require "successive title offset") source |> List.tail
+            Offset.path p 1.04<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt |> require "successive title offset") source |> List.tail
         let palette=[|"#2563eb";"#dc2626";"#16a34a";"#9333ea";"#ea580c";"#0891b2";"#be185d";"#4f46e5";"#0d9488"|]
         panels 1800 440 ["Nine offsets at 1.04",(source,"fill:#111827;opacity:.14")::(levels |> List.mapi(fun i p -> layer p "none" palette[i] 0.055))]
     let crescent () =
@@ -108,7 +108,7 @@ module Fixtures =
             {circle with X=chord+fraction*(circle.X-chord)})
         let cloud=Path.ofSubpaths (Subpath.ofSegment(Line(start,finish))::List.map Subpath.empty points)
         let hull=ConvexHull.pathHull cloud |> require "crescent hull"
-        let reference=Subpath.ofSegment(Arc {Start=start; Radius=point 120. 120.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish}) |> path
+        let reference=Subpath.ofSegment(Arc ({Start=start; Radius=point 120. 120.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish}: Ellipse.EndpointArcData)) |> path
         let matrix=Transform.matrix 5.8 0. 0. 2. (-482.4<length>) 182.0<length>
         let display p=Transform.path p matrix |> require "crescent transform"
         let markers=points |> List.map(fun p ->
@@ -143,7 +143,7 @@ module Fixtures =
                     "nested-evenodd",nested,rect 42. 32. 78. 68.,EvenOdd
                     "bowtie-rectangle",parse "M5 5L115 95L115 5L5 95Z",rect 35. 25. 88. 82.,Nonzero]
         let render operation a b rule () =
-            let result=(operation a b rule |> require "boolean").Path
+            let result=(operation a b rule |> require "boolean" : Csg.CsgResult).Path
             let graph=Arrangement.build [a;b] 1e-6<length> 1e-5<length> |> require "arrangement"
             let edges=graph.Graph.Edges |> List.map(fun edge -> path(Subpath.ofSegment edge.Segment) |> fun p -> layer p "none" "#334155" 0.65)
             let fill=if rule=EvenOdd then "fill-rule:evenodd" else "fill-rule:nonzero"
@@ -172,5 +172,5 @@ module Fixtures =
          "gallery-cut-radiator.svg",radiator
          "gallery-package-title-second-offset-arrangement.svg",ArrangementCapture.generate
          "gallery-lazy-dog-offset-coil.svg",OffsetText.generate false
-         "gallery-lazy-dog-offset-decaying-spiral.svg",OffsetText.generate true] @ csgCases()
+         "gallery-lazy-dog-offset-decaying-spiral.svg",OffsetText.generate true] @ csgCases() @ W3cJoins.all
     let snapshots : string list = []

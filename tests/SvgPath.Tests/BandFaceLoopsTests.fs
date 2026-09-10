@@ -97,4 +97,4 @@ let ``triple_multiplicity_is_not_silently_dropped_test`` () =
 let ``empty_and_open_inputs_have_explicit_contracts_test`` () =
     Assert.True(Offset.enumerateBandFaceLoops Path.empty = Ok Path.empty)
     let source = [p(0.0,0.0);p(1.0,0.0)] |> Subpath.polyline |> unwrap
-    Assert.True(Offset.enumerateBandFaceLoops (path [source]) = Error InternalBandSubpathNotClosed)
+    Assert.True(Offset.enumerateBandFaceLoops (path [source]) = Error Offset.InternalBandSubpathNotClosed)

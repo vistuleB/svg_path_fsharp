@@ -1,16 +1,17 @@
 namespace SvgPath
 
-[<Struct>]
-type ClipOptions =
-    { Intersection: IntersectionOptions
-      Containment: ContainmentOptions
-      Tolerance: float<length> }
-
 /// Clipping of subpaths and paths against filled path regions.
 /// Open clipping-region subpaths include implicit straight closure edges;
 /// open input curves remain open.
 [<RequireQualifiedAccess>]
 module Clip =
+
+    [<Struct>]
+    type Options =
+        { Intersection: Intersections.IntersectionOptions
+          Containment: ContainmentOptions
+          Tolerance: float<length> }
+
     let defaultOptions =
         { Intersection = Intersections.defaultOptions
           Containment = WindingField.defaultOptions

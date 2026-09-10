@@ -6,7 +6,7 @@ open Xunit
 module TransformSerializeTests =
     [<Fact>]
     let ``transform serialization preserves small shear`` () =
-        let options = {DecimalPlaces=None;FixedDecimals=false;ForceMatrix=false}
+        let options = ({DecimalPlaces=None;FixedDecimals=false;ForceMatrix=false}: TransformSerialize.Options)
         for scale,shear in [2.0,1e-6;2.0,-1e-6;2000000.0,1.0] do
             let matrix = Transform.fromTuple (scale,0.0,shear,scale,0.0<length>,0.0<length>)
             let text = TransformSerialize.toStringWith matrix options
@@ -109,9 +109,9 @@ module TransformSerializeTests =
             Transform.scale 1.0000005
             |> fun scale -> Transform.chain scale (Transform.rotate 90.0<degree>)
         let options =
-            { DecimalPlaces = None
-              FixedDecimals = false
-              ForceMatrix = false }
+            ({ DecimalPlaces = None
+               FixedDecimals = false
+               ForceMatrix = false }: TransformSerialize.Options)
         Assert.Equal("rotate(90) scale(1.0000005)", TransformSerialize.toStringWith transform options)
 
         let machineEpsilonScale =

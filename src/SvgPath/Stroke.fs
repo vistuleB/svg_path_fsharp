@@ -1,33 +1,34 @@
 namespace SvgPath
 
-type StrokeError =
-    | StrokePathError of error: SegmentError
-    | StrokeOffsetError of error: Error
-    | InvalidStrokeOutlineWidth of width: float<length>
-    | InvalidDashLength of length: float<length>
-    | InvalidDashOffset of offset: float<length>
-    | InvalidDashPatternLength
-
-[<Struct>]
-/// Stroke width and technical offset settings; join and cap are operation arguments.
-/// Stroke overrides trimming: side cusp trimming is disabled, final in-band
-/// trimming enabled. Single-offset trimming options do not apply.
-type StrokeOptions =
-    { Width: float<length>
-      Offset: Options }
-
-[<Struct>]
-type DashOptions =
-    { Pattern: float<length> list
-      Offset: float<length>
-      LengthOptions: LengthOptions }
-
 /// Dash-pattern application and stroke-outline construction.
 /// Outline operations require explicit styles; pure dash extraction does not.
 [<RequireQualifiedAccess>]
 module Stroke =
-    type Join = SvgPath.Join
-    type Cap = SvgPath.Cap
+
+    type Error =
+        | StrokePathError of error: SegmentError
+        | StrokeOffsetError of error: Offset.Error
+        | InvalidStrokeOutlineWidth of width: float<length>
+        | InvalidDashLength of length: float<length>
+        | InvalidDashOffset of offset: float<length>
+        | InvalidDashPatternLength
+
+    [<Struct>]
+    /// Stroke width and technical offset settings; join and cap are operation arguments.
+    /// Stroke overrides trimming: side cusp trimming is disabled, final in-band
+    /// trimming enabled. Single-offset trimming options do not apply.
+    type Options =
+        { Width: float<length>
+          Offset: Offset.Options }
+
+    [<Struct>]
+    type DashOptions =
+        { Pattern: float<length> list
+          Offset: float<length>
+          LengthOptions: LengthOptions }
+
+    type Join = Offset.Join
+    type Cap = Offset.Cap
 
     let defaultOptions =
         { Width = 1.0<length>
@@ -115,31 +116,31 @@ module Stroke =
     let private zeroLengthStrokePath subpath radius cap =
         let center = Subpath.start subpath
         match cap with
-        | Butt -> Ok Path.empty
-        | RoundCap -> zeroLengthRoundStrokePath center radius
-        | Square -> zeroLengthSquareStrokePath center radius (Point.create 1.0 0.0)
+        | Offset.Butt -> Ok Path.empty
+        | Offset.RoundCap -> zeroLengthRoundStrokePath center radius
+        | Offset.Square -> zeroLengthSquareStrokePath center radius (Point.create 1.0 0.0)
 
     // Entry points validate even empty geometry. Internal traversal reuses that
     // validation for each subpath/dash rather than repeating it.
-    let private strokeValidatedSubpath subpath join cap (options: StrokeOptions) =
+    let private strokeValidatedSubpath subpath join cap (options: Options) =
             let radius = options.Width / 2.0
             match Subpath.segments subpath with
                 | [] -> Ok Path.empty
                 | _ ->
                     Subpath.isZeroLength subpath 1.0e-9<length>
-                    |> Result.mapError (PathError >> StrokeOffsetError)
+                    |> Result.mapError (Offset.PathError >> StrokeOffsetError)
                     |> Result.bind (fun zeroLength ->
                         if zeroLength then
-                            zeroLengthStrokePath subpath radius cap |> Result.mapError (PathError >> StrokeOffsetError)
+                            zeroLengthStrokePath subpath radius cap |> Result.mapError (Offset.PathError >> StrokeOffsetError)
                         else
                             Offset.subpathBandWith subpath -radius radius join cap
-                                {options.Offset with BandTrimming={InnerCusps=false;OuterCusps=false;InBand=true}}
+                                {options.Offset with Offset.BandTrimming={InnerCusps=false;OuterCusps=false;InBand=true}}
                             |> Result.mapError StrokeOffsetError)
 
     /// Delegate nonzero strokes to symmetric bands. For compatibility strokes
     /// disable side cusp trimming and enable final trimming regardless of the
     /// supplied band trimming settings; band construction owns caps and topology.
-    let subpathWith subpath join cap (options: StrokeOptions) =
+    let subpathWith subpath join cap (options: Options) =
         validateOptions options join
         |> Result.bind (fun () -> strokeValidatedSubpath subpath join cap options)
 
@@ -293,7 +294,7 @@ module Stroke =
                 state |> Result.bind (fun paths ->
                     let pointDash = match Subpath.segments piece with [Line(a,b)] -> a=b | _ -> false
                     let stroked =
-                        if cap = Square && pointDash then
+                        if cap = Offset.Square && pointDash then
                             Subpath.parameterAtLengthWith subpath at dashOptions.LengthOptions
                             |> Result.bind (Subpath.directions subpath)
                             |> Result.mapError StrokePathError
@@ -303,7 +304,7 @@ module Stroke =
                                     | Some direction, _ | None, Some direction -> direction
                                     | None, None -> Point.create 1.0 0.0
                                 zeroLengthSquareStrokePath (Subpath.start piece) (options.Width / 2.0) direction
-                                |> Result.mapError (PathError >> StrokeOffsetError))
+                                |> Result.mapError (Offset.PathError >> StrokeOffsetError))
                         else strokeValidatedSubpath piece join cap options
                     stroked |> Result.map (fun path -> path :: paths))) (Ok [])
             |> Result.map (List.rev >> List.collect Path.subpaths >> Path.ofSubpaths))

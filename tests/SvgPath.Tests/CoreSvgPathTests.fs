@@ -19,8 +19,8 @@ let ``reverse segment reverses lines quadratics cubics and arcs`` () =
     Assert.Equal(Line(b, a), Segment.reverse (Line(a, b)))
     Assert.Equal(QuadraticBezier(c, b, a), Segment.reverse (QuadraticBezier(a, b, c)))
     Assert.Equal(CubicBezier(d, c, b, a), Segment.reverse (CubicBezier(a, b, c, d)))
-    let arc = Arc { Start = a; Radius = point 4.0 5.0; XAxisRotation = 30.0<degree>; LargeArc = true; Sweep = false; End = b }
-    let expected = Arc { Start = b; Radius = point 4.0 5.0; XAxisRotation = 30.0<degree>; LargeArc = true; Sweep = true; End = a }
+    let arc = Arc ({ Start = a; Radius = point 4.0 5.0; XAxisRotation = 30.0<degree>; LargeArc = true; Sweep = false; End = b }: Ellipse.EndpointArcData)
+    let expected = Arc ({ Start = b; Radius = point 4.0 5.0; XAxisRotation = 30.0<degree>; LargeArc = true; Sweep = true; End = a }: Ellipse.EndpointArcData)
     Assert.Equal(expected, Segment.reverse arc)
 
 [<Fact>]
@@ -50,7 +50,7 @@ let ``segment remap endpoints maps endpoints exactly`` () =
 let ``path point pair similarity maps arcs`` () =
     let sourceStart, sourceEnd = point 0.0 0.0, point 2.0 0.0
     let targetStart, targetEnd = point 10.0 20.0, point 10.0 24.0
-    let source = Arc { Start = sourceStart; Radius = point 1.0 2.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = sourceEnd } |> Segment.asPath
+    let source = Arc ({ Start = sourceStart; Radius = point 1.0 2.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = sourceEnd }: Ellipse.EndpointArcData) |> Segment.asPath
     let remapped = Path.byPointPairSimilarity source sourceStart sourceEnd targetStart targetEnd |> Result.defaultWith (failwithf "%A")
     match remapped.Subpaths |> List.exactlyOne |> _.Segments |> List.exactlyOne with
     | Arc arc ->
@@ -83,14 +83,14 @@ let ``segment point evaluates lines quadratics cubics and arcs`` () =
         [ Line(point 0.0 0.0, point 10.0 20.0), point 5.0 10.0
           QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0), point 10.0 10.0
           CubicBezier(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0), point 15.0 22.5
-          Arc { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }, point 10.0 -10.0 ]
+          Arc ({ Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData), point 10.0 -10.0 ]
     for segment, expected in segmentsAndExpected do
         Segment.point segment 0.5<parameter> |> Result.defaultWith (failwithf "%A") |> assertPointNear expected
 
 [<Fact>]
 let ``segment point returns stored arc endpoints exactly`` () =
     let startPoint, endPoint = point 1.23456789 -2.34567891, point 9.87654321 7.65432109
-    let arc = Arc { Start = startPoint; Radius = point 8.1 5.7; XAxisRotation = 23.0<degree>; LargeArc = false; Sweep = true; End = endPoint }
+    let arc = Arc ({ Start = startPoint; Radius = point 8.1 5.7; XAxisRotation = 23.0<degree>; LargeArc = false; Sweep = true; End = endPoint }: Ellipse.EndpointArcData)
     Assert.Equal(Ok startPoint, Segment.point arc 0.0<parameter>)
     Assert.Equal(Ok endPoint, Segment.point arc 1.0<parameter>)
 
@@ -100,14 +100,14 @@ let ``segment derivative evaluates lines quadratics cubics and arcs`` () =
     assertPointNear (Point.create 10.0<length / parameter> 20.0<length / parameter>) (derivative (Line(point 0.0 0.0, point 10.0 20.0)))
     assertPointNear (Point.create 20.0<length / parameter> 0.0<length / parameter>) (derivative (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)))
     assertPointNear (Point.create 45.0<length / parameter> 0.0<length / parameter>) (derivative (CubicBezier(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)))
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     let arcDerivative = derivative arc
     Assert.True(arcDerivative.X > 0.0<length / parameter>)
     Assert.True(abs arcDerivative.Y < 1.0e-6<length / parameter>)
 
 [<Fact>]
 let ``segment second derivative evaluates arc analytically`` () =
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     let second = Segment.secondDerivative arc 0.5<parameter> |> Result.defaultWith (failwithf "%A")
     assertPointNear (Point.create 0.0<length / parameter^2> 98.69604401089359<length / parameter^2>) second
 
@@ -120,7 +120,7 @@ let ``segment bounding box handles lines beziers and arcs`` () =
     check (Line(point 1.0 2.0, point 5.0 -3.0)) (point 1.0 -3.0) (point 5.0 2.0)
     check (QuadraticBezier(point 0.0 0.0, point 10.0 10.0, point 20.0 0.0)) (point 0.0 0.0) (point 20.0 5.0)
     check (CubicBezier(point 0.0 0.0, point 0.0 30.0, point 30.0 30.0, point 30.0 0.0)) (point 0.0 0.0) (point 30.0 22.5)
-    check (Arc { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }) (point 0.0 -10.0) (point 20.0 0.0)
+    check (Arc ({ Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)) (point 0.0 -10.0) (point 20.0 0.0)
 
 [<Fact>]
 let ``bounding box dimensions use extents`` () =
@@ -163,11 +163,11 @@ let ``points_bounding_box_returns_error_for_empty_lists_test`` () =
 
 [<Fact>]
 let ``segment bounding box returns degenerate arc errors`` () =
-    let segment = Arc { Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Error DegenerateArc, Segment.boundingBox segment)
 
 let private semicircle =
-    Arc { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    Arc ({ Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
 
 [<Fact>]
 let ``arc center data converts arc segments`` () =
@@ -400,7 +400,7 @@ let ``segments between inside rejects any outside t`` () =
 
 [<Fact>]
 let ``segment eval and split return degenerate arc error`` () =
-    let segment = Arc { Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Error DegenerateArc, Segment.point segment 0.5<parameter>)
     Assert.Equal(Error DegenerateArc, Segment.derivative segment 0.5<parameter>)
     Assert.Equal(Error DegenerateArc, Segment.split segment 0.5<parameter>)
@@ -894,12 +894,12 @@ let ``segment to cubic beziers converts quadratic exactly`` () =
 [<Fact>]
 let ``segment_arcs_to_cubic_beziers_splits_half_turn_into_two_cubics_test`` () =
     let a, b = point 0.0 0.0, point 20.0 0.0
-    let pieces = Segment.arcsToCubicBeziers (Arc { Start = a; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = b })
+    let pieces = Segment.arcsToCubicBeziers (Arc ({ Start = a; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = b }: Ellipse.EndpointArcData))
     Assert.Equal(2, pieces.Length); Assert.Equal(a, Segment.start pieces.Head); Assert.Equal(b, Segment.finish pieces[pieces.Length - 1])
 
 [<Fact>]
 let ``segment arcs to cubic beziers large arc uses more than two cubics`` () =
-    let pieces = Segment.arcsToCubicBeziers (Arc { Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = true; Sweep = true; End = point 10.0 10.0 })
+    let pieces = Segment.arcsToCubicBeziers (Arc ({ Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = true; Sweep = true; End = point 10.0 10.0 }: Ellipse.EndpointArcData))
     Assert.True(pieces.Length > 2)
     Assert.True(pieces |> List.forall (function CubicBezier _ -> true | _ -> false))
     Assert.True(pieces |> List.pairwise |> List.forall (fun (left, right) -> Segment.finish left = Segment.start right))
@@ -907,7 +907,7 @@ let ``segment arcs to cubic beziers large arc uses more than two cubics`` () =
 [<Fact>]
 let ``segment arcs to cubic beziers degenerate arc falls back to line cubic`` () =
     let a, d = point 0.0 0.0, point 9.0 0.0
-    let arc = Arc { Start = a; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = d }
+    let arc = Arc ({ Start = a; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = d }: Ellipse.EndpointArcData)
     Assert.Equal<Segment list>([ CubicBezier(a, point 3.0 0.0, point 6.0 0.0, d) ], Segment.arcsToCubicBeziers arc)
 
 [<Fact>]
@@ -921,7 +921,7 @@ let ``subpath arcs to cubic beziers preserves closed state`` () =
 let ``subpath arcs to cubic beziers replaces only arcs`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 20.0 0.0, point 30.0 0.0
     let line = Line(a, b)
-    let arc = Arc { Start = b; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = c }
+    let arc = Arc ({ Start = b; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = c }: Ellipse.EndpointArcData)
     let quadratic = QuadraticBezier(c, c, d)
     let converted = Subpath.assertCreate [ line; arc; quadratic ] |> Subpath.arcsToCubicBeziers
     Assert.Equal(a, Segment.start converted.Segments.Head)
@@ -940,7 +940,7 @@ let ``subpath to cubic beziers preserves closed state`` () =
 [<Fact>]
 let ``path arcs to cubic beziers converts each subpath`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 20.0 0.0, point 30.0 0.0
-    let arc = Arc { Start = a; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = b }
+    let arc = Arc ({ Start = a; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = b }: Ellipse.EndpointArcData)
     let line = Line(c, d)
     let segments = Path.ofSubpaths [ Subpath.ofSegment arc; Subpath.ofSegment line ] |> Path.arcsToCubicBeziers |> _.Subpaths |> List.collect _.Segments
     Assert.DoesNotContain(segments, fun segment -> match segment with Arc _ -> true | _ -> false)
@@ -982,7 +982,7 @@ let ``segment to lines detects collinear control overshoot`` () =
 [<Fact>]
 let ``segment to lines approximates arcs within tolerance`` () =
     let tolerance = 0.05<length>
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 10.0 5.0; XAxisRotation = 30.0<degree>; LargeArc = true; Sweep = true; End = point 20.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 10.0 5.0; XAxisRotation = 30.0<degree>; LargeArc = true; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     let lines = Segment.toLinesWith { Tolerance = tolerance; MaxDepth = 20 } arc |> Result.defaultWith (failwithf "%A")
     Assert.True(lines |> List.forall (function Line _ -> true | _ -> false))
     Assert.Equal(Segment.start arc, Segment.start lines.Head)
@@ -995,7 +995,7 @@ let ``segment to lines approximates arcs within tolerance`` () =
 [<Fact>]
 let ``segment to lines degenerate arc falls back to line`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let arc = Arc { Start = a; Radius = point 0.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = b }
+    let arc = Arc ({ Start = a; Radius = point 0.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = b }: Ellipse.EndpointArcData)
     Assert.Equal(Ok [ Line(a, b) ], Segment.toLines arc)
 
 [<Fact>]
@@ -1326,13 +1326,13 @@ let ``set closed with wiggle closes misaligned horizontal lines`` () =
 
 [<Fact>]
 let ``fit cubic with endpoint tangents returns root segment`` () =
-    let original = CubicBezierData(point 0.0 0.0, point 35.0 65.0, point 90.0 -35.0, point 130.0 25.0)
+    let original = Bezier.CubicBezierData(point 0.0 0.0, point 35.0 65.0, point 90.0 -35.0, point 130.0 25.0)
     let sample t = Parameter.fromFloat t, Bezier.point original (Parameter.fromFloat t)
     let startTangent = Bezier.derivative original 0.0<parameter>
     let endTangent = Bezier.derivative original 1.0<parameter>
     let fit, report = Bezier.fitCubicWithEndpointTangents (Bezier.start original) (Bezier.finish original) startTangent endTangent [ sample 0.25; sample 0.5; sample 0.75 ] |> Result.defaultWith (failwithf "%A")
     match fit, original with
-    | CubicBezierData(a, b, c, d), CubicBezierData(e, f, g, h) ->
+    | Bezier.CubicBezierData(a, b, c, d), Bezier.CubicBezierData(e, f, g, h) ->
         assertPointNear e a; assertPointNear f b; assertPointNear g c; assertPointNear h d
     | _ -> failwith "expected cubics"
     Assert.True(abs report.RootSumSquare <= 1.0e-6<length>)
@@ -1349,12 +1349,12 @@ let ``fit cubic with endpoints returns root segment`` () =
 [<Fact>]
 let ``fit cubic with endpoint tangents reports degenerate tangent`` () =
     let result = Bezier.fitCubicWithEndpointTangents (point 0.0 0.0) (point 10.0 0.0) (point 0.0 0.0) (point 1.0 0.0) [ 0.5<parameter>, point 5.0 1.0 ]
-    Assert.Equal(Error DegenerateTangent, result)
+    Assert.Equal(Error Bezier.DegenerateTangent, result)
 
 [<Fact>]
 let ``fit cubic with endpoints reports underdetermined fit`` () =
     let result = Bezier.fitCubicWithEndpoints (point 0.0 0.0) (point 10.0 0.0) [ 0.5<parameter>, point 5.0 1.0 ]
-    Assert.Equal(Error UnderdeterminedCubicFit, result)
+    Assert.Equal(Error Bezier.UnderdeterminedCubicFit, result)
 
 [<Fact>]
 let ``assert_join_with_wiggle_reconciles_tiny_endpoint_gap_test`` () =

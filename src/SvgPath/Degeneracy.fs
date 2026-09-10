@@ -1,21 +1,22 @@
 namespace SvgPath
 
-type DegeneracyError =
-    /// The tolerance must be finite and non-negative.
-    | DegeneracyInvalidTolerance of tolerance: float<length>
-    | DegeneracyPathError of error: SegmentError
-    | DegeneracyConvexHullError of error: ConvexHullError
-
-[<Struct>]
-type internal ThinPrefix =
-    { Segments: Segment list
-      Remaining: Segment list
-      Hull: Subpath option
-      Strip: MinimumWidthStrip option }
-
 /// Detection and normalization of geometrically degenerate path segments.
 [<RequireQualifiedAccess>]
 module Degeneracy =
+
+    type Error =
+        /// The tolerance must be finite and non-negative.
+        | DegeneracyInvalidTolerance of tolerance: float<length>
+        | DegeneracyPathError of error: SegmentError
+        | DegeneracyConvexHullError of error: ConvexHull.Error
+
+    [<Struct>]
+    type internal ThinPrefix =
+        { Segments: Segment list
+          Remaining: Segment list
+          Hull: Subpath option
+          Strip: ConvexHull.MinimumWidthStrip option }
+
     let private traversalLines tolerance points =
         points
         |> List.pairwise
@@ -33,7 +34,7 @@ module Degeneracy =
 
     let private sourceWidthDecision segments hull tolerance =
         match ConvexHull.internalSourceStripCandidate segments with
-        | Ok(Some strip) when strip.Width <= tolerance -> Ok(MinimumWidthFits strip)
+        | Ok(Some strip) when strip.Width <= tolerance -> Ok(ConvexHull.MinimumWidthFits strip)
         | _ -> widthDecision hull tolerance
 
     let rec private longestThinPrefixLoop tolerance accepted hull strip remaining =
@@ -49,13 +50,13 @@ module Degeneracy =
             |> Result.bind (fun (candidateHull, decision) ->
                 let decision =
                     match ConvexHull.internalSourceStripCandidate (first :: accepted) with
-                    | Ok(Some strip) when strip.Width <= tolerance -> MinimumWidthFits strip
+                    | Ok(Some strip) when strip.Width <= tolerance -> ConvexHull.MinimumWidthFits strip
                     | _ -> decision
                 match decision with
-                | MinimumWidthFits candidateStrip ->
+                | ConvexHull.MinimumWidthFits candidateStrip ->
                     longestThinPrefixLoop tolerance (first :: accepted) candidateHull candidateStrip rest
-                | MinimumWidthExceeds _
-                | MinimumWidthUnresolved _ ->
+                | ConvexHull.MinimumWidthExceeds _
+                | ConvexHull.MinimumWidthUnresolved _ ->
                     makeSubpath (List.rev (first :: accepted))
                     |> Result.bind (fun candidate ->
                         ConvexHull.subpathHull candidate
@@ -63,10 +64,10 @@ module Degeneracy =
                         |> Result.bind (fun rebuiltHull ->
                             sourceWidthDecision (first :: accepted) rebuiltHull tolerance
                             |> Result.bind (function
-                                | MinimumWidthFits rebuiltStrip ->
+                                | ConvexHull.MinimumWidthFits rebuiltStrip ->
                                     longestThinPrefixLoop tolerance (first :: accepted) rebuiltHull rebuiltStrip rest
-                                | MinimumWidthExceeds _
-                                | MinimumWidthUnresolved _ ->
+                                | ConvexHull.MinimumWidthExceeds _
+                                | ConvexHull.MinimumWidthUnresolved _ ->
                                     Ok { Segments = List.rev accepted
                                          Remaining = first :: rest
                                          Hull = Some hull
@@ -81,9 +82,9 @@ module Degeneracy =
             |> Result.bind (fun hull ->
                 sourceWidthDecision [first] hull tolerance
                 |> Result.bind (function
-                    | MinimumWidthFits strip -> longestThinPrefixLoop tolerance [ first ] hull strip rest
-                    | MinimumWidthExceeds _
-                    | MinimumWidthUnresolved _ ->
+                    | ConvexHull.MinimumWidthFits strip -> longestThinPrefixLoop tolerance [ first ] hull strip rest
+                    | ConvexHull.MinimumWidthExceeds _
+                    | ConvexHull.MinimumWidthUnresolved _ ->
                         Ok { Segments = []; Remaining = first :: rest; Hull = None; Strip = None }))
 
     let private pointAlreadyPresent point points tolerance =
@@ -111,7 +112,7 @@ module Degeneracy =
         |> Result.bind (fun (t, supportPoint, value) ->
             loop 1 (0, t, supportPoint, value) (List.tail segments))
 
-    let private stripPointsInTraversalOrder segments (strip: MinimumWidthStrip) tolerance =
+    let private stripPointsInTraversalOrder segments (strip: ConvexHull.MinimumWidthStrip) tolerance =
         let angle = strip.Normal |> Point.rotateClockwise |> Point.heading
         traversalSupport segments (angle + 180.0<degree>)
         |> Result.bind (fun (minIndex, minT, minPoint, _) ->

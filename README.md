@@ -36,6 +36,12 @@ geometry with a polygonal approximation.
 [`svg_path`](https://github.com/vistuleB/svg_path) package, with F# units of
 measure added to audit scalar usage.
 
+Public operation types live in their corresponding modules, following the
+Gleam API's organization: for example, `Offset.Options`, `Offset.Error`,
+`Stroke.Options`, and `Stroke.Error`. Shared geometry types such as `Point`,
+`Segment`, `Subpath`, `Path`, and `Affine` live directly in `SvgPath`.
+One `open SvgPath` makes both the geometry types and operation modules available.
+
 ```shell
 dotnet add package SvgPath
 ```
@@ -167,7 +173,7 @@ type Segment =
     | Line of startPoint: Point<length> * endPoint: Point<length>
     | QuadraticBezier of startPoint: Point<length> * control: Point<length> * endPoint: Point<length>
     | CubicBezier of startPoint: Point<length> * control1: Point<length> * control2: Point<length> * endPoint: Point<length>
-    | Arc of EndpointArcData
+    | Arc of Ellipse.EndpointArcData
 ```
 
 For `Arc`, `XAxisRotation` is measured in degrees, matching SVG path data.
@@ -1017,7 +1023,7 @@ BottomLeft   BottomCenter   BottomRight
 
 ```fsharp
 let flipPathHorizontally path =
-    Transform.pathAboutAnchor path (Transform.scaleXY -1.0 1.0) Center
+    Transform.pathAboutAnchor path (Transform.scaleXY -1.0 1.0) Transform.Center
 ```
 
 ## Transform Attributes
@@ -1127,12 +1133,12 @@ negative offsets point along the visual right normal. For example, a positive
 offset of a horizontal line directed from left to right appears above that line.
 
 ```fsharp
-Offset.segment segment 12.0<length> (Miter Offset.defaultMiterLimit)
-// Result<Subpath, SvgPath.Error>
+Offset.segment segment 12.0<length> (Offset.Miter Offset.defaultMiterLimit)
+// Result<Subpath, Offset.Error>
 
-Offset.subpath subpath 12.0<length> (Miter Offset.defaultMiterLimit) Butt
-Offset.path path 12.0<length> (Miter Offset.defaultMiterLimit) Butt
-// Result<Path, SvgPath.Error>
+Offset.subpath subpath 12.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt
+Offset.path path 12.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt
+// Result<Path, Offset.Error>
 ```
 
 A segment offset returns a `Subpath` because one source curve may require
@@ -1140,15 +1146,54 @@ several fitted pieces. Subpath and path offsets return a `Path`: trimming may
 split one offset walk into multiple subpaths or remove it entirely.
 
 Join and cap styles are explicit arguments, including on forms without `With`.
-The `Join` cases are `Bevel`, `Miter miterLimit`, and `Round`; the `Cap` cases
+The `Join` cases are `Bevel`, `Miter miterLimit`, `MiterClip miterLimit`,
+`Arcs miterLimit`, and `Round`; the `Cap` cases
 are `Butt`, `Square`, and `RoundCap`. Segment offsets take only a join, used
 when degenerate normalization produces multiple traversals. Trimmed single
 offsets take a cap for their internal source-to-offset winding bands, not to
 add caps to the returned one-sided walk.
 
-The `With` variants additionally accept `SvgPath.Options` as the last argument.
-This record contains only technical controls, not styles. `Options.Fitting`
+`MiterClip limit` clips an over-limit tip perpendicular to the pivot-to-tip
+direction at `limit * abs(offset)`, rather than falling back immediately to
+Bevel. Divergent extensions or a clipping plane behind either join endpoint
+use Bevel; the join does not shorten neighboring segments.
+
+![Miter versus clipped miter](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/main/docs/readme/miter_clip_comparison.svg)
+
+![MiterClip limits](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/main/docs/readme/miter_clip_limits.svg)
+
+`Arcs limit` continues source curvature with tangent circles (a line for zero
+or unavailable endpoint curvature), adjusting nonintersecting circles while
+preserving tangency. Clipping uses the auxiliary arc length from the pivot.
+Straight pairs use MiterClip; diverging rays, parallel rays, and reversed
+source endpoints use Round. Limits that would trim neighbors use Bevel.
+Both join limits must be finite and positive. Failed circle construction
+returns `ConstructionFailed`.
+
+![Arcs self-intersecting example](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/main/docs/readme/arcs_join_self_intersection.svg)
+
+![Arcs disjoint circles](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/main/docs/readme/arcs_join_comparison_2.svg)
+
+These follow the [published SVG 2 proposal](https://www.w3.org/TR/SVG2/painting.html#LineJoinShape),
+not a promise of browser support: `arcs` was adopted on
+[19 September 2012](https://www.w3.org/2012/09/19-svg-minutes.html#action10),
+`miter-clip` on [12 February 2015](https://www.w3.org/2015/02/12-svg-minutes.html#action02),
+and both were removed from the editor's draft in
+[March 2026](https://w3c.github.io/svgwg/svg2-draft/changes.html#painting).
+The parallel-ray Round fallback deliberately differs from its rectangle.
+All four figures above are generated independently by this F# repository.
+
+The `With` variants additionally accept `Offset.Options` as the last argument.
+This record contains technical controls and an optional inner-corner join
+override; the main join and cap remain explicit arguments. `Offset.Options.Fitting`
 controls fitted-curve accuracy and maximum subdivision depth.
+
+At local inner corners, `Offset.Round` defaults to round joins; every other
+join style defaults to bevel joins. Set `InnerJoin = Some Offset.InnerRound`
+or `Some Offset.InnerBevel` in `Offset.Options` to override that choice.
+`None` retains the style-dependent default. This applies independently to both
+band sides and to single offsets; it does not mean the caller-named inner
+offset. Stroke callers can set it through their nested `Offset` options.
 
 Use `Offset.subpathUntrimmed`, `Offset.pathUntrimmed`, or their `With` variants
 to obtain the connected offset walks before topological trimming. These are
@@ -1164,9 +1209,9 @@ but no cap. The offset-map helpers take neither style.
 ```fsharp
 let options =
     { Offset.defaultOptions with
-        SingleOffsetTrimming =
+        Offset.SingleOffsetTrimming =
             { Offside = true
-               FinalTrimming = InBandTrimming } }
+               FinalTrimming = Offset.InBandTrimming } }
 ```
 
 `Offside` applies only to closed source subpaths. The source and its offset
@@ -1204,8 +1249,8 @@ cleanup is intentionally not a public switch.
 offsets:
 
 ```fsharp
-Offset.subpathBand subpath 18.0<length> 34.0<length> Round Butt
-Offset.pathBand path 18.0<length> 34.0<length> Round Butt
+Offset.subpathBand subpath 18.0<length> 34.0<length> Offset.Round Offset.Butt
+Offset.pathBand path 18.0<length> 34.0<length> Offset.Round Offset.Butt
 ```
 
 `inner` and `outer` are caller-assigned roles, not a numeric-order restriction.
@@ -1221,7 +1266,7 @@ Band trimming has three independent Boolean controls:
 ```fsharp
 let options =
     { Offset.defaultOptions with
-        BandTrimming =
+        Offset.BandTrimming =
             { InnerCusps = true
               OuterCusps = true
               InBand = true } }
@@ -1264,21 +1309,21 @@ They take a join argument but no cap.
 ## Stroke Outlines and Dashes
 
 `Stroke` is a small public wrapper over symmetric offset bands. It
-uses `StrokeOptions` and dash options rather than exposing every
+uses `Stroke.Options` and dash options rather than exposing every
 offset-specific detail at the top level. The join and cap styles use the same
 `Join` and `Cap` types as `Offset`.
 
 ```fsharp
-Stroke.segment (Line(a, b)) 2.0<length> Round Butt
-Stroke.subpath subpath 2.0<length> Round RoundCap
-Stroke.path path 2.0<length> (Miter 4.0) Square
+Stroke.segment (Line(a, b)) 2.0<length> Offset.Round Offset.Butt
+Stroke.subpath subpath 2.0<length> Offset.Round Offset.RoundCap
+Stroke.path path 2.0<length> (Offset.Miter 4.0) Offset.Square
 
 let options = { Stroke.defaultOptions with Width = 2.0<length> }
 
-Stroke.subpathWith subpath Round RoundCap options
+Stroke.subpathWith subpath Offset.Round Offset.RoundCap options
 ```
 
-`StrokeOptions` contains `Width` and technical `Offset` settings only.
+`Stroke.Options` contains `Width` and technical `Offset` settings only.
 All outline operations require explicit join/cap arguments, including dashed
 strokes and forms without `With`. Pure dash extraction takes neither style.
 
@@ -1299,7 +1344,7 @@ offset is normalized around the total pattern length.
 Curvature helpers return `CurvatureError`, distinguishing invalid tolerance,
 sample count, maximum depth, and margin (with their offending values) from
 `DegenerateCurvatureDerivative` and `InfiniteRadiusOfCurvature`.
-`CurvatureOptions.Tolerance` accepts zero for exact-only parameter comparisons;
+`Curvature.Options.Tolerance` accepts zero for exact-only parameter comparisons;
 negative and non-finite tolerances remain invalid. `Curvature.segmentDerivatives`
 continues to return `SegmentError` for underlying path errors.
 

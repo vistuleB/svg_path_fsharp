@@ -83,17 +83,17 @@ let ``polygon converts points to closed subpath`` () =
 
 [<Fact>]
 let ``invalid dimensions return errors`` () =
-    Assert.Equal(Error(InvalidRectWidth(length -1.0)), BasicShapes.rect (length 0.0) (length 0.0) (length -1.0) (length 2.0) None None)
-    Assert.Equal(Error(InvalidCircleRadius(length -1.0)), BasicShapes.circle (length 0.0) (length 0.0) (length -1.0))
-    Assert.Equal(Error(InvalidEllipseRadiusY(length -1.0)), BasicShapes.ellipse (length 0.0) (length 0.0) (length 1.0) (length -1.0))
+    Assert.Equal(Error(BasicShapes.InvalidRectWidth(length -1.0)), BasicShapes.rect (length 0.0) (length 0.0) (length -1.0) (length 2.0) None None)
+    Assert.Equal(Error(BasicShapes.InvalidCircleRadius(length -1.0)), BasicShapes.circle (length 0.0) (length 0.0) (length -1.0))
+    Assert.Equal(Error(BasicShapes.InvalidEllipseRadiusY(length -1.0)), BasicShapes.ellipse (length 0.0) (length 0.0) (length 1.0) (length -1.0))
 
 [<Fact>]
 let ``disabled rendering returns error`` () =
-    Assert.Equal(Error DisabledRendering, BasicShapes.rect (length 0.0) (length 0.0) (length 0.0) (length 2.0) None None)
-    Assert.Equal(Error DisabledRendering, BasicShapes.circle (length 0.0) (length 0.0) (length 0.0))
-    Assert.Equal(Error DisabledRendering, BasicShapes.ellipse (length 0.0) (length 0.0) (length 1.0) (length 0.0))
+    Assert.Equal(Error BasicShapes.DisabledRendering, BasicShapes.rect (length 0.0) (length 0.0) (length 0.0) (length 2.0) None None)
+    Assert.Equal(Error BasicShapes.DisabledRendering, BasicShapes.circle (length 0.0) (length 0.0) (length 0.0))
+    Assert.Equal(Error BasicShapes.DisabledRendering, BasicShapes.ellipse (length 0.0) (length 0.0) (length 1.0) (length 0.0))
 
 [<Fact>]
 let ``invalid point lists return core errors`` () =
-    Assert.Equal(Error(PathError EmptySubpath), BasicShapes.polyline [])
-    Assert.Equal(Error(PathError EmptySubpath), BasicShapes.polygon [ point 1.0 2.0 ])
+    Assert.Equal(Error(BasicShapes.PathError EmptySubpath), BasicShapes.polyline [])
+    Assert.Equal(Error(BasicShapes.PathError EmptySubpath), BasicShapes.polygon [ point 1.0 2.0 ])

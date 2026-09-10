@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="690" viewBox="0 0 1000 690"><rect x="0" y="0" width="1000" height="690" fill="white"/><text x="20" y="25" font-family="sans-serif" font-size="18">Miter limit 3 — W3C reference (top), F# blue overlay (bottom)</text><svg x="20" y="40" width="960" height="288" viewBox="0 0 600 180" opacity="1" xmlns:xlink="http://www.w3.org/1999/xlink"><g class="top">
+  <desc>Example stroke miter limit - demonstrates effect of miter limit.</desc>
+  <style type="text/css"><![CDATA[
+    .thick { stroke: gray; stroke-width: 35px }
+    .thin { stroke: #ccc; stroke-width: 2px }
+    .top text { text-anchor: middle; font: 16px sans-serif }
+    .top circle { fill: #ccc; stroke: none }
+  ]]></style>
+  <defs>
+    <path id="toppath1" d="m 25,60 150,30 -150,30" style="fill:none;stroke-miterlimit:10"/>
+    <circle id="topcircle1" cx="175" cy="90" r="4"/>
+    <path id="toplimit" d="m 227.5,30 0,120" style="fill:none;stroke:#6a9100;stroke-dasharray:4"/>
+    <clipPath id="topclip1">
+      <rect width="227.5" height="100%"/>
+    </clipPath>
+  </defs>
+
+  <g transform="translate(0,0)">
+    <use class="thick" xlink:href="#toppath1" stroke-linejoin="miter"/>
+    <use class="thick" xlink:href="#toppath1" stroke-linejoin="bevel" style="stroke:black"/>
+    <use class="thin" xlink:href="#toppath1"/>
+    <use xlink:href="#topcircle1"/>
+    <use xlink:href="#toplimit"/>
+    <text x="150" y="150">‘miter’ join</text>
+  </g>
+
+  <g transform="translate(300,0)">
+    <use class="thick" xlink:href="#toppath1" stroke-linejoin="miter"/>
+    <use class="thick" xlink:href="#toppath1" stroke-linejoin="miter" style="stroke:black;clip-path:url(#topclip1)"/>
+    <use class="thin" xlink:href="#toppath1"/>
+    <use xlink:href="#topcircle1"/>
+    <use xlink:href="#toplimit"/>
+    <text x="150" y="150">‘miter-clip’ join</text>
+  </g>
+</g></svg><svg x="20" y="360" width="960" height="288" viewBox="0 0 600 180" opacity="0.45" xmlns:xlink="http://www.w3.org/1999/xlink"><g class="bottom">
+  <desc>Example stroke miter limit - demonstrates effect of miter limit.</desc>
+  <style type="text/css"><![CDATA[
+    .thick { stroke: gray; stroke-width: 35px }
+    .thin { stroke: #ccc; stroke-width: 2px }
+    .bottom text { text-anchor: middle; font: 16px sans-serif }
+    .bottom circle { fill: #ccc; stroke: none }
+  ]]></style>
+  <defs>
+    <path id="bottompath1" d="m 25,60 150,30 -150,30" style="fill:none;stroke-miterlimit:10"/>
+    <circle id="bottomcircle1" cx="175" cy="90" r="4"/>
+    <path id="bottomlimit" d="m 227.5,30 0,120" style="fill:none;stroke:#6a9100;stroke-dasharray:4"/>
+    <clipPath id="bottomclip1">
+      <rect width="227.5" height="100%"/>
+    </clipPath>
+  </defs>
+
+  <g transform="translate(0,0)">
+    <use class="thick" xlink:href="#bottompath1" stroke-linejoin="miter"/>
+    <use class="thick" xlink:href="#bottompath1" stroke-linejoin="bevel" style="stroke:black"/>
+    <use class="thin" xlink:href="#bottompath1"/>
+    <use xlink:href="#bottomcircle1"/>
+    <use xlink:href="#bottomlimit"/>
+    <text x="150" y="150">‘miter’ join</text>
+  </g>
+
+  <g transform="translate(300,0)">
+    <use class="thick" xlink:href="#bottompath1" stroke-linejoin="miter"/>
+    <use class="thick" xlink:href="#bottompath1" stroke-linejoin="miter" style="stroke:black;clip-path:url(#bottomclip1)"/>
+    <use class="thin" xlink:href="#bottompath1"/>
+    <use xlink:href="#bottomcircle1"/>
+    <use xlink:href="#bottomlimit"/>
+    <text x="150" y="150">‘miter-clip’ join</text>
+  </g>
+</g></svg><svg x="20" y="360" width="960" height="288" viewBox="0 0 600 180"><path transform="" d="M 178.43203 72.83984 V 107.16016 L 28.43203 137.16016 L 21.56797 102.83984 L 85.76716 90 L 21.56797 77.16016 L 28.43203 42.83984 Z" fill="none" stroke="#1565ff" stroke-width="1.4"/><path transform="translate(300 0)" d="M 178.43203 72.83984 L 227.5 82.65343 V 97.34657 L 178.43203 107.16016 L 28.43203 137.16016 L 21.56797 102.83984 L 85.76716 90 L 21.56797 77.16016 L 28.43203 42.83984 Z" fill="none" stroke="#1565ff" stroke-width="1.4"/></svg></svg>

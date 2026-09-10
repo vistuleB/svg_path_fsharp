@@ -12,8 +12,8 @@ let ``document renders a complete svg document`` () =
     let path = Path.ofSubpaths [ Subpath.ofSegment (Line(point 1.0 2.0, point 11.0 2.0)) ]
     let actual =
         Svg.document
-            [ StyledPath(path, "fill: none; stroke: red; stroke-width: 0.25")
-              Text("start", "fill: black; font-family: sans-serif", point 1.0 2.0, length 4.0) ]
+            [ Svg.StyledPath(path, "fill: none; stroke: red; stroke-width: 0.25")
+              Svg.Text("start", "fill: black; font-family: sans-serif", point 1.0 2.0, length 4.0) ]
             (box 0.0 -5.0 20.0 15.0)
     Assert.Equal(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 -5 20 20\" width=\"20\" height=\"20\">\n"
@@ -25,9 +25,9 @@ let ``document renders a complete svg document`` () =
 let ``document renders rectangles circles and ellipses`` () =
     let actual =
         Svg.document
-            [ Rectangle(point 1.0 2.0, length 10.0, length 5.0, "fill: white; stroke: black")
-              Circle(point 8.0 9.0, length 3.0, "fill: red; stroke: none")
-              Ellipse(point 12.0 13.0, point 4.0 2.0, "fill: blue; stroke: none") ]
+            [ Svg.Rectangle(point 1.0 2.0, length 10.0, length 5.0, "fill: white; stroke: black")
+              Svg.Circle(point 8.0 9.0, length 3.0, "fill: red; stroke: none")
+              Svg.Ellipse(point 12.0 13.0, point 4.0 2.0, "fill: blue; stroke: none") ]
             (box 0.0 0.0 20.0 20.0)
     Assert.Equal(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" width=\"20\" height=\"20\">\n"
@@ -41,11 +41,11 @@ let ``paths escapes path style and text values`` () =
     let escapedStyle = "stroke: \"red\"; marker: url(a&b<c>d)"
     let actual =
         Svg.document
-            [ StyledPath(Path.empty, escapedStyle)
-              Rectangle(point 0.0 0.0, length 1.0, length 1.0, escapedStyle)
-              Circle(point 0.5 0.5, length 0.25, escapedStyle)
-              Ellipse(point 0.5 0.5, point 0.25 0.125, escapedStyle)
-              Text("\"a\" & <b>", "font-family: \"serif\"; fill: a&b<c>d", point 0.5 1.0, length 12.0) ]
+            [ Svg.StyledPath(Path.empty, escapedStyle)
+              Svg.Rectangle(point 0.0 0.0, length 1.0, length 1.0, escapedStyle)
+              Svg.Circle(point 0.5 0.5, length 0.25, escapedStyle)
+              Svg.Ellipse(point 0.5 0.5, point 0.25 0.125, escapedStyle)
+              Svg.Text("\"a\" & <b>", "font-family: \"serif\"; fill: a&b<c>d", point 0.5 1.0, length 12.0) ]
             (box 0.0 0.0 1.0 1.0)
     Assert.Equal(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1 1\" width=\"1\" height=\"1\">\n"
@@ -60,8 +60,8 @@ let ``paths escapes path style and text values`` () =
 let ``document renders rotated rectangles and text`` () =
     let actual =
         Svg.document
-            [ RotatedRectangle(point 1.0 2.0, length 3.0, length 4.0, "fill: red", 45.0<degree>, point 5.0 6.0)
-              RotatedText("label", "fill: black", point 7.0 8.0, length 9.0, -30.0<degree>, point 1.0 2.0) ]
+            [ Svg.RotatedRectangle(point 1.0 2.0, length 3.0, length 4.0, "fill: red", 45.0<degree>, point 5.0 6.0)
+              Svg.RotatedText("label", "fill: black", point 7.0 8.0, length 9.0, -30.0<degree>, point 1.0 2.0) ]
             (box 0.0 0.0 20.0 20.0)
     Assert.Contains("style=\"fill: red\" transform=\"rotate(45 5 6)\" />", actual)
     Assert.Contains("style=\"fill: black\" transform=\"rotate(-30 1 2)\">label</text>", actual)

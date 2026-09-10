@@ -17,8 +17,8 @@ let private generatedPaths () =
     [ path [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 20.0); Line(point 10.0 20.0, point -5.0 20.0) ]
       path [ Line(point -10.0 -10.0, point -5.0 -5.0); QuadraticBezier(point -5.0 -5.0, point 0.0 15.0, point 10.0 0.0); QuadraticBezier(point 10.0 0.0, point 20.0 -15.0, point 25.0 5.0) ]
       path [ CubicBezier(point 0.0 0.0, point 5.0 10.0, point 15.0 -10.0, point 20.0 0.0); CubicBezier(point 20.0 0.0, point 30.0 10.0, point 35.0 -10.0, point 40.0 0.0) ]
-      path [ Arc { Start = point 0.0 0.0; Radius = point 10.0 5.0; XAxisRotation = 30.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 10.0 }; Arc { Start = point 20.0 10.0; Radius = point 8.0 8.0; XAxisRotation = -45.0<degree>; LargeArc = true; Sweep = false; End = point 40.0 0.0 } ]
-      path [ Line(point 0.0 0.0, point 12.0 0.0); QuadraticBezier(point 12.0 0.0, point 18.0 8.0, point 24.0 0.0); CubicBezier(point 24.0 0.0, point 30.0 -8.0, point 36.0 8.0, point 42.0 0.0); Arc { Start = point 42.0 0.0; Radius = point 6.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 50.0 0.0 } ]
+      path [ Arc ({ Start = point 0.0 0.0; Radius = point 10.0 5.0; XAxisRotation = 30.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 10.0 }: Ellipse.EndpointArcData); Arc ({ Start = point 20.0 10.0; Radius = point 8.0 8.0; XAxisRotation = -45.0<degree>; LargeArc = true; Sweep = false; End = point 40.0 0.0 }: Ellipse.EndpointArcData) ]
+      path [ Line(point 0.0 0.0, point 12.0 0.0); QuadraticBezier(point 12.0 0.0, point 18.0 8.0, point 24.0 0.0); CubicBezier(point 24.0 0.0, point 30.0 -8.0, point 36.0 8.0, point 42.0 0.0); Arc ({ Start = point 42.0 0.0; Radius = point 6.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 50.0 0.0 }: Ellipse.EndpointArcData) ]
       Subpath.polygon [ point 0.0 0.0; point 20.0 0.0; point 20.0 20.0; point 0.0 20.0 ] |> Result.defaultWith (failwithf "%A") |> Path.singleton
       Path.ofSubpaths [ subpath [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 10.0 10.0) ]; subpath [ Line(point 30.0 30.0, point 40.0 30.0); Line(point 40.0 30.0, point 40.0 40.0) ] ] ]
 
@@ -90,23 +90,23 @@ let ``generated paths round trip with minimized repeat commands false options`` 
 
 [<Fact>]
 let ``generated paths round trip with subpath newlines and repeat commands`` () =
-    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.repeatCommands true |> Serialize.withNewlines AtSubpaths)
+    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.repeatCommands true |> Serialize.withNewlines Serialize.AtSubpaths)
 
 [<Fact>]
 let ``generated paths round trip with subpath newlines and omitted repeat commands`` () =
-    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines AtSubpaths)
+    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSubpaths)
 
 [<Fact>]
 let ``generated paths round trip with segment newlines and repeat commands`` () =
-    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.repeatCommands true |> Serialize.withNewlines AtSegments)
+    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.repeatCommands true |> Serialize.withNewlines Serialize.AtSegments)
 
 [<Fact>]
 let ``generated paths round trip with segment newlines and omitted repeat commands`` () =
-    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines AtSegments)
+    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments)
 
 [<Fact>]
 let ``generated paths round trip with commas segment newlines and omitted repeat commands`` () =
-    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.withCommas true |> Serialize.repeatCommands false |> Serialize.withNewlines AtSegments)
+    assertMultilineRoundTrips (Serialize.defaultOptions |> Serialize.withCommas true |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments)
 
 [<Fact>]
 let ``generated paths round trip with commas and minimized whitespace`` () =

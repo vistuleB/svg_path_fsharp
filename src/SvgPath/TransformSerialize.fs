@@ -1,21 +1,22 @@
 namespace SvgPath
 
-type TransformSerializeOptions =
-    { DecimalPlaces: int option
-      FixedDecimals: bool
-      ForceMatrix: bool }
-
-type private LinearTransform =
-    | Matrix2x2
-    | Identity2x2
-    | Scale2x2 of x: float * y: float
-    | SkewX2x2 of tangent: float
-    | SkewY2x2 of tangent: float
-    | RotateScale2x2 of degrees: float<degree> * scaleX: float * scaleY: float
-
 /// Serialize affine matrices as SVG transform attribute values.
 [<RequireQualifiedAccess>]
 module TransformSerialize =
+
+    type Options =
+        { DecimalPlaces: int option
+          FixedDecimals: bool
+          ForceMatrix: bool }
+
+    type private LinearTransform =
+        | Matrix2x2
+        | Identity2x2
+        | Scale2x2 of x: float * y: float
+        | SkewX2x2 of tangent: float
+        | SkewY2x2 of tangent: float
+        | RotateScale2x2 of degrees: float<degree> * scaleX: float * scaleY: float
+
     let private rotationScaleEpsilon = 0.000001
     let private identityScaleEpsilon = 0.0000000000001
 
@@ -39,12 +40,12 @@ module TransformSerialize =
     let private number value options =
         let rightDecimals =
             match options.DecimalPlaces, options.FixedDecimals with
-            | None, _ -> System
-            | Some decimalPlaces, false -> AtMost decimalPlaces
-            | Some decimalPlaces, true -> Fixed decimalPlaces
+            | None, _ -> NumberFormat.System
+            | Some decimalPlaces, false -> NumberFormat.AtMost decimalPlaces
+            | Some decimalPlaces, true -> NumberFormat.Fixed decimalPlaces
 
         NumberFormat.prepare
-            { LeftDecimals = Succinct
+            { LeftDecimals = NumberFormat.Succinct
               RightDecimals = rightDecimals }
             [ value ]
         |> NumberFormat.number value

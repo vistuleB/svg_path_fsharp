@@ -16,7 +16,7 @@ let ``minified number groups preserve integer decimal boundaries`` () =
 let ``minified subpath lines separate repeated command arguments`` () =
     for points in [[point 0. 0.;point 1. 0.;point 2. 0.;point 3. 0.];[point 0. 0.;point 0. 1.;point 0. 2.;point 0. 3.];[point 0. 0.;point 1. 1.;point 2. 2.;point 3. 3.]] do
         let source = Subpath.polyline points |> Result.defaultWith (failwithf "%A") |> Path.singleton
-        let options = {Serialize.minifyingOptions 5 with Newlines=AtSubpaths;ExplicitInitialLineto=true}
+        let options = {Serialize.minifyingOptions 5 with Newlines=Serialize.AtSubpaths;ExplicitInitialLineto=true}
         Assert.Equal(Ok source,Parse.path(Serialize.pathWith source options))
 
 [<Fact>]
@@ -29,12 +29,12 @@ let ``empty subpath serializes to move`` () =
 
 [<Fact>]
 let ``serialization preserves scientific exponents`` () =
-    let options = Serialize.defaultOptions |> Serialize.withRightDecimals System
+    let options = Serialize.defaultOptions |> Serialize.withRightDecimals NumberFormat.System
     Assert.Equal("M 1e20 0", Serialize.subpathWith (Subpath.empty (point 1.0e20 0.0)) options)
 
 [<Fact>]
 let ``serialized padding measures scientific significands`` () =
-    let options = Serialize.defaultOptions |> Serialize.withRightDecimals System |> Serialize.withLeftPadding (LeftPadding(4, Zero))
+    let options = Serialize.defaultOptions |> Serialize.withRightDecimals NumberFormat.System |> Serialize.withLeftPadding (NumberFormat.LeftPadding(4, NumberFormat.Zero))
     Assert.Equal("M 0001e20 0002", Serialize.subpathWith (Subpath.empty (point 1.0e20 2.0)) options)
 
 [<Fact>]
@@ -94,7 +94,7 @@ let ``bezier and arc segments serialize`` () =
         Subpath.create
             [ QuadraticBezier(a, b, c)
               CubicBezier(c, d, e, b)
-              Arc { Start = b; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = a } ]
+              Arc ({ Start = b; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = a }: Ellipse.EndpointArcData) ]
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 Q 10 0 20 10 C 30 0 40 20 10 0 A 5 8 45 1 0 0 0", Serialize.subpath subpath)
 
@@ -123,12 +123,12 @@ let ``fixed decimal options can use zero places`` () =
 
 [<Fact>]
 let ``left padding pads serialized numbers`` () =
-    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (LeftPadding(3, Zero))
+    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (NumberFormat.LeftPadding(3, NumberFormat.Zero))
     Assert.Equal("M 000.0 -02.0 L 012.2 010.2", Serialize.segmentWith (Line(point 0.0 -2.0, point 12.2 10.2)) options)
 
 [<Fact>]
 let ``space left padding pads serialized numbers`` () =
-    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (LeftPadding(3, Space))
+    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (NumberFormat.LeftPadding(3, NumberFormat.Space))
     Assert.Equal("M   0.0  -2.0 L  12.2  10.2", Serialize.segmentWith (Line(point 0.0 -2.0, point 12.2 10.2)) options)
 
 [<Fact>]
@@ -148,7 +148,7 @@ let ``minimized fractions omit leading zero and use decimal boundary`` () =
 let ``minifying options concatenate arc flags and endpoint`` () =
     let subpath =
         Subpath.ofSegment
-            (Arc { Start = point 0.0 0.0; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = point 3.0 -2.0 })
+            (Arc ({ Start = point 0.0 0.0; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = point 3.0 -2.0 }: Ellipse.EndpointArcData))
     let serialized = Serialize.subpathWith subpath (Serialize.minifyingOptions 0)
     Assert.Equal("m0 0a5 8 45 103-2", serialized)
     Assert.Equal(Ok(Path.ofSubpaths [ subpath ]), Parse.path serialized)
@@ -223,7 +223,7 @@ let ``repeat commands false omits repeated smooth commands`` () =
 [<Fact>]
 let ``repeat commands false omits repeated arc commands`` () =
     let radius = point 5.0 5.0
-    let arc startPoint endPoint = Arc { Start = startPoint; Radius = radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = endPoint }
+    let arc startPoint endPoint = Arc ({ Start = startPoint; Radius = radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = endPoint }: Ellipse.EndpointArcData)
     let subpath = Subpath.create [ arc (point 0.0 0.0) (point 10.0 0.0); arc (point 10.0 0.0) (point 20.0 0.0) ] |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 A 5 5 0 0 1 10 0 5 5 0 0 1 20 0", Serialize.subpathWith subpath (Serialize.repeatCommands false Serialize.defaultOptions))
 
@@ -232,44 +232,44 @@ let ``at segments with repeat commands true starts lines with commands`` () =
     let subpath =
         Subpath.polygon [ point 0.0 0.0; point 10.0 10.0; point 20.0 20.0 ]
         |> Result.defaultWith (failwithf "%A")
-    Assert.Equal("M 0 0\nL 10 10\nL 20 20\nZ", Serialize.subpathWith subpath (Serialize.withNewlines AtSegments Serialize.defaultOptions))
+    Assert.Equal("M 0 0\nL 10 10\nL 20 20\nZ", Serialize.subpathWith subpath (Serialize.withNewlines Serialize.AtSegments Serialize.defaultOptions))
 
 [<Fact>]
 let ``at segments with repeat commands false trails emitted commands`` () =
     let subpath =
         Subpath.polygon [ point 0.0 0.0; point 10.0 10.0; point 20.0 20.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let compact = Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines AtSegments
+    let compact = Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments
     Assert.Equal("M\n0 0 L\n10 10\n20 20 Z", Serialize.subpathWith subpath compact)
 
 [<Fact>]
 let ``at segments with repeat commands true starts curve lines with commands`` () =
     let subpath = Subpath.create [ CubicBezier(point 0.0 0.0, point 10.0 0.0, point 20.0 10.0, point 30.0 0.0); CubicBezier(point 30.0 0.0, point 20.0 10.0, point 10.0 0.0, point 40.0 10.0) ] |> Result.bind (Subpath.setClosedWith Bridge true) |> Result.defaultWith (failwithf "%A")
-    Assert.Equal("M 0 0\nC 10 0 20 10 30 0\nC 20 10 10 0 40 10\nZ", Serialize.subpathWith subpath (Serialize.withNewlines AtSegments Serialize.defaultOptions))
+    Assert.Equal("M 0 0\nC 10 0 20 10 30 0\nC 20 10 10 0 40 10\nZ", Serialize.subpathWith subpath (Serialize.withNewlines Serialize.AtSegments Serialize.defaultOptions))
 
 [<Fact>]
 let ``at segments with repeat commands false trails curve commands`` () =
     let subpath = Subpath.create [ CubicBezier(point 0.0 0.0, point 10.0 0.0, point 20.0 10.0, point 30.0 0.0); CubicBezier(point 30.0 0.0, point 20.0 10.0, point 10.0 0.0, point 40.0 10.0) ] |> Result.bind (Subpath.setClosedWith Bridge true) |> Result.defaultWith (failwithf "%A")
-    let options = Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines AtSegments
+    let options = Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments
     Assert.Equal("M\n0 0 C\n10 0 20 10 30 0\n20 10 10 0 40 10 Z", Serialize.subpathWith subpath options)
 
 [<Fact>]
 let ``at subpaths puts each subpath on its own line`` () =
     let closed points = Subpath.polygon points |> Result.defaultWith (failwithf "%A")
     let path = Path.ofSubpaths [ closed [ point 0.0 0.0; point 10.0 10.0; point 20.0 20.0 ]; closed [ point 100.0 100.0; point 110.0 110.0; point 120.0 120.0 ] ]
-    Assert.Equal("M 0 0 L 10 10 L 20 20 Z\nM 100 100 L 110 110 L 120 120 Z", Serialize.pathWith path (Serialize.withNewlines AtSubpaths Serialize.defaultOptions))
+    Assert.Equal("M 0 0 L 10 10 L 20 20 Z\nM 100 100 L 110 110 L 120 120 Z", Serialize.pathWith path (Serialize.withNewlines Serialize.AtSubpaths Serialize.defaultOptions))
 
 [<Fact>]
 let ``at segments with repeat commands false starts moves on new lines`` () =
     let first = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 10.0))
     let second = Subpath.ofSegment (Line(point 100.0 100.0, point 110.0 110.0))
-    let options = Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines AtSegments
+    let options = Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments
     Assert.Equal("M\n0 0 L\n10 10\nM\n100 100 L\n110 110", Serialize.pathWith (Path.ofSubpaths [ first; second ]) options)
 
 [<Fact>]
 let ``commas separate coordinates inside point pairs`` () =
     let subpath = Subpath.polygon [ point 0.0 0.0; point 10.0 10.0; point 20.0 20.0 ] |> Result.defaultWith (failwithf "%A")
-    let options = Serialize.defaultOptions |> Serialize.withCommas true |> Serialize.repeatCommands false |> Serialize.withNewlines AtSegments
+    let options = Serialize.defaultOptions |> Serialize.withCommas true |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments
     Assert.Equal("M\n0,0 L\n10,10\n20,20 Z", Serialize.subpathWith subpath options)
 
 [<Fact>]
@@ -281,12 +281,12 @@ let ``commas preserve spaces between curve point pairs`` () =
               CubicBezier(b, point 260.0 30.0, point -320.0 45.0, c)
               CubicBezier(c, point 600.5 -70.25, point 720.0 80.0, d) ]
         |> Result.defaultWith (failwithf "%A")
-    let options = Serialize.fixedDecimalOptions 2 |> Serialize.withLeftPadding (AutoLeftPadding Space) |> Serialize.withCommas true |> Serialize.repeatCommands false |> Serialize.withNewlines AtSegments
+    let options = Serialize.fixedDecimalOptions 2 |> Serialize.withLeftPadding (NumberFormat.AutoLeftPadding NumberFormat.Space) |> Serialize.withCommas true |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments
     Assert.Equal("M\n  20.00, -30.00 C\n -15.00,  40.00   80.00, -90.00  140.00,  20.00\n 260.00,  30.00 -320.00,  45.00  480.00, -60.00\n 600.50, -70.25  720.00,  80.00  840.00, -90.00", Serialize.subpathWith subpath options)
 
 [<Fact>]
 let ``commas apply to arc radius and endpoint pairs`` () =
-    let arc = Arc { Start = point 10.0 20.0; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = point 13.0 18.0 }
+    let arc = Arc ({ Start = point 10.0 20.0; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = point 13.0 18.0 }: Ellipse.EndpointArcData)
     Assert.Equal("m 10,20 a 5,8 45 1 0 3,-2", Serialize.segmentWith arc (Serialize.relativeDecimalOptions 0 |> Serialize.withCommas true))
 
 [<Fact>]
@@ -307,7 +307,7 @@ let ``relative options use relative curve commands`` () =
 
 [<Fact>]
 let ``relative options use relative arc endpoint`` () =
-    let arc = Arc { Start = point 10.0 20.0; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = point 13.0 18.0 }
+    let arc = Arc ({ Start = point 10.0 20.0; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = point 13.0 18.0 }: Ellipse.EndpointArcData)
     Assert.Equal("m 10 20 a 5 8 45 1 0 3 -2", Serialize.segmentWith arc (Serialize.relativeDecimalOptions 0))
 
 [<Fact>]
@@ -387,13 +387,13 @@ let ``parser tracked relative cubic uses similarity correction`` () =
 [<Fact>]
 let ``auto left padding aligns serialized path numbers`` () =
     let subpath = Subpath.polyline [ point 0.0 -5.0; point 120.0 10.0; point 2.0 -30.0 ] |> Result.defaultWith (failwithf "%A")
-    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (AutoLeftPadding Zero)
+    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (NumberFormat.AutoLeftPadding NumberFormat.Zero)
     Assert.Equal("M 000.0 -05.0 L 120.0 010.0 L 002.0 -30.0", Serialize.subpathWith subpath options)
 
 [<Fact>]
 let ``parser tracked auto padding uses corrected numbers`` () =
     let subpath = Subpath.ofSegment (Line(point 0.14 0.0, point 10.06 0.0))
-    let options = Serialize.relativeDecimalOptions 1 |> Serialize.withLeftPadding (AutoLeftPadding Zero)
+    let options = Serialize.relativeDecimalOptions 1 |> Serialize.withLeftPadding (NumberFormat.AutoLeftPadding NumberFormat.Zero)
     Assert.Equal("m 00.1 00 h 10", Serialize.pathWith (Path.ofSubpaths [ subpath ]) options)
 
 [<Fact>]
@@ -404,7 +404,7 @@ let ``parser tracked relative lines preserve axis constraints`` () =
 [<Fact>]
 let ``parser tracked relative coincident arc does not invent geometry`` () =
     let anchor = point 0.34 0.0
-    let arc = Arc { Start = anchor; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = anchor }
+    let arc = Arc ({ Start = anchor; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = anchor }: Ellipse.EndpointArcData)
     let serialized = Serialize.segmentWith arc (Serialize.relativeDecimalOptions 1)
     Assert.Equal("m 0.3 0 a 10 10 0 0 1 0 0",serialized)
     let parsed = Parse.path serialized |> Result.defaultWith (failwithf "%A")
@@ -414,7 +414,7 @@ let ``parser tracked relative coincident arc does not invent geometry`` () =
 let ``relative coincident zero radius arc terminates`` () =
     let anchor = point 0.0 0.0
     for radius in [point 0.0 2.0;point 2.0 0.0] do
-        let arc = Arc {Start=anchor;Radius=radius;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=anchor}
+        let arc = Arc ({Start=anchor;Radius=radius;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=anchor}: Ellipse.EndpointArcData)
         let source = Subpath.ofSegment arc |> Path.singleton
         let encoded = Serialize.pathWith source Serialize.relativeOptions
         let parsed = Parse.path encoded |> Result.defaultWith (failwithf "%A")
@@ -431,7 +431,7 @@ let ``parser tracked relative close resets the parser current`` () =
 
 [<Fact>]
 let ``parser tracked relative arc applies chord similarity`` () =
-    let arc = Arc { Start = point 0.34 0.0; Radius = point 2.0 1.0; XAxisRotation = 15.0<degree>; LargeArc = false; Sweep = true; End = point 1.39 0.0 }
+    let arc = Arc ({ Start = point 0.34 0.0; Radius = point 2.0 1.0; XAxisRotation = 15.0<degree>; LargeArc = false; Sweep = true; End = point 1.39 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal("m 0.3 0 a 2.1 1 15 0 1 1.1 0", Serialize.segmentWith arc (Serialize.relativeDecimalOptions 1))
 
 [<Fact>]
@@ -446,7 +446,7 @@ let ``parser tracked relative smooth quadratic uses parser control`` () =
 
 [<Fact>]
 let ``parser tracked relative collapsed arc preserves arc fields`` () =
-    let arc = Arc { Start = point 0.04 0.0; Radius = point 2.0 1.0; XAxisRotation = 15.0<degree>; LargeArc = false; Sweep = true; End = point 0.049 0.0 }
+    let arc = Arc ({ Start = point 0.04 0.0; Radius = point 2.0 1.0; XAxisRotation = 15.0<degree>; LargeArc = false; Sweep = true; End = point 0.049 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal("m 0 0 a 2 1 15 0 1 0 0", Serialize.segmentWith arc (Serialize.relativeDecimalOptions 1))
 
 [<Fact>]

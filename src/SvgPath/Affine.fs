@@ -1,14 +1,5 @@
 namespace SvgPath
 
-/// Failures while constructing a transform from point correspondences.
-type AffineError =
-    /// Zero source separation in the scaled calculation.
-    | DegenerateSourcePair
-    /// Zero computed determinant, for example collinear or repeated source points.
-    | DegenerateSourceTriple
-    /// Construction produced a non-finite denominator or matrix coefficient.
-    | NonFiniteTransform
-
 /// A two-dimensional affine transform in SVG's six-value matrix form.
 /// The linear coefficients are dimensionless; translations use SVG lengths.
 [<Struct>]
@@ -23,6 +14,15 @@ type Affine =
 /// Generic two-dimensional affine matrices and matrix composition.
 [<RequireQualifiedAccess>]
 module Affine =
+    /// Failures while constructing a transform from point correspondences.
+    type Error =
+        /// Zero source separation in the scaled calculation.
+        | DegenerateSourcePair
+        /// Zero computed determinant, for example collinear or repeated source points.
+        | DegenerateSourceTriple
+        /// Construction produced a non-finite denominator or matrix coefficient.
+        | NonFiniteTransform
+
     let matrix a b c d (e: float<length>) (f: float<length>) : Affine =
         { A = a; B = b; C = c; D = d; E = e; F = f }
 
@@ -100,7 +100,7 @@ module Affine =
         (sourceEnd: Point<length>)
         (targetStart: Point<length>)
         (targetEnd: Point<length>)
-        : Result<Affine, AffineError> =
+        : Result<Affine, Error> =
         let source = Point.displacement sourceStart sourceEnd
         let target = Point.displacement targetStart targetEnd
         let vectorScale =
@@ -141,7 +141,7 @@ module Affine =
         (targetA: Point<length>)
         (targetB: Point<length>)
         (targetC: Point<length>)
-        : Result<Affine, AffineError> =
+        : Result<Affine, Error> =
         let sourceAB = Point.displacement sourceA sourceB
         let sourceAC = Point.displacement sourceA sourceC
         let targetAB = Point.displacement targetA targetB

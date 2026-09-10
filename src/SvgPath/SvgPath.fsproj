@@ -53,6 +53,7 @@
     <Compile Include="Arrangement.fs" />
     <Compile Include="ArrangementDrawing.fs" />
     <Compile Include="Csg.fs" />
+    <Compile Include="ArcsJoin.fs" />
     <Compile Include="Offset.fs" />
     <Compile Include="Stroke.fs" />
   </ItemGroup>

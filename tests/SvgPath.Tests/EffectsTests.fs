@@ -12,7 +12,7 @@ let private arcCount (subpath: Subpath) =
 
 [<Fact>]
 let ``leave corner preserves untrimmed zero length segments`` () =
-    let options = { Effects.defaultRoundCornerOptions with Failure=LeaveCorner }
+    let options = { Effects.defaultRoundCornerOptions with Failure=Effects.LeaveCorner }
     let a,b,c = point 0. 0.,point 10. 0.,point 10. 10.
     for points in [[a;a;b;c];[a;b;b;c];[a;b;c;c]] do
         let source = Subpath.polyline points |> Result.defaultWith (failwithf "%A")
@@ -58,22 +58,22 @@ let ``round corners rounds closed square`` () =
 let ``normalize degenerate segments returns direct tolerance error`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     Assert.Equal(
-        Error(InvalidDegeneracyTolerance -0.000001<length>),
+        Error(Effects.InvalidDegeneracyTolerance -0.000001<length>),
         Effects.normalizeDegenerateSegments source -0.000001<length>)
 
 [<Fact>]
 let ``normalize degenerate segments rejects nonfinite tolerance`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     let infinity = Length.fromFloat System.Double.PositiveInfinity
-    Assert.Equal(Error(InvalidDegeneracyTolerance infinity), Effects.normalizeDegenerateSegments source infinity)
+    Assert.Equal(Error(Effects.InvalidDegeneracyTolerance infinity), Effects.normalizeDegenerateSegments source infinity)
     match Effects.normalizeDegenerateSegments source (Length.fromFloat System.Double.NaN) with
-    | Error(InvalidDegeneracyTolerance tolerance) -> Assert.True(System.Double.IsNaN(float tolerance))
+    | Error(Effects.InvalidDegeneracyTolerance tolerance) -> Assert.True(System.Double.IsNaN(float tolerance))
     | result -> failwithf "expected a direct invalid-tolerance error, got %A" result
 
 [<Fact>]
 let ``angular tolerance controls corner eligibility in degrees`` () =
     let source = rightAngle ()
-    let skipped = { Effects.defaultRoundCornerOptions with Failure = LeaveCorner; AngularTolerance = 90.0<degree> }
+    let skipped = { Effects.defaultRoundCornerOptions with Failure = Effects.LeaveCorner; AngularTolerance = 90.0<degree> }
     let rounded = { skipped with AngularTolerance = 89.999<degree> }
     Assert.Equal(Ok source, Effects.roundSubpathCornersWith source 2.0<length> skipped)
     Assert.Equal(1, Effects.roundSubpathCornersWith source 2.0<length> rounded |> Result.defaultWith (failwithf "%A") |> arcCount)
@@ -81,7 +81,7 @@ let ``angular tolerance controls corner eligibility in degrees`` () =
 [<Fact>]
 let ``distance tolerance controls minimum trim distance`` () =
     let source = rightAngle ()
-    let skipped = { Effects.defaultRoundCornerOptions with Failure = LeaveCorner; DistanceTolerance = 2.0<length> }
+    let skipped = { Effects.defaultRoundCornerOptions with Failure = Effects.LeaveCorner; DistanceTolerance = 2.0<length> }
     let rounded = { skipped with DistanceTolerance = 1.999<length> }
     Assert.Equal(Ok source, Effects.roundSubpathCornersWith source 2.0<length> skipped)
     Assert.Equal(1, Effects.roundSubpathCornersWith source 2.0<length> rounded |> Result.defaultWith (failwithf "%A") |> arcCount)
@@ -104,7 +104,7 @@ let ``round corners rounds closed one segment cusp`` () =
         Subpath.ofSegment (CubicBezier(point 0.0 0.0, point -40.0 -30.0, point -40.0 30.0, point 0.0 0.0))
         |> Subpath.setClosed true
         |> Result.defaultWith (failwithf "%A")
-    let options = { Effects.defaultRoundCornerOptions with Failure = AdaptRadius }
+    let options = { Effects.defaultRoundCornerOptions with Failure = Effects.AdaptRadius }
     let rounded = Effects.roundSubpathCornersWith source 4.0<length> options |> Result.defaultWith (failwithf "%A")
     Assert.True rounded.Closed
     Assert.Equal(2, rounded.Segments.Length)
@@ -136,12 +136,12 @@ let ``stretch to join endpoint policy closes near loop single segment`` () =
 [<Fact>]
 let ``round corners errors when radius does not fit`` () =
     let actual = Effects.roundSubpathCorners (rightAngle ()) 20.0<length>
-    Assert.Equal(Error(CannotRoundCorner 0), actual)
+    Assert.Equal(Error(Effects.CannotRoundCorner 0), actual)
 
 [<Fact>]
 let ``round corners can leave unfittable corner`` () =
     let source = rightAngle ()
-    let options = { Effects.defaultRoundCornerOptions with Failure = LeaveCorner }
+    let options = { Effects.defaultRoundCornerOptions with Failure = Effects.LeaveCorner }
     let actual = Effects.roundSubpathCornersWith source 20.0<length> options
     Assert.Equal(Ok source, actual)
 
@@ -150,7 +150,7 @@ let ``round corners can adapt radius to fit short segments`` () =
     let square =
         Subpath.polygon [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let options = { Effects.defaultRoundCornerOptions with Failure = AdaptRadius }
+    let options = { Effects.defaultRoundCornerOptions with Failure = Effects.AdaptRadius }
     let rounded = Effects.roundSubpathCornersWith square 20.0<length> options |> Result.defaultWith (failwithf "%A")
     Assert.True rounded.Closed
     Assert.Equal(8, rounded.Segments.Length)
@@ -223,7 +223,7 @@ let ``round corners adapts tight inward spiral`` () =
             [ point 0.0 0.0; point 8.0 0.0; point 8.0 8.0; point 2.0 8.0; point 2.0 2.0
               point 6.0 2.0; point 6.0 6.0; point 4.0 6.0; point 4.0 4.0; point 4.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let options = { Effects.defaultRoundCornerOptions with Failure = AdaptRadius; DistanceTolerance = 1.0<length> }
+    let options = { Effects.defaultRoundCornerOptions with Failure = Effects.AdaptRadius; DistanceTolerance = 1.0<length> }
     let rounded = Effects.roundSubpathCornersWith spiral 2.0<length> options |> Result.defaultWith (failwithf "%A")
     Assert.True rounded.Closed
     Assert.Equal(4, arcCount rounded)
@@ -243,7 +243,7 @@ let ``round corners accepts zero distance tolerance`` () =
     rounded.Segments
     |> List.choose (function Arc arc -> Some arc.Radius.X | _ -> None)
     |> List.iter (fun radius -> Assert.True(abs (radius - 1.0<length>) <= 1.0e-6<length>))
-    Assert.Equal(Error(CannotRoundCorner 0), Effects.roundSubpathCornersWith square 1.0<length> wide)
+    Assert.Equal(Error(Effects.CannotRoundCorner 0), Effects.roundSubpathCornersWith square 1.0<length> wide)
 
 [<Fact>]
 let ``round corners rejects negative distance tolerance`` () =
@@ -251,7 +251,7 @@ let ``round corners rejects negative distance tolerance`` () =
         Subpath.polygon [ point 0.0 0.0; point 4.0 0.0; point 4.0 4.0; point 0.0 4.0 ]
         |> Result.defaultWith (failwithf "%A")
     let options = { Effects.defaultRoundCornerOptions with DistanceTolerance = -0.000001<length> }
-    Assert.Equal(Error(EffectsError.InvalidDistanceTolerance -0.000001<length>), Effects.roundSubpathCornersWith square 1.0<length> options)
+    Assert.Equal(Error(Effects.Error.InvalidDistanceTolerance -0.000001<length>), Effects.roundSubpathCornersWith square 1.0<length> options)
 
 [<Fact>]
 let ``round corners errors on exact trim consume at zero distance tolerance`` () =
@@ -259,7 +259,7 @@ let ``round corners errors on exact trim consume at zero distance tolerance`` ()
         Subpath.polyline [ point 0.0 0.0; point 4.0 0.0; point 4.0 4.0; point 8.0 4.0 ]
         |> Result.defaultWith (failwithf "%A")
     let options = { Effects.defaultRoundCornerOptions with DistanceTolerance = 0.0<length> }
-    Assert.Equal(Error(CornerTrimsOverlap 1), Effects.roundSubpathCornersWith polyline 2.0<length> options)
+    Assert.Equal(Error(Effects.CornerTrimsOverlap 1), Effects.roundSubpathCornersWith polyline 2.0<length> options)
 
 [<Fact>]
 let ``round corners adapt rejects exact center consume at zero distance tolerance`` () =
@@ -268,5 +268,5 @@ let ``round corners adapt rejects exact center consume at zero distance toleranc
             [ point 0.0 0.0; point 8.0 0.0; point 8.0 8.0; point 2.0 8.0; point 2.0 2.0
               point 6.0 2.0; point 6.0 6.0; point 4.0 6.0; point 4.0 4.0; point 4.0 10.0; point 0.0 10.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let options = { Effects.defaultRoundCornerOptions with Failure = AdaptRadius; DistanceTolerance = 0.0<length> }
-    Assert.Equal(Error(CornerTrimsOverlap 4), Effects.roundSubpathCornersWith spiral 2.0<length> options)
+    let options = { Effects.defaultRoundCornerOptions with Failure = Effects.AdaptRadius; DistanceTolerance = 0.0<length> }
+    Assert.Equal(Error(Effects.CornerTrimsOverlap 4), Effects.roundSubpathCornersWith spiral 2.0<length> options)

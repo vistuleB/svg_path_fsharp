@@ -1,34 +1,35 @@
 namespace SvgPath
 
-type EffectsError =
-    /// The degeneracy tolerance must be finite and non-negative.
-    | InvalidDegeneracyTolerance of tolerance: float<length>
-    | EffectsPathError of error: SegmentError
-    | InvalidRadius of radius: float<length>
-    /// The distance tolerance must be finite and non-negative.
-    | InvalidDistanceTolerance of tolerance: float<length>
-    | InvalidAngularTolerance of tolerance: float<degree>
-    | CannotRoundCorner of index: int
-    | CornerTrimsOverlap of segmentIndex: int
-    | EffectsConvexHullError of error: ConvexHullError
-
-type FailureMode =
-    | ErrorOnFailure
-    | LeaveCorner
-    /// Measure eligible corners and collect strongest per-segment limits,
-    /// then apply them together in one scaling pass, not in visitation order.
-    | AdaptRadius
-
-[<Struct>]
-type RoundCornerOptions =
-    { Failure: FailureMode
-      LengthOptions: LengthOptions
-      DistanceTolerance: float<length>
-      AngularTolerance: float<degree> }
-
 /// Reusable endpoint policies and path-editing effects.
 [<RequireQualifiedAccess>]
 module Effects =
+
+    type Error =
+        /// The degeneracy tolerance must be finite and non-negative.
+        | InvalidDegeneracyTolerance of tolerance: float<length>
+        | EffectsPathError of error: SegmentError
+        | InvalidRadius of radius: float<length>
+        /// The distance tolerance must be finite and non-negative.
+        | InvalidDistanceTolerance of tolerance: float<length>
+        | InvalidAngularTolerance of tolerance: float<degree>
+        | CannotRoundCorner of index: int
+        | CornerTrimsOverlap of segmentIndex: int
+        | EffectsConvexHullError of error: ConvexHull.Error
+
+    type FailureMode =
+        | ErrorOnFailure
+        | LeaveCorner
+        /// Measure eligible corners and collect strongest per-segment limits,
+        /// then apply them together in one scaling pass, not in visitation order.
+        | AdaptRadius
+
+    [<Struct>]
+    type RoundCornerOptions =
+        { Failure: FailureMode
+          LengthOptions: LengthOptions
+          DistanceTolerance: float<length>
+          AngularTolerance: float<degree> }
+
     type private SegmentInfo =
         { Index: int
           Segment: Segment
@@ -52,9 +53,9 @@ module Effects =
           AngularTolerance = 1.0e-6<degree> }
 
     let private degeneracyError = function
-        | DegeneracyInvalidTolerance tolerance -> InvalidDegeneracyTolerance tolerance
-        | DegeneracyPathError error -> EffectsPathError error
-        | DegeneracyConvexHullError error -> EffectsConvexHullError error
+        | Degeneracy.DegeneracyInvalidTolerance tolerance -> InvalidDegeneracyTolerance tolerance
+        | Degeneracy.DegeneracyPathError error -> EffectsPathError error
+        | Degeneracy.DegeneracyConvexHullError error -> EffectsConvexHullError error
 
     /// Replace maximal thin windows through Degeneracy, preserving start/end
     /// and both longitudinal support extrema in source order. Intermediate

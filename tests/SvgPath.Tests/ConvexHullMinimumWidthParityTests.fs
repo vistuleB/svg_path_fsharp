@@ -27,14 +27,14 @@ let private rectangleAtAngle center length width angle =
 
 let private assertFits vertices tolerance maxDepth =
     match ConvexHull.internalConvexPolygonMinimumWidthDecision vertices tolerance maxDepth with
-    | MinimumWidthFits strip ->
+    | ConvexHull.MinimumWidthFits strip ->
         Assert.True(width vertices <= tolerance)
         Assert.True(strip.Width <= tolerance)
     | result -> Assert.Fail($"expected fit, got {result}")
 
 let private assertExceeds vertices tolerance maxDepth =
     match ConvexHull.internalConvexPolygonMinimumWidthDecision vertices tolerance maxDepth with
-    | MinimumWidthExceeds lowerBound ->
+    | ConvexHull.MinimumWidthExceeds lowerBound ->
         Assert.True(width vertices > tolerance)
         Assert.True(lowerBound > tolerance)
     | result -> Assert.Fail($"expected excess, got {result}")
@@ -42,8 +42,8 @@ let private assertExceeds vertices tolerance maxDepth =
 let private circleSubpath radius =
     let right, left = point radius 0.0, point -radius 0.0
     Subpath.create
-        [ Arc { Start = right; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = left }
-          Arc { Start = left; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = right } ]
+        [ Arc ({ Start = right; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = left }: Ellipse.EndpointArcData)
+          Arc ({ Start = left; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = right }: Ellipse.EndpointArcData) ]
     |> Result.bind (Subpath.setClosed true)
     |> Result.defaultWith (failwithf "%A")
 
@@ -94,7 +94,7 @@ let ``five way search handles an irregular convex polygon`` () =
 let ``five way search does not guess at the exact threshold`` () =
     let vertices = rectangleAtAngle (point 0.0 0.0) 7.0 2.0 13.0
     match ConvexHull.internalConvexPolygonMinimumWidthDecision vertices (width vertices) 3 with
-    | MinimumWidthUnresolved _ -> ()
+    | ConvexHull.MinimumWidthUnresolved _ -> ()
     | result -> Assert.Fail($"expected unresolved, got {result}")
 
 [<Fact>]
@@ -109,10 +109,10 @@ let ``five way decisions are translation and reversal invariant`` () =
 let ``curved circle hull uses exact directional support`` () =
     let hull = ConvexHull.subpathHull (circleSubpath 2.0) |> Result.defaultWith (failwithf "%A")
     match ConvexHull.internalConvexSubpathMinimumWidthDecision hull 4.001<length> with
-    | Ok(MinimumWidthFits strip) -> near 4.0<length> strip.Width
+    | Ok(ConvexHull.MinimumWidthFits strip) -> near 4.0<length> strip.Width
     | result -> Assert.Fail($"expected fit, got {result}")
     match ConvexHull.internalConvexSubpathMinimumWidthDecision hull 3.999<length> with
-    | Ok(MinimumWidthExceeds lowerBound) -> Assert.True(lowerBound > 3.999<length>)
+    | Ok(ConvexHull.MinimumWidthExceeds lowerBound) -> Assert.True(lowerBound > 3.999<length>)
     | result -> Assert.Fail($"expected excess, got {result}")
 
 [<Fact>]
@@ -120,7 +120,7 @@ let ``curved hull search certifies an arbitrary line at graph tolerance`` () =
     let finish = Point.direction 31.7<degree> |> Point.scale 10.0<length>
     let hull = ConvexHull.segmentHull (Line(point 0.0 0.0, finish)) |> Result.defaultWith (failwithf "%A")
     match ConvexHull.internalConvexSubpathMinimumWidthDecision hull 1.0e-9<length> with
-    | Ok(MinimumWidthFits strip) -> Assert.True(strip.Width <= 1.0e-9<length>)
+    | Ok(ConvexHull.MinimumWidthFits strip) -> Assert.True(strip.Width <= 1.0e-9<length>)
     | result -> Assert.Fail($"expected fit, got {result}")
 
 [<Fact>]
@@ -128,14 +128,14 @@ let ``adding a segment returns the augmented hull and width decision`` () =
     let first, second, third = line 0.0 0.0 1.0 0.0, line 1.0 0.0 2.0 0.0, line 2.0 0.0 2.0 2.0
     let firstHull = ConvexHull.segmentHull first |> Result.defaultWith (failwithf "%A")
     let secondHull, secondDecision = ConvexHull.internalConvexSubpathAddSegmentAndTestWidth firstHull second 0.01<length> |> Result.defaultWith (failwithf "%A")
-    match secondDecision with MinimumWidthFits strip -> Assert.True(strip.Width <= 0.01<length>) | result -> Assert.Fail($"expected fit, got {result}")
+    match secondDecision with ConvexHull.MinimumWidthFits strip -> Assert.True(strip.Width <= 0.01<length>) | result -> Assert.Fail($"expected fit, got {result}")
     let _, thirdDecision = ConvexHull.internalConvexSubpathAddSegmentAndTestWidth secondHull third 0.01<length> |> Result.defaultWith (failwithf "%A")
-    match thirdDecision with MinimumWidthExceeds _ -> () | result -> Assert.Fail($"expected excess, got {result}")
+    match thirdDecision with ConvexHull.MinimumWidthExceeds _ -> () | result -> Assert.Fail($"expected excess, got {result}")
 
 [<Fact>]
 let ``public minimum width finds rotated rectangle thickness`` () =
     let source = rectangleAtAngle (point 3.0 -2.0) 12.0 0.4 31.7 |> polygon
-    let result = ConvexHull.subpathMinimumWidthWith source { Accuracy = 1.0e-6<length>; MaxDepth = 12 } |> Result.defaultWith (failwithf "%A")
+    let result = ConvexHull.subpathMinimumWidthWith source ({ Accuracy = 1.0e-6<length>; MaxDepth = 12 }: ConvexHull.WidthSearchOptions) |> Result.defaultWith (failwithf "%A")
     Assert.True result.Converged
     Assert.True(abs (result.Width - 0.4<length>) <= 1.0e-6<length>)
     Assert.True(
@@ -144,7 +144,7 @@ let ``public minimum width finds rotated rectangle thickness`` () =
 
 [<Fact>]
 let ``public diameter returns witness pair and midpoint`` () =
-    let result = ConvexHull.subpathDiameterWith (polygon [ point 0.0 0.0; point 3.0 4.0; point 0.0 1.0 ]) { Accuracy = 1.0e-6<length>; MaxDepth = 12 } |> Result.defaultWith (failwithf "%A")
+    let result = ConvexHull.subpathDiameterWith (polygon [ point 0.0 0.0; point 3.0 4.0; point 0.0 1.0 ]) ({ Accuracy = 1.0e-6<length>; MaxDepth = 12 }: ConvexHull.WidthSearchOptions) |> Result.defaultWith (failwithf "%A")
     Assert.True result.Converged
     near 5.0<length> result.Width
     near 5.0<length> (Point.distance result.LowerPoint result.UpperPoint)
@@ -161,7 +161,7 @@ let ``path diameter uses direct support across move only subpaths`` () =
 [<Fact>]
 let ``width extremum reports depth limit before convergence`` () =
     let source = rectangleAtAngle (point 0.0 0.0) 7.0 2.0 13.0 |> polygon
-    let result = ConvexHull.subpathMinimumWidthWith source { Accuracy = 0.0<length>; MaxDepth = 0 } |> Result.defaultWith (failwithf "%A")
+    let result = ConvexHull.subpathMinimumWidthWith source ({ Accuracy = 0.0<length>; MaxDepth = 0 }: ConvexHull.WidthSearchOptions) |> Result.defaultWith (failwithf "%A")
     Assert.False result.Converged
     Assert.True(result.LowerBound < result.UpperBound)
 

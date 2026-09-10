@@ -63,4 +63,4 @@ let ``path hull includes empty subpath start points`` () =
 
 [<Fact>]
 let ``path hull rejects empty path`` () =
-    Assert.Equal(Error(ConvexHullPathError EmptyPath), ConvexHull.pathHull Path.empty)
+    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.pathHull Path.empty)

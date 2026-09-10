@@ -1,29 +1,5 @@
 namespace SvgPath
 
-/// Invalid curvature arguments, underlying path failures, and undefined geometry.
-type CurvatureError =
-    | CurvaturePathError of error: SegmentError
-    | InvalidCurvatureTolerance of tolerance: float<parameter>
-    | InvalidCurvatureMaxDepth of maxDepth: int
-    | InvalidCurvatureMargin of margin: float<length>
-    | DegenerateCurvatureDerivative
-    | InfiniteRadiusOfCurvature
-    | CurvatureRootIsolationFailed
-    | CurvatureMaxDepthReached of lower: float<parameter> * upper: float<parameter>
-
-/// Cusp discovery options. Every field is validated; algebraic inflection
-/// discovery uses none of the fields after validation.
-[<Struct>]
-type CurvatureOptions =
-    { Tolerance: float<parameter>
-      MaxDepth: int }
-
-/// First and second parameter derivatives at a segment parameter.
-[<Struct>]
-type SegmentDerivatives =
-    { First: Point<length / parameter>
-      Second: Point<length / parameter^2> }
-
 /// Signed curvature, radius, inflection points, and offset-cusp diagnostics.
 /// Signs refer to the visual left normal in SVG coordinates (positive y down).
 /// Curvature has inverse-length units; radius, offsets, and margins have length
@@ -32,6 +8,31 @@ type SegmentDerivatives =
 /// curvature extrema before bisection. Individual contracts describe limitations.
 [<RequireQualifiedAccess>]
 module Curvature =
+
+    /// Invalid curvature arguments, underlying path failures, and undefined geometry.
+    type Error =
+        | CurvaturePathError of error: SegmentError
+        | InvalidCurvatureTolerance of tolerance: float<parameter>
+        | InvalidCurvatureMaxDepth of maxDepth: int
+        | InvalidCurvatureMargin of margin: float<length>
+        | DegenerateCurvatureDerivative
+        | InfiniteRadiusOfCurvature
+        | CurvatureRootIsolationFailed
+        | CurvatureMaxDepthReached of lower: float<parameter> * upper: float<parameter>
+
+    /// Cusp discovery options. Every field is validated; algebraic inflection
+    /// discovery uses none of the fields after validation.
+    [<Struct>]
+    type Options =
+        { Tolerance: float<parameter>
+          MaxDepth: int }
+
+    /// First and second parameter derivatives at a segment parameter.
+    [<Struct>]
+    type Derivatives =
+        { First: Point<length / parameter>
+          Second: Point<length / parameter^2> }
+
     /// Default refinement options.
     let defaultOptions =
         { Tolerance = 1.0e-9<parameter>
@@ -54,7 +55,7 @@ module Curvature =
         | Error error, _
         | _, Error error -> Error error
 
-    let private leftNormalCurvatureFromDerivatives data : Result<float<1 / length>, CurvatureError> =
+    let private leftNormalCurvatureFromDerivatives data : Result<float<1 / length>, Error> =
         let speedSquared = Point.dot data.First data.First
         if speedSquared <= 0.0<length^2 / parameter^2>
            || not (System.Double.IsFinite(float speedSquared)) then Error DegenerateCurvatureDerivative
@@ -73,7 +74,7 @@ module Curvature =
     /// Signed visual-left radius. Lines and inflection points return
     /// InfiniteRadiusOfCurvature; zero-speed parameters return
     /// DegenerateCurvatureDerivative.
-    let segmentLeftNormalRadius segment t : Result<float<length>, CurvatureError> =
+    let segmentLeftNormalRadius segment t : Result<float<length>, Error> =
         segmentLeftNormalCurvature segment t
         |> Result.bind (fun curvature -> if InternalNumber.isZero curvature then Error InfiniteRadiusOfCurvature else Ok(1.0 / curvature))
 
@@ -116,14 +117,14 @@ module Curvature =
     let inline private signChange a b = (a < 0.0<_> && b > 0.0<_>) || (a > 0.0<_> && b < 0.0<_>)
 
     let rec private refineRoot
-        (f: float<parameter> -> Result<float<'Unit>, CurvatureError>)
+        (f: float<parameter> -> Result<float<'Unit>, Error>)
         (a: float<parameter>)
         (b: float<parameter>)
         (va: float<'Unit>)
         (vb: float<'Unit>)
         options
         depth
-        : Result<float<parameter>, CurvatureError> =
+        : Result<float<parameter>, Error> =
         let midpoint = (a + b) / 2.0
         match f midpoint with
         | Error error -> Error error
@@ -258,6 +259,6 @@ module Curvature =
             | QuadraticBezier _
             | Arc _ -> Ok []
             | CubicBezier(startPoint, control1, control2, endPoint) ->
-                CubicBezierData(startPoint, control1, control2, endPoint)
+                Bezier.CubicBezierData(startPoint, control1, control2, endPoint)
                 |> Bezier.cubicInflectionParameters
                 |> Ok

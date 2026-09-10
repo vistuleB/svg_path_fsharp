@@ -1,167 +1,168 @@
 namespace SvgPath
 
-// The graph representation deliberately keeps source segment endpoints rather
-// than snapping edge geometry to vertex centers.
-
-[<Struct>]
-/// A topological vertex and the source endpoints represented by it.
-/// Point is the smallest enclosing circle's center for EndpointSamples.
-/// Every sample is within endpoint tolerance. A cluster's center is determined
-/// by its samples, but greedy endpoint-to-cluster assignment can depend on order.
-type ArrangementVertex =
-    { Id: int
-      Point: Point<length>
-      EndpointSamples: Point<length> list }
-
-[<Struct>]
-/// One atomic geometric edge, including directional source multiplicities.
-/// Its length upper bound is at least the legacy minimumChord size threshold.
-type ArrangementEdge =
-    { Id: int
-      Segment: Segment
-      Bounds: BoundingBox
-      StartVertex: int
-      EndVertex: int
-      ForwardMultiplicity: int
-      ReverseMultiplicity: int }
-
-[<Struct>]
-/// A reference to an arrangement edge in either stored or reversed direction.
-type OrientedArrangementEdge = { EdgeId: int; Reversed: bool }
-
-/// A noded planar graph. CyclicOrders stores clockwise groups of incident
-/// oriented edges; a group can contain edges whose local order is unresolved.
-type ArrangementGraph =
-    { Vertices: ArrangementVertex list
-      Edges: ArrangementEdge list
-      CyclicOrders: (int * OrientedArrangementEdge list list) list }
-
-/// One oriented edge occurrence in a face-boundary walk. Left identifies the
-/// face on the visual-left side of the stored edge direction.
-type ArrangementFaceEdge = { EdgeId: int; Left: bool }
-/// One connected boundary walk of an arrangement face.
-type ArrangementFaceWalk = { Outer: bool; Edges: ArrangementFaceEdge list }
-/// A dual face. The unbounded face and each bounded face are explicitly marked.
-type ArrangementFace = { Id: int; Outer: bool; Walks: ArrangementFaceWalk list }
-/// The faces incident to the visual-left and visual-right sides of an edge.
-type ArrangementEdgeFaces = { EdgeId: int; LeftFace: int; RightFace: int }
-/// Face decomposition and edge-to-face incidence for an arrangement graph.
-type DualArrangementGraph = { Faces: ArrangementFace list; EdgeFaces: ArrangementEdgeFaces list }
-
-/// Signed winding change from stored-edge visual left to visual right.
-/// Describes the winding boundary, not necessarily every geometric preimage.
-type internal EdgeWindingChange = { EdgeId: int; RightMinusLeft: int }
-type internal FaceWinding = { FaceId: int; Value: int }
-type internal WindingPropagationError =
-    | InvalidWindingDual
-    | InvalidWindingChanges
-    | MissingWindingChange of edgeId: int
-    | ContradictoryWinding of edgeId: int * faceId: int * assigned: int * required: int
-    | UnreachableWindingFace of faceId: int
-
-[<Struct>]
-/// One atomic graph edge traversed by an input segment.
-type DirectedEdgeReference = { EdgeId: int; Reversed: bool }
-
-/// Ordered atomic graph-edge image of one source segment.
-type ArrangementSegmentImage =
-    { PathIndex: int
-      SubpathIndex: int
-      SegmentIndex: int
-      Edges: DirectedEdgeReference list }
-
-/// Arrangement graph plus the ordered images of all input segments.
-type ArrangementGraphBuild =
-    { Graph: ArrangementGraph
-      SegmentImages: ArrangementSegmentImage list }
-
-[<Struct>]
-/// One atomic edge in the image of a directly supplied source segment.
-/// From <= To are source intervals retained through subdivision, not projection.
-type ArrangementSegmentEdgeImage =
-    { From: float<parameter>
-      To: float<parameter>
-      EdgeId: int
-      Reversed: bool
-      Own: bool }
-
-/// Ordered atomic-edge image of one directly supplied source segment.
-type ArrangementSourceSegmentImage =
-    { SegmentIndex: int
-      Edges: ArrangementSegmentEdgeImage list }
-
-[<Struct>]
-/// One source occurrence represented by an arrangement edge.
-type ArrangementEdgeSourceImage =
-    { SegmentIndex: int
-      From: float<parameter>
-      To: float<parameter>
-      Reversed: bool }
-
-/// All source occurrences represented by one arrangement edge.
-type ArrangementEdgeImage = { EdgeId: int; Sources: ArrangementEdgeSourceImage list }
-
-/// Detailed arrangement build for direct segment-list construction.
-/// An image may be empty when every refined piece's length upper bound falls
-/// below the historically named minimumChord threshold.
-type ArrangementSegmentBuild =
-    { Graph: ArrangementGraph
-      Segments: Segment list
-      SegmentImages: ArrangementSourceSegmentImage list
-      EdgeImages: ArrangementEdgeImage list }
-
-/// Errors returned while constructing, validating, or dualizing arrangements.
-type internal ArrangementInternalError =
-    | InternalArrangementSegmentError of error: SegmentError
-    | InternalNormalizationError
-    | InternalSelfIntersectionSubdivisionFailed of sourceIndex: int
-    | InternalInvalidArrangementTolerance of tolerance: float<length>
-    /// Minimum length-upper-bound threshold must be positive.
-    | InternalInvalidMinimumChord of minimumChord: float<length>
-    | InternalInvalidEndpointSliverTolerance of tolerance: float<parameter>
-    /// Legacy chord label carries the segment length upper bound.
-    | InternalSegmentTooShort of chord: float<length> * minimum: float<length>
-    | InternalSegmentCollapsedToVertex of vertex: int
-    | InternalLoopEdge of vertex: int
-    | InternalMissingArrangementVertex of vertex: int
-    | InternalMissingArrangementEdge of edge: int
-    | InternalIsolatedVertex of vertex: int
-    | InternalInvalidMultiplicity of edge: int
-    | InternalOddWeightedDegree of vertex: int * degree: int
-    | InternalEdgeEndpointMismatch of edge: int * vertex: int * distance: float<length>
-    | InternalVertexWithoutEndpointSamples of vertex: int
-    | InternalVertexCenterMismatch of vertex: int * distanceSquared: float<length^2>
-    | InternalVertexSampleOutsideTolerance of vertex: int * distanceSquared: float<length^2> * toleranceSquared: float<length^2>
-    | InternalContourTraceFailed of vertex: int
-    | InternalCyclicOrderMissingVertex of vertex: int
-    | InternalCyclicOrderRadiusUnavailable of vertex: int
-    | InternalInvalidCyclicOrderAttempts of maxAttempts: int
-    | InternalCyclicOrderCircleIntersectionFailed of vertex: int * edge: int * radius: float<length>
-    | InternalDualMissingCyclicOrder of vertex: int
-    | InternalDualMissingIncidentEdge of vertex: int * edge: int
-    | InternalDualWalkDidNotClose of edge: int * left: bool
-    | InternalDualSweepContradiction of walk: int
-    | InternalDualSweepExhausted of unresolved: int
-    | InternalDualInvalidOuterWalkCount of count: int
-    | InternalDualMissingEdgeFace of edge: int * left: bool
-    | InternalDualInvalidOuterFaceCount of count: int
-
-
-/// Stable errors returned by arrangement construction and validation.
-type ArrangementError =
-    | ArrangementSegmentError of error: SegmentError
-    | InvalidArrangementTolerance of tolerance: float<length>
-    /// Minimum length-upper-bound threshold must be positive.
-    | InvalidMinimumChord of minimumChord: float<length>
-    | InvalidEndpointSliverTolerance of tolerance: float<parameter>
-    /// Legacy chord label carries the segment length upper bound.
-    | SegmentTooShort of chord: float<length> * minimum: float<length>
-    | ConstructionFailed
-
 [<RequireQualifiedAccess>]
 /// Construction, validation, source-image lookup, and dualization of planar
 /// arrangements formed from SVG path segments.
 module Arrangement =
+
+    // The graph representation deliberately keeps source segment endpoints rather
+    // than snapping edge geometry to vertex centers.
+
+    [<Struct>]
+    /// A topological vertex and the source endpoints represented by it.
+    /// Point is the smallest enclosing circle's center for EndpointSamples.
+    /// Every sample is within endpoint tolerance. A cluster's center is determined
+    /// by its samples, but greedy endpoint-to-cluster assignment can depend on order.
+    type ArrangementVertex =
+        { Id: int
+          Point: Point<length>
+          EndpointSamples: Point<length> list }
+
+    [<Struct>]
+    /// One atomic geometric edge, including directional source multiplicities.
+    /// Its length upper bound is at least the legacy minimumChord size threshold.
+    type ArrangementEdge =
+        { Id: int
+          Segment: Segment
+          Bounds: BoundingBox
+          StartVertex: int
+          EndVertex: int
+          ForwardMultiplicity: int
+          ReverseMultiplicity: int }
+
+    [<Struct>]
+    /// A reference to an arrangement edge in either stored or reversed direction.
+    type OrientedArrangementEdge = { EdgeId: int; Reversed: bool }
+
+    /// A noded planar graph. CyclicOrders stores clockwise groups of incident
+    /// oriented edges; a group can contain edges whose local order is unresolved.
+    type ArrangementGraph =
+        { Vertices: ArrangementVertex list
+          Edges: ArrangementEdge list
+          CyclicOrders: (int * OrientedArrangementEdge list list) list }
+
+    /// One oriented edge occurrence in a face-boundary walk. Left identifies the
+    /// face on the visual-left side of the stored edge direction.
+    type ArrangementFaceEdge = { EdgeId: int; Left: bool }
+    /// One connected boundary walk of an arrangement face.
+    type ArrangementFaceWalk = { Outer: bool; Edges: ArrangementFaceEdge list }
+    /// A dual face. The unbounded face and each bounded face are explicitly marked.
+    type ArrangementFace = { Id: int; Outer: bool; Walks: ArrangementFaceWalk list }
+    /// The faces incident to the visual-left and visual-right sides of an edge.
+    type ArrangementEdgeFaces = { EdgeId: int; LeftFace: int; RightFace: int }
+    /// Face decomposition and edge-to-face incidence for an arrangement graph.
+    type DualArrangementGraph = { Faces: ArrangementFace list; EdgeFaces: ArrangementEdgeFaces list }
+
+    /// Signed winding change from stored-edge visual left to visual right.
+    /// Describes the winding boundary, not necessarily every geometric preimage.
+    type internal EdgeWindingChange = { EdgeId: int; RightMinusLeft: int }
+    type internal FaceWinding = { FaceId: int; Value: int }
+    type internal WindingPropagationError =
+        | InvalidWindingDual
+        | InvalidWindingChanges
+        | MissingWindingChange of edgeId: int
+        | ContradictoryWinding of edgeId: int * faceId: int * assigned: int * required: int
+        | UnreachableWindingFace of faceId: int
+
+    [<Struct>]
+    /// One atomic graph edge traversed by an input segment.
+    type DirectedEdgeReference = { EdgeId: int; Reversed: bool }
+
+    /// Ordered atomic graph-edge image of one source segment.
+    type ArrangementSegmentImage =
+        { PathIndex: int
+          SubpathIndex: int
+          SegmentIndex: int
+          Edges: DirectedEdgeReference list }
+
+    /// Arrangement graph plus the ordered images of all input segments.
+    type ArrangementGraphBuild =
+        { Graph: ArrangementGraph
+          SegmentImages: ArrangementSegmentImage list }
+
+    [<Struct>]
+    /// One atomic edge in the image of a directly supplied source segment.
+    /// From <= To are source intervals retained through subdivision, not projection.
+    type ArrangementSegmentEdgeImage =
+        { From: float<parameter>
+          To: float<parameter>
+          EdgeId: int
+          Reversed: bool
+          Own: bool }
+
+    /// Ordered atomic-edge image of one directly supplied source segment.
+    type ArrangementSourceSegmentImage =
+        { SegmentIndex: int
+          Edges: ArrangementSegmentEdgeImage list }
+
+    [<Struct>]
+    /// One source occurrence represented by an arrangement edge.
+    type ArrangementEdgeSourceImage =
+        { SegmentIndex: int
+          From: float<parameter>
+          To: float<parameter>
+          Reversed: bool }
+
+    /// All source occurrences represented by one arrangement edge.
+    type ArrangementEdgeImage = { EdgeId: int; Sources: ArrangementEdgeSourceImage list }
+
+    /// Detailed arrangement build for direct segment-list construction.
+    /// An image may be empty when every refined piece's length upper bound falls
+    /// below the historically named minimumChord threshold.
+    type ArrangementSegmentBuild =
+        { Graph: ArrangementGraph
+          Segments: Segment list
+          SegmentImages: ArrangementSourceSegmentImage list
+          EdgeImages: ArrangementEdgeImage list }
+
+    /// Errors returned while constructing, validating, or dualizing arrangements.
+    type internal ArrangementInternalError =
+        | InternalArrangementSegmentError of error: SegmentError
+        | InternalNormalizationError
+        | InternalSelfIntersectionSubdivisionFailed of sourceIndex: int
+        | InternalInvalidArrangementTolerance of tolerance: float<length>
+        /// Minimum length-upper-bound threshold must be positive.
+        | InternalInvalidMinimumChord of minimumChord: float<length>
+        | InternalInvalidEndpointSliverTolerance of tolerance: float<parameter>
+        /// Legacy chord label carries the segment length upper bound.
+        | InternalSegmentTooShort of chord: float<length> * minimum: float<length>
+        | InternalSegmentCollapsedToVertex of vertex: int
+        | InternalLoopEdge of vertex: int
+        | InternalMissingArrangementVertex of vertex: int
+        | InternalMissingArrangementEdge of edge: int
+        | InternalIsolatedVertex of vertex: int
+        | InternalInvalidMultiplicity of edge: int
+        | InternalOddWeightedDegree of vertex: int * degree: int
+        | InternalEdgeEndpointMismatch of edge: int * vertex: int * distance: float<length>
+        | InternalVertexWithoutEndpointSamples of vertex: int
+        | InternalVertexCenterMismatch of vertex: int * distanceSquared: float<length^2>
+        | InternalVertexSampleOutsideTolerance of vertex: int * distanceSquared: float<length^2> * toleranceSquared: float<length^2>
+        | InternalContourTraceFailed of vertex: int
+        | InternalCyclicOrderMissingVertex of vertex: int
+        | InternalCyclicOrderRadiusUnavailable of vertex: int
+        | InternalInvalidCyclicOrderAttempts of maxAttempts: int
+        | InternalCyclicOrderCircleIntersectionFailed of vertex: int * edge: int * radius: float<length>
+        | InternalDualMissingCyclicOrder of vertex: int
+        | InternalDualMissingIncidentEdge of vertex: int * edge: int
+        | InternalDualWalkDidNotClose of edge: int * left: bool
+        | InternalDualSweepContradiction of walk: int
+        | InternalDualSweepExhausted of unresolved: int
+        | InternalDualInvalidOuterWalkCount of count: int
+        | InternalDualMissingEdgeFace of edge: int * left: bool
+        | InternalDualInvalidOuterFaceCount of count: int
+
+
+    /// Stable errors returned by arrangement construction and validation.
+    type Error =
+        | ArrangementSegmentError of error: SegmentError
+        | InvalidArrangementTolerance of tolerance: float<length>
+        /// Minimum length-upper-bound threshold must be positive.
+        | InvalidMinimumChord of minimumChord: float<length>
+        | InvalidEndpointSliverTolerance of tolerance: float<parameter>
+        /// Legacy chord label carries the segment length upper bound.
+        | SegmentTooShort of chord: float<length> * minimum: float<length>
+        | ConstructionFailed
+
     let internal publicError = function
         | InternalArrangementSegmentError error -> ArrangementSegmentError error
         | InternalInvalidArrangementTolerance value -> InvalidArrangementTolerance value

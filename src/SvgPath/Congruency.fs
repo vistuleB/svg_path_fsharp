@@ -1,23 +1,24 @@
 namespace SvgPath
 
-type TransformFamily =
-    | Similar
-    | Affine
-
-[<Struct>]
-type CongruencyTolerance =
-    { Distance: float<length>
-      Angle: float<degree> }
-
-[<Struct>]
-type CongruencyFit =
-    { Transform: Affine
-      Error: float<length> }
-
 /// Congruency checks allow translation, rotation, and uniform scale, not
 /// reflection or shear. Best-fit queries also support the affine family.
 [<RequireQualifiedAccess>]
 module Congruency =
+
+    type TransformFamily =
+        | Similar
+        | Affine
+
+    [<Struct>]
+    type CongruencyTolerance =
+        { Distance: float<length>
+          Angle: float<degree> }
+
+    [<Struct>]
+    type Fit =
+        { Transform: Affine
+          Error: float<length> }
+
     let private defaultAngleTolerance = 1.0e-9<degree>
 
     type private IndexedPoint =

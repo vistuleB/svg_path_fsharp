@@ -271,7 +271,7 @@ let ``exponent_and_plus_signed_numbers_parse_test`` () =
 
 [<Fact>]
 let ``overflowing_path_number_is_rejected_test`` () =
-    Assert.Equal(Error(ParseError(InvalidNumber "1e400", "1e400 0")), Parse.path "M 1e400 0")
+    Assert.Equal(Error(Parse.ParseError(Parse.InvalidNumber "1e400", "1e400 0")), Parse.path "M 1e400 0")
 
 [<Fact>]
 let ``path_exponent_scaling_preserves_finite_compensated_values_test`` () =
@@ -304,7 +304,7 @@ let ``move_only_subpaths_are_ignored_among_real_subpaths_test`` () =
 
 [<Fact>]
 let ``invalid_arc_flags_are_rejected_test`` () =
-    Assert.Equal(Error(ParseError(ExpectedArcFlag, "2 1 10 0")), Parse.path "M 0 0 A 5 5 0 2 1 10 0")
+    Assert.Equal(Error(Parse.ParseError(Parse.ExpectedArcFlag, "2 1 10 0")), Parse.path "M 0 0 A 5 5 0 2 1 10 0")
 
 [<Fact>]
 let ``concatenated_arc_flags_and_endpoint_parse_test`` () =
@@ -320,39 +320,39 @@ let ``concatenated_arc_flags_parse_in_repeated_argument_sets_test`` () =
 
 [<Fact>]
 let ``unsupported_commands_are_rejected_test`` () =
-    Assert.Equal(Error(ParseError(UnsupportedCommand "R", "R 1 2 3 4")), Parse.path "M 0 0 R 1 2 3 4")
+    Assert.Equal(Error(Parse.ParseError(Parse.UnsupportedCommand "R", "R 1 2 3 4")), Parse.path "M 0 0 R 1 2 3 4")
 
 [<Fact>]
 let ``drawing_command_before_move_is_rejected_test`` () =
-    Assert.Equal(Error(ParseError(ExpectedMove, "L 10 10")), Parse.path "L 10 10")
+    Assert.Equal(Error(Parse.ParseError(Parse.ExpectedMove, "L 10 10")), Parse.path "L 10 10")
 
 [<Fact>]
 let ``command_without_required_number_is_rejected_test`` () =
-    Assert.Equal(Error(ParseError(ExpectedNumber, "")), Parse.path "M 0 0 L")
+    Assert.Equal(Error(Parse.ParseError(Parse.ExpectedNumber, "")), Parse.path "M 0 0 L")
 
 [<Fact>]
 let ``invalid_number_is_rejected_test`` () =
-    Assert.Equal(Error(ParseError(InvalidNumber ".", ". 0")), Parse.path "M . 0")
+    Assert.Equal(Error(Parse.ParseError(Parse.InvalidNumber ".", ". 0")), Parse.path "M . 0")
 
 [<Fact>]
 let ``comma_immediately_after_command_is_rejected_test`` () =
-    Assert.Equal(Error(ParseError(InvalidSeparator, ",0,0")), Parse.path "M,0,0")
+    Assert.Equal(Error(Parse.ParseError(Parse.InvalidSeparator, ",0,0")), Parse.path "M,0,0")
 
 [<Fact>]
 let ``repeated_comma_is_rejected_test`` () =
-    Assert.Equal(Error(ParseError(InvalidSeparator, ",,0")), Parse.path "M0,,0")
+    Assert.Equal(Error(Parse.ParseError(Parse.InvalidSeparator, ",,0")), Parse.path "M0,,0")
 
 [<Fact>]
 let ``trailing_comma_is_rejected_test`` () =
-    Assert.Equal(Error(ParseError(InvalidSeparator, ",")), Parse.path "M0 0,")
+    Assert.Equal(Error(Parse.ParseError(Parse.InvalidSeparator, ",")), Parse.path "M0 0,")
 
 [<Fact>]
 let ``comma_before_command_is_rejected_test`` () =
-    Assert.Equal(Error(ParseError(InvalidSeparator, ",L1 1")), Parse.path "M0 0,L1 1")
+    Assert.Equal(Error(Parse.ParseError(Parse.InvalidSeparator, ",L1 1")), Parse.path "M0 0,L1 1")
 
 [<Fact>]
 let ``error_remaining_preserves_unicode_suffix_test`` () =
-    Assert.Equal(Error(ParseError(UnsupportedCommand "é", "émore")), Parse.path "M0 0 émore")
+    Assert.Equal(Error(Parse.ParseError(Parse.UnsupportedCommand "é", "émore")), Parse.path "M0 0 émore")
 
 [<Fact>]
 let ``comma_with_surrounding_whitespace_between_numbers_parses_test`` () =

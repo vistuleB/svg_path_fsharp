@@ -9,7 +9,7 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let ``invalid round-corner angular tolerance is rejected`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     let invalid = { Effects.defaultRoundCornerOptions with AngularTolerance = -1.0<degree> }
-    Assert.Equal(Error(InvalidAngularTolerance -1.0<degree>), Effects.roundSubpathCornersWith source 1.0<length> invalid)
+    Assert.Equal(Error(Effects.InvalidAngularTolerance -1.0<degree>), Effects.roundSubpathCornersWith source 1.0<length> invalid)
 
 [<Fact>]
 let ``degeneracy effect converts a nearly linear quadratic`` () =

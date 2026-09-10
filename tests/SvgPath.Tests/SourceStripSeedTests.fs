@@ -14,7 +14,7 @@ let ``source seed preserves exact rotated collinearity`` () =
     Assert.Equal(0.0<length>, strip.Width)
 [<Fact>]
 let ``source seed checks actual arc not endpoint chord`` () =
-    let strip = candidate [Arc { Start = p 1. 0.; Radius = p 1. 1.; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = p -1. 0. }]
+    let strip = candidate [Arc ({ Start = p 1. 0.; Radius = p 1. 1.; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = p -1. 0. }: Ellipse.EndpointArcData)]
     Assert.True(abs(strip.Width - 1.0<length>) < 1e-9<length>)
 [<Fact>]
 let ``source seed skips empty or coincident point cloud`` () =

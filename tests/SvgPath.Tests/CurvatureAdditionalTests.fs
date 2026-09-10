@@ -10,11 +10,11 @@ let private parameter value = Parameter.fromFloat value
 let ``line has zero curvature and infinite radius`` () =
     let line = Line(point 0.0 0.0, point 4.0 0.0)
     Assert.Equal(Ok 0.0<1 / length>, Curvature.segmentLeftNormalCurvature line (parameter 0.5))
-    Assert.Equal(Error InfiniteRadiusOfCurvature, Curvature.segmentLeftNormalRadius line (parameter 0.5))
+    Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature, Curvature.segmentLeftNormalRadius line (parameter 0.5))
 
 [<Fact>]
 let ``clockwise visual circle arc has negative left-normal curvature`` () =
-    let arc = Arc { Start = point 4.0 0.0; Radius = point 4.0 4.0; XAxisRotation = Degree.fromFloat 0.0; LargeArc = false; Sweep = true; End = point 0.0 4.0 }
+    let arc = Arc ({ Start = point 4.0 0.0; Radius = point 4.0 4.0; XAxisRotation = Degree.fromFloat 0.0; LargeArc = false; Sweep = true; End = point 0.0 4.0 }: Ellipse.EndpointArcData)
     let curvature = Curvature.segmentLeftNormalCurvature arc (parameter 0.5) |> Result.defaultWith (failwithf "%A")
     Assert.True(abs (curvature + 0.25<1 / length>) < 1.0e-12<1 / length>)
 
@@ -27,5 +27,5 @@ let ``quadratic derivatives retain parameter powers`` () =
 
 [<Fact>]
 let ``circle radius is recognized within a length margin`` () =
-    let arc = Arc { Start = point 4.0 0.0; Radius = point 4.0 4.0; XAxisRotation = Degree.fromFloat 0.0; LargeArc = false; Sweep = true; End = point 0.0 4.0 }
+    let arc = Arc ({ Start = point 4.0 0.0; Radius = point 4.0 4.0; XAxisRotation = Degree.fromFloat 0.0; LargeArc = false; Sweep = true; End = point 0.0 4.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Ok true, Curvature.segmentLeftNormalRadiusCloseTo arc -4.0<length> 1.0e-9<length> (parameter 0.5))

@@ -78,5 +78,5 @@ module OffsetText =
              Max=point (float box.Max.X+30.0) (float box.Max.Y+45.0)}
         let style = if decaying then "fill: #581c87; fill-opacity: 0.78; stroke: #2e1065; stroke-width: 0.2"
                     else "fill: #0f766e; fill-opacity: 0.78; stroke: #064e3b; stroke-width: 0.25"
-        Svg.document [ThingToDraw.Rectangle(view.Min,BoundingBox.width view,BoundingBox.height view,"fill: #ffffff; stroke: none")
-                      StyledPath(mapped,style)] view
+        Svg.document [Svg.ThingToDraw.Rectangle(view.Min,BoundingBox.width view,BoundingBox.height view,"fill: #ffffff; stroke: none")
+                      Svg.StyledPath(mapped,style)] view

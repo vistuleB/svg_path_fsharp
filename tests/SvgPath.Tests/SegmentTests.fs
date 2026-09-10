@@ -141,12 +141,12 @@ let ``segment ray crossings find line quadratic cubic and arc roots`` () =
 
     let arc =
         Arc
-            { Start = point 0.0 0.0
-              Radius = point 10.0 10.0
-              XAxisRotation = 0.0<degree>
-              LargeArc = false
-              Sweep = true
-              End = point 20.0 0.0 }
+            ({ Start = point 0.0 0.0
+               Radius = point 10.0 10.0
+               XAxisRotation = 0.0<degree>
+               LargeArc = false
+               Sweep = true
+               End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     let arcT, arcRayT =
         crossing arc (point 10.0 -15.0) (direction 0.0 1.0)
         |> List.filter (fun (_, rayT) -> rayT > 0.0<length>)

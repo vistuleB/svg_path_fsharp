@@ -1,19 +1,20 @@
 namespace SvgPath
 
-type BasicShapeError =
-    | InvalidRectWidth of width: float<length>
-    | InvalidRectHeight of height: float<length>
-    | InvalidRectRadiusX of rx: float<length>
-    | InvalidRectRadiusY of ry: float<length>
-    | InvalidCircleRadius of r: float<length>
-    | InvalidEllipseRadiusX of rx: float<length>
-    | InvalidEllipseRadiusY of ry: float<length>
-    | DisabledRendering
-    | PathError of error: SegmentError
-
 /// Conversion of SVG basic shapes to path geometry.
 [<RequireQualifiedAccess>]
 module BasicShapes =
+
+    type Error =
+        | InvalidRectWidth of width: float<length>
+        | InvalidRectHeight of height: float<length>
+        | InvalidRectRadiusX of rx: float<length>
+        | InvalidRectRadiusY of ry: float<length>
+        | InvalidCircleRadius of r: float<length>
+        | InvalidEllipseRadiusX of rx: float<length>
+        | InvalidEllipseRadiusY of ry: float<length>
+        | DisabledRendering
+        | PathError of error: SegmentError
+
     let private degrees value = Degree.fromFloat value
 
     let private closed segments =

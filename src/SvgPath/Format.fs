@@ -1,34 +1,35 @@
 namespace SvgPath
 
-open System
-open System.Globalization
-
-type LeftPaddingStyle =
-    | Zero
-    | Space
-
-type LeftDecimalOptions =
-    | Succinct
-    | AutoLeftPadding of LeftPaddingStyle
-    | LeftPadding of width: int * style: LeftPaddingStyle
-
-type RightDecimalOptions =
-    | System
-    | AtMost of decimalPlaces: int
-    | Fixed of decimalPlaces: int
-
-[<Struct>]
-type NumberFormatOptions =
-    { LeftDecimals: LeftDecimalOptions
-      RightDecimals: RightDecimalOptions }
-
-type NumberFormat =
-    private
-        { Options: NumberFormatOptions
-          LeftPadding: (int * LeftPaddingStyle) option }
-
 [<RequireQualifiedAccess>]
 module NumberFormat =
+
+    open System
+    open System.Globalization
+
+    type LeftPaddingStyle =
+        | Zero
+        | Space
+
+    type LeftDecimalOptions =
+        | Succinct
+        | AutoLeftPadding of LeftPaddingStyle
+        | LeftPadding of width: int * style: LeftPaddingStyle
+
+    type RightDecimalOptions =
+        | System
+        | AtMost of decimalPlaces: int
+        | Fixed of decimalPlaces: int
+
+    [<Struct>]
+    type Options =
+        { LeftDecimals: LeftDecimalOptions
+          RightDecimals: RightDecimalOptions }
+
+    type NumberFormat =
+        private
+            { Options: Options
+              LeftPadding: (int * LeftPaddingStyle) option }
+
     let private invariant = CultureInfo.InvariantCulture
     let private maximumDecimalPlaces = 100
 
@@ -100,7 +101,7 @@ module NumberFormat =
             else scientificDecimal number decimalPlaces
         if fixedDecimals then formatted else stripTrailingDecimalZeros formatted
 
-    let rawNumber (number: float) (options: NumberFormatOptions) =
+    let rawNumber (number: float) (options: Options) =
         match options.RightDecimals with
         | System ->
             number.ToString("G", invariant)

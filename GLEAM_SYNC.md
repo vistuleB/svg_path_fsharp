@@ -643,6 +643,78 @@ Do not substitute the final Gleam tree for the historical source commit.
   `scripts/generate-gallery-figures`: 29 succeeded, 0 failed.
   `scripts/generate-readme-figures`: all nine generated successfully.
 
-Completed source target: Gleam v0.46.0 (`ed94708`). Later MiterClip/arcs work is
-not included. F# 0.6.0 release metadata and immutable asset publication follow
-as separate release-preparation work.
+## Post-0.6.0 join migration (2026-09-10)
+
+Applied in source commit order; changes are not yet committed in F#:
+
+- `411c34a` — MiterClip variant, finite-positive limit validation, directed
+  extension and pivot-plane clipping, endpoint-preserving bevel fallback.
+  Shared F# Join means Stroke needs no duplicate conversion branch. All ten
+  source regression tests ported one-to-one. `dotnet test
+  tests/SvgPath.Tests/SvgPath.Tests.fsproj --no-restore --filter
+  FullyQualifiedName~MiterClipTests`: 10 passed before wiring Arcs.
+- `71b05d1` — corner-local ArcsJoin geometry and offset provenance wiring,
+  radius adjustment, auxiliary-arc clipping, reversal/divergence fallbacks,
+  exact endpoint restoration, internal failure mapped to ConstructionFailed.
+  All thirteen source regression tests ported one-to-one. The radius quadratic
+  uses explicit length-unit conversion because F# Root currently labels roots
+  as parameters; it does not substitute a different solver.
+- `9789684` — all four README comparison strips generated independently with
+  F# public Stroke calls, with the same source geometry and join settings.
+- Subsequent uncommitted Gleam work — historical adoption/removal dates and
+  four W3C comparison Gallery fixtures. Vendored reference SVGs are shared data,
+  not copied computed output. F# outlines come from Stroke.subpath.
+
+Verification: `dotnet test tests/SvgPath.Tests/SvgPath.Tests.fsproj --no-restore
+--filter 'Category!=Slow'`: **1827 passed**, no failures (1804 + 23).
+`dotnet run --project tools/ReadmeFigures --no-restore --
+miter_clip_comparison.svg miter_clip_limits.svg arcs_join_self_intersection.svg
+arcs_join_comparison_2.svg`: four generated.
+`dotnet run --project tools/GalleryFigures --no-restore -- w3c-miter-limit.svg
+w3c-linejoin-construction-fallback.svg w3c-linejoin-construction-fallback2.svg
+w3c-linejoin-construction-fallback3.svg`: four succeeded, zero failed.
+The slow profile, remaining Gallery fixtures and release verification were not
+rerun for this batch. No package version/tag/push was changed. The new README
+URLs target main/docs/readme and require publication of these files before
+they work online; promote to immutable assets before the next package release.
+
+The original release checkpoint remains Gleam v0.46.0 (`ed94708`) / F# 0.6.0.
+# F# public type ownership — 2026-09-10
+
+User-directed API layout change, not a new Gleam geometry commit: moved
+operation-owned errors, options, and result types into their corresponding
+F# modules, using Gleam-style qualification (`Stroke.Error`, `Offset.Options`,
+`Arrangement.Error`, etc.). Core geometry/path types remain namespace-level.
+Updated consumers, README examples, and both figure generators. Earlier
+uncommitted MiterClip/Arcs and gallery work is preserved.
+
+Verification:
+
+- `dotnet test tests/SvgPath.Tests/SvgPath.Tests.fsproj --no-restore --filter 'Category!=Slow'`:
+  1830 passed, including 3 new public-layout tests; no existing tests removed.
+- `dotnet build tools/ReadmeFigures/ReadmeFigures.fsproj --no-restore`: succeeds.
+- `dotnet build tools/GalleryFigures/GalleryFigures.fsproj --no-restore`: succeeds.
+- `dotnet fsi examples/debug/public_api_audit.fsx`: 37 public error unions,
+  no unnamed error payloads, no root-level `SvgPath.Error`, Root remains internal.
+- `git diff --check`: succeeds.
+
+Included in the public type ownership and join-options checkpoint.
+
+## Local inner-corner join override — 2026-09-10
+
+Ported the current user-requested Gleam change without changing its algorithm:
+`Offset.InnerJoin = InnerBevel | InnerRound`, optional `Options.InnerJoin`,
+defaulting to Round only for Round joins and Bevel otherwise. Inner-side
+classification uses source endpoint tangents and the signed offset. The option
+is threaded through both synchronized sides and the closing seam. It is not a
+selector for the caller-designated inner contour.
+
+Five regression tests map one-to-one to `svg_path_inner_join_test.gleam`.
+The earlier Arcs inner-corner test now expects the requested default Bevel in
+both languages. README and changelog document the new option.
+
+- Gleam `scripts/test-fast`: 1640 passed.
+- F# `dotnet test tests/SvgPath.Tests/SvgPath.Tests.fsproj --no-restore --filter 'Category!=Slow'`:
+  1835 passed.
+- Both F# figure-generator projects build with `dotnet build <project> --no-restore`.
+- Included in the public type ownership and join-options checkpoint.

@@ -84,7 +84,7 @@ let ``segment degenerate lines preserves cubic backtracking`` () =
 
 [<Fact>]
 let ``segment degenerate lines converts zero radius arc`` () =
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 10.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Some [ line 0.0 0.0 10.0 0.0 ], Segment.degenerateLines arc 0.001<length> |> Result.defaultWith (failwithf "%A"))
 
 [<Fact>]
@@ -157,12 +157,12 @@ let private assertLengthNear expected (actual: float<length>) =
 
 let private semicircle () =
     Arc
-        { Start = point 0.0 0.0
-          Radius = point 10.0 10.0
-          XAxisRotation = 0.0<degree>
-          LargeArc = false
-          Sweep = true
-          End = point 20.0 0.0 }
+        ({ Start = point 0.0 0.0
+           Radius = point 10.0 10.0
+           XAxisRotation = 0.0<degree>
+           LargeArc = false
+           Sweep = true
+           End = point 20.0 0.0 }: Ellipse.EndpointArcData)
 
 [<Fact>]
 let ``segment crossings finds line crossing`` () =
@@ -279,7 +279,7 @@ let ``segment crossings rejects invalid options`` () =
 
 [<Fact>]
 let ``segment crossings returns degenerate arc errors`` () =
-    let segment = Arc { Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Error DegenerateArc, Segment.crossings segment (fun sample -> sample.X))
 
 [<Fact>]
@@ -315,7 +315,7 @@ let ``segment minimize with rejects invalid options`` () =
 
 [<Fact>]
 let ``segment minimize returns degenerate arc errors`` () =
-    let segment = Arc { Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Error DegenerateArc, Segment.minimize segment (fun sample -> float sample.X))
 
 [<Fact>]
@@ -361,7 +361,7 @@ let ``segment distance with rejects invalid options`` () =
 
 [<Fact>]
 let ``segment distance returns degenerate arc errors`` () =
-    let segment = Arc { Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }
+    let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal(Error DegenerateArc, Segment.distance segment (point 10.0 0.0))
 
 [<Fact>]
@@ -723,7 +723,7 @@ let ``projection of curve points respects geometric tolerance`` () =
     let segments =
         [ QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
           CubicBezier(point 0.0 0.0, point 5.0 20.0, point 15.0 -20.0, point 20.0 0.0)
-          Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 10.0 0.0 } ]
+          Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 10.0 0.0 }: Ellipse.EndpointArcData) ]
     let parameters = [ 1.0 / 6.0; 1.0 / 3.0; 0.5; 2.0 / 3.0; 5.0 / 6.0 ] |> List.map Parameter.fromFloat
     let options = { Samples = 100; Tolerance = 1.0e-9<length>; MaxIterations = 100 }
     for segment in segments do
@@ -868,8 +868,8 @@ let ``path winding accumulates subpath winding`` () =
 let ``clockwise svg circle has positive winding`` () =
     let source =
         Subpath.create
-            [ Arc { Start = point 1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point -1.0 0.0 }
-              Arc { Start = point -1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 1.0 0.0 } ]
+            [ Arc ({ Start = point 1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point -1.0 0.0 }: Ellipse.EndpointArcData)
+              Arc ({ Start = point -1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 1.0 0.0 }: Ellipse.EndpointArcData) ]
         |> Result.bind (Subpath.setClosed true)
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(Ok(Winding 1), Path.winding (point 0.0 0.0) (Path.singleton source))
@@ -933,14 +933,14 @@ let ``segment intersections finds line like cubic crossing`` () =
 
 [<Fact>]
 let ``segment intersections certifies line arc crossing geometrically`` () =
-    let arc = Arc { Start = point 70.0 6.0; Radius = point 24.0 24.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 46.0 30.0 }
+    let arc = Arc ({ Start = point 70.0 6.0; Radius = point 24.0 24.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 46.0 30.0 }: Ellipse.EndpointArcData)
     let found = Intersections.segment (line 0.0 24.0 120.0 24.0) arc |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.True(abs (found.Point.Y - 24.0<length>) <= 1.0e-9<length>)
 
 [<Fact>]
 let ``segment intersections certifies arc arc crossing geometrically`` () =
-    let left = Arc { Start = point 120.0 24.0; Radius = point 24.0 24.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 96.0 0.0 }
-    let right = Arc { Start = point 96.0 30.0; Radius = point 24.0 24.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 120.0 6.0 }
+    let left = Arc ({ Start = point 120.0 24.0; Radius = point 24.0 24.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 96.0 0.0 }: Ellipse.EndpointArcData)
+    let right = Arc ({ Start = point 96.0 30.0; Radius = point 24.0 24.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 120.0 6.0 }: Ellipse.EndpointArcData)
     let found = Intersections.segment left right |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     let leftPoint = Segment.point left found.LeftT |> Result.defaultWith (failwithf "%A")
     let rightPoint = Segment.point right found.RightT |> Result.defaultWith (failwithf "%A")
@@ -971,8 +971,8 @@ let ``segment intersections prefers shared endpoint over near endpoint minimum``
             point 2.823382761239994 2.914671758602366,
             point 2.816706698732441 2.9041808032333547,
             point 2.8162911593757998 2.903741355683332)
-    let raw = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = NoParameterSnap } |> Result.defaultWith (failwithf "%A")
-    let snapped = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = DecimalParameterSnap 7 } |> Result.defaultWith (failwithf "%A")
+    let raw = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = Intersections.NoParameterSnap } |> Result.defaultWith (failwithf "%A")
+    let snapped = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = Intersections.DecimalParameterSnap 7 } |> Result.defaultWith (failwithf "%A")
     for found in [raw;snapped] do
         IntersectionContractSupport.assertCandidates found left right 1e-9<length>
         Assert.Equal(4, found.Length) // Numerical candidate-count snapshot.
@@ -985,9 +985,9 @@ let ``segment intersections prefers shared endpoint over near endpoint minimum``
 [<Fact>]
 let ``segment intersections with rejects invalid options`` () =
     let segment = line 0.0 0.0 10.0 0.0
-    Assert.Equal(Error(InvalidIntersectionTolerance 0.0<length>), Intersections.segmentWith segment segment { Tolerance = 0.0<length>; MaxDepth = 32; ParameterSnap = NoParameterSnap })
-    Assert.Equal(Error(InvalidIntersectionMaxDepth 0), Intersections.segmentWith segment segment { Tolerance = 1.0e-9<length>; MaxDepth = 0; ParameterSnap = NoParameterSnap })
-    Assert.Equal(Error(InvalidIntersectionParameterSnapExponent 0), Intersections.segmentWith segment segment { Tolerance = 1.0e-9<length>; MaxDepth = 32; ParameterSnap = DecimalParameterSnap 0 })
+    Assert.Equal(Error(InvalidIntersectionTolerance 0.0<length>), Intersections.segmentWith segment segment { Tolerance = 0.0<length>; MaxDepth = 32; ParameterSnap = Intersections.NoParameterSnap })
+    Assert.Equal(Error(InvalidIntersectionMaxDepth 0), Intersections.segmentWith segment segment { Tolerance = 1.0e-9<length>; MaxDepth = 0; ParameterSnap = Intersections.NoParameterSnap })
+    Assert.Equal(Error(InvalidIntersectionParameterSnapExponent 0), Intersections.segmentWith segment segment { Tolerance = 1.0e-9<length>; MaxDepth = 32; ParameterSnap = Intersections.DecimalParameterSnap 0 })
 
 [<Fact>]
 let ``translated monotone cubics are certified disjoint`` () =
@@ -1051,7 +1051,7 @@ let ``segment subpath intersections propagates errors`` () =
     Assert.Equal(Error OverlappingSegments, Intersections.segmentSubpath segment source)
 
 let private semanticallyEqualArcs () =
-    let make largeArc = Arc { Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = largeArc; Sweep = true; End = point 10.0 0.0 }
+    let make largeArc = Arc ({ Start = point 0.0 0.0; Radius = point 5.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = largeArc; Sweep = true; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     make false, make true
 
 [<Fact>]
@@ -1140,10 +1140,10 @@ let ``path intersections canonicalizes near boundary aliases`` () =
         Path.ofSubpaths
             [ Subpath.ofSegment (line 9.9999999999 -5.0 9.9999999999 5.0)
               Subpath.ofSegment (line 10.0000000001 -5.0 10.0000000001 5.0) ]
-    let options =
+    let options: Intersections.IntersectionOptions =
         { Tolerance = 0.000001<length>
           MaxDepth = 48
-          ParameterSnap = DecimalParameterSnap 7 }
+          ParameterSnap = Intersections.DecimalParameterSnap 7 }
     let found = Intersections.pathWith left right options |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.True(Point.near 1.0e-6<length> found.Point middle)
     Assert.Equal<PathParameter list>([ pathParameter 0 1 0.0 ], found.LeftParameters)

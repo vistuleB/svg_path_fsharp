@@ -10,7 +10,8 @@ module Program =
         Directory.CreateDirectory output |> ignore
         let check = arguments |> Array.contains "--check"
         let mutable mismatch = false
-        for name, generate in Fixtures.all do
+        let selected = arguments |> Array.filter (fun a -> a <> "--check")
+        for name, generate in Fixtures.all @ JoinFigures.all |> List.filter(fun (n,_) -> selected.Length=0 || Array.contains n selected) do
             let destination = Path.Combine(output, name)
             let contents = generate ()
             if check then

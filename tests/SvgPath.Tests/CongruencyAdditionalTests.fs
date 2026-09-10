@@ -4,7 +4,7 @@ open SvgPath
 open Xunit
 
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
-let private tolerance = { Distance = 1.0e-9<length>; Angle = 1.0e-9<degree> }
+let private tolerance = ({ Distance = 1.0e-9<length>; Angle = 1.0e-9<degree> }: Congruency.CongruencyTolerance)
 
 [<Fact>]
 let ``points recover a similarity transform`` () =
@@ -18,8 +18,8 @@ let ``points recover a similarity transform`` () =
 let ``similar fit rejects reflection while affine fit accepts it`` () =
     let source = [ point 0.0 0.0; point 2.0 0.0; point 0.0 1.0 ]
     let target = List.map (fun value -> point (-Length.toFloat value.X) (Length.toFloat value.Y)) source
-    let similar = Congruency.fitPoints source target Similar |> Result.defaultWith (failwithf "%A")
-    let affine = Congruency.fitPoints source target TransformFamily.Affine |> Result.defaultWith (failwithf "%A")
+    let similar = Congruency.fitPoints source target Congruency.Similar |> Result.defaultWith (failwithf "%A")
+    let affine = Congruency.fitPoints source target Congruency.TransformFamily.Affine |> Result.defaultWith (failwithf "%A")
     Assert.True(similar.Error > 0.1<length>)
     Assert.True(affine.Error < 1.0e-12<length>)
     Assert.True(Affine.determinant affine.Transform < 0.0)
@@ -28,11 +28,11 @@ let ``similar fit rejects reflection while affine fit accepts it`` () =
 let ``arc congruency preserves sweep semantics`` () =
     let arc sweep =
         Arc
-            { Start = point 1.0 0.0
-              Radius = point 2.0 1.0
-              XAxisRotation = 15.0<degree>
-              LargeArc = false
-              Sweep = sweep
-              End = point -1.0 0.0 }
+            ({ Start = point 1.0 0.0
+               Radius = point 2.0 1.0
+               XAxisRotation = 15.0<degree>
+               LargeArc = false
+               Sweep = sweep
+               End = point -1.0 0.0 }: Ellipse.EndpointArcData)
     Assert.True(Congruency.segmentWith (arc true) (arc true) tolerance |> Result.isOk)
     Assert.Equal(Error(), Congruency.segmentWith (arc true) (arc false) tolerance)

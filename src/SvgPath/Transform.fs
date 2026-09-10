@@ -1,24 +1,25 @@
 namespace SvgPath
 
-type Anchor =
-    | TopLeft
-    | TopCenter
-    | TopRight
-    | CenterLeft
-    | Center
-    | CenterRight
-    | BottomLeft
-    | BottomCenter
-    | BottomRight
-
-type TransformError =
-    | DegenerateArcTransform
-    | InvalidMatrix
-    | PathError of error: SegmentError
-
 /// Affine transformation of SVG segments, subpaths, paths, and bounds.
 [<RequireQualifiedAccess>]
 module Transform =
+
+    type Anchor =
+        | TopLeft
+        | TopCenter
+        | TopRight
+        | CenterLeft
+        | Center
+        | CenterRight
+        | BottomLeft
+        | BottomCenter
+        | BottomRight
+
+    type Error =
+        | DegenerateArcTransform
+        | InvalidMatrix
+        | PathError of error: SegmentError
+
     let matrix = Affine.matrix
     let fromTuple = Affine.fromTuple
     let toTuple = Affine.toTuple
@@ -236,7 +237,7 @@ module Transform =
     let skewXPath input degrees = path input (skewX degrees)
     let skewYPath input degrees = path input (skewY degrees)
 
-    let boundingBox (box: BoundingBox) transform : Result<BoundingBox, TransformError> =
+    let boundingBox (box: BoundingBox) transform : Result<BoundingBox, Error> =
         validate transform
         |> Result.map (fun _ ->
             [ box.Min

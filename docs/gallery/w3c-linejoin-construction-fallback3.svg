@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="360" viewBox="0 0 1040 360"><rect x="0" y="0" width="1040" height="360" fill="white"/><g font-family="sans-serif" fill="#333"><text x="20" y="25" font-size="18">Arcs: parallel tangents (intentional Round fallback)</text><text x="20" y="55">W3C illustration</text><text x="540" y="55">Same illustration + F# computed outline (blue)</text><svg x="10" y="70" width="500" height="250" viewBox="0 0 500 250" opacity="1" xmlns:xlink="http://www.w3.org/1999/xlink"><g class="left">
+  <defs>
+    <g id="leftdot">
+      <rect x="-3" y="-3" width="6" height="6" fill="white"/>
+      <rect x="-2" y="-2" width="4" height="4" fill="black"/>
+    </g>
+  </defs>
+  <path
+     style="fill:deeppink"
+     d="m 250,125 0,-20 100,0 0,40 -100,0 z" />
+  <!-- Dark gray stroke -->
+  <path style="fill:none;stroke:#444;stroke-width:40px"
+     d="m 150,25 a 100,100 0 0 0 100,100 m 0,0 a 100,100 0 0 0 -100,100" />
+  <path style="fill:none;stroke:#ccc;stroke-width:2px"
+     d="m 150,25 a 100,100 0 0 0 100,100 m 0,0 a 100,100 0 0 0 -100,100" />
+  <g style="fill:none;stroke:black;stroke-dasharray:3, 3">
+    <circle cx="250"  cy="25"  r="80" />
+    <circle cx="250"  cy="225" r="80" />
+    <path d="m 350,75 0, 100" />
+  </g>
+  <g style="fill:none;stroke:#6a9100">
+    <path d="m 0,105 500,0" />
+    <path d="m 0,145 500,0" />
+  </g>
+</g></svg><svg x="530" y="70" width="500" height="250" viewBox="0 0 500 250" opacity="0.45" xmlns:xlink="http://www.w3.org/1999/xlink"><g class="right">
+  <defs>
+    <g id="rightdot">
+      <rect x="-3" y="-3" width="6" height="6" fill="white"/>
+      <rect x="-2" y="-2" width="4" height="4" fill="black"/>
+    </g>
+  </defs>
+  <path
+     style="fill:deeppink"
+     d="m 250,125 0,-20 100,0 0,40 -100,0 z" />
+  <!-- Dark gray stroke -->
+  <path style="fill:none;stroke:#444;stroke-width:40px"
+     d="m 150,25 a 100,100 0 0 0 100,100 m 0,0 a 100,100 0 0 0 -100,100" />
+  <path style="fill:none;stroke:#ccc;stroke-width:2px"
+     d="m 150,25 a 100,100 0 0 0 100,100 m 0,0 a 100,100 0 0 0 -100,100" />
+  <g style="fill:none;stroke:black;stroke-dasharray:3, 3">
+    <circle cx="250"  cy="25"  r="80" />
+    <circle cx="250"  cy="225" r="80" />
+    <path d="m 350,75 0, 100" />
+  </g>
+  <g style="fill:none;stroke:#6a9100">
+    <path d="m 0,105 500,0" />
+    <path d="m 0,145 500,0" />
+  </g>
+</g></svg><svg x="530" y="70" width="500" height="250" viewBox="0 0 500 250"><path transform="" d="M 250 105 A 20 20 0 0 1 250 145 A 80 80 0 0 0 170 225 H 130 A 120 120 0 0 1 183.6675 125 A 120 120 0 0 1 130 25 H 170 A 80 80 0 0 0 250 105 Z" fill="none" stroke="#1565ff" stroke-width="1.4"/></svg><text x="20" y="345" font-size="12">Original W3C viewport retained; width 40, Butt caps. Reference guides are rounded approximations.</text></g></svg>

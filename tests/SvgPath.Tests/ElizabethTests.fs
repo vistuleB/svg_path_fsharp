@@ -10,9 +10,9 @@ let private tangent = QuadraticBezier(p 0.0 0.25,p 0.5 -0.25,p 1.0 0.25)
 let private unwrap result = Result.defaultWith (failwithf "%A") result
 let private options = Intersections.defaultOptions
 let private beam left right options = Intersections.elizabethBeamIntersections left right options
-let private near value (hit:SegmentIntersection) tolerance = abs(hit.LeftT-value)<=tolerance && abs(hit.RightT-value)<=tolerance
+let private near value (hit:Intersections.SegmentIntersection) tolerance = abs(hit.LeftT-value)<=tolerance && abs(hit.RightT-value)<=tolerance
 let private residuals left right tolerance found =
-    for (hit:SegmentIntersection) in found do
+    for (hit:Intersections.SegmentIntersection) in found do
         let a,b = Segment.point left hit.LeftT |> unwrap,Segment.point right hit.RightT |> unwrap
         Assert.True(Point.squaredDistance a b <= tolerance*tolerance)
 let private clustered offset =
@@ -49,7 +49,7 @@ let ``elizabeth_beam_simple_crossing_needs_no_culling_test`` () =
 [<Fact>]
 let ``elizabeth_beam_still_reports_depth_exhaustion_test`` () =
     match beam horizontal diagonal {options with MaxDepth=1} with
-    | Error(CurveSolverDepthLimit _) -> ()
+    | Error(Intersections.CurveSolverDepthLimit _) -> ()
     | result -> failwithf "%A" result
 
 [<Fact>]
@@ -68,8 +68,8 @@ let ``elizabeth_beam_flat_crossing_completes_with_explicit_loss_test`` () =
 
 [<Fact>]
 let ``elizabeth_beam_join_line_selection_keeps_endpoint_test`` () =
-    let arc = Arc {Start=p 430.66681589309076 178.69245771161582;Radius=p 3.0 3.0
-                   XAxisRotation=0.0<degree>;LargeArc=false;Sweep=false;End=p 430.670203101245 178.69477431938788}
+    let arc = Arc ({Start=p 430.66681589309076 178.69245771161582;Radius=p 3.0 3.0
+                    XAxisRotation=0.0<degree>;LargeArc=false;Sweep=false;End=p 430.670203101245 178.69477431938788}: Ellipse.EndpointArcData)
     let line = Line(Segment.finish arc,p 430.22232031893986 178.38890397610967)
     let options = {options with Tolerance=5e-14<length>;MaxDepth=48}
     let report = beam arc line options |> unwrap

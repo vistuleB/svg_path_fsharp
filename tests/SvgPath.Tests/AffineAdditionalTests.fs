@@ -32,24 +32,24 @@ let ``linear part preserves the input coordinate unit`` () =
 
 [<Fact>]
 let ``point_pair_similarity_reports_degenerate_source_test`` () =
-    Assert.Equal(Error AffineError.DegenerateSourcePair, Affine.pointPairSimilarity (point 1.0 2.0) (point 1.0 2.0) (point 0.0 0.0) (point 1.0 0.0))
+    Assert.Equal(Error Affine.Error.DegenerateSourcePair, Affine.pointPairSimilarity (point 1.0 2.0) (point 1.0 2.0) (point 0.0 0.0) (point 1.0 0.0))
 
 [<Fact>]
 let ``point_triple_map_reports_degenerate_source_test`` () =
     let result = Affine.pointTripleMap (point 0.0 0.0) (point 1.0 0.0) (point 2.0 0.0) (point 0.0 0.0) (point 1.0 0.0) (point 0.0 1.0)
-    Assert.Equal(Error AffineError.DegenerateSourceTriple, result)
+    Assert.Equal(Error Affine.Error.DegenerateSourceTriple, result)
     let origin = point 0.0 0.0
-    Assert.Equal(Error AffineError.DegenerateSourceTriple,
+    Assert.Equal(Error Affine.Error.DegenerateSourceTriple,
         Affine.pointTripleMap origin origin origin origin origin origin)
 
 [<Fact>]
 let ``point_pair_similarity_reports_nonfinite_transform_test`` () =
-    Assert.Equal(Error AffineError.NonFiniteTransform,
+    Assert.Equal(Error Affine.Error.NonFiniteTransform,
         Affine.pointPairSimilarity (point 1.0e200 0.0) (point 1.0e200 1.0) (point 0.0 0.0) (point 0.0 1.0e150))
 
 [<Fact>]
 let ``point_triple_map_reports_nonfinite_transform_test`` () =
-    Assert.Equal(Error AffineError.NonFiniteTransform,
+    Assert.Equal(Error Affine.Error.NonFiniteTransform,
         Affine.pointTripleMap (point 0.0 0.0) (point 0.5 0.0) (point 0.0 0.5)
             (point 0.0 0.0) (point 1.0e308 0.0) (point 0.0 1.0e308))
 

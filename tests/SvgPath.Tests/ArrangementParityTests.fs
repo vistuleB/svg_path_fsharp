@@ -16,7 +16,7 @@ let ``annotated drawing uses requested winding tolerance`` () =
     let build = Arrangement.build [path] 1e-12<length> 1e-8<length> |> Result.defaultWith (failwithf "%A")
     let things = ArrangementDrawing.annotatedDrawing build.Graph path 1e-12<length> |> Result.defaultWith (failwithf "%A")
     let labels = things |> List.choose (function
-        | RotatedText(label, style, _, _, _, _) when style="fill: #0f172a; font-family: ui-monospace, monospace; font-weight: 700; text-anchor: middle" -> Some label
+        | Svg.RotatedText(label, style, _, _, _, _) when style="fill: #0f172a; font-family: ui-monospace, monospace; font-weight: 700; text-anchor: middle" -> Some label
         | _ -> None)
     Assert.Equal(4, List.length labels)
     Assert.True(labels |> List.forall (fun label -> label="0/1" || label="1/0"))
@@ -28,7 +28,7 @@ let private buildLoopFixture segments =
     Assert.True(build.Graph.Edges |> List.forall (fun edge -> edge.StartVertex<>edge.EndVertex))
     build.Graph
 
-let private assertImageIntervals source (graph:ArrangementGraph) (images:ArrangementSegmentEdgeImage list) =
+let private assertImageIntervals source (graph:Arrangement.ArrangementGraph) (images:Arrangement.ArrangementSegmentEdgeImage list) =
     let mutable previous = 0.0<parameter>
     for image in images do
         Assert.Equal(previous,image.From)
@@ -126,12 +126,12 @@ let ``progressive duplicate curves preserve directional multiplicity`` () =
 
 let private arc start radius largeArc sweep finish =
     Arc
-        { Start = start
-          Radius = radius
-          XAxisRotation = 0.0<degree>
-          LargeArc = largeArc
-          Sweep = sweep
-          End = finish }
+        ({ Start = start
+           Radius = radius
+           XAxisRotation = 0.0<degree>
+           LargeArc = largeArc
+           Sweep = sweep
+           End = finish }: Ellipse.EndpointArcData)
 
 let private closedSubpath segments =
     Subpath.create segments
@@ -161,7 +161,7 @@ let private buildGraph subpaths =
 let private sourceWindingSetup subpaths =
     let graph = buildGraph subpaths |> Result.defaultWith (failwithf "%A")
     let dual = Arrangement.dual graph |> Result.defaultWith (failwithf "%A")
-    let changes = graph.Edges |> List.map (fun e -> {EdgeId=e.Id;RightMinusLeft=e.ForwardMultiplicity-e.ReverseMultiplicity})
+    let changes = graph.Edges |> List.map (fun e -> ({EdgeId=e.Id;RightMinusLeft=e.ForwardMultiplicity-e.ReverseMultiplicity}: Arrangement.EdgeWindingChange))
     dual,changes
 
 let private propagatedSourceWindings subpaths =
@@ -185,22 +185,22 @@ let ``dual face windings accumulate overlap and multiplicity`` () =
 let ``dual face windings reject open boundary but accept cancellation`` () =
     let line = Segment.asSubpath(Line(point 0. 0.,point 10. 0.))
     match propagatedSourceWindings [line] with
-    | Error(ContradictoryWinding _) -> ()
+    | Error(Arrangement.ContradictoryWinding _) -> ()
     | result -> failwithf "%A" result
     let values = propagatedSourceWindings [line;Subpath.reverse line] |> Result.defaultWith (failwithf "%A")
     Assert.Equal<int list>([0],values |> List.map _.Value)
 
 [<Fact>]
 let ``dual face windings empty graph`` () =
-    Assert.Equal(Ok [{FaceId=0;Value=0}],propagatedSourceWindings [])
+    Assert.Equal(Ok [({FaceId=0;Value=0}: Arrangement.FaceWinding)],propagatedSourceWindings [])
 
 [<Fact>]
 let ``dual face windings validate changes and detect cycle conflicts`` () =
     let dual,changes = sourceWindingSetup [square 0. 0. 10.]
-    Assert.Equal(Error InvalidWindingChanges,Arrangement.faceWindings dual changes.Tail)
-    Assert.Equal(Error InvalidWindingChanges,Arrangement.faceWindings dual (changes.Head::changes))
+    Assert.Equal(Error Arrangement.InvalidWindingChanges,Arrangement.faceWindings dual changes.Tail)
+    Assert.Equal(Error Arrangement.InvalidWindingChanges,Arrangement.faceWindings dual (changes.Head::changes))
     match Arrangement.faceWindings dual ({changes.Head with RightMinusLeft=changes.Head.RightMinusLeft+1}::changes.Tail) with
-    | Error(ContradictoryWinding _) -> ()
+    | Error(Arrangement.ContradictoryWinding _) -> ()
     | result -> failwithf "%A" result
 
 let private sweepGraph subpaths =
@@ -227,8 +227,8 @@ let ``dual mixed nested and separate components`` () =
 
 let private dualTestCircle radius =
     let a,b,r = point radius 0., point -radius 0., point radius radius
-    closedSubpath [Arc {Start=a;End=b;Radius=r;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true}
-                   Arc {Start=b;End=a;Radius=r;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true}]
+    closedSubpath [Arc ({Start=a;End=b;Radius=r;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true}: Ellipse.EndpointArcData)
+                   Arc ({Start=b;End=a;Radius=r;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true}: Ellipse.EndpointArcData)]
 
 [<Fact>]
 let ``dual curved nested components ignore traversal orientation`` () =
@@ -252,13 +252,13 @@ let private buildSegments segments =
     |> Result.defaultWith (failwithf "%A")
 
 let private edge id segment startVertex endVertex =
-    { Id = id
-      Segment = segment
-      Bounds = Segment.boundingBox segment |> Result.defaultWith (failwithf "%A")
-      StartVertex = startVertex
-      EndVertex = endVertex
-      ForwardMultiplicity = 1
-      ReverseMultiplicity = 1 }
+    ({ Id = id
+       Segment = segment
+       Bounds = Segment.boundingBox segment |> Result.defaultWith (failwithf "%A")
+       StartVertex = startVertex
+       EndVertex = endVertex
+       ForwardMultiplicity = 1
+       ReverseMultiplicity = 1 }: Arrangement.ArrangementEdge)
 
 let private graphWithClusteredEndpoints endpoints clusterTolerance =
     let rec loop index endpoints graph =
@@ -411,7 +411,7 @@ let ``segment_images_follow_crossing_source_traversals_test`` () =
     let verticalEdges =
         build.SegmentImages[1].Edges
         |> List.map (fun reference -> build.Graph.Edges |> List.find (fun edge -> edge.Id = reference.EdgeId), reference.Reversed)
-    let orientedSegment (edge, reversed) =
+    let orientedSegment (edge: Arrangement.ArrangementEdge, reversed) =
         if reversed then Segment.reverse edge.Segment else edge.Segment
     Assert.Equal(2, horizontalEdges.Length)
     Assert.Equal(2, verticalEdges.Length)
@@ -535,28 +535,28 @@ let ``builder_consolidates_near_equal_circles_inside_tolerance_test`` () =
 [<Fact>]
 let ``build_rejects_invalid_tolerance_before_inspecting_sources_test`` () =
     let badSegment = line 0.0 0.0 0.0 0.0
-    Assert.Equal(Error(InternalInvalidArrangementTolerance 0.0<length>), Arrangement.buildWith [ badSegment ] 0.0<length> minimumChord 0.0<parameter>)
-    Assert.Equal(Error(InvalidArrangementTolerance -1.0<length>), Arrangement.build [ Path.singleton (Subpath.ofSegment badSegment) ] -1.0<length> minimumChord)
+    Assert.Equal(Error(Arrangement.InternalInvalidArrangementTolerance 0.0<length>), Arrangement.buildWith [ badSegment ] 0.0<length> minimumChord 0.0<parameter>)
+    Assert.Equal(Error(Arrangement.InvalidArrangementTolerance -1.0<length>), Arrangement.build [ Path.singleton (Subpath.ofSegment badSegment) ] -1.0<length> minimumChord)
 
 [<Fact>]
 let ``build_rejects_invalid_minimum_chord_before_inspecting_sources_test`` () =
     let badSegment = line 0.0 0.0 0.0 0.0
-    Assert.Equal(Error(InternalInvalidMinimumChord 0.0<length>), Arrangement.buildWith [ badSegment ] tolerance 0.0<length> 0.0<parameter>)
-    Assert.Equal(Error(InvalidMinimumChord -1.0<length>), Arrangement.build [ Path.singleton (Subpath.ofSegment badSegment) ] tolerance -1.0<length>)
+    Assert.Equal(Error(Arrangement.InternalInvalidMinimumChord 0.0<length>), Arrangement.buildWith [ badSegment ] tolerance 0.0<length> 0.0<parameter>)
+    Assert.Equal(Error(Arrangement.InvalidMinimumChord -1.0<length>), Arrangement.build [ Path.singleton (Subpath.ofSegment badSegment) ] tolerance -1.0<length>)
 
 [<Fact>]
 let ``build_rejects_nonfinite_numeric_options_test`` () =
     let segment = line 0.0 0.0 10.0 0.0
     let infiniteLength = LanguagePrimitives.FloatWithMeasure<length> System.Double.PositiveInfinity
     let infiniteParameter = LanguagePrimitives.FloatWithMeasure<parameter> System.Double.PositiveInfinity
-    Assert.Equal(Error(InternalInvalidArrangementTolerance infiniteLength), Arrangement.buildWith [ segment ] infiniteLength minimumChord 0.0<parameter>)
-    Assert.Equal(Error(InternalInvalidMinimumChord infiniteLength), Arrangement.buildWith [ segment ] tolerance infiniteLength 0.0<parameter>)
-    Assert.Equal(Error(InternalInvalidEndpointSliverTolerance infiniteParameter), Arrangement.buildWith [ segment ] tolerance minimumChord infiniteParameter)
+    Assert.Equal(Error(Arrangement.InternalInvalidArrangementTolerance infiniteLength), Arrangement.buildWith [ segment ] infiniteLength minimumChord 0.0<parameter>)
+    Assert.Equal(Error(Arrangement.InternalInvalidMinimumChord infiniteLength), Arrangement.buildWith [ segment ] tolerance infiniteLength 0.0<parameter>)
+    Assert.Equal(Error(Arrangement.InternalInvalidEndpointSliverTolerance infiniteParameter), Arrangement.buildWith [ segment ] tolerance minimumChord infiniteParameter)
 
 [<Fact>]
 let ``insertion_reports_tolerance_cluster_collapse_test`` () =
     Assert.Equal(
-        Error(InternalSegmentCollapsedToVertex 0),
+        Error(Arrangement.InternalSegmentCollapsedToVertex 0),
         Arrangement.insertAtomicSegment Arrangement.empty (line 0.0 0.0 0.5 0.0) 1.0<length> 0.1<length>)
 
 [<Fact>]
@@ -598,17 +598,17 @@ let ``exactly_equal_endpoint_samples_preserve_exact_vertex_test`` () =
 [<Fact>]
 let ``build_with_rejects_negative_endpoint_sliver_tolerance_test`` () =
     let segment = line 0.0 0.0 10.0 0.0
-    Assert.Equal(Error(InternalInvalidEndpointSliverTolerance -0.001<parameter>), Arrangement.buildWith [ segment ] tolerance minimumChord -0.001<parameter>)
+    Assert.Equal(Error(Arrangement.InternalInvalidEndpointSliverTolerance -0.001<parameter>), Arrangement.buildWith [ segment ] tolerance minimumChord -0.001<parameter>)
 
 [<Fact>]
 let ``validation_rejects_invalid_numeric_options_test`` () =
-    Assert.Equal(Error(InvalidArrangementTolerance 0.0<length>), Arrangement.validate Arrangement.empty 0.0<length> minimumChord)
-    Assert.Equal(Error(InvalidMinimumChord 0.0<length>), Arrangement.validate Arrangement.empty tolerance 0.0<length>)
+    Assert.Equal(Error(Arrangement.InvalidArrangementTolerance 0.0<length>), Arrangement.validate Arrangement.empty 0.0<length> minimumChord)
+    Assert.Equal(Error(Arrangement.InvalidMinimumChord 0.0<length>), Arrangement.validate Arrangement.empty tolerance 0.0<length>)
     let infinite = LanguagePrimitives.FloatWithMeasure<length> System.Double.PositiveInfinity
-    Assert.Equal(Error(InvalidArrangementTolerance infinite), Arrangement.validate Arrangement.empty infinite minimumChord)
-    Assert.Equal(Error(InvalidMinimumChord infinite), Arrangement.validate Arrangement.empty tolerance infinite)
-    Assert.Equal(Error(InternalInvalidArrangementTolerance infinite), Arrangement.cyclicOrdersWith Arrangement.empty infinite 3)
-    Assert.Equal(Error(InternalInvalidArrangementTolerance 0.0<length>), Arrangement.cyclicOrdersWith Arrangement.empty 0.0<length> 0)
+    Assert.Equal(Error(Arrangement.InvalidArrangementTolerance infinite), Arrangement.validate Arrangement.empty infinite minimumChord)
+    Assert.Equal(Error(Arrangement.InvalidMinimumChord infinite), Arrangement.validate Arrangement.empty tolerance infinite)
+    Assert.Equal(Error(Arrangement.InternalInvalidArrangementTolerance infinite), Arrangement.cyclicOrdersWith Arrangement.empty infinite 3)
+    Assert.Equal(Error(Arrangement.InternalInvalidArrangementTolerance 0.0<length>), Arrangement.cyclicOrdersWith Arrangement.empty 0.0<length> 0)
 
 [<Fact>]
 let ``validation_rejects_vertex_sample_outside_official_tolerance_test`` () =
@@ -616,15 +616,15 @@ let ``validation_rejects_vertex_sample_outside_official_tolerance_test`` () =
     let graph =
         { Arrangement.empty with
             Vertices =
-                [ { Id = 0
-                    Point = point 0.0 0.0
-                    EndpointSamples = [ point -2.0 0.0; point 2.0 0.0 ] }
-                  { Id = 1
-                    Point = point 10.0 0.0
-                    EndpointSamples = [ point 10.0 0.0 ] } ]
+                [ ({ Id = 0
+                     Point = point 0.0 0.0
+                     EndpointSamples = [ point -2.0 0.0; point 2.0 0.0 ] }: Arrangement.ArrangementVertex)
+                  ({ Id = 1
+                     Point = point 10.0 0.0
+                     EndpointSamples = [ point 10.0 0.0 ] }: Arrangement.ArrangementVertex) ]
             Edges = [ edge 0 segment 0 1 ] }
     Assert.Equal(
-        Error(ConstructionFailed),
+        Error(Arrangement.ConstructionFailed),
         Arrangement.validate graph 1.0<length> minimumChord)
 
 [<Fact>]
@@ -633,15 +633,15 @@ let ``validation_rejects_noncanonical_vertex_center_test`` () =
     let graph =
         { Arrangement.empty with
             Vertices =
-                [ { Id = 0
-                    Point = point 0.1 0.0
-                    EndpointSamples = [ point 0.0 0.0 ] }
-                  { Id = 1
-                    Point = point 10.0 0.0
-                    EndpointSamples = [ point 10.0 0.0 ] } ]
+                [ ({ Id = 0
+                     Point = point 0.1 0.0
+                     EndpointSamples = [ point 0.0 0.0 ] }: Arrangement.ArrangementVertex)
+                  ({ Id = 1
+                     Point = point 10.0 0.0
+                     EndpointSamples = [ point 10.0 0.0 ] }: Arrangement.ArrangementVertex) ]
             Edges = [ edge 0 segment 0 1 ] }
     match Arrangement.validate graph 1.0<length> minimumChord with
-    | Error ConstructionFailed -> ()
+    | Error Arrangement.ConstructionFailed -> ()
     | other -> failwithf "unexpected result: %A" other
 
 [<Fact>]
@@ -650,10 +650,10 @@ let ``validation_rejects_vertex_without_endpoint_samples_test`` () =
     let graph =
         { Arrangement.empty with
             Vertices =
-                [ { Id = 0; Point = point 0.0 0.0; EndpointSamples = [] }
-                  { Id = 1; Point = point 10.0 0.0; EndpointSamples = [ point 10.0 0.0 ] } ]
+                [ ({ Id = 0; Point = point 0.0 0.0; EndpointSamples = [] }: Arrangement.ArrangementVertex)
+                  ({ Id = 1; Point = point 10.0 0.0; EndpointSamples = [ point 10.0 0.0 ] }: Arrangement.ArrangementVertex) ]
             Edges = [ edge 0 segment 0 1 ] }
-    Assert.Equal(Error ConstructionFailed, Arrangement.validate graph tolerance minimumChord)
+    Assert.Equal(Error Arrangement.ConstructionFailed, Arrangement.validate graph tolerance minimumChord)
 
 [<Fact>]
 let ``reversed_duplicate_increments_reverse_multiplicity_test`` () =
@@ -665,7 +665,7 @@ let ``reversed_duplicate_increments_reverse_multiplicity_test`` () =
 [<Fact>]
 let ``short_chord_is_rejected_test`` () =
     Assert.Equal(
-        Error(InternalSegmentTooShort(0.000001<length>, minimumChord)),
+        Error(Arrangement.InternalSegmentTooShort(0.000001<length>, minimumChord)),
         Arrangement.insertAtomicSegment Arrangement.empty (line 0.0 0.0 0.000001 0.0) tolerance minimumChord)
 
 [<Fact>]

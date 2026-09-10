@@ -27,17 +27,17 @@ let private baseLine () = Line(point 0.0 0.0, point 10.0 0.0)
 
 let private baseArc largeArc sweep =
     Arc
-        { Start = point 0.0 0.0
-          Radius = point 5.0 5.0
-          XAxisRotation = 0.0<degree>
-          LargeArc = largeArc
-          Sweep = sweep
-          End = point 10.0 0.0 }
+        ({ Start = point 0.0 0.0
+           Radius = point 5.0 5.0
+           XAxisRotation = 0.0<degree>
+           LargeArc = largeArc
+           Sweep = sweep
+           End = point 10.0 0.0 }: Ellipse.EndpointArcData)
 
-let private intersectionOptions tolerance =
+let private intersectionOptions tolerance : Intersections.IntersectionOptions =
     { Tolerance = tolerance
       MaxDepth = 48
-      ParameterSnap = DecimalParameterSnap 7 }
+      ParameterSnap = Intersections.DecimalParameterSnap 7 }
 
 let private assertOverlapContract left right expectedOverlap =
     let tolerance = 1.0e-6<length>
@@ -227,7 +227,7 @@ let ``non affinely parameterized line cubics are rejected`` () =
 
 [<Fact>]
 let ``segment overlap exposes affine parameter correspondence`` () =
-    let overlap: SegmentOverlap =
+    let overlap: Overlaps.SegmentOverlap =
         { LeftFrom = parameter 0.2
           LeftTo = parameter 0.8
           RightFrom = parameter 0.9
@@ -279,17 +279,17 @@ let ``subpath overlap exact lookup accepts closed seam alias`` () =
         Subpath.polyline [ point 0.0 0.0; point 1.0 0.0; point 1.0 1.0; point 0.0 1.0; point 0.0 0.0 ]
         |> Result.bind (Subpath.setClosed true)
         |> Result.defaultWith (failwithf "%A")
-    let correspondence: SegmentOverlap =
+    let correspondence: Overlaps.SegmentOverlap =
         { LeftFrom = parameter 0.5
           LeftTo = parameter 1.0
           RightFrom = parameter 0.0
           RightTo = parameter 1.0
           Start = point 0.0 0.5
           Finish = point 0.0 0.0 }
-    let overlap =
+    let overlap: Overlaps.SubpathOverlap =
         { Start = correspondence.Start
           Finish = correspondence.Finish
-          Pieces = [ { LeftSegmentIndex = 3; RightSegmentIndex = 0; Correspondence = correspondence } ] }
+          Pieces = [ ({ LeftSegmentIndex = 3; RightSegmentIndex = 0; Correspondence = correspondence }: Overlaps.SubpathOverlapPiece) ] }
     Assert.Equal(
         Ok(Some { SegmentIndex = 1; T = parameter 0.0 }),
         Overlaps.subpathOverlapRightParameter overlap { SegmentIndex = 0; T = parameter 0.0 } closed closed)

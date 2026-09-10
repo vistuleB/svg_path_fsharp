@@ -12,12 +12,12 @@ let private bigLineLoop () =
 
 let private smallArc () =
     Arc
-        { Start = point 999.94340504 7.63106966
-          Radius = point 30.0 30.0
-          XAxisRotation = 0.0<degree>
-          LargeArc = false
-          Sweep = true
-          End = point 999.92428935 9.82151131 }
+        ({ Start = point 999.94340504 7.63106966
+           Radius = point 30.0 30.0
+           XAxisRotation = 0.0<degree>
+           LargeArc = false
+           Sweep = true
+           End = point 999.92428935 9.82151131 }: Ellipse.EndpointArcData)
 
 let private smallArcLoop () =
     let arc = smallArc ()
@@ -106,12 +106,12 @@ let ``ambitious repair loop with loop adds tiny arc slice`` () =
 let ``path hull handles scaled two arc probe`` () =
     let largeArc =
         Arc
-            { Start = point 1000.0 0.0
-              Radius = point 1000.0 1000.0
-              XAxisRotation = 0.0<degree>
-              LargeArc = false
-              Sweep = true
-              End = point 999.84769516 17.45240644 }
+            ({ Start = point 1000.0 0.0
+               Radius = point 1000.0 1000.0
+               XAxisRotation = 0.0<degree>
+               LargeArc = false
+               Sweep = true
+               End = point 999.84769516 17.45240644 }: Ellipse.EndpointArcData)
     let path = Path.ofSubpaths [ Subpath.ofSegment largeArc; Subpath.ofSegment (smallArc ()) ]
     let hull = ConvexHull.pathHull path |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
@@ -119,7 +119,7 @@ let ``path hull handles scaled two arc probe`` () =
 [<Fact>]
 let ``path hull with dumb repair mode handles line arc probe`` () =
     let hull =
-        ConvexHull.internalPathHullWithRepairMode (lineArcProbePath ()) PointRepair
+        ConvexHull.internalPathHullWithRepairMode (lineArcProbePath ()) ConvexHull.PointRepair
         |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     assertProbeEndpointsInside hull
@@ -127,7 +127,7 @@ let ``path hull with dumb repair mode handles line arc probe`` () =
 [<Fact>]
 let ``path hull with ambitious repair mode handles line arc probe`` () =
     let hull =
-        ConvexHull.internalPathHullWithRepairMode (lineArcProbePath ()) LoopRepair
+        ConvexHull.internalPathHullWithRepairMode (lineArcProbePath ()) ConvexHull.LoopRepair
         |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     assertProbeEndpointsInside hull

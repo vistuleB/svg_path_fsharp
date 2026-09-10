@@ -35,13 +35,13 @@ let ``cocircular points preserve radius under rotation and scaling`` () =
 [<Fact>]
 let ``one point preserves exact center`` () =
     let sample = point 3.0 -7.0
-    let expected = Ok { Center = sample; RadiusSquared = 0.0<length^2> }
+    let expected = Ok ({ Center = sample; RadiusSquared = 0.0<length^2> }: SmallestEnclosingCircle.EnclosingCircle)
     Assert.Equal(expected, SmallestEnclosingCircle.points [ sample ])
 
 [<Fact>]
 let ``equal points preserve exact center`` () =
     let sample = point 3.0 -7.0
-    let expected = Ok { Center = sample; RadiusSquared = 0.0<length^2> }
+    let expected = Ok ({ Center = sample; RadiusSquared = 0.0<length^2> }: SmallestEnclosingCircle.EnclosingCircle)
     Assert.Equal(expected, SmallestEnclosingCircle.points [ sample; sample; sample ])
 
 [<Fact>]

@@ -13,7 +13,7 @@ type Segment =
         control1: Point<length> *
         control2: Point<length> *
         endPoint: Point<length>
-    | Arc of EndpointArcData
+    | Arc of Ellipse.EndpointArcData
 
 /// Position of a policy call in input traversal. First and Last mark forward
 /// pairs (both for two segments). The separate closing call has only Closing.
@@ -311,10 +311,10 @@ module Segment =
                 { Min = Point.create (min startPoint.X endPoint.X) (min startPoint.Y endPoint.Y)
                   Max = Point.create (max startPoint.X endPoint.X) (max startPoint.Y endPoint.Y) }
         | QuadraticBezier(startPoint, control, endPoint) ->
-            let box = Bezier.boundingBox (QuadraticBezierData(startPoint, control, endPoint))
+            let box = Bezier.boundingBox (Bezier.QuadraticBezierData(startPoint, control, endPoint))
             Ok { Min = box.Min; Max = box.Max }
         | CubicBezier(startPoint, control1, control2, endPoint) ->
-            let box = Bezier.boundingBox (CubicBezierData(startPoint, control1, control2, endPoint))
+            let box = Bezier.boundingBox (Bezier.CubicBezierData(startPoint, control1, control2, endPoint))
             Ok { Min = box.Min; Max = box.Max }
         | Arc endpoint ->
             Ellipse.endpointToCenter endpoint
@@ -443,10 +443,10 @@ module Segment =
 
     let private asBezier segment =
         match segment with
-        | Line(startPoint, endPoint) -> LinearBezierData(startPoint, endPoint)
-        | QuadraticBezier(startPoint, control, endPoint) -> QuadraticBezierData(startPoint, control, endPoint)
+        | Line(startPoint, endPoint) -> Bezier.LinearBezierData(startPoint, endPoint)
+        | QuadraticBezier(startPoint, control, endPoint) -> Bezier.QuadraticBezierData(startPoint, control, endPoint)
         | CubicBezier(startPoint, control1, control2, endPoint) ->
-            CubicBezierData(startPoint, control1, control2, endPoint)
+            Bezier.CubicBezierData(startPoint, control1, control2, endPoint)
         | Arc _ -> invalidArg (nameof segment) "arcs are not Bezier segments"
 
     let arcCenterData segment =
@@ -472,9 +472,9 @@ module Segment =
 
     let private fromBezier curve =
         match curve with
-        | LinearBezierData(startPoint, endPoint) -> Line(startPoint, endPoint)
-        | QuadraticBezierData(startPoint, control, endPoint) -> QuadraticBezier(startPoint, control, endPoint)
-        | CubicBezierData(startPoint, control1, control2, endPoint) -> CubicBezier(startPoint, control1, control2, endPoint)
+        | Bezier.LinearBezierData(startPoint, endPoint) -> Line(startPoint, endPoint)
+        | Bezier.QuadraticBezierData(startPoint, control, endPoint) -> QuadraticBezier(startPoint, control, endPoint)
+        | Bezier.CubicBezierData(startPoint, control1, control2, endPoint) -> CubicBezier(startPoint, control1, control2, endPoint)
 
     let private splitUnchecked segment t =
         match segment with
@@ -1194,7 +1194,7 @@ module Segment =
             else p::stack
         | _ -> p::stack
 
-    let rec private boundingArcPoints (arc: CenterArcData) (fromT: float<parameter>) (toT: float<parameter>) =
+    let rec private boundingArcPoints (arc: Ellipse.CenterArcData) (fromT: float<parameter>) (toT: float<parameter>) =
         let middle = fromT + (toT-fromT)/2.0
         let span = arc.DeltaAngle * Parameter.ratio (toT-fromT)
         if abs span > 90.0<degree> then
@@ -1441,9 +1441,9 @@ module Segment =
     let private bezierError curve =
         let startPoint, endPoint, controls =
             match curve with
-            | LinearBezierData(startPoint, endPoint) -> startPoint, endPoint, []
-            | QuadraticBezierData(startPoint, control, endPoint) -> startPoint, endPoint, [ control ]
-            | CubicBezierData(startPoint, control1, control2, endPoint) -> startPoint, endPoint, [ control1; control2 ]
+            | Bezier.LinearBezierData(startPoint, endPoint) -> startPoint, endPoint, []
+            | Bezier.QuadraticBezierData(startPoint, control, endPoint) -> startPoint, endPoint, [ control ]
+            | Bezier.CubicBezierData(startPoint, control1, control2, endPoint) -> startPoint, endPoint, [ control1; control2 ]
         controls
         |> List.map (controlDistanceToChord startPoint endPoint)
         |> List.fold max 0.0<length>
@@ -1459,7 +1459,7 @@ module Segment =
             | Error error, _
             | _, Error error -> Error error
 
-    let private arcChordErrorBound (arc: CenterArcData) =
+    let private arcChordErrorBound (arc: Ellipse.CenterArcData) =
         let radius = max (abs arc.Radius.X) (abs arc.Radius.Y)
         let delta = abs arc.DeltaAngle
         if delta > 180.0<degree> then 2.0 * radius
@@ -1871,7 +1871,7 @@ module Subpath =
                                     |> Result.mapError (fun _ -> ParametricFitFailed))))
                     |> Result.bind (fun (curve, report) ->
                         match curve with
-                        | CubicBezierData(a, b, c, d) ->
+                        | Bezier.CubicBezierData(a, b, c, d) ->
                             let segment = CubicBezier(a, b, c, d)
                             if [ a; b; c; d ] |> List.forall finitePoint then Ok(segment, report.Max)
                             else Error ParametricFitFailed

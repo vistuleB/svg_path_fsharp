@@ -29,7 +29,7 @@ let private assertValidInAllModes points =
     |> Result.defaultWith (failwithf "%A")
     |> assertValidHull points
     let path = points |> List.map Subpath.empty |> Path.ofSubpaths
-    for mode in [ PointRepair; LoopRepair ] do
+    for mode in [ ConvexHull.PointRepair; ConvexHull.LoopRepair ] do
         ConvexHull.internalPathHullWithRepairMode path mode
         |> Result.defaultWith (failwithf "%A")
         |> assertValidHull points
@@ -47,7 +47,7 @@ let ``point cloud hull handles 10 point cloud`` () =
 
 [<Fact>]
 let ``point cloud hull rejects empty point cloud`` () =
-    Assert.Equal(Error(ConvexHullPathError EmptyPath), ConvexHull.pointsHull [])
+    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.pointsHull [])
 
 [<Fact>]
 let ``point cloud hull handles points`` () =

@@ -1,46 +1,47 @@
 namespace SvgPath
 
-[<Struct>]
-type SegmentOverlap =
-    { LeftFrom: float<parameter>
-      LeftTo: float<parameter>
-      RightFrom: float<parameter>
-      RightTo: float<parameter>
-      Start: Point<length>
-      Finish: Point<length> }
-
-[<Struct>]
-type SegmentSubpathOverlapPiece =
-    { SubpathSegmentIndex: int
-      Correspondence: SegmentOverlap }
-
-[<Struct>]
-type SegmentSubpathOverlap =
-    { Start: Point<length>
-      Finish: Point<length>
-      Pieces: SegmentSubpathOverlapPiece list }
-
-[<Struct>]
-type SubpathOverlapPiece =
-    { LeftSegmentIndex: int
-      RightSegmentIndex: int
-      Correspondence: SegmentOverlap }
-
-[<Struct>]
-type SubpathOverlap =
-    { Start: Point<length>
-      Finish: Point<length>
-      Pieces: SubpathOverlapPiece list }
-
-[<Struct>]
-type PathOverlap =
-    { LeftSubpathIndex: int
-      RightSubpathIndex: int
-      Correspondence: SubpathOverlap }
-
 /// Parametric overlap detection between SVG segments and paths.
 [<RequireQualifiedAccess>]
 module Overlaps =
+
+    [<Struct>]
+    type SegmentOverlap =
+        { LeftFrom: float<parameter>
+          LeftTo: float<parameter>
+          RightFrom: float<parameter>
+          RightTo: float<parameter>
+          Start: Point<length>
+          Finish: Point<length> }
+
+    [<Struct>]
+    type SegmentSubpathOverlapPiece =
+        { SubpathSegmentIndex: int
+          Correspondence: SegmentOverlap }
+
+    [<Struct>]
+    type SegmentSubpathOverlap =
+        { Start: Point<length>
+          Finish: Point<length>
+          Pieces: SegmentSubpathOverlapPiece list }
+
+    [<Struct>]
+    type SubpathOverlapPiece =
+        { LeftSegmentIndex: int
+          RightSegmentIndex: int
+          Correspondence: SegmentOverlap }
+
+    [<Struct>]
+    type SubpathOverlap =
+        { Start: Point<length>
+          Finish: Point<length>
+          Pieces: SubpathOverlapPiece list }
+
+    [<Struct>]
+    type PathOverlap =
+        { LeftSubpathIndex: int
+          RightSubpathIndex: int
+          Correspondence: SubpathOverlap }
+
     let defaultTolerance = 1.0e-9<length>
     let private parameterTolerance = 1.0e-9<parameter>
 

@@ -1,44 +1,45 @@
 namespace SvgPath
 
-type EllipsePoint = Point<length>
-
-[<Struct>]
-type EllipseBoundingBox =
-    { Min: EllipsePoint
-      Max: EllipsePoint }
-
-[<Struct>]
-type EndpointArcData =
-    { Start: EllipsePoint
-      Radius: EllipsePoint
-      XAxisRotation: float<degree>
-      LargeArc: bool
-      Sweep: bool
-      End: EllipsePoint }
-
-[<Struct>]
-type CenterArcData =
-    { Center: EllipsePoint
-      Radius: EllipsePoint
-      XAxisRotation: float<degree>
-      StartAngle: float<degree>
-      DeltaAngle: float<degree> }
-
-[<Struct>]
-type EllipseCubic =
-    { Start: EllipsePoint
-      Control1: EllipsePoint
-      Control2: EllipsePoint
-      End: EllipsePoint }
-
-type EllipseError =
-    | DegenerateInputArc
-    | NotCollapsedToLine
-    | SplitOutsideArc
-
 /// SVG elliptical-arc conversion, evaluation, and geometric queries.
 [<RequireQualifiedAccess>]
 module Ellipse =
+
+    type EllipsePoint = Point<length>
+
+    [<Struct>]
+    type BoundingBox =
+        { Min: EllipsePoint
+          Max: EllipsePoint }
+
+    [<Struct>]
+    type EndpointArcData =
+        { Start: EllipsePoint
+          Radius: EllipsePoint
+          XAxisRotation: float<degree>
+          LargeArc: bool
+          Sweep: bool
+          End: EllipsePoint }
+
+    [<Struct>]
+    type CenterArcData =
+        { Center: EllipsePoint
+          Radius: EllipsePoint
+          XAxisRotation: float<degree>
+          StartAngle: float<degree>
+          DeltaAngle: float<degree> }
+
+    [<Struct>]
+    type Cubic =
+        { Start: EllipsePoint
+          Control1: EllipsePoint
+          Control2: EllipsePoint
+          End: EllipsePoint }
+
+    type Error =
+        | DegenerateInputArc
+        | NotCollapsedToLine
+        | SplitOutsideArc
+
     let private scalarTolerance = 1.0e-9
     let private parameterTolerance = 1.0e-9<parameter>
     let private degreeTolerance = 1.0e-9<degree>
@@ -152,7 +153,7 @@ module Ellipse =
         largeArc
         sweep
         (endPoint: EllipsePoint)
-        : Result<CenterArcData, EllipseError> =
+        : Result<CenterArcData, Error> =
         let rx = abs radius.X
         let ry = abs radius.Y
         let coincident = InternalNumber.isZero(startPoint.X-endPoint.X) && InternalNumber.isZero(startPoint.Y-endPoint.Y)

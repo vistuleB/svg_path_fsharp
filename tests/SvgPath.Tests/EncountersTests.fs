@@ -9,7 +9,7 @@ module EncountersTests =
     let private p value = Parameter.fromFloat value
     let private parameterInside value first second = value >= min first second && value <= max first second
 
-    let private segmentIntersectionIsValid left right (intersection: SegmentIntersection) tolerance =
+    let private segmentIntersectionIsValid left right (intersection: Intersections.SegmentIntersection) tolerance =
         if tolerance < 0.0<length> || not (parameterInside intersection.LeftT (p 0.0) (p 1.0))
            || not (parameterInside intersection.RightT (p 0.0) (p 1.0)) then false
         else
@@ -17,7 +17,7 @@ module EncountersTests =
             let rightPoint = Segment.point right intersection.RightT |> Result.defaultWith (failwithf "%A")
             Point.near tolerance leftPoint intersection.Point && Point.near tolerance rightPoint intersection.Point
 
-    let private segmentOverlapIsValid left right (overlap: SegmentOverlap) tolerance =
+    let private segmentOverlapIsValid left right (overlap: Overlaps.SegmentOverlap) tolerance =
         if tolerance < 0.0<length> || overlap.LeftFrom < p 0.0 || overlap.LeftTo > p 1.0
            || overlap.RightFrom < p 0.0 || overlap.RightFrom > p 1.0
            || overlap.RightTo < p 0.0 || overlap.RightTo > p 1.0
@@ -31,11 +31,11 @@ module EncountersTests =
                 let rightPoint = Segment.point right rightT |> Result.defaultWith (failwithf "%A")
                 Point.near tolerance leftPoint rightPoint)
 
-    let private intersectionContainedInOverlap (intersection: SegmentIntersection) (overlap: SegmentOverlap) =
+    let private intersectionContainedInOverlap (intersection: Intersections.SegmentIntersection) (overlap: Overlaps.SegmentOverlap) =
         parameterInside intersection.LeftT overlap.LeftFrom overlap.LeftTo
         && parameterInside intersection.RightT overlap.RightFrom overlap.RightTo
 
-    let private intersectionConflictsWithOverlap (intersection: SegmentIntersection) (overlap: SegmentOverlap) =
+    let private intersectionConflictsWithOverlap (intersection: Intersections.SegmentIntersection) (overlap: Overlaps.SegmentOverlap) =
         let leftInside = parameterInside intersection.LeftT overlap.LeftFrom overlap.LeftTo
         let rightInside = parameterInside intersection.RightT overlap.RightFrom overlap.RightTo
         if leftInside <> rightInside then true
@@ -55,7 +55,7 @@ module EncountersTests =
     let private at index value: SubpathParameter = { SegmentIndex = index; T = p value }
 
     let private filterRemovesParameterPair leftParameter rightParameter left right overlaps tolerance =
-        let intersection: SubpathIntersection =
+        let intersection: Intersections.SubpathIntersection =
             { Point = point 0.0<length> 0.0<length>
               LeftParameters = [ leftParameter ]
               RightParameters = [ rightParameter ] }
@@ -63,7 +63,7 @@ module EncountersTests =
         Encounters.filterFullyOverlapExplainedSubpathIntersectionParameters found left right tolerance
         |> Result.map (fun filtered -> List.isEmpty filtered.Intersections)
 
-    let private segmentSubpathOverlapIsValid segment (subpathValue: Subpath) (overlap: SegmentSubpathOverlap) tolerance =
+    let private segmentSubpathOverlapIsValid segment (subpathValue: Subpath) (overlap: Overlaps.SegmentSubpathOverlap) tolerance =
         not (List.isEmpty overlap.Pieces)
         && overlap.Pieces
            |> List.forall (fun piece ->
@@ -78,15 +78,15 @@ module EncountersTests =
             point -0.5416666666666666<length> -0.3333333333333333<length>,
             point 0.1875<length> 0.0<length>)
 
-    let private segmentOverlap fromValue toValue: SegmentOverlap =
+    let private segmentOverlap fromValue toValue: Overlaps.SegmentOverlap =
         { Start = point (fromValue * 10.0<length>) 0.0<length>
           Finish = point (toValue * 10.0<length>) 0.0<length>
           LeftFrom = p fromValue; LeftTo = p toValue
           RightFrom = p fromValue; RightTo = p toValue }
 
-    let private intersectionAt value: SegmentIntersection =
-        { Point = point (value * 10.0<length>) 0.0<length>
-          LeftT = p value; RightT = p value }
+    let private intersectionAt value: Intersections.SegmentIntersection =
+        ({ Point = point (value * 10.0<length>) 0.0<length>
+           LeftT = p value; RightT = p value }: Intersections.SegmentIntersection)
 
     [<Fact>]
     let ``disjoint segments have no encounters`` () =
@@ -133,7 +133,7 @@ module EncountersTests =
     [<Fact>]
     let ``overlapping segments still validate intersection options`` () =
         let segment = line 0.0<length> 0.0<length> 10.0<length> 0.0<length>
-        let options = { Intersections.defaultOptions with MaxDepth = 0; ParameterSnap = NoParameterSnap }
+        let options = { Intersections.defaultOptions with MaxDepth = 0; ParameterSnap = Intersections.NoParameterSnap }
         Assert.Equal(Error(InvalidIntersectionMaxDepth 0), Encounters.segmentWith segment segment options)
 
     [<Fact>]
@@ -148,7 +148,7 @@ module EncountersTests =
 
     [<Fact>]
     let ``overlap validator rejects out of range parameters`` () =
-        let invalid: SegmentOverlap =
+        let invalid: Overlaps.SegmentOverlap =
             { LeftFrom = p -0.1; LeftTo = p 1.0; RightFrom = p 0.0; RightTo = p 1.0
               Start = point 0.0<length> 0.0<length>; Finish = point 10.0<length> 0.0<length> }
         let segment = line 0.0<length> 0.0<length> 10.0<length> 0.0<length>
@@ -158,18 +158,18 @@ module EncountersTests =
     let ``overlap validator rejects noncoincident interiors`` () =
         let left = line 0.0<length> 0.0<length> 10.0<length> 0.0<length>
         let right = QuadraticBezier(point 0.0<length> 0.0<length>, point 5.0<length> 5.0<length>, point 10.0<length> 0.0<length>)
-        let invalid: SegmentOverlap =
+        let invalid: Overlaps.SegmentOverlap =
             { LeftFrom = p 0.0; LeftTo = p 1.0; RightFrom = p 0.0; RightTo = p 1.0
               Start = point 0.0<length> 0.0<length>; Finish = point 10.0<length> 0.0<length> }
         Assert.False(segmentOverlapIsValid left right invalid 1.0e-9<length>)
 
     [<Fact>]
     let ``encounter validator reports intersection contained in overlap`` () =
-        let overlap: SegmentOverlap =
+        let overlap: Overlaps.SegmentOverlap =
             { LeftFrom = p 0.0; LeftTo = p 1.0; RightFrom = p 1.0; RightTo = p 0.0
               Start = point 0.0<length> 0.0<length>; Finish = point 10.0<length> 0.0<length> }
-        let intersection: SegmentIntersection =
-            { LeftT = p 0.5; RightT = p 0.5; Point = point 5.0<length> 0.0<length> }
+        let intersection: Intersections.SegmentIntersection =
+            ({ LeftT = p 0.5; RightT = p 0.5; Point = point 5.0<length> 0.0<length> }: Intersections.SegmentIntersection)
         Assert.True(intersectionContainedInOverlap intersection overlap)
         let segment = line 0.0<length> 0.0<length> 10.0<length> 0.0<length>
         let found = { Overlaps = [ overlap ]; Intersections = [ intersection ] }
@@ -180,7 +180,7 @@ module EncountersTests =
         let left = line 0.0<length> 0.0<length> 10.0<length> 10.0<length>
         let right = line 0.0<length> 10.0<length> 10.0<length> 0.0<length>
         let recorded = point 6.0<length> 5.0<length>
-        let invalid = { LeftT = p 0.5; RightT = p 0.5; Point = recorded }
+        let invalid = ({ LeftT = p 0.5; RightT = p 0.5; Point = recorded }: Intersections.SegmentIntersection)
         Assert.False(segmentIntersectionIsValid left right invalid 1.0e-9<length>)
 
     [<Fact>]
@@ -273,7 +273,7 @@ module EncountersTests =
         let left = subpath [ line 0.0<length> 0.0<length> 10.0<length> 0.0<length> ]
         let right = subpath [ line 2.0<length> 0.0<length> 8.0<length> 0.0<length> ]
         let overlaps = Overlaps.subpath left right |> Result.defaultWith (failwithf "%A")
-        let intersection: SubpathIntersection =
+        let intersection: Intersections.SubpathIntersection =
             { Point = point 5.0<length> 0.0<length>
               LeftParameters = [ at 0 0.5 ]
               RightParameters = [ at 0 0.5 ] }
@@ -287,7 +287,7 @@ module EncountersTests =
     [<Fact>]
     let ``empty filtered encounters still validate tolerance`` () =
         let value = subpath [ line 0.0<length> 0.0<length> 10.0<length> 0.0<length> ]
-        let found: Encounters<SubpathOverlap, SubpathIntersection> = { Overlaps = []; Intersections = [] }
+        let found: Encounters<Overlaps.SubpathOverlap, Intersections.SubpathIntersection> = { Overlaps = []; Intersections = [] }
         Assert.Equal(
             Error(InvalidIntersectionTolerance 0.0<length>),
             Encounters.filterFullyOverlapExplainedSubpathIntersectionParameters found value value 0.0<length>)
@@ -300,7 +300,7 @@ module EncountersTests =
         let complementaryLeft = at 0 0.5
         let nonComplementaryLeft = at 0 0.8
         let rightParameter = at 0 0.5
-        let found: Encounters<SubpathOverlap, SubpathIntersection> =
+        let found: Encounters<Overlaps.SubpathOverlap, Intersections.SubpathIntersection> =
             { Overlaps = overlaps
               Intersections =
                 [ { Point = point 5.0<length> 0.0<length>
@@ -370,13 +370,13 @@ module EncountersTests =
     let ``higher level overlap validators reject invalid segment index`` () =
         let segment = line 0.0<length> 0.0<length> 10.0<length> 0.0<length>
         let subpathValue = subpath [ segment; line 10.0<length> 0.0<length> 20.0<length> 0.0<length> ]
-        let correspondence: SegmentOverlap =
+        let correspondence: Overlaps.SegmentOverlap =
             { LeftFrom = p 0.0; LeftTo = p 1.0; RightFrom = p 0.0; RightTo = p 1.0
               Start = point 0.0<length> 0.0<length>; Finish = point 10.0<length> 0.0<length> }
-        let invalid: SegmentSubpathOverlap =
+        let invalid: Overlaps.SegmentSubpathOverlap =
             { Start = point 0.0<length> 0.0<length>
               Finish = point 10.0<length> 0.0<length>
-              Pieces = [ { SubpathSegmentIndex = 99; Correspondence = correspondence } ] }
+              Pieces = [ ({ SubpathSegmentIndex = 99; Correspondence = correspondence }: Overlaps.SegmentSubpathOverlapPiece) ] }
         Assert.False(segmentSubpathOverlapIsValid segment subpathValue invalid 1.0e-9<length>)
 
     [<Fact>]
@@ -430,11 +430,11 @@ module EncountersTests =
     let ``one sided overlap containment is flagged fixture`` () =
         let whole = selfCrossingCubic ()
         let branch = Segment.betweenInside whole (p 0.1) (p 0.5) |> Result.defaultWith (failwithf "%A")
-        let overlap: SegmentOverlap =
+        let overlap: Overlaps.SegmentOverlap =
             { Start = Segment.start branch; Finish = Segment.finish branch
               LeftFrom = p 0.1; LeftTo = p 0.5; RightFrom = p 0.0; RightTo = p 1.0 }
         let crossing = Segment.point whole (p 0.75) |> Result.defaultWith (failwithf "%A")
-        let intersection: SegmentIntersection = { Point = crossing; LeftT = p 0.75; RightT = p 0.375 }
+        let intersection: Intersections.SegmentIntersection = ({ Point = crossing; LeftT = p 0.75; RightT = p 0.375 }: Intersections.SegmentIntersection)
         Assert.True(segmentOverlapIsValid whole branch overlap 1.0e-6<length>)
         Assert.True(segmentIntersectionIsValid whole branch intersection 1.0e-6<length>)
         Assert.False(parameterInside intersection.LeftT overlap.LeftFrom overlap.LeftTo)

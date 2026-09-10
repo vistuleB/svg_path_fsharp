@@ -17,7 +17,7 @@ let ``point inspection preserves scientific exponents`` () =
 
 [<Fact>]
 let ``point padding measures scientific significands`` () =
-    let options = Inspect.defaultOptions () |> Inspect.withLeftPadding (LeftPadding(4, Zero))
+    let options = Inspect.defaultOptions () |> Inspect.withLeftPadding (NumberFormat.LeftPadding(4, NumberFormat.Zero))
     Assert.Equal("0001e20,0002", Inspect.pointWith (point 1.0e20 2.0) options)
 
 [<Fact>]
@@ -51,24 +51,24 @@ let ``segment inspects with decimal options`` () =
 
 [<Fact>]
 let ``segment inspects with auto left padding`` () =
-    let options = Inspect.fixedDecimalOptions 1 |> Inspect.withLeftPadding (AutoLeftPadding Zero)
+    let options = Inspect.fixedDecimalOptions 1 |> Inspect.withLeftPadding (NumberFormat.AutoLeftPadding NumberFormat.Zero)
     Assert.Equal("Line(start=000.0,-05.0 end=120.0,010.0)", Inspect.segmentWith (Line(point 0.0 -5.0, point 120.0 10.0)) options)
 
 [<Fact>]
 let ``point inspects with explicit left padding`` () =
-    let options = Inspect.fixedDecimalOptions 1 |> Inspect.withLeftPadding (LeftPadding(4, Zero))
+    let options = Inspect.fixedDecimalOptions 1 |> Inspect.withLeftPadding (NumberFormat.LeftPadding(4, NumberFormat.Zero))
     Assert.Equal("0002.0,-003.0", Inspect.pointWith (point 2.0 -3.0) options)
 
 [<Fact>]
 let ``point inspects with space left padding`` () =
-    let options = Inspect.fixedDecimalOptions 1 |> Inspect.withLeftPadding (LeftPadding(4, Space))
+    let options = Inspect.fixedDecimalOptions 1 |> Inspect.withLeftPadding (NumberFormat.LeftPadding(4, NumberFormat.Space))
     Assert.Equal("   2.0,  -3.0", Inspect.pointWith (point 2.0 -3.0) options)
 
 [<Fact>]
 let ``curve and arc segments inspect named fields`` () =
     let quadratic = QuadraticBezier(point 0.0 0.0, point 5.0 10.0, point 12.0 10.0)
     let cubic = CubicBezier(point 0.0 0.0, point 2.0 4.0, point 6.0 8.0, point 10.0 12.0)
-    let arc = Arc { Start = point 0.0 0.0; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = point 20.0 0.0 }
+    let arc = Arc ({ Start = point 0.0 0.0; Radius = point 5.0 8.0; XAxisRotation = 45.0<degree>; LargeArc = true; Sweep = false; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
     Assert.Equal("QuadraticBezier(start=0,0 control=5,10 end=12,10)", Inspect.segment quadratic)
     Assert.Equal("CubicBezier(start=0,0 control1=2,4 control2=6,8 end=10,12)", Inspect.segment cubic)
     Assert.Equal("Arc(start=0,0 radius=5,8 x_axis_rotation=45 large_arc=true sweep=false end=20,0)", Inspect.segment arc)
@@ -120,5 +120,5 @@ let ``code inspection respects decimal options`` () =
 [<Fact>]
 let ``code inspection respects auto left padding`` () =
     let value = subpath [ Line(point 0.0 -5.0, point 120.0 10.0); Line(point 120.0 10.0, point 2.0 -30.0) ] |> Path.singleton
-    let options = Inspect.fixedDecimalOptions 1 |> Inspect.withLeftPadding (AutoLeftPadding Zero)
+    let options = Inspect.fixedDecimalOptions 1 |> Inspect.withLeftPadding (NumberFormat.AutoLeftPadding NumberFormat.Zero)
     Assert.Equal("Path.ofSubpaths [\n  Subpath.create [\n    Line(Point.create (000.0<length>) (-05.0<length>), Point.create (120.0<length>) (010.0<length>));\n    Line(Point.create (120.0<length>) (010.0<length>), Point.create (002.0<length>) (-30.0<length>))\n  ]\n  |> Result.defaultWith (failwithf \"%A\")\n]", Inspect.pathCodeWith value options)

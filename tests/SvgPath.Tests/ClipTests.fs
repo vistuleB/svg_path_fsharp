@@ -144,8 +144,8 @@ module ClipTests =
     let ``closed circle clips to open arc fragments`` () =
         let input =
             Subpath.create
-                [ Arc { Start = point 10.0<length> 0.0<length>; Radius = point 10.0<length> 10.0<length>; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point -10.0<length> 0.0<length> }
-                  Arc { Start = point -10.0<length> 0.0<length>; Radius = point 10.0<length> 10.0<length>; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 10.0<length> 0.0<length> } ]
+                [ Arc ({ Start = point 10.0<length> 0.0<length>; Radius = point 10.0<length> 10.0<length>; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point -10.0<length> 0.0<length> }: Ellipse.EndpointArcData)
+                  Arc ({ Start = point -10.0<length> 0.0<length>; Radius = point 10.0<length> 10.0<length>; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 10.0<length> 0.0<length> }: Ellipse.EndpointArcData) ]
             |> Result.bind (Subpath.setClosed true)
             |> Result.defaultWith (failwithf "%A")
         let clipped =

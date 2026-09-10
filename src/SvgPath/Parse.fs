@@ -1,40 +1,41 @@
 namespace SvgPath
 
-open System
-open System.Globalization
-
-type PathParseErrorReason =
-    | ParsedPathError of error: SegmentError
-    | ExpectedArcFlag
-    | ExpectedCommand
-    | ExpectedMove
-    | ExpectedNumber
-    | InvalidNumber of token: string
-    | InvalidSeparator
-    | UnsupportedCommand of command: string
-
-type PathParseError =
-    | ParseError of reason: PathParseErrorReason * remaining: string
-
-type private PathToken =
-    | Command of char * at: int
-    | Number of float * at: int
-
-[<Struct>]
-type private ParseState =
-    { Subpaths: Subpath list
-      Subpath: Subpath
-      Current: Point<length>
-      HasCurrent: bool
-      Active: bool
-      LastCubicControl: Point<length> option
-      LastQuadraticControl: Point<length> option
-      At: int
-      EndAt: int }
-
 /// Parsing of SVG path-data strings.
 [<RequireQualifiedAccess>]
 module Parse =
+
+    open System
+    open System.Globalization
+
+    type ErrorReason =
+        | ParsedPathError of error: SegmentError
+        | ExpectedArcFlag
+        | ExpectedCommand
+        | ExpectedMove
+        | ExpectedNumber
+        | InvalidNumber of token: string
+        | InvalidSeparator
+        | UnsupportedCommand of command: string
+
+    type Error =
+        | ParseError of reason: ErrorReason * remaining: string
+
+    type private PathToken =
+        | Command of char * at: int
+        | Number of float * at: int
+
+    [<Struct>]
+    type private ParseState =
+        { Subpaths: Subpath list
+          Subpath: Subpath
+          Current: Point<length>
+          HasCurrent: bool
+          Active: bool
+          LastCubicControl: Point<length> option
+          LastQuadraticControl: Point<length> option
+          At: int
+          EndAt: int }
+
     let private supportedCommand character =
         match character with
         | 'M' | 'm' | 'L' | 'l' | 'Q' | 'q' | 'T' | 't'
@@ -176,7 +177,7 @@ module Parse =
                     |> Result.map (fun sweepValue -> radiusX, radiusY, rotation, large, sweepValue, endX, endY, rest))
             | _ -> Error(expectedNumber state tokens))
 
-    let rec private parseTokens tokens state : Result<Path, PathParseErrorReason * int> =
+    let rec private parseTokens tokens state : Result<Path, ErrorReason * int> =
         match tokens with
         | [] -> Ok(Path.ofSubpaths (state |> finishActive |> _.Subpaths |> List.rev))
         | Number(_, at) :: _ -> Error(ExpectedCommand, at)

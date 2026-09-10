@@ -8,6 +8,14 @@ let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap x = Result.defaultWith (failwithf "%A") x
 
 [<Fact>]
+let ``negative zero sizes disable rendering`` () =
+    Assert.Equal(Error DisabledRendering,BasicShapes.circle 0.0<length> 0.0<length> -0.0<length>)
+    Assert.Equal(Error DisabledRendering,BasicShapes.ellipse 0.0<length> 0.0<length> -0.0<length> 1.0<length>)
+    Assert.Equal(Error DisabledRendering,BasicShapes.ellipse 0.0<length> 0.0<length> 1.0<length> -0.0<length>)
+    Assert.Equal(Error DisabledRendering,BasicShapes.rect 0.0<length> 0.0<length> -0.0<length> 1.0<length> None None)
+    Assert.Equal(Error DisabledRendering,BasicShapes.rect 0.0<length> 0.0<length> 1.0<length> -0.0<length> None None)
+
+[<Fact>]
 let ``negative zero length returns exact start parameter`` () =
     let curve = QuadraticBezier(p 0. 0.,p 1. 1.,p 2. 0.)
     let subpath = Subpath.create [curve] |> unwrap

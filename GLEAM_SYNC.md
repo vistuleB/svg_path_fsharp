@@ -114,4 +114,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   zero signs. Subpath length lookup delegates to the same segment guard.
   Two source regressions added. `scripts/test-fast`: 1671 passed.
 
-Next: `e69b71b` (disabled zero-size primitive shapes).
+- `e69b71b` — either signed-zero primitive size disables rendering. One source
+  regression added. `scripts/test-fast`: 1672 passed.
+
+Next: `22b8376` (curvature signed-zero predicates).

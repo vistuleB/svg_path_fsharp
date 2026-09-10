@@ -45,7 +45,7 @@ module BasicShapes =
         (ry: float<length> option) =
         if width < 0.0<length> then Error(InvalidRectWidth width)
         elif height < 0.0<length> then Error(InvalidRectHeight height)
-        elif width = 0.0<length> || height = 0.0<length> then Error DisabledRendering
+        elif InternalNumber.isZero width || InternalNumber.isZero height then Error DisabledRendering
         else
             radii width height rx ry
             |> Result.bind (fun (rx, ry) ->
@@ -72,7 +72,7 @@ module BasicShapes =
     let ellipse cx cy rx ry =
         if rx < 0.0<length> then Error(InvalidEllipseRadiusX rx)
         elif ry < 0.0<length> then Error(InvalidEllipseRadiusY ry)
-        elif rx = 0.0<length> || ry = 0.0<length> then Error DisabledRendering
+        elif InternalNumber.isZero rx || InternalNumber.isZero ry then Error DisabledRendering
         else
             let startPoint = Point.create (cx + rx) cy
             let radius = Point.create rx ry
@@ -84,7 +84,7 @@ module BasicShapes =
 
     let circle cx cy radius =
         if radius < 0.0<length> then Error(InvalidCircleRadius radius)
-        elif radius = 0.0<length> then Error DisabledRendering
+        elif InternalNumber.isZero radius then Error DisabledRendering
         else ellipse cx cy radius radius
 
     let line x1 y1 x2 y2 =

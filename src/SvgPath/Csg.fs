@@ -1,6 +1,8 @@
 namespace SvgPath
 
 [<Struct>]
+/// Finite positive tolerances. MinimumChord is a historical name for the
+/// segment-length upper-bound threshold, not endpoint chord distance.
 type CsgOptions =
     { Tolerance: float<length>
       MinimumChord: float<length> }

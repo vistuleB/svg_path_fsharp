@@ -1,6 +1,10 @@
 namespace SvgPath
 
 /// One SVG path segment in user-space coordinates.
+/// SVG coordinates point right/down; angles are degrees. Parameters normally
+/// span 0..1, but evaluation/unchecked splitting permit extrapolation. Parameters
+/// are not arc-length fractions; use at-length helpers for traveled distances
+/// and directions for singularity-safe unit tangents.
 type Segment =
     | Line of startPoint: Point<length> * endPoint: Point<length>
     | QuadraticBezier of startPoint: Point<length> * control: Point<length> * endPoint: Point<length>

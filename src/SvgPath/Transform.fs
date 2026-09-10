@@ -29,6 +29,7 @@ module Transform =
     let translate = Affine.translate
     let scale = Affine.scale
     let scaleXY = Affine.scaleXY
+    /// Positive angles rotate visually clockwise in SVG's y-down coordinates.
     let rotate = Affine.rotate
     let skewX = Affine.skewX
     let skewY = Affine.skewY

@@ -1,6 +1,7 @@
 namespace SvgPath
 
 [<Struct>]
+/// A center and squared radius.
 type EnclosingCircle =
     { Center: Point<length>
       RadiusSquared: float<length^2> }
@@ -98,6 +99,7 @@ module SmallestEnclosingCircle =
             |> Some
 
     /// Return the deterministic smallest circle containing a non-empty point set.
+    /// Empty input returns an error; the final radius encloses all input points.
     let points samples =
         let samples = samples |> List.sortWith comparePoints |> List.distinct
         match samples with

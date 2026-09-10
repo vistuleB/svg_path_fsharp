@@ -205,6 +205,9 @@ type private ProjectionWindow =
       RemainingDepth: int }
 
 /// Intersections, closest-point pairs, projections, and ray crossings.
+/// General curve-pair search is bounded and heuristic: acceptable candidates
+/// need not represent distinct mathematical roots, nor certify completeness.
+/// Continuous overlaps are errors here; Encounters combines both query kinds.
 [<RequireQualifiedAccess>]
 module Intersections =
     let defaultOptions =
@@ -1121,6 +1124,8 @@ module Intersections =
                         let best = minima |> List.reduce closerMinimum
                         projectionAt left right best.LeftT best.RightT)))
 
+    /// Separate distance-minimization search, including nonintersecting curves.
+    /// Overlaps return a zero-distance pair; tied parameters need not be canonical.
     let segmentSegmentProjection left right =
         segmentSegmentProjectionWith left right defaultOptions
 

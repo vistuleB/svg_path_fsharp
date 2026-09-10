@@ -4,6 +4,7 @@ open System
 open System.Globalization
 
 [<RequireQualifiedAccess>]
+// Floating-point compatibility and numeric-text helpers; not geometric policies.
 module InternalNumber =
     /// Mathematical zero of either sign, without a tolerance. Unlike Erlang
     /// exact equality, .NET equality already equates positive and negative zero.

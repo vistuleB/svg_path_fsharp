@@ -110,7 +110,6 @@ type SingleOffsetTrimming =
 /// Trimming controls for a two-sided offset band.
 /// InnerCusps and OuterCusps independently trim reversed submerged runs before
 /// the sides are assembled. InBand applies the final band-wide trimming pass.
-/// Each cusp-trimming region uses Butt closures, independently of the final cap.
 type BandTrimming =
     { InnerCusps: bool
       OuterCusps: bool
@@ -657,6 +656,7 @@ module Offset =
     let private maximumRefinementGeneration = 5
     let private defaultMaxDepth = maximumRefinementGeneration
     let private defaultSamples = 10
+    /// Conventional miter-limit ratio for constructing Miter joins.
     let defaultMiterLimit = 4.0
     let inline private smallUnitDivisionTolerance<[<Measure>] 'Unit> () : float<'Unit> =
         LanguagePrimitives.FloatWithMeasure<'Unit> 1.0e-6
@@ -683,6 +683,7 @@ module Offset =
     let private defaultStalledOffsetDiameter = 0.01<length>
     let private adjacentLoopEndpointParameterTolerance = 1.0e-4<parameter>
 
+    /// Default cubic-fitting options for offset construction.
     let defaultFittingOptions =
         { Tolerance = defaultTolerance
           Samples = defaultSamples
@@ -3781,6 +3782,8 @@ module Offset =
         subpathUntrimmedWith subpath offset join defaultOptions
 
     /// Constructs synchronized untrimmed inner and outer offsets.
+    /// Returns separate uncapped sides, without side-local or final trimming.
+    /// Use subpathBandWith with trimming disabled for a capped band.
     let subpathBandUntrimmedWith subpath innerOffset outerOffset join options =
         validateOptions options
         |> Result.mapError publicError
@@ -3794,6 +3797,7 @@ module Offset =
         |> Result.map (fun build -> Path.ofSubpaths [ build.Inner; build.Outer ])
 
     /// Constructs synchronized untrimmed inner and outer offsets with default options.
+    /// These sides remain separate and uncapped.
     let subpathBandUntrimmed subpath innerOffset outerOffset join =
         subpathBandUntrimmedWith subpath innerOffset outerOffset join defaultOptions
 
@@ -3851,6 +3855,7 @@ module Offset =
         |> Result.map Path.ofSubpaths
 
     /// Constructs untrimmed bands for a path with default options.
+    /// Each subpath's synchronized pair is returned separately and uncapped.
     let pathBandUntrimmed path innerOffset outerOffset join =
         pathBandUntrimmedWith path innerOffset outerOffset join defaultOptions
 
@@ -5344,6 +5349,8 @@ module Offset =
     /// Constructs the trimmed region between two signed offsets of a subpath.
     /// Either offset ordering is accepted; exchanging them reverses the result.
     /// Caps close internal winding bands; disabling InBand exposes the capped outline.
+    /// Cusp trimming applies only to enabled sides. InBand controls the final
+    /// joint winding/parity pass; open bands retain caps when it is disabled.
     let subpathBandWith
         subpath innerOffset outerOffset join cap (options: Options) =
         validateOptions options
@@ -5393,6 +5400,8 @@ module Offset =
                 | _, Error error -> Error error))
 
     /// Constructs an offset band with default options.
+    /// Band between signed visual-left-normal offsets with default trimming.
+    /// Open sources receive caps; exchanging offsets reverses orientation.
     let subpathBand subpath innerOffset outerOffset join cap =
         subpathBandWith subpath innerOffset outerOffset join cap defaultOptions
 

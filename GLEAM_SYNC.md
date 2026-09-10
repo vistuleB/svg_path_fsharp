@@ -604,4 +604,11 @@ Do not substitute the final Gleam tree for the historical source commit.
   threshold and dual-face semantics aligned to source. Existing F# development
   commands already name the fast/slow/full/release profiles. Documentation only.
 
-Next: `a78128f` (package documentation).
+- `a78128f` — port current geometry contracts into F# docstrings/comments:
+  visual rotations, numerical root/intersection limits, arc conversion policy,
+  support-based normalization, capped/untrimmed bands, stroke overrides and
+  winding sampling. Gallery links its actual runner workflow. Gleam-specific
+  disabled-test paths do not apply to .NET trait-based test selection.
+  Documentation only; no additional tests run for this checkpoint.
+
+Next: `19d2949` (archive superseded notes).

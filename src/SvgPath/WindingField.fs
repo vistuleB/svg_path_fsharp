@@ -266,6 +266,7 @@ module internal WindingField =
                             | CalculatedBoundary -> BoundaryWinding
                             | CalculatedWinding(next, _) -> Winding(winding + next)))) (Ok(Winding 0)))
 
+    /// Visually clockwise loops contribute +1; counterclockwise loops contribute -1.
     let pathWinding point path = pathWindingWith point path defaultOptions
 
     let pathContainmentWith
@@ -322,6 +323,9 @@ module internal WindingField =
                 nonzeroLevelAt left path options
                 |> Result.bind (fun leftLevel -> nonzeroLevelAt right path options |> Result.map (fun rightLevel -> Some(leftLevel, rightLevel)))
 
+    // Sample visual left/right without certifying absence of intervening boundaries.
+    // Try midpoint first, then symmetric parameter pairs if its tangent is unavailable;
+    // those fallback samples must agree.
     let segmentSideNonzeroLevels
         (segment: Segment)
         (path: Path)

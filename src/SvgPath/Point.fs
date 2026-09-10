@@ -41,6 +41,7 @@ module Point =
             |> canonicalTurnEndpoint
 
     /// Return the clockwise aperture from one coordinate pair to another in [0, 360).
+    /// A zero vector is treated as pointing right when comparing headings.
     let clockwiseAperture (fromPoint: Point<'From>) (toPoint: Point<'To>) : float<degree> =
         let difference = Degree.toFloat (heading toPoint) - Degree.toFloat (heading fromPoint)
         Degree.fromFloat (if difference < 0.0 then difference + 360.0 else difference)

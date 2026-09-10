@@ -102,6 +102,8 @@ type ArrangementEdgeSourceImage =
 type ArrangementEdgeImage = { EdgeId: int; Sources: ArrangementEdgeSourceImage list }
 
 /// Detailed arrangement build for direct segment-list construction.
+/// An image may be empty when every refined piece's length upper bound falls
+/// below the historically named minimumChord threshold.
 type ArrangementSegmentBuild =
     { Graph: ArrangementGraph
       Segments: Segment list

@@ -10,6 +10,8 @@ type StrokeError =
 
 [<Struct>]
 /// Stroke width and technical offset settings; join and cap are operation arguments.
+/// Stroke overrides trimming: side cusp trimming is disabled, final in-band
+/// trimming enabled. Single-offset trimming options do not apply.
 type StrokeOptions =
     { Width: float<length>
       Offset: Options }

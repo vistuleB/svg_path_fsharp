@@ -1,5 +1,10 @@
 namespace SvgPath
 
+// Linear/quadratic roots are direct; higher degrees partition at recursively
+// solved derivative roots and bisect sign-changing windows. Fixed parameter
+// merging and coefficient-relative zero tests are numerical, not certificates
+// of algebraic multiplicity or completeness for ill-conditioned polynomials.
+
 type internal RepeatedRootPolicy =
     | ConsolidateRepeatedRoot
     | PreserveRepeatedRoot

@@ -56,6 +56,9 @@ module Effects =
         | DegeneracyPathError error -> EffectsPathError error
         | DegeneracyConvexHullError error -> EffectsConvexHullError error
 
+    /// Replace maximal thin windows through Degeneracy, preserving start/end
+    /// and both longitudinal support extrema in source order. Intermediate
+    /// local reversals need not survive.
     let normalizeDegenerateSegments subpath tolerance =
         Degeneracy.normalizeDegenerateSegments subpath tolerance
         |> Result.mapError degeneracyError

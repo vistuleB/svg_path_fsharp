@@ -109,6 +109,7 @@ module Ellipse =
 
     let arcPoint arc t = ellipsePoint arc (angleAtRaw arc t)
 
+    /// Derivative with respect to parameter progress, including parameter speed.
     let arcDerivative arc t : Point<length / parameter> =
         let degreesPerParameter =
             LanguagePrimitives.FloatWithMeasure<degree / parameter> (Degree.toFloat arc.DeltaAngle)
@@ -182,6 +183,9 @@ module Ellipse =
                   StartAngle = vectorAngle Point.right startVector
                   DeltaAngle = sweptDeltaAngle startVector endVector sweep }
 
+    /// Coincident endpoints or absolute radii at/below 1e-9 return
+    /// DegenerateInputArc. The radius cutoff is numerical policy; this does not
+    /// substitute SVG's straight-line fallback. Radii otherwise follow SVG correction.
     let endpointToCenter (data: EndpointArcData) =
         doEndpointToCenter data.Start data.Radius data.XAxisRotation data.LargeArc data.Sweep data.End
 

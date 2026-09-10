@@ -53,6 +53,7 @@ module Affine =
 
     let scaleXY x y = matrix x 0.0 0.0 y 0.0<length> 0.0<length>
 
+    /// Positive angles rotate visually clockwise in SVG's y-down coordinates.
     let rotate (degrees: float<degree>) =
         let cosine = Trig.cosDegrees degrees
         let sine = Trig.sinDegrees degrees

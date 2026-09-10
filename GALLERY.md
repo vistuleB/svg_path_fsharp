@@ -4,6 +4,8 @@ These figures parallel the Gleam Gallery, using the F# library and the same
 source geometry. Run `scripts/generate-gallery-figures` from this repository.
 The generator is a non-packable project under `tools/GalleryFigures`; it requires
 no neighboring Gleam checkout. Panel framing is computed from F# geometry bounds.
+Production arrangement capture and concurrent worker details are in
+[COMMIT_CYCLE.md](COMMIT_CYCLE.md).
 
 All twenty-nine figures are calculated by F#. The second-offset arrangement
 captures production calls in a diagnostic-only build; no alternate solver is used.

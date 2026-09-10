@@ -212,6 +212,8 @@ module Overlaps =
               T = piece.Correspondence.RightTo })
 
     let private exactEndpointAliases (first: SubpathParameter) (second: SubpathParameter) (subpath: Subpath) =
+        let first = { first with T=InternalNumber.normalizeZero first.T }
+        let second = { second with T=InternalNumber.normalizeZero second.T }
         let count = List.length subpath.Segments
         first = second
         || (first.T = 1.0<parameter>

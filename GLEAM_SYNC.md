@@ -158,4 +158,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   either zero sign in arc-radius guards. Source adds no tests.
   `scripts/test-fast`: 1674 passed.
 
-Next: `89a4617` (overlap endpoint alias normalization).
+- `89a4617` — canonical signed-zero overlap endpoint aliases; one source
+  regression added. `scripts/test-fast`: 1675 passed.
+
+Next: `838b78d` (boundary cubic self-intersections).

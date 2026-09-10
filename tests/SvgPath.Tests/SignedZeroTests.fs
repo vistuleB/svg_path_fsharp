@@ -8,6 +8,14 @@ let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap x = Result.defaultWith (failwithf "%A") x
 
 [<Fact>]
+let ``subpath overlap accepts negative zero endpoint alias`` () =
+    let left = Subpath.polyline [p 0. 0.;p 1. 0.;p 2. 0.] |> unwrap
+    let right = Subpath.polyline [p 0.5 0.;p 1. 0.] |> unwrap
+    let correspondence: SegmentOverlap = { LeftFrom=0.5<parameter>; LeftTo=1.0<parameter>; RightFrom=0.0<parameter>; RightTo=1.0<parameter>; Start=p 0.5 0.; Finish=p 1. 0. }
+    let overlap: SubpathOverlap = { Start=correspondence.Start; Finish=correspondence.Finish; Pieces=[{ LeftSegmentIndex=0; RightSegmentIndex=0; Correspondence=correspondence }] }
+    Assert.Equal(Ok(Some { SegmentIndex=0; T=1.0<parameter> }),Overlaps.subpathOverlapRightParameter overlap { SegmentIndex=1; T= -0.0<parameter> } left right)
+
+[<Fact>]
 let ``signed zero matrix entries do not add operations`` () =
     Assert.Equal("translate(0)",TransformSerialize.toString(Affine.fromTuple (1.0,-0.0,-0.0,1.0,-0.0<length>,-0.0<length>)))
     Assert.Equal("scale(2)",TransformSerialize.toString(Affine.fromTuple (2.0,-0.0,-0.0,2.0,-0.0<length>,-0.0<length>)))

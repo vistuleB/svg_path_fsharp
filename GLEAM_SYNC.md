@@ -120,4 +120,7 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `22b8376` — curvature and bisection zero predicates; one source regression
   added. `scripts/test-fast`: 1673 passed.
 
-Next: `7d735a0` (transform serialization zero entries).
+- `7d735a0` — canonical transform entries before compact serialization.
+  One source regression added. `scripts/test-fast`: 1674 passed.
+
+Next: `e5c1399` (Bezier zero predicates).

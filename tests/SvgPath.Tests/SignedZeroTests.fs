@@ -8,6 +8,12 @@ let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap x = Result.defaultWith (failwithf "%A") x
 
 [<Fact>]
+let ``signed zero matrix entries do not add operations`` () =
+    Assert.Equal("translate(0)",TransformSerialize.toString(Affine.fromTuple (1.0,-0.0,-0.0,1.0,-0.0<length>,-0.0<length>)))
+    Assert.Equal("scale(2)",TransformSerialize.toString(Affine.fromTuple (2.0,-0.0,-0.0,2.0,-0.0<length>,-0.0<length>)))
+    Assert.Equal("translate(10)",TransformSerialize.toString(Affine.translate 10.0<length> -0.0<length>))
+
+[<Fact>]
 let ``reversed line still has infinite radius`` () =
     let line = Line(p 1. 0.,p 0. 0.)
     Assert.Equal(Error InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadius line 0.5<parameter>)

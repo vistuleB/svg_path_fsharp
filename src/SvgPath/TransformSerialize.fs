@@ -144,6 +144,9 @@ module TransformSerialize =
 
     let toStringWith (transform: Affine) options =
         let a, b, c, d, e, f = Affine.toTuple transform
+        // Exact matrix-shape recognition must not depend on zero's sign.
+        let a,b,c,d = InternalNumber.normalizeZero a,InternalNumber.normalizeZero b,InternalNumber.normalizeZero c,InternalNumber.normalizeZero d
+        let e,f = InternalNumber.normalizeZero e,InternalNumber.normalizeZero f
         if options.ForceMatrix then
             matrixTransform a b c d e f options
         else

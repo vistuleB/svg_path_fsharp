@@ -294,4 +294,9 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `126e79c` — remove shared-endpoint intersection skipping. All three source
   regressions ported. `scripts/test-fast`: 1729 passed.
 
-Next: `8b43c68` (late self-intersection subdivision and length bounds).
+- `8b43c68` — use length bounds instead of chords for size filters; compare
+  same-source pieces; split self-intersections only after existing-edge checks,
+  reinserting both children with bounded subdivision depth. Four source
+  regressions ported. `scripts/test-fast`: 1733 passed.
+
+Next: `af898f9` (source intervals through graph subdivision).

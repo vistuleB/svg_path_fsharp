@@ -8,6 +8,34 @@ let private minimumChord = 0.00001<length>
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private line ax ay bx by = Line(point ax ay, point bx by)
 
+let private selfCrossingCubic () = CubicBezier(point 0. -0.09375,point (-1./3.) 0.13541666666666666,point (-1./3.) -0.13541666666666666,point 0. 0.09375)
+let private closedCubic () = CubicBezier(point 0. 0.,point 2. 2.,point -2. 2.,point 0. 0.)
+let private buildLoopFixture segments =
+    let build = Arrangement.buildWith segments 1e-9<length> 1e-8<length> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
+    Assert.True(build.Graph.Edges |> List.forall (fun edge -> edge.StartVertex<>edge.EndVertex))
+    build.Graph
+
+[<Fact>]
+let ``closed cubic is split instead of discarded`` () =
+    let graph = buildLoopFixture [closedCubic()]
+    Assert.Equal(2,List.length graph.Vertices)
+    Assert.Equal(2,List.length graph.Edges)
+[<Fact>]
+let ``self crossing cubic is noded and its loop preserved`` () =
+    let graph = buildLoopFixture [selfCrossingCubic()]
+    Assert.Equal(4,List.length graph.Vertices)
+    Assert.Equal(4,List.length graph.Edges)
+    Assert.True(graph.Vertices |> List.exists (fun vertex -> Point.distance vertex.Point (point -0.1875 0.)<1e-9<length>))
+[<Fact>]
+let ``preexisting cuts do not hide same source self crossing`` () =
+    let graph = buildLoopFixture [line -0.24 -1. -0.24 1.;selfCrossingCubic()]
+    Assert.True(graph.Vertices |> List.exists (fun vertex -> Point.distance vertex.Point (point -0.1875 0.)<1e-9<length>))
+[<Fact>]
+let ``externally cut closed cubic needs no extra midpoint`` () =
+    let graph = buildLoopFixture [line -2. 0.75 2. 0.75;closedCubic()]
+    Assert.Equal(5,List.length graph.Vertices)
+    Assert.Equal(6,List.length graph.Edges)
+
 [<Fact>]
 let ``shared endpoints do not hide an interior crossing`` () =
     let start,finish = point 0. 0.,point 1. 0.

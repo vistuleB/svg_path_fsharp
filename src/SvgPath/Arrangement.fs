@@ -15,6 +15,7 @@ type ArrangementVertex =
 
 [<Struct>]
 /// One atomic geometric edge, including directional source multiplicities.
+/// Its length upper bound is at least the legacy minimumChord size threshold.
 type ArrangementEdge =
     { Id: int
       Segment: Segment
@@ -99,9 +100,12 @@ type ArrangementSegmentBuild =
 type internal ArrangementInternalError =
     | InternalArrangementSegmentError of error: SegmentError
     | InternalNormalizationError
+    | InternalSelfIntersectionSubdivisionFailed of sourceIndex: int
     | InternalInvalidArrangementTolerance of tolerance: float<length>
+    /// Minimum length-upper-bound threshold must be positive.
     | InternalInvalidMinimumChord of minimumChord: float<length>
     | InternalInvalidEndpointSliverTolerance of tolerance: float<parameter>
+    /// Legacy chord label carries the segment length upper bound.
     | InternalSegmentTooShort of chord: float<length> * minimum: float<length>
     | InternalSegmentCollapsedToVertex of vertex: int
     | InternalLoopEdge of vertex: int
@@ -132,8 +136,10 @@ type internal ArrangementInternalError =
 type ArrangementError =
     | ArrangementSegmentError of error: SegmentError
     | InvalidArrangementTolerance of tolerance: float<length>
+    /// Minimum length-upper-bound threshold must be positive.
     | InvalidMinimumChord of minimumChord: float<length>
     | InvalidEndpointSliverTolerance of tolerance: float<parameter>
+    /// Legacy chord label carries the segment length upper bound.
     | SegmentTooShort of chord: float<length> * minimum: float<length>
     | ConstructionFailed
 
@@ -171,33 +177,38 @@ module Arrangement =
             let id = vertices |> List.fold (fun maximum vertex -> max maximum vertex.Id) -1 |> (+) 1
             vertices @ [ { Id = id; Point = point; EndpointSamples = [ point ] } ], id
 
+    let private segmentLengthBound segment =
+        Segment.lengthUpperBound segment |> Result.mapError InternalArrangementSegmentError
+
     let internal insertAtomicSegment (graph: ArrangementGraph) segment tolerance minimumChord =
         if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
         elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
-        elif Segment.chordLength segment < minimumChord then Error(InternalSegmentTooShort(Segment.chordLength segment, minimumChord))
         else
-            let vertices, startVertex = attachVertex tolerance (Segment.start segment) graph.Vertices
-            let vertices, endVertex = attachVertex tolerance (Segment.finish segment) vertices
-            if startVertex = endVertex then Error(InternalSegmentCollapsedToVertex startVertex)
+          segmentLengthBound segment |> Result.bind (fun size ->
+            if size < minimumChord then Error(InternalSegmentTooShort(size,minimumChord))
             else
-                let forward = graph.Edges |> List.tryFind (fun edge -> edge.StartVertex = startVertex && edge.EndVertex = endVertex && edge.Segment = segment)
-                let reverseSegment = Segment.reverse segment
-                let reverse = graph.Edges |> List.tryFind (fun edge -> edge.StartVertex = endVertex && edge.EndVertex = startVertex && edge.Segment = reverseSegment)
-                let edges =
+                let vertices, startVertex = attachVertex tolerance (Segment.start segment) graph.Vertices
+                let vertices, endVertex = attachVertex tolerance (Segment.finish segment) vertices
+                if startVertex = endVertex then Error(InternalSegmentCollapsedToVertex startVertex)
+                else
+                    let forward = graph.Edges |> List.tryFind (fun edge -> edge.StartVertex = startVertex && edge.EndVertex = endVertex && edge.Segment = segment)
+                    let reverseSegment = Segment.reverse segment
+                    let reverse = graph.Edges |> List.tryFind (fun edge -> edge.StartVertex = endVertex && edge.EndVertex = startVertex && edge.Segment = reverseSegment)
+                    let edges =
+                        match forward, reverse with
+                        | Some matching, _ -> graph.Edges |> List.map (fun edge -> if edge.Id = matching.Id then { edge with ForwardMultiplicity = edge.ForwardMultiplicity + 1 } else edge)
+                        | None, Some matching -> graph.Edges |> List.map (fun edge -> if edge.Id = matching.Id then { edge with ReverseMultiplicity = edge.ReverseMultiplicity + 1 } else edge)
+                        | None, None -> graph.Edges
                     match forward, reverse with
-                    | Some matching, _ -> graph.Edges |> List.map (fun edge -> if edge.Id = matching.Id then { edge with ForwardMultiplicity = edge.ForwardMultiplicity + 1 } else edge)
-                    | None, Some matching -> graph.Edges |> List.map (fun edge -> if edge.Id = matching.Id then { edge with ReverseMultiplicity = edge.ReverseMultiplicity + 1 } else edge)
-                    | None, None -> graph.Edges
-                match forward, reverse with
-                | None, None ->
-                    Segment.boundingBox segment
-                    |> Result.mapError InternalArrangementSegmentError
-                    |> Result.map (fun bounds ->
-                        let id = graph.Edges |> List.fold (fun maximum edge -> max maximum edge.Id) -1 |> (+) 1
-                        { Vertices = vertices
-                          Edges = edges @ [ { Id = id; Segment = segment; Bounds = bounds; StartVertex = startVertex; EndVertex = endVertex; ForwardMultiplicity = 1; ReverseMultiplicity = 0 } ]
-                          CyclicOrders = [] })
-                | _ -> Ok { Vertices = vertices; Edges = edges; CyclicOrders = [] }
+                    | None, None ->
+                        Segment.boundingBox segment
+                        |> Result.mapError InternalArrangementSegmentError
+                        |> Result.map (fun bounds ->
+                            let id = graph.Edges |> List.fold (fun maximum edge -> max maximum edge.Id) -1 |> (+) 1
+                            { Vertices = vertices
+                              Edges = edges @ [ { Id = id; Segment = segment; Bounds = bounds; StartVertex = startVertex; EndVertex = endVertex; ForwardMultiplicity = 1; ReverseMultiplicity = 0 } ]
+                              CyclicOrders = [] })
+                    | _ -> Ok { Vertices = vertices; Edges = edges; CyclicOrders = [] })
 
     // Checks edges and endpoint clusters, including closed-boundary degree parity.
     // This does not validate cyclic orders.
@@ -213,13 +224,16 @@ module Arrangement =
                     elif edge.StartVertex = edge.EndVertex then Some(InternalLoopEdge edge.StartVertex)
                     elif vertex edge.StartVertex |> Option.isNone then Some(InternalMissingArrangementVertex edge.StartVertex)
                     elif vertex edge.EndVertex |> Option.isNone then Some(InternalMissingArrangementVertex edge.EndVertex)
-                    elif Segment.chordLength edge.Segment < minimumChord then Some(InternalSegmentTooShort(Segment.chordLength edge.Segment, minimumChord))
                     else
                         let startDistance = Point.distance (Segment.start edge.Segment) (vertex edge.StartVertex).Value.Point
                         let endDistance = Point.distance (Segment.finish edge.Segment) (vertex edge.EndVertex).Value.Point
                         if startDistance > tolerance then Some(InternalEdgeEndpointMismatch(edge.Id, edge.StartVertex, startDistance))
                         elif endDistance > tolerance then Some(InternalEdgeEndpointMismatch(edge.Id, edge.EndVertex, endDistance))
-                        else None)
+                        else
+                            match segmentLengthBound edge.Segment with
+                            | Error error -> Some error
+                            | Ok size when size<minimumChord -> Some(InternalSegmentTooShort(size,minimumChord))
+                            | Ok _ -> None)
             match edgeError with
             | Some error -> Error error
             | None ->
@@ -414,6 +428,7 @@ module Arrangement =
           SegmentIndex: int
           SourceFrom: float<parameter>
           SourceTo: float<parameter>
+          SelfSplitDepth: int
           Segment: Segment }
 
     type private IncomingContext =
@@ -495,25 +510,23 @@ module Arrangement =
                             loop (if motion <= tolerance then distinct else first :: distinct) rest))
         loop [] parameters
 
-    let private parameterChordLongEnough segment fromParameter toParameter minimumChord =
-        Segment.point segment fromParameter
+    let private parameterLengthBoundLongEnough segment fromParameter toParameter minimumChord =
+        Segment.between segment fromParameter toParameter
         |> Result.mapError InternalArrangementSegmentError
-        |> Result.bind (fun startPoint ->
-            Segment.point segment toParameter
-            |> Result.mapError InternalArrangementSegmentError
-            |> Result.map (fun finishPoint -> Point.distance startPoint finishPoint >= minimumChord))
+        |> Result.bind segmentLengthBound
+        |> Result.map (fun size -> size>=minimumChord)
 
-    let private retainMinimumChordCuts segment parameters minimumChord =
+    let private retainMinimumLengthCuts segment parameters minimumChord =
         let replaceHead value = function | [] -> [ value ] | _ :: rest -> value :: rest
         let rec loop previous retained = function
             | [] -> Ok(List.rev retained)
             | [ last ] ->
-                parameterChordLongEnough segment previous last minimumChord
+                parameterLengthBoundLongEnough segment previous last minimumChord
                 |> Result.map (fun longEnough -> List.rev(if longEnough then last :: retained else replaceHead last retained))
             | candidate :: next :: rest ->
-                parameterChordLongEnough segment previous candidate minimumChord
+                parameterLengthBoundLongEnough segment previous candidate minimumChord
                 |> Result.bind (fun beforeLongEnough ->
-                    parameterChordLongEnough segment candidate next minimumChord
+                    parameterLengthBoundLongEnough segment candidate next minimumChord
                     |> Result.bind (fun afterLongEnough ->
                         if beforeLongEnough && afterLongEnough then loop candidate (candidate :: retained) (next :: rest)
                         else loop previous retained (next :: rest)))
@@ -522,11 +535,12 @@ module Arrangement =
         | start :: rest -> loop start [ start ] rest
 
     let private retainedSplitSegments minimumChord segments =
-        segments |> List.filter (fun segment -> Segment.chordLength segment >= minimumChord)
+        segments |> List.fold (fun state segment -> state |> Result.bind (fun retained ->
+            segmentLengthBound segment |> Result.map (fun size -> if size>=minimumChord then retained @ [segment] else retained))) (Ok [])
 
     let private effectiveCutParameters segment cuts tolerance minimumChord =
         distinctParameters segment tolerance (List.sort (0.0<parameter> :: 1.0<parameter> :: cuts))
-        |> Result.bind (fun parameters -> retainMinimumChordCuts segment parameters minimumChord)
+        |> Result.bind (fun parameters -> retainMinimumLengthCuts segment parameters minimumChord)
         |> Result.bind (fun parameters ->
             let interior =
                 match parameters with
@@ -537,7 +551,7 @@ module Arrangement =
             | _ ->
                 Segment.betweenManyInside segment (List.sort (0.0<parameter> :: 1.0<parameter> :: interior))
                 |> Result.mapError InternalArrangementSegmentError
-                |> Result.map (retainedSplitSegments minimumChord)
+                |> Result.bind (retainedSplitSegments minimumChord)
                 |> Result.map (fun retained -> if retained.Length >= 2 then interior else []))
 
     let private splitAtomicPiece (piece: AtomicPiece) (cuts: float<parameter> list) tolerance minimumChord =
@@ -545,25 +559,22 @@ module Arrangement =
         |> Result.bind (fun parameters ->
             Segment.betweenManyInside piece.Segment parameters
             |> Result.mapError InternalArrangementSegmentError
-            |> Result.map (fun segments ->
+            |> Result.bind (fun segments ->
                 List.zip segments (List.pairwise parameters)
-                |> List.choose (fun (segment, (fromParameter, toParameter)) ->
-                    if Segment.chordLength segment < minimumChord then None
+                |> List.fold (fun state (segment, (fromParameter, toParameter)) -> state |> Result.bind (fun pieces ->
+                  segmentLengthBound segment |> Result.map (fun size ->
+                    if size < minimumChord then pieces
                     else
                         let interpolate (left: float<parameter>) (right: float<parameter>) (t: float<parameter>) =
                             left + (right - left) * Parameter.ratio t
-                        Some
+                        pieces @ [
                             { piece with
                                 SourceFrom = interpolate piece.SourceFrom piece.SourceTo fromParameter
                                 SourceTo = interpolate piece.SourceFrom piece.SourceTo toParameter
-                                Segment = segment })))
+                                Segment = segment } ]))) (Ok [])))
 
     let private appendImageReference sourceIndex (reference: DirectedEdgeReference) (images: DirectedEdgeReference list list) =
         images |> List.mapi (fun index image -> if index = sourceIndex then image @ [ reference ] else image)
-
-    let private referencesContain edgeId (references: DirectedEdgeReference list) = references |> List.exists (fun reference -> reference.EdgeId = edgeId)
-    let private edgeIsImageOfSource sourceIndex edgeId (images: DirectedEdgeReference list list) =
-        images |> List.tryItem sourceIndex |> Option.exists (referencesContain edgeId)
 
     let private reverseReferences (references: DirectedEdgeReference list) =
         references |> List.rev |> List.map (fun reference -> { reference with Reversed = not reference.Reversed })
@@ -587,8 +598,8 @@ module Arrangement =
             |> Result.bind (fun parameters ->
                 Segment.betweenManyInside edge.Segment parameters
                 |> Result.mapError InternalArrangementSegmentError)
-            |> Result.bind (fun segments ->
-                let retained = retainedSplitSegments minimumChord segments
+            |> Result.bind (retainedSplitSegments minimumChord)
+            |> Result.bind (fun retained ->
                 match retained with
                 | [] -> Error(InternalSegmentTooShort(0.0<length>, minimumChord))
                 | _ ->
@@ -719,11 +730,10 @@ module Arrangement =
                 insertAtomicSegment graph context.Piece.Segment tolerance minimumChord
                 |> Result.map (fun next -> next, edgeId, false))
 
-    let private splitExistingEdgeAtEndpoint (context: IncomingContext) (graph: ArrangementGraph) (images: DirectedEdgeReference list list) endpoint tolerance minimumChord =
+    let private splitExistingEdgeAtEndpoint (graph: ArrangementGraph) (images: DirectedEdgeReference list list) endpoint tolerance minimumChord =
         let rec find (edges: ArrangementEdge list) =
             match edges with
             | [] -> Ok None
-            | edge :: rest when edgeIsImageOfSource context.Piece.SourceIndex edge.Id images -> find rest
             | edge :: rest when not (pointInExpandedBox endpoint edge.Bounds tolerance) -> find rest
             | edge :: rest ->
                 vertexProjectsToPieceInterior endpoint edge.Segment tolerance
@@ -737,10 +747,10 @@ module Arrangement =
         find graph.Edges
 
     let private splitExistingEdgeAtIncomingEndpoint (context: IncomingContext) (graph: ArrangementGraph) (images: DirectedEdgeReference list list) tolerance minimumChord =
-        splitExistingEdgeAtEndpoint context graph images (Segment.start context.Piece.Segment) tolerance minimumChord
+        splitExistingEdgeAtEndpoint graph images (Segment.start context.Piece.Segment) tolerance minimumChord
         |> Result.bind (function
             | Some result -> Ok(Some result)
-            | None -> splitExistingEdgeAtEndpoint context graph images (Segment.finish context.Piece.Segment) tolerance minimumChord)
+            | None -> splitExistingEdgeAtEndpoint graph images (Segment.finish context.Piece.Segment) tolerance minimumChord)
 
     let private progressiveCompareEdgeCuts (context: IncomingContext) (edge: ArrangementEdge) (graph: ArrangementGraph) (images: DirectedEdgeReference list list) existingCuts incomingCuts tolerance minimumChord =
         effectiveCutParameters edge.Segment existingCuts tolerance minimumChord
@@ -759,18 +769,41 @@ module Arrangement =
                             splitAtomicPiece context.Piece cuts tolerance minimumChord
                             |> Result.map (fun replacements -> ProgressiveReplaceIncoming(graph, images, replacements)))))
 
+    let private progressiveInsertDirect (context:IncomingContext) graph images tolerance minimumChord =
+        let piece = context.Piece
+        // Existing-edge comparisons are finished. Children re-enter ordinary
+        // insertion, which will discover their mutual non-endpoint intersections.
+        Intersections.segmentSelfWith piece.Segment {MinimumArcLengthSeparation=minimumChord;DistanceTolerance=tolerance/2.0}
+        |> Result.mapError InternalArrangementSegmentError
+        |> Result.bind (function
+            | hit::_ ->
+                let middle = hit.LeftT + (hit.RightT-hit.LeftT)/2.0
+                let sourceMiddle = piece.SourceFrom + (piece.SourceTo-piece.SourceFrom)*Parameter.ratio middle
+                if piece.SelfSplitDepth>=32 || not(middle>0.0<parameter> && middle<1.0<parameter>)
+                   || not(sourceMiddle>piece.SourceFrom && sourceMiddle<piece.SourceTo) then
+                    Error(InternalSelfIntersectionSubdivisionFailed piece.SourceIndex)
+                else
+                    Segment.split piece.Segment middle |> Result.mapError InternalArrangementSegmentError
+                    |> Result.bind (fun (left,right) ->
+                        let depth = piece.SelfSplitDepth+1
+                        [{piece with Segment=left;SourceTo=sourceMiddle;SelfSplitDepth=depth};{piece with Segment=right;SourceFrom=sourceMiddle;SelfSplitDepth=depth}]
+                        |> List.fold (fun state child -> state |> Result.bind (fun kept ->
+                            segmentLengthBound child.Segment |> Result.map (fun size -> if size>=minimumChord then kept @ [child] else kept))) (Ok [])
+                        |> Result.map (fun replacements -> ProgressivePieceReplaced(graph,images,replacements)))
+            | [] ->
+                insertCorrespondingPiece context graph tolerance minimumChord
+                |> Result.map (fun (graph,edgeId,reversed) ->
+                    let reference:DirectedEdgeReference = {EdgeId=edgeId;Reversed=reversed}
+                    ProgressivePieceInserted(graph,appendImageReference piece.SourceIndex reference images))
+                |> function
+                    | Error(InternalSegmentCollapsedToVertex _) | Error(InternalSegmentTooShort _) -> Ok(ProgressivePieceInserted(graph,images))
+                    | result -> result)
+
     let private progressiveCompareEdges (context: IncomingContext) (graph: ArrangementGraph) (images: DirectedEdgeReference list list) tolerance minimumChord endpointSliverTolerance =
         let rec compare graph images (edges: ArrangementEdge list) =
             match edges with
             | [] ->
-                insertCorrespondingPiece context graph tolerance minimumChord
-                |> Result.map (fun (graph, edgeId, reversed) ->
-                    let reference: DirectedEdgeReference = { EdgeId = edgeId; Reversed = reversed }
-                    ProgressivePieceInserted(graph, appendImageReference context.Piece.SourceIndex reference images))
-                |> function
-                    | Error(InternalSegmentCollapsedToVertex _) | Error(InternalSegmentTooShort _) -> Ok(ProgressivePieceInserted(graph, images))
-                    | result -> result
-            | edge :: rest when edgeIsImageOfSource context.Piece.SourceIndex edge.Id images -> compare graph images rest
+                progressiveInsertDirect context graph images tolerance minimumChord
             | edge :: rest when not (boundingBoxesOverlap context.Bounds edge.Bounds tolerance) -> compare graph images rest
             | edge :: rest ->
                 // Shared endpoint vertices do not exclude interior intersections.
@@ -809,17 +842,19 @@ module Arrangement =
 
     let private atomicPieces minimumChord (indexed: IndexedSegment list) =
         indexed
-        |> List.choose (fun source ->
-            if Segment.chordLength source.Segment < minimumChord then None
+        |> List.fold (fun state source -> state |> Result.bind (fun pieces ->
+          segmentLengthBound source.Segment |> Result.map (fun size ->
+            if size < minimumChord then pieces
             else
-                Some
+                pieces @ [
                     { SourceIndex = source.FlatIndex
                       PathIndex = source.PathIndex
                       SubpathIndex = source.SubpathIndex
                       SegmentIndex = source.SegmentIndex
                       SourceFrom = 0.0<parameter>
                       SourceTo = 1.0<parameter>
-                      Segment = source.Segment })
+                      SelfSplitDepth = 0
+                      Segment = source.Segment } ]))) (Ok [])
 
     let private sourceSegmentEdgeImage source (graph: ArrangementGraph) (reference: DirectedEdgeReference) =
         match graph.Edges |> List.tryFind (fun edge -> edge.Id = reference.EdgeId) with
@@ -962,6 +997,9 @@ module Arrangement =
         |> Result.bind (fun () -> certifySegmentImageGeometry graph segments segmentImages tolerance)
 
     /// Build directly from a flat segment list without source normalization.
+    /// Self-intersections are checked after existing edges. Split children
+    /// re-enter ordinary insertion. minimumChord filters by length upper bound,
+    /// so zero-chord loops are not discarded merely for coincident endpoints.
     let internal buildWith segments vertexTolerance minimumChord (endpointSliverTolerance: float<parameter>) =
         if vertexTolerance <= 0.0<length> || not (finite vertexTolerance) then Error(InternalInvalidArrangementTolerance vertexTolerance)
         elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
@@ -973,9 +1011,9 @@ module Arrangement =
                 |> List.indexed
                 |> List.map (fun (index, segment) ->
                     { FlatIndex = index; PathIndex = 0; SubpathIndex = 0; SegmentIndex = index; Segment = segment })
-            let pieces = atomicPieces minimumChord indexed
             let workingImages = List.replicate segments.Length []
-            progressiveInsertPieces pieces empty workingImages vertexTolerance minimumChord endpointSliverTolerance
+            atomicPieces minimumChord indexed
+            |> Result.bind (fun pieces -> progressiveInsertPieces pieces empty workingImages vertexTolerance minimumChord endpointSliverTolerance)
             |> Result.bind (fun (graph, workingImages) ->
                 buildSourceImages segments graph workingImages vertexTolerance
                 |> Result.bind (fun images ->

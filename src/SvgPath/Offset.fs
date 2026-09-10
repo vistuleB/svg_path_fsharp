@@ -746,7 +746,7 @@ module Offset =
         Segment.directions segment t
         |> Result.mapError InternalPathError
         |> Result.bind (fun directions ->
-            if t = 0.0<parameter> then requiredDirection t directions.Outgoing
+            if InternalNumber.isZero t then requiredDirection t directions.Outgoing
             elif t = 1.0<parameter> then requiredDirection t directions.Incoming
             else interiorUnitTangent t directions)
 
@@ -1770,14 +1770,14 @@ module Offset =
             else
                 let middle = (fromValue + toValue) / 2.0
                 let middleScore = score middle
-                if middleScore = 0.0 then middle
+                if InternalNumber.isZero middleScore then middle
                 elif fromScore * middleScore <= 0.0 then
                     loop fromValue middle fromScore (remaining - 1)
                 else loop middle toValue middleScore (remaining - 1)
         let fromScore = score fromValue
         let toScore = score toValue
-        if fromScore = 0.0 then Ok fromValue
-        elif toScore = 0.0 then Ok toValue
+        if InternalNumber.isZero fromScore then Ok fromValue
+        elif InternalNumber.isZero toScore then Ok toValue
         elif fromScore * toScore > 0.0 then Error InternalNonFinite
         else Ok(loop fromValue toValue fromScore iterations)
 
@@ -1906,7 +1906,7 @@ module Offset =
         if interiorDistance > 0.01<parameter> then Error(InternalDegenerateTangent endpointT)
         else
             let interiorT =
-                if endpointT = 0.0<parameter> then interiorDistance
+                if InternalNumber.isZero endpointT then interiorDistance
                 else 1.0<parameter> - interiorDistance
             match Curvature.segmentLeftNormalCurvature segment interiorT with
             | Ok curvature ->
@@ -1916,7 +1916,7 @@ module Offset =
                     segment tangent endpointT (interiorDistance * 10.0) offset
 
     let private offsetEndpointDirectionLimit segment tangent t offset =
-        if t = 0.0<parameter> || t = 1.0<parameter> then
+        if InternalNumber.isZero t || t = 1.0<parameter> then
             offsetEndpointDirectionLimitFromInterior
                 segment tangent t curvatureParameterTolerance offset
         else Error(InternalDegenerateTangent t)
@@ -1924,7 +1924,7 @@ module Offset =
     let private offsetDirection segment t offset =
         unitTangent segment t
         |> Result.bind (fun tangent ->
-            if offset = 0.0<length> then Ok tangent
+            if InternalNumber.isZero offset then Ok tangent
             else
                 match Curvature.segmentLeftNormalCurvature segment t with
                 | Ok curvature -> offsetDirectionFromCurvature tangent curvature offset t
@@ -1988,7 +1988,7 @@ module Offset =
 
     let private boundaryReachesOffsetRadius boundary offset =
         match boundary with
-        | ReversalBoundary(Some value) when value <> 0.0<1/length> ->
+        | ReversalBoundary(Some value) when not (InternalNumber.isZero value) ->
             let radius = 1.0 / value
             System.Double.IsFinite(float radius)
             && abs (radius - offset) <= curvatureRadiusTolerance
@@ -4950,7 +4950,7 @@ module Offset =
         offsetImages zeroImages arrangement dual offset
         (_options: Options)
         sourceSubpathIndex =
-        if not (Subpath.isClosed build.Subpath) || offset = 0.0<length> then
+        if not (Subpath.isClosed build.Subpath) || InternalNumber.isZero offset then
             Ok [ tracedSubpathFromI build.Culled sourceSubpathIndex ]
         else
             let barriers = segmentImageEdgeIds zeroImages []

@@ -7,6 +7,10 @@ open Xunit
 let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap x = Result.defaultWith (failwithf "%A") x
 
+[<Fact>]
+let ``negative zero endpoint has forward offset unit tangent`` () =
+    Assert.Equal(Ok(Point.create 1.0 0.0),Offset.unitTangent (Line(p 0. 0.,p 1. 0.)) -0.0<parameter>)
+
 let private zeroTestArc =
     { Center=p 0. 0.; Radius=p 1. 1.; XAxisRotation=0.0<degree>; StartAngle=0.0<degree>; DeltaAngle=360.0<degree> }
 [<Fact>]

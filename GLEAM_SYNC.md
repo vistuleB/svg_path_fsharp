@@ -106,4 +106,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `ac66040` — ellipse split parameter canonicalization and zero-direction
   predicates. Two source regressions added. `scripts/test-fast`: 1668 passed.
 
-Next: `5f6eddf` (offset signed-zero predicates).
+- `5f6eddf` — offset tangent, score, boundary, and offside predicates explicitly
+  accept either zero sign. One source regression added. `scripts/test-fast`:
+  1669 passed.
+
+Next: `a4a80c0` (zero length requests and scalar guards).

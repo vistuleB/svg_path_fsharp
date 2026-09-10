@@ -56,7 +56,7 @@ Run the canonical generator from the repository root:
 scripts/generate-readme-figures
 ```
 
-It regenerates the nine README figures in `docs/readme` from the F# fixtures in
+It regenerates the thirteen README figures in `docs/readme` from the F# fixtures in
 `tools/ReadmeFigures`. It does not promote them anywhere: the promotion step for
 NuGet rendering happens on the `markdown-assets` branch described below.
 

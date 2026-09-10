@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 - 2026-09-10
+
+- Aligned with Gleam `svg_path` v0.47.0 (`f543511`).
+- Breaking: Transform correspondence helpers now return `Transform.Error`,
+  preserving Affine errors and distinguishing invalid tolerance from failed
+  correspondence checks (with mapped point, target, and tolerance).
+- Internal quadratic solving supports arbitrary root units; Arcs radius
+  calculations no longer convert through curve parameters. Numerical solving
+  and existing curve-polynomial behavior are unchanged.
 
 - Added `Offset.InnerJoin` and the optional `Offset.Options.InnerJoin` override,
   matching Gleam's local inner-corner policy: Round for Round joins, Bevel for
@@ -17,6 +25,11 @@
   `71b05d1`, including their signed-offset fallback and clipping contracts.
 - Added the 23 corresponding regression tests one-to-one and four independently
   generated README comparison strips (`9789684`).
+- Added four independently generated Gallery overlays of historical SVG 2
+  join illustrations. README images are pinned to `assets-v0.7.0`.
+- Release verification: `scripts/test-release` passed 1,840 fast tests and
+  26 slow convex-hull tests; `scripts/generate-readme-figures --check` passed.
+  `scripts/generate-gallery-figures` regenerated all 33 figures successfully.
 
 ## 0.6.0
 

@@ -1,5 +1,20 @@
 # Gleam commit-by-commit synchronization
 
+## v0.47.0 release alignment
+
+- Gleam `1f6f732` → F# `10bdd06`: detailed Transform correspondence errors,
+  with corresponding regression tests.
+- Gleam `4f908a2`: InnerJoin implementation already ported in F# `a3179e1`.
+- Gleam `f543511`: release documentation and join Gallery fixtures are present
+  here; F# generates its own figures. The Erlang tracing tuple-index repair
+  does not apply to F#'s typed diagnostic capture.
+- F# `3926676`: unit-generic quadratic solver, with no numerical algorithm
+  change or required Gleam counterpart.
+
+Release verification is recorded in the v0.7.0 changelog and release commit.
+
+## Historical baseline
+
 Baseline: F# `c612b7b`, corresponding to Gleam `29ce1db` (curvature public
 diagnostics/docs). Work proceeds in `git log --reverse 29ce1db..a251698` order:
 109 source commits, followed by subsequent committed Gleam history as authorized.

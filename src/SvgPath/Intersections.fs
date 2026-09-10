@@ -403,18 +403,92 @@ module Intersections =
                         RightFrom = rightFrom
                         RightTo = rightFrom + rightThird
                         Depth = window.Depth - 1 } ]
+        |> List.filter (fun child ->
+            child.LeftFrom < child.LeftTo && child.RightFrom < child.RightTo
+            && (child.LeftFrom > window.LeftFrom || child.LeftTo < window.LeftTo
+                || child.RightFrom > window.RightFrom || child.RightTo < window.RightTo))
+
+    type private WindowBounds = BoundingBoxes | EnclosingPolygons
+    let private windowBounds = EnclosingPolygons
+
+    let rec private arcEnclosingPoints (arc: CenterArcData) (fromT: float<parameter>) (toT: float<parameter>) =
+        let middle = fromT + (toT - fromT) / 2.0
+        let span = arc.DeltaAngle * float (toT - fromT)
+        if abs span > 90.0<degree> then
+            arcEnclosingPoints arc fromT middle @ arcEnclosingPoints arc middle toT
+        else
+            let a = Ellipse.arcPoint arc fromT
+            let b = Ellipse.arcPoint arc toT
+            let m = Ellipse.arcPoint arc middle
+            let divisor = Trig.cosDegrees (span / 2.0)
+            [ a; b; Point.create (arc.Center.X + (m.X - arc.Center.X) / divisor)
+                                (arc.Center.Y + (m.Y - arc.Center.Y) / divisor) ]
+
+    // The points' convex hull encloses the portion; boundary ordering is unnecessary.
+    let private segmentEnclosingPoints segment fromT toT =
+        match segment with
+        | Arc arc -> Ellipse.endpointToCenter arc |> Result.mapError (fun _ -> DegenerateArc)
+                     |> Result.map (fun center -> arcEnclosingPoints center fromT toT)
+        | _ -> Segment.between segment fromT toT |> Result.bind (function
+                   | Line(a,b) -> Ok [a;b]
+                   | QuadraticBezier(a,b,c) -> Ok [a;b;c]
+                   | CubicBezier(a,b,c,d) -> Ok [a;b;c;d]
+                   | Arc _ -> Error DegenerateArc)
+
+    let rec private enclosingPointAxes (points: Point<length> list) =
+        match points with
+        | [] -> []
+        | a :: rest ->
+            List.fold (fun axes b ->
+                let dx = b.X - a.X
+                let dy = b.Y - a.Y
+                Point.create -dy dx :: Point.create dx dy :: axes) (enclosingPointAxes rest) rest
+
+    let private enclosingProjectionInterval (points: Point<length> list) (origin: Point<length>) (axis: Point<length>) =
+        let value (p: Point<length>) = (p.X - origin.X) * axis.X + (p.Y - origin.Y) * axis.Y
+        let initial = value (List.head points)
+        List.fold (fun (a,b) p -> let v = value p in min a v, max b v) (initial,initial) (List.tail points)
+
+    let private enclosingPointsDisjoint (left: Point<length> list) (right: Point<length> list) =
+        match left,right with
+        | [],_ | _,[] -> false
+        | origin :: _, _ ->
+            let scale = List.fold (fun scale (p: Point<length>) ->
+                max scale (max (max (abs p.X) (abs p.Y)) (max (abs (p.X-origin.X)) (abs (p.Y-origin.Y))))) 0.0<length> (left @ right)
+            let axes = Point.create 1.0<length> 0.0<length> :: Point.create 0.0<length> 1.0<length> :: (enclosingPointAxes left @ enclosingPointAxes right)
+            axes |> List.exists (fun axis ->
+                let a,b = enclosingProjectionInterval left origin axis
+                let c,d = enclosingProjectionInterval right origin axis
+                let margin = 1e-12 * scale * (abs axis.X + abs axis.Y)
+                b + margin < c || d + margin < a)
+
+    let private windowSegmentBoundingBox segment fromT toT =
+        match segment with
+        | Arc _ -> segmentEnclosingPoints segment fromT toT |> Result.map (fun points ->
+            let first = List.head points
+            List.fold (fun (box: BoundingBox) p ->
+                { Min=Point.create (min box.Min.X p.X) (min box.Min.Y p.Y)
+                  Max=Point.create (max box.Max.X p.X) (max box.Max.Y p.Y) }) {Min=first;Max=first} (List.tail points))
+        | _ -> Segment.between segment fromT toT |> Result.bind Segment.boundingBox
+
+    let private windowBoundsOverlap left right window leftBox rightBox =
+        if not (boxesOverlap enclosureSlack leftBox rightBox) then Ok false
+        else match windowBounds with
+             | BoundingBoxes -> Ok true
+             | EnclosingPolygons ->
+                 segmentEnclosingPoints left window.LeftFrom window.LeftTo |> Result.bind (fun a ->
+                     segmentEnclosingPoints right window.RightFrom window.RightTo |> Result.map (fun b -> not (enclosingPointsDisjoint a b)))
 
     let private inspectWindow left right tolerance window =
-        match Segment.betweenInside left window.LeftFrom window.LeftTo,
-              Segment.betweenInside right window.RightFrom window.RightTo with
+        match windowSegmentBoundingBox left window.LeftFrom window.LeftTo,
+              windowSegmentBoundingBox right window.RightFrom window.RightTo with
         | Error error, _
         | _, Error error -> Error error
-        | Ok leftPiece, Ok rightPiece ->
-            match Segment.boundingBox leftPiece, Segment.boundingBox rightPiece with
-            | Error error, _
-            | _, Error error -> Error error
-            | Ok leftBox, Ok rightBox when not (boxesOverlap enclosureSlack leftBox rightBox) -> Ok(None, false)
-            | Ok leftBox, Ok rightBox ->
+        | Ok leftBox, Ok rightBox ->
+            match windowBoundsOverlap left right window leftBox rightBox with
+            | Error error -> Error error
+            | Ok false -> Ok(None, false)
+            | Ok true ->
                 match Segment.point left window.LeftFrom, Segment.point left window.LeftTo,
                       Segment.point right window.RightFrom, Segment.point right window.RightTo with
                 | Ok leftStart, Ok leftFinish, Ok rightStart, Ok rightFinish ->

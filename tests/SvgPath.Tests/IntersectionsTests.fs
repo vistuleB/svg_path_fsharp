@@ -6,6 +6,17 @@ open Xunit
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
 [<Fact>]
+let ``arc window subdivision preserves original ellipse`` () =
+    let finish = point -89.11764705882354 7.529411764705882
+    let curve = CubicBezier(point -100.9882874507623 -19.817662984205167,
+                            point -98.39429354181092 -11.553611592855663,
+                            point -94.47604615998095 -2.517586549964266, finish)
+    let arc = Arc {Start=finish; Radius=point 16.0 16.0; XAxisRotation=0.0<degree>;
+                   LargeArc=false; Sweep=true; End=point -89.11764705882354 -7.529411764705882}
+    let found = Intersections.segment curve arc |> Result.defaultWith (failwithf "%A")
+    Assert.True(found |> List.exists (fun hit -> hit.LeftT=1.0<parameter> && hit.RightT=0.0<parameter>))
+
+[<Fact>]
 let ``ray crossing rejects unmatched clamped endpoint root`` () =
     let curve = CubicBezier(point -16.041725986943476 -10.810480774525221,
                             point -330.65275800451764 -215.61911559176272,

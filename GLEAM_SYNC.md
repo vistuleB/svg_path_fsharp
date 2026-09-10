@@ -316,4 +316,11 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `46b3cd6` — validate crossing brackets and reject unmatched clamped endpoint
   roots. Source regression ported. `scripts/test-fast`: 1738 passed.
 
-Next: `d49e170` (conservative polygon bounds and subdivision safeguards).
+- `d49e170` — conservative polygon enclosures, original-ellipse evaluation
+  for arc windows, private bounds switch, and empty/unchanged child guards.
+  Source regression ported. `scripts/test-fast`: 1739 passed.
+  `dotnet fsi examples/debug/intersection_enclosures.fsx`: 2127 helper checks
+  passed. This ports the source diagnostic's enclosure assertions; its
+  JavaScript module-rewriting comparison harness is not a library component.
+
+Next: `71f18fe` (archive the historical residual-window experiment).

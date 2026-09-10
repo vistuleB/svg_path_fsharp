@@ -1258,6 +1258,12 @@ module Intersections =
                                 | None -> elizabethTerminalAlternating left right window t u None false tolerance 8))
                         |> Result.map (List.choose id)))))
 
+    // Enclosing points are constructed once; no curve extrema or axis boxes.
+    let private elizabethWindowOverlaps left right window =
+        segmentEnclosingPoints left window.LeftFrom window.LeftTo |> Result.bind (fun a ->
+            segmentEnclosingPoints right window.RightFrom window.RightTo |> Result.map (fun b ->
+                not(enclosingPointsDisjoint a b)))
+
     let private elizabethDepthFirstIntersections left right options maxWindows =
         let tolerance = min options.Tolerance 1e-12<length>
         let rec search pending candidates examined =
@@ -1265,9 +1271,7 @@ module Intersections =
             | [] -> Ok candidates
             | _ when examined >= maxWindows -> Error(ExperimentalWindowLimit maxWindows)
             | window :: rest ->
-                windowSegmentBoundingBox left window.LeftFrom window.LeftTo |> Result.bind (fun a ->
-                    windowSegmentBoundingBox right window.RightFrom window.RightTo |> Result.bind (fun b ->
-                        windowBoundsOverlap left right window a b))
+                elizabethWindowOverlaps left right window
                 |> Result.mapError ExperimentalPathError
                 |> Result.bind (fun overlaps ->
                     if not overlaps then search rest candidates (examined+1)
@@ -1364,9 +1368,7 @@ module Intersections =
                             {report with Intersections=selected;DiscardedCandidates=List.length intersections-List.length selected}))
                     | _ ->
                         pending |> elizabethTryMap (fun window ->
-                            windowSegmentBoundingBox left window.LeftFrom window.LeftTo |> Result.bind (fun a ->
-                                windowSegmentBoundingBox right window.RightFrom window.RightTo |> Result.bind (fun b ->
-                                    windowBoundsOverlap left right window a b |> Result.map (fun overlaps -> window,overlaps))))
+                            elizabethWindowOverlaps left right window |> Result.map (fun overlaps -> window,overlaps))
                         |> Result.mapError ExperimentalPathError
                         |> Result.bind (fun overlapping ->
                             let survivors = overlapping |> List.filter snd |> List.map fst

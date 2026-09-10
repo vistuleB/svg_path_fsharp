@@ -543,4 +543,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   gallery-difference-circle-rectangle.svg gallery-symmetric-figure-eight-bands.svg`:
   all three generated. The two previously failing Boolean figures now succeed.
 
-Next: `78c263b` (polygon-only Elizabeth rejection).
+- `78c263b` — Elizabeth rejects using enclosing polygons directly, without
+  constructing axis-aligned boxes or extrema. `scripts/test-fast`: 1808 passed,
+  6 failed. The five preceding assertions remain; the strict translated
+  depth-first experiment now exhausts 10000 windows. The following upstream
+  commit removes that experimental solver/test rather than changing production.
+
+Next: `f730fc1` (remove depth-first Elizabeth).

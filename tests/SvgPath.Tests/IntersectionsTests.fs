@@ -6,6 +6,17 @@ open Xunit
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
 [<Fact>]
+let ``ray crossing rejects unmatched clamped endpoint root`` () =
+    let curve = CubicBezier(point -16.041725986943476 -10.810480774525221,
+                            point -330.65275800451764 -215.61911559176272,
+                            point -330.65275800435217 215.61911559210864,
+                            point -16.041725986446977 10.810480774202006)
+    let options = { Segment.defaultCrossingOptions with Samples=100; SignedLineDistanceTolerance=2.5e-10<length>; MaxIterations=100 }
+    let t, _ = Segment.rayCrossingsWith curve (point 0.0 -10.810480773800316) (Point.create 1.0 0.0) options
+               |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    Assert.True(t > 0.46<parameter> && t < 0.48<parameter>)
+
+[<Fact>]
 let ``circular arc intersections respect local axis rotation`` () =
     for sweep in [false;true] do
         for leftRotation in [0.0;30.0;90.0;-90.0] do

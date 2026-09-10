@@ -799,11 +799,19 @@ module Segment =
                         | PositiveToNegative ->
                             lineCrossingValue segment pointOnLine normal isolation.Lower
                             |> Result.bind (fun lowerValue ->
-                                refineLineCrossing
-                                    segment pointOnLine normal signedLineDistanceTolerance
-                                    isolation.Lower lowerValue isolation.Upper options.MaxIterations
+                                lineCrossingValue segment pointOnLine normal isolation.Upper
+                                |> Result.bind (fun upperValue ->
+                                    if abs lowerValue <= signedLineDistanceTolerance then Ok(Some isolation.Lower)
+                                    elif abs upperValue <= signedLineDistanceTolerance then Ok(Some isolation.Upper)
+                                    elif crossingValuesHaveSameSign lowerValue upperValue then Ok None
+                                    else refineLineCrossing
+                                            segment pointOnLine normal signedLineDistanceTolerance
+                                            isolation.Lower lowerValue isolation.Upper options.MaxIterations)
                                 |> Result.bind (function
                                     | Some parameter -> Ok(parameter :: crossings)
+                                    // A clipped coefficient-relative endpoint root may fail the
+                                    // caller's geometric tolerance without supplying a sign bracket.
+                                    | None when isolation.Estimate = 0.0<parameter> || isolation.Estimate = 1.0<parameter> -> Ok crossings
                                     | None -> Error(CrossingMaxIterationsReached(isolation.Estimate, estimateValue))))
                         | _ -> Error(CrossingMaxIterationsReached(isolation.Estimate, estimateValue))))) (Ok [])
         |> Result.map List.rev

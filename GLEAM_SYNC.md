@@ -634,5 +634,15 @@ Do not substitute the final Gleam tree for the historical source commit.
   `scripts/test-fast`: 1803 passed, the obsolete F# orientation assertion failed,
   1804 total. Candidate-count snapshots remain unchanged and passing.
 
-Next: `ed94708` (Gleam 0.46.0 release/docs/assets); authorized F# obsolete-test
-cleanup precedes final verification. No later/uncommitted Gleam work is in scope.
+- `ed94708` — completed the Gleam 0.46.0 documentation/assets checkpoint.
+  Refreshed F# changelog and regenerated local assets from F# fixtures.
+  Authorized F# supplemental-test cleanup (`75d617c`) replaces the obsolete
+  nesting-orientation assertion with traversal preservation in both directions;
+  this is not counted as an additional Gleam parity test.
+  `scripts/test-release`: fast 1804 passed, slow 26 passed, no failures.
+  `scripts/generate-gallery-figures`: 29 succeeded, 0 failed.
+  `scripts/generate-readme-figures`: all nine generated successfully.
+
+Completed source target: Gleam v0.46.0 (`ed94708`). Later MiterClip/arcs work is
+not included. F# 0.6.0 release metadata and immutable asset publication follow
+as separate release-preparation work.

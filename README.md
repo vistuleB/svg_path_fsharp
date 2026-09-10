@@ -37,7 +37,7 @@ geometry with a polygonal approximation.
 measure added to audit scalar usage.
 
 ```shell
-dotnet add package SvgPath --version 0.1.0
+dotnet add package SvgPath
 ```
 
 ```fsharp
@@ -1223,8 +1223,8 @@ let options =
     { Offset.defaultOptions with
         BandTrimming =
             { InnerCusps = true
-               OuterCusps = true
-               InBand = true } }
+              OuterCusps = true
+              InBand = true } }
 ```
 
 - `InnerCusps` applies side-local cusp trimming to the caller-designated inner

@@ -959,9 +959,9 @@ module Offset =
         match eliminateSmallSegments subpath.Segments tolerance with
         | [] -> Ok subpath
         | normalized ->
-            Subpath.createWith (WiggleThenBridgeWith tolerance) normalized
+            Subpath.createWith (WiggleElseBridgeWith tolerance) normalized
             |> Result.bind (fun normalizedSubpath ->
-                Subpath.setClosedWith (WiggleThenBridgeWith tolerance) subpath.Closed normalizedSubpath)
+                Subpath.setClosedWith (WiggleElseBridgeWith tolerance) subpath.Closed normalizedSubpath)
             |> Result.mapError InternalPathError
 
     let internal normalizeSourceSubpath subpath options =
@@ -3961,7 +3961,7 @@ module Offset =
             |> Result.mapError InternalPathError
             |> Result.mapError survivorChainDiscontinuity
             |> Result.bind (fun subpath ->
-                Subpath.setClosedWith (WiggleThenBridgeWith tolerance) first.Closed subpath
+                Subpath.setClosedWith (WiggleElseBridgeWith tolerance) first.Closed subpath
                 |> Result.mapError InternalPathError)
             |> Result.bind (fun subpath ->
                 survivorChainsToSubpaths rest tolerance (subpath :: subpaths))
@@ -3969,7 +3969,7 @@ module Offset =
     let private closeSurvivorSubpath subpath tolerance =
         if Subpath.isClosed subpath then Ok subpath
         elif Point.distance (Subpath.start subpath) (Subpath.finish subpath) <= tolerance then
-            Subpath.setClosedWith (WiggleThenBridgeWith tolerance) true subpath
+            Subpath.setClosedWith (WiggleElseBridgeWith tolerance) true subpath
             |> Result.mapError InternalPathError
         else Ok subpath
 

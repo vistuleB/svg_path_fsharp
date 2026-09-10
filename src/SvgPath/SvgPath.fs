@@ -27,8 +27,8 @@ type EndpointPolicy =
     | Wiggle
     | WiggleWith of float<length>
     | Bridge
-    | WiggleThenBridge
-    | WiggleThenBridgeWith of float<length>
+    | WiggleElseBridge
+    | WiggleElseBridgeWith of float<length>
     | Custom of (Segment -> Segment -> EndpointPolicyContext -> Segment list)
 
 /// Constructors for endpoint policies with caller-supplied tolerances.
@@ -38,9 +38,9 @@ module EndpointPolicy =
     let wiggleWith (tolerance: float<length>) : EndpointPolicy =
         WiggleWith tolerance
 
-    /// Create a wiggle-then-bridge policy; construction validates the tolerance.
-    let wiggleThenBridgeWith (tolerance: float<length>) : EndpointPolicy =
-        WiggleThenBridgeWith tolerance
+    /// Create a wiggle-else-bridge policy; construction validates the tolerance.
+    let wiggleElseBridgeWith (tolerance: float<length>) : EndpointPolicy =
+        WiggleElseBridgeWith tolerance
 
 [<Struct>]
 /// A segment index and local parameter within a subpath.
@@ -1592,7 +1592,7 @@ module Subpath =
             wiggleNearby previous next closing
         else strictReconcile previous next closing
 
-    let private wiggleThenBridgeReconcile tolerance previous next closing =
+    let private wiggleElseBridgeReconcile tolerance previous next closing =
         if Point.distance (Segment.finish previous) (Segment.start next) <= tolerance then
             wiggleNearby previous next closing
         else bridgeReconcile previous next closing
@@ -1600,7 +1600,7 @@ module Subpath =
     let private validatePolicy policy =
         match policy with
         | WiggleWith tolerance
-        | WiggleThenBridgeWith tolerance when float tolerance < 0.0 || not (System.Double.IsFinite(float tolerance)) ->
+        | WiggleElseBridgeWith tolerance when float tolerance < 0.0 || not (System.Double.IsFinite(float tolerance)) ->
             Error(InvalidWiggleTolerance tolerance)
         | _ -> Ok()
 
@@ -1610,8 +1610,8 @@ module Subpath =
         | Wiggle -> fun previous next context -> wiggleReconcile defaultWiggleTolerance previous next context.Closing
         | WiggleWith tolerance -> fun previous next context -> wiggleReconcile tolerance previous next context.Closing
         | Bridge -> fun previous next context -> bridgeReconcile previous next context.Closing
-        | WiggleThenBridge -> fun previous next context -> wiggleThenBridgeReconcile defaultWiggleTolerance previous next context.Closing
-        | WiggleThenBridgeWith tolerance -> fun previous next context -> wiggleThenBridgeReconcile tolerance previous next context.Closing
+        | WiggleElseBridge -> fun previous next context -> wiggleElseBridgeReconcile defaultWiggleTolerance previous next context.Closing
+        | WiggleElseBridgeWith tolerance -> fun previous next context -> wiggleElseBridgeReconcile tolerance previous next context.Closing
         | Custom reconcile -> reconcile
 
     /// Construct an open subpath while validating every endpoint-policy replacement.
@@ -1964,13 +1964,13 @@ module Subpath =
                     | Wiggle
                     | WiggleWith _ when distance <= (match policy with WiggleWith value -> value | _ -> defaultWiggleTolerance) ->
                         Ok [ Segment.withStart subpath.startPoint segment ]
-                    | WiggleThenBridge
-                    | WiggleThenBridgeWith _ when distance <= (match policy with WiggleThenBridgeWith value -> value | _ -> defaultWiggleTolerance) ->
+                    | WiggleElseBridge
+                    | WiggleElseBridgeWith _ when distance <= (match policy with WiggleElseBridgeWith value -> value | _ -> defaultWiggleTolerance) ->
                         Ok [ Segment.withStart subpath.startPoint segment ]
                     | Bridge when actual = subpath.startPoint -> Ok [ segment ]
                     | Bridge
-                    | WiggleThenBridge
-                    | WiggleThenBridgeWith _ -> Ok [ Line(subpath.startPoint, actual); segment ]
+                    | WiggleElseBridge
+                    | WiggleElseBridgeWith _ -> Ok [ Line(subpath.startPoint, actual); segment ]
                     | Wiggle
                     | WiggleWith _ -> Error(discontinuity -1 0 subpath.startPoint actual)
                 validatePolicy policy

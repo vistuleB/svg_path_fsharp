@@ -231,8 +231,8 @@ module ConvexHull =
         match pieces with
         | [] -> Error InternalLoopUnionCollapsed
         | _ ->
-            Subpath.createWith WiggleThenBridge pieces
-            |> Result.bind (Subpath.setClosedWith WiggleThenBridge true)
+            Subpath.createWith WiggleElseBridge pieces
+            |> Result.bind (Subpath.setClosedWith WiggleElseBridge true)
             |> Result.mapError InternalConstructionPathError
 
     let private supportCandidates segment direction =
@@ -482,8 +482,8 @@ module ConvexHull =
             (Ok [])
         |> Result.map List.rev
         |> Result.bind (fun segments ->
-            Subpath.createWith WiggleThenBridge segments
-            |> Result.bind (Subpath.setClosedWith WiggleThenBridge true))
+            Subpath.createWith WiggleElseBridge segments
+            |> Result.bind (Subpath.setClosedWith WiggleElseBridge true))
         |> Result.mapError InternalConstructionPathError
 
     let private normalizeAngle (angle: float<degree>) =
@@ -1083,7 +1083,7 @@ module ConvexHull =
         |> List.filter (segmentIsExactlyConstant >> not)
         |> function
             | [] -> Error InternalTangentSearchDegenerateLoop
-            | segments -> Subpath.createWith WiggleThenBridge segments |> Result.mapError InternalConstructionPathError
+            | segments -> Subpath.createWith WiggleElseBridge segments |> Result.mapError InternalConstructionPathError
 
     let private segmentChainIsOutside segments point clockwise =
         match segments with

@@ -58,4 +58,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `0590b19` — README traversal flags, deletion behavior, and immediate replacement
   validation clarified. Documentation-only; `git diff --check` passes.
 
-Next: `297fe29` (WiggleElseBridge rename).
+- `297fe29` — rename WiggleThenBridge and its configurable constructor to
+  WiggleElseBridge throughout source, tests, and README. `scripts/test-fast`:
+  1616 passed.
+
+Next: `ba7159d` (segment/subpath/path length upper bounds).

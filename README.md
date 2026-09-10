@@ -284,8 +284,8 @@ type EndpointPolicy =
     | Wiggle
     | WiggleWith of float<length>
     | Bridge
-    | WiggleThenBridge
-    | WiggleThenBridgeWith of float<length>
+    | WiggleElseBridge
+    | WiggleElseBridgeWith of float<length>
     | Custom of (Segment -> Segment -> EndpointPolicyContext -> Segment list)
 ```
 
@@ -298,9 +298,9 @@ bridge is inserted regardless of endpoint distance.
 
 `WiggleWith tolerance` provides the same policy with an explicit tolerance.
 `Bridge` keeps existing endpoints in place and inserts a straight line segment
-when needed. `WiggleThenBridge` applies the pair-local wiggle behavior when
+when needed. `WiggleElseBridge` applies the pair-local wiggle behavior when
 adjacent endpoints are within tolerance, and otherwise bridges that pair.
-`WiggleThenBridgeWith tolerance` is its configurable counterpart.
+`WiggleElseBridgeWith tolerance` is its configurable counterpart.
 
 `Custom` gives callers a hook for bespoke endpoint reconciliation. Its third
 callback argument is `{ First: bool; Last: bool; Closing: bool }`.
@@ -329,7 +329,7 @@ Subpath.createWith Wiggle segments
 Subpath.joinWith Bridge [ firstSubpath; secondSubpath ]
 Subpath.spliceWith Wiggle startIndex deleteCount replacementSegments subpath
 Subpath.setClosedWith Bridge true subpath
-Subpath.rebuildWith WiggleThenBridge subpath
+Subpath.rebuildWith WiggleElseBridge subpath
 Path.rebuildWith Wiggle path
 ```
 

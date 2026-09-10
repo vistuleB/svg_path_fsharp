@@ -569,4 +569,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   `scripts/test-fast`: 1797 passed, the same 5 historical assertions failed,
   1802 total.
 
-Next: `6db0bf7` (obsolete cusp arguments and containment helpers).
+- `6db0bf7` — remove unused cusp cap arguments and obsolete semantic containment
+  helpers; retain the open-payload rejection regression through topological band
+  construction. Ported pipeline/small-loop switch comments. `scripts/test-fast`:
+  1795 passed, the same 5 historical assertions failed, 1800 total.
+
+Next: `44db918` (stroke validation/helper errors).

@@ -867,27 +867,9 @@ let ``pairwise_healing_loop_short_circuit_is_idempotent_test`` () =
         Subject.internalShortCircuitAdjacentOffsetSegmentLoop rebuiltPrevious rebuiltNext)
 
 [<Fact>]
-let ``band_inside_function_uses_nonzero_for_open_subpath_band_test`` () =
-    let outline = squareLoop ()
-    let inside = Subject.internalBandInsideFunction [ OpenSubpathBand outline ] |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok true, inside (point 5.0 5.0))
-    Assert.Equal(Ok false, inside (point 15.0 5.0))
-
-[<Fact>]
-let ``band_inside_function_reverses_second_closed_subpath_side_test`` () =
-    let outer = squareLoop ()
-    let inner =
-        Subpath.polygon [ point 2.0 2.0; point 8.0 2.0; point 8.0 8.0; point 2.0 8.0 ]
-        |> Result.defaultWith (failwithf "%A")
-    let inside = Subject.internalBandInsideFunction [ ClosedSubpathBand(outer, inner) ] |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok true, inside (point 1.0 1.0))
-    Assert.Equal(Ok false, inside (point 5.0 5.0))
-    Assert.Equal(Ok false, inside (point 12.0 5.0))
-
-[<Fact>]
-let ``band_inside_function_rejects_open_payload_test`` () =
+let ``topological_band_loops_rejects_open_payload_test`` () =
     let openSubpath = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    Assert.Equal(Error InternalBandSubpathNotClosed, Subject.internalBandInsideFunction [ OpenSubpathBand openSubpath ])
+    Assert.Equal(Error InternalBandSubpathNotClosed, Subject.internalTopologicalBandLoops [] [ OpenSubpathBand openSubpath ] Subject.defaultOptions)
 
 [<Fact>]
 let ``topological_band_loops_filters_submerged_loop_test`` () =

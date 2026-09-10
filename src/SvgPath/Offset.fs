@@ -3486,6 +3486,10 @@ module Offset =
     // Embedded culling runs only when cusp trimming runs, not independently
     // during offside or final trimming. Retain the established default.
     type private SmallLoopCullingStage = BeforeCuspTrimming | InsideCuspTrimming
+    // Intentional internal comparison switch. Before cuts adjacent opposite-
+    // REVERSED loops during I construction even without a later cusp stage.
+    // Inside instead marks their AG edges within cusp trimming; without a cusp
+    // stage it performs no small-loop culling. Default single offsets have none.
     let private smallLoopCullingStage = BeforeCuspTrimming
 
     let private cullAdjacentPreimageLoops
@@ -4663,7 +4667,6 @@ module Offset =
         (subpath: ICulledOffsetSubpath)
         (zeroSource: Subpath)
         (offset: float<length>)
-        (_cap: Cap)
         (options: Options) =
         match subpath.Segments with
         | [] -> Ok None
@@ -4925,11 +4928,11 @@ module Offset =
 
     let private trimBandSideCusps
         (subpath: ICulledOffsetSubpath)
-        zeroSource offset cap
+        zeroSource offset
         (options: Options)
         enabled =
         if enabled then
-            cuspTrimISubpath subpath zeroSource offset cap options
+            cuspTrimISubpath subpath zeroSource offset options
             |> Result.bind (function
                 | None -> Ok None
                 | Some trimmed ->
@@ -5198,8 +5201,8 @@ module Offset =
 
     let private cuspTrimTracedSubpath
         (traced: TracedOffsetSubpath)
-        zeroSource offset cap options =
-        cuspTrimISubpath (iSubpathFromTraced traced) zeroSource offset cap options
+        zeroSource offset options =
+        cuspTrimISubpath (iSubpathFromTraced traced) zeroSource offset options
         |> Result.map (Option.map (fun subpath ->
             tracedSubpathFromCuspTrimmed
                 subpath traced.SourceSubpathIndex traced.Side))
@@ -5207,7 +5210,7 @@ module Offset =
     let rec private cuspTrimmedSingleOffsetSubpaths
         (subpaths: TracedOffsetSubpath list)
         (builds: SingleOffsetUntrimmedBuild list)
-        offset cap options
+        offset options
         (trimmed: TracedOffsetSubpath list) =
         match subpaths with
         | [] -> Ok(List.rev trimmed)
@@ -5215,18 +5218,18 @@ module Offset =
             match List.tryItem traced.SourceSubpathIndex builds with
             | None -> Error InternalSegmentImageCountMismatch
             | Some build ->
-                cuspTrimTracedSubpath traced build.ZeroSource offset cap options
+                cuspTrimTracedSubpath traced build.ZeroSource offset options
                 |> Result.bind (fun result ->
                     cuspTrimmedSingleOffsetSubpaths
-                        rest builds offset cap options
+                        rest builds offset options
                         (match result with
                          | Some subpath -> subpath :: trimmed
                          | None -> trimmed))
 
     let private cuspTrimmedSingleOffsetSubpathsResult
-        offsideTrimmed builds offset cap (options: Options) =
+        offsideTrimmed builds offset (options: Options) =
         cuspTrimmedSingleOffsetSubpaths
-            offsideTrimmed builds offset cap options []
+            offsideTrimmed builds offset options []
         |> Result.bind (fun traced ->
             traced
             |> List.fold (fun state subpath ->
@@ -5262,9 +5265,12 @@ module Offset =
                     trimSingleOffsetArrangement
                         arrangement untrimmed options)))
 
+    // Enter Traced form, optionally replace closed I walks with offside survivors,
+    // then select exactly one finish: cusp-only, general in-band, or materialize.
+    // Cusp and in-band finishes are alternatives, not successive operations.
     let private finalSingleOffsetSubpaths
         (builds: SingleOffsetUntrimmedBuild list)
-        offset bands cap (options: Options) offside finalTrimming =
+        offset bands (options: Options) offside finalTrimming =
         let originalUntrimmed = builds |> List.map (fun build -> build.Subpath)
         let zeroSourceSegments =
             builds |> List.collect (fun build -> Subpath.segments build.ZeroSource)
@@ -5276,7 +5282,7 @@ module Offset =
                 match finalTrimming with
                 | CuspTrimming ->
                     cuspTrimmedSingleOffsetSubpathsResult
-                        offsideTrimmed builds offset cap options
+                        offsideTrimmed builds offset options
                 | InBandTrimming ->
                     submergedTrimmedSingleOffsetSubpaths
                         offsideTrimmed builds originalArrangement
@@ -5290,9 +5296,9 @@ module Offset =
                     |> Result.map List.rev))
 
     let private trimSingleOffsetBuilds
-        builds offset bands cap (options: Options) =
+        builds offset bands (options: Options) =
         finalSingleOffsetSubpaths
-            builds offset bands cap options
+            builds offset bands options
             options.SingleOffsetTrimming.Offside
             options.SingleOffsetTrimming.FinalTrimming
         |> Result.map (List.filter (fun subpath -> not (List.isEmpty (Subpath.segments subpath))))
@@ -5334,7 +5340,7 @@ module Offset =
                 untrimmedBuild.Subpath offset cap
             |> Result.bind (fun band ->
                 trimSingleOffsetBuilds
-                    [ untrimmedBuild ] offset [ band ] cap options))
+                    [ untrimmedBuild ] offset [ band ] options))
         |> Result.mapError publicError
 
     /// Constructs and trims one signed offset with default options.
@@ -5356,10 +5362,10 @@ module Offset =
             |> Result.mapError publicError
             |> Result.bind (fun build ->
                 match trimBandSideCusps
-                          build.InnerCulled normalized innerOffset cap options
+                          build.InnerCulled normalized innerOffset options
                           options.BandTrimming.InnerCusps |> Result.mapError publicError,
                       trimBandSideCusps
-                          build.OuterCulled normalized outerOffset cap options
+                          build.OuterCulled normalized outerOffset options
                           options.BandTrimming.OuterCusps |> Result.mapError publicError with
                 | Ok(Some inner), Ok(Some outer) ->
                     bandFromSides inner innerOffset outer outerOffset cap
@@ -5422,7 +5428,7 @@ module Offset =
                 singleOffsetBandsFromBuilds builds offset cap []
                 |> Result.mapError publicError
                 |> Result.bind (fun bands ->
-                    trimSingleOffsetBuilds builds offset bands cap options
+                    trimSingleOffsetBuilds builds offset bands options
                     |> Result.mapError publicError)))
 
     /// Constructs trimmed path offsets with default options.
@@ -5452,21 +5458,6 @@ module Offset =
     /// Constructs path offset bands with default options.
     let pathBand (path: Path) innerOffset outerOffset join cap =
         pathBandWith path innerOffset outerOffset join cap defaultOptions
-
-    let rec private pointInsideAnySemanticBand point paths =
-        match paths with
-        | [] -> Ok false
-        | first :: rest ->
-            WindingField.pathContainment point first Nonzero
-            |> Result.mapError InternalPathError
-            |> Result.bind (function
-                | Inside -> Ok true
-                | Outside
-                | Boundary -> pointInsideAnySemanticBand point rest)
-
-    let internal internalBandInsideFunction bands =
-        oneSubpathBandSemanticPaths bands []
-        |> Result.map (fun paths -> fun point -> pointInsideAnySemanticBand point paths)
 
     let rec private lengthSpans
         (segments: Segment list)

@@ -554,4 +554,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   passed, 5 failed, 1811 total. The four historical candidate-count assertions
   and obsolete single-offset nesting assertion remain; no additional failures.
 
-Next: `5d6e8bc` (review documentation), then `caab926` (remove old orientator).
+- `5d6e8bc` — source audit/Elizabeth status documentation only. No production
+  change; F# verification remains recorded above rather than copying Gleam's
+  successful test claims into this repository.
+
+Next: `caab926` (remove old orientator).

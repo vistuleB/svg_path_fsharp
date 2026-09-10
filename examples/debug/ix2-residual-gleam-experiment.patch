@@ -1,0 +1,708 @@
+diff --git a/src/svg_path.gleam b/src/svg_path.gleam
+index 366f701..77afb27 100644
+--- a/src/svg_path.gleam
++++ b/src/svg_path.gleam
+@@ -5242,6 +5242,7 @@ fn polish_line_crossing_roots(
+                 lower,
+                 upper,
+               ))
++              let at_endpoint = number.is_zero(estimate) || estimate == 1.0
+               case polished {
+                 Some(parameter) ->
+                   polish_line_crossing_roots(
+@@ -5252,6 +5253,19 @@ fn polish_line_crossing_roots(
+                     signed_line_distance_tolerance,
+                     crossings: [parameter, ..crossings],
+                   )
++                // A coefficient-relative root can be clamped to a domain
++                // endpoint without satisfying this caller's stricter
++                // geometric tolerance. If its clipped window has no sign
++                // bracket either, it is not an accepted endpoint crossing.
++                None if at_endpoint ->
++                  polish_line_crossing_roots(
++                    segment,
++                    crossing_function,
++                    rest,
++                    options,
++                    signed_line_distance_tolerance,
++                    crossings:,
++                  )
+                 None ->
+                   Error(CrossingMaxIterationsReached(
+                     estimate:,
+@@ -5565,12 +5579,14 @@ fn refine_crossing(
+ ) -> Result(Option(Float), Error) {
+   let previous_value = crossing_value_unsafe(segment, f, previous_t)
+   let next_value = crossing_value_unsafe(segment, f, next_t)
++  let unbracketed = same_sign(previous_value, next_value)
+ 
+   case float.absolute_value(previous_value) <=. signed_line_distance_tolerance {
+     True -> Ok(Some(previous_t))
+     False -> {
+       case float.absolute_value(next_value) <=. signed_line_distance_tolerance {
+         True -> Ok(Some(next_t))
++        False if unbracketed -> Ok(None)
+         False ->
+           refine_crossing_loop(
+             segment,
+diff --git a/src/svg_path/intersections.gleam b/src/svg_path/intersections.gleam
+index ccfe19d..2f80008 100644
+--- a/src/svg_path/intersections.gleam
++++ b/src/svg_path/intersections.gleam
+@@ -3989,6 +3989,177 @@ fn parameter_tolerance_for_chord(direction: Point, tolerance: Float) -> Float {
+ 
+ const window_preserving_maximum_windows = 1000
+ 
++// Private prototype switch. Both modes retain the cheap bounding-box check;
++// EnclosingPolygons additionally tests convex enclosures when boxes overlap.
++type WindowBounds {
++  BoundingBoxes
++  EnclosingPolygons
++}
++
++const window_bounds = EnclosingPolygons
++
++// The convex hull of these points contains the requested curve portion.
++// Points are not boundary-ordered. For arcs, use the original center
++// parameterization rather than reconstructing an ellipse from cut endpoints.
++fn segment_enclosing_points(
++  segment: Segment,
++  from: Float,
++  to: Float,
++) -> Result(List(Point), svg_path.Error) {
++  case segment {
++    Arc(start:, radius:, x_axis_rotation:, large_arc:, sweep:, end:) -> {
++      use arc <- result.try(
++        ellipse.endpoint_to_center(ellipse.EndpointArcData(
++          ellipse.EllipsePoint(start.x, start.y),
++          ellipse.EllipsePoint(radius.x, radius.y),
++          x_axis_rotation,
++          large_arc,
++          sweep,
++          ellipse.EllipsePoint(end.x, end.y),
++        ))
++        |> result.map_error(fn(_) { svg_path.DegenerateArc }),
++      )
++      Ok(arc_enclosing_points(arc, from, to))
++    }
++    _ -> {
++      use piece <- result.try(svg_path.segment_between(segment, from, to))
++      case piece {
++        Line(start:, end:) -> Ok([start, end])
++        QuadraticBezier(start:, control:, end:) -> Ok([start, control, end])
++        CubicBezier(start:, control1:, control2:, end:) ->
++          Ok([start, control1, control2, end])
++        Arc(..) -> Error(svg_path.DegenerateArc)
++      }
++    }
++  }
++}
++
++fn arc_enclosing_points(
++  arc: ellipse.CenterArcData,
++  from: Float,
++  to: Float,
++) -> List(Point) {
++  let middle = from +. { to -. from } /. 2.0
++  let span = arc.delta_angle *. { to -. from }
++  case float.absolute_value(span) >. 90.0 {
++    True ->
++      list.append(
++        arc_enclosing_points(arc, from, middle),
++        arc_enclosing_points(arc, middle, to),
++      )
++    False -> {
++      let a = ellipse.arc_point(arc, from)
++      let b = ellipse.arc_point(arc, to)
++      let m = ellipse.arc_point(arc, middle)
++      // Tangent intersection = center + radial(midpoint) / cos(half-span).
++      // No nearly-parallel line solve: cos(half-span) >= sqrt(1/2).
++      let divisor = trig.cos_degrees(span /. 2.0)
++      [
++        Point(a.x, a.y),
++        Point(b.x, b.y),
++        Point(
++          arc.center.x +. { m.x -. arc.center.x } /. divisor,
++          arc.center.y +. { m.y -. arc.center.y } /. divisor,
++        ),
++      ]
++    }
++  }
++}
++
++// A separating axis for the two convex hulls is sufficient. Trying every
++// point-pair normal includes all hull-edge normals without constructing hulls.
++// Pair directions and coordinate axes also cover line/point degeneracies.
++// The allowance is a floating-point heuristic, not geometric tolerance.
++fn enclosing_points_disjoint(left: List(Point), right: List(Point)) -> Bool {
++  case left, right {
++    [], _ | _, [] -> False
++    [origin, ..], _ -> {
++      let points = list.append(left, right)
++      let scale =
++        list.fold(points, 0.0, fn(scale, p) {
++          float.max(
++            scale,
++            float.max(
++              float.max(float.absolute_value(p.x), float.absolute_value(p.y)),
++              float.max(
++                float.absolute_value(p.x -. origin.x),
++                float.absolute_value(p.y -. origin.y),
++              ),
++            ),
++          )
++        })
++      let axes =
++        list.append(enclosing_point_axes(left), enclosing_point_axes(right))
++      list.any([Point(1.0, 0.0), Point(0.0, 1.0), ..axes], fn(axis) {
++        let #(a, b) = enclosing_projection_interval(left, origin, axis)
++        let #(c, d) = enclosing_projection_interval(right, origin, axis)
++        let margin =
++          0.000000000001
++          *. scale
++          *. { float.absolute_value(axis.x) +. float.absolute_value(axis.y) }
++        b +. margin <. c || d +. margin <. a
++      })
++    }
++  }
++}
++
++fn enclosing_point_axes(points: List(Point)) -> List(Point) {
++  case points {
++    [] -> []
++    [a, ..rest] ->
++      list.fold(rest, enclosing_point_axes(rest), fn(axes, b) {
++        let dx = b.x -. a.x
++        let dy = b.y -. a.y
++        [Point(0.0 -. dy, dx), Point(dx, dy), ..axes]
++      })
++  }
++}
++
++fn enclosing_projection_interval(
++  points: List(Point),
++  origin: Point,
++  axis: Point,
++) -> #(Float, Float) {
++  let assert [first, ..rest] = points
++  let initial =
++    { first.x -. origin.x } *. axis.x +. { first.y -. origin.y } *. axis.y
++  list.fold(rest, #(initial, initial), fn(bounds, p) {
++    let value = { p.x -. origin.x } *. axis.x +. { p.y -. origin.y } *. axis.y
++    #(float.min(bounds.0, value), float.max(bounds.1, value))
++  })
++}
++
++fn window_bounds_overlap(
++  left: Segment,
++  right: Segment,
++  window: WindowPreservingWindow,
++  left_box: BoundingBox,
++  right_box: BoundingBox,
++) -> Result(Bool, svg_path.Error) {
++  case window_preserving_boxes_overlap(left_box, right_box, 0.000000000001) {
++    False -> Ok(False)
++    True ->
++      case window_bounds {
++        BoundingBoxes -> Ok(True)
++        EnclosingPolygons -> {
++          use a <- result.try(segment_enclosing_points(
++            left,
++            window.left_from,
++            window.left_to,
++          ))
++          use b <- result.try(segment_enclosing_points(
++            right,
++            window.right_from,
++            window.right_to,
++          ))
++          Ok(!enclosing_points_disjoint(a, b))
++        }
++      }
++  }
++}
++
++const window_preserving_distinct_parameter_tolerance = 0.0000001
++
+ type WindowPreservingWindow {
+   WindowPreservingWindow(
+     left_from: Float,
+@@ -4006,6 +4177,13 @@ type WindowPreservingSearchState {
+   )
+ }
+ 
++// Exhaustion is not completion: carry partial discoveries to the fallback.
++// Other errors still propagate normally rather than becoming partial success.
++type WindowPreservingSearchResult {
++  WindowSearchComplete(List(SegmentIntersection))
++  WindowSearchExhausted(List(SegmentIntersection))
++}
++
+ // Find curve intersections while preserving parameter windows. Transverse
+ // roots are seeded by chord crossings and refined by tangent-line Newton
+ // steps. Nontransverse contacts remain discoverable through exact curve-piece
+@@ -4015,7 +4193,7 @@ fn window_preserving_segment_with(
+   right: svg_path.Segment,
+   tolerance tolerance: Float,
+   max_depth max_depth: Int,
+-) -> Result(List(svg_path.SegmentIntersection), svg_path.Error) {
++) -> Result(WindowPreservingSearchResult, svg_path.Error) {
+   case left, right {
+     svg_path.Arc(radius: left_radius, ..),
+       svg_path.Arc(radius: right_radius, ..)
+@@ -4026,6 +4204,7 @@ fn window_preserving_segment_with(
+       {
+         True ->
+           window_preserving_circular_arc_intersections(left, right, tolerance)
++          |> result.map(WindowSearchComplete)
+         False ->
+           window_preserving_windowed_intersections(
+             left,
+@@ -4049,9 +4228,9 @@ fn window_preserving_windowed_intersections(
+   right: svg_path.Segment,
+   tolerance: Float,
+   max_depth: Int,
+-) -> Result(List(svg_path.SegmentIntersection), svg_path.Error) {
++) -> Result(WindowPreservingSearchResult, svg_path.Error) {
+   case window_preserving_certified_disjoint_translation(left, right) {
+-    True -> Ok([])
++    True -> Ok(WindowSearchComplete([]))
+     False ->
+       window_preserving_windowed_intersections_unchecked(
+         left,
+@@ -4067,7 +4246,7 @@ fn window_preserving_windowed_intersections_unchecked(
+   right: svg_path.Segment,
+   tolerance: Float,
+   max_depth: Int,
+-) -> Result(List(svg_path.SegmentIntersection), svg_path.Error) {
++) -> Result(WindowPreservingSearchResult, svg_path.Error) {
+   use endpoints <- result.try(window_preserving_endpoint_candidates(
+     left,
+     right,
+@@ -4456,7 +4635,7 @@ fn window_preserving_sampled_crossing_candidate(
+         left_t,
+         right_t,
+         tolerance,
+-        remaining: 20,
++        remaining: 32,
+       ))
+       case candidate {
+         None -> Ok(candidates)
+@@ -4553,29 +4732,28 @@ fn window_preserving_search(
+   right: svg_path.Segment,
+   tolerance: Float,
+   state: WindowPreservingSearchState,
+-) -> Result(List(svg_path.SegmentIntersection), svg_path.Error) {
++) -> Result(WindowPreservingSearchResult, svg_path.Error) {
+   let WindowPreservingSearchState(pending:, intersections:, examined:) = state
+   case pending {
+-    [] -> Ok(list.reverse(intersections))
++    [] -> Ok(WindowSearchComplete(list.reverse(intersections)))
+     [#(window, depth), ..rest] -> {
+-      case window_preserving_window_already_resolved(window, intersections) {
+-        True ->
++      case window_preserving_residual_windows(window, intersections) {
++        Some(residuals) ->
+           window_preserving_search(
+             left,
+             right,
+             tolerance,
+             WindowPreservingSearchState(
+-              pending: rest,
++              pending: list.fold(residuals, rest, fn(pending, residual) {
++                [#(residual, depth), ..pending]
++              }),
+               intersections:,
+               examined:,
+             ),
+           )
+-        False ->
++        None ->
+           case examined >= window_preserving_maximum_windows {
+-            True ->
+-              Error(svg_path.IntersectionTerminalWindowLimitExceeded(
+-                window_preserving_maximum_windows,
+-              ))
++            True -> Ok(WindowSearchExhausted(list.reverse(intersections)))
+             False -> {
+               use decision <- result.try(window_preserving_inspect_window(
+                 left,
+@@ -4596,17 +4774,47 @@ fn window_preserving_search(
+                     ),
+                   )
+                 Candidate(candidate) -> {
++                  // Geometric residual alone gives poor parameter accuracy
++                  // at shallow crossings. Polish before excluding its small
++                  // parameter neighbourhood, rather than excluding the whole
++                  // window in which this candidate happened to be found.
++                  use polished <- result.try(
++                    window_preserving_refine_tangent_crossing(
++                      left,
++                      right,
++                      candidate.left_t,
++                      candidate.right_t,
++                      tolerance,
++                      remaining: 32,
++                    ),
++                  )
++                  let candidate = option.unwrap(polished, candidate)
+                   let intersections =
+                     window_preserving_insert_intersection(
+                       intersections,
+                       candidate,
+                     )
++                  let pending = case
++                    window_preserving_residual_windows(window, intersections)
++                  {
++                    Some(residuals) ->
++                      list.fold(residuals, rest, fn(pending, residual) {
++                        [#(residual, depth), ..pending]
++                      })
++                    None if depth > 0 ->
++                      list.fold(
++                        window_preserving_split_window_nine(window),
++                        rest,
++                        fn(pending, child) { [#(child, depth - 1), ..pending] },
++                      )
++                    None -> rest
++                  }
+                   window_preserving_search(
+                     left,
+                     right,
+                     tolerance,
+                     WindowPreservingSearchState(
+-                      pending: rest,
++                      pending:,
+                       intersections:,
+                       examined: examined + 1,
+                     ),
+@@ -4652,39 +4860,41 @@ fn window_preserving_search(
+   }
+ }
+ 
+-fn window_preserving_window_already_resolved(
++fn window_preserving_residual_windows(
+   window: WindowPreservingWindow,
+   intersections: List(svg_path.SegmentIntersection),
+-) -> Bool {
++) -> Option(List(WindowPreservingWindow)) {
+   let WindowPreservingWindow(left_from:, left_to:, right_from:, right_to:) =
+     window
+-  let left_width = left_to -. left_from
+-  let right_width = right_to -. right_from
+-  left_width <=. 0.125
+-  && right_width <=. 0.125
+-  && list.any(intersections, fn(intersection) {
+-    window_preserving_parameter_near_interval(
+-      intersection.left_t,
+-      left_from,
+-      left_to,
+-      left_width *. 2.0,
+-    )
+-    && window_preserving_parameter_near_interval(
+-      intersection.right_t,
+-      right_from,
+-      right_to,
+-      right_width *. 2.0,
+-    )
+-  })
+-}
+-
+-fn window_preserving_parameter_near_interval(
+-  parameter: Float,
+-  from: Float,
+-  to: Float,
+-  margin: Float,
+-) -> Bool {
+-  parameter >=. from -. margin && parameter <=. to +. margin
++  case intersections {
++    [] -> None
++    [hit, ..rest] -> {
++      let d = window_preserving_distinct_parameter_tolerance
++      let a = float.max(left_from, hit.left_t -. d)
++      let b = float.min(left_to, hit.left_t +. d)
++      let c = float.max(right_from, hit.right_t -. d)
++      let e = float.min(right_to, hit.right_t +. d)
++      case a <. b && c <. e {
++        False -> window_preserving_residual_windows(window, rest)
++        True -> {
++          // Subtract only the root's deduplication rectangle. The four
++          // remaining rectangles cover everything outside it, including
++          // other intersections sharing either one of its parameters.
++          Some(
++            list.filter(
++              [
++                WindowPreservingWindow(left_from, a, right_from, right_to),
++                WindowPreservingWindow(b, left_to, right_from, right_to),
++                WindowPreservingWindow(a, b, right_from, c),
++                WindowPreservingWindow(a, b, e, right_to),
++              ],
++              fn(w) { w.left_from <. w.left_to && w.right_from <. w.right_to },
++            ),
++          )
++        }
++      }
++    }
++  }
+ }
+ 
+ type WindowPreservingDecision {
+@@ -4701,25 +4911,30 @@ fn window_preserving_inspect_window(
+ ) -> Result(WindowPreservingDecision, svg_path.Error) {
+   let WindowPreservingWindow(left_from:, left_to:, right_from:, right_to:) =
+     window
+-  use left_piece <- result.try(svg_path.segment_between(
++  use left_box <- result.try(window_segment_bounding_box(
+     left,
+-    from: left_from,
+-    to: left_to,
++    left_from,
++    left_to,
+   ))
+-  use right_piece <- result.try(svg_path.segment_between(
++  use right_box <- result.try(window_segment_bounding_box(
+     right,
+-    from: right_from,
+-    to: right_to,
++    right_from,
++    right_to,
+   ))
+-  use left_box <- result.try(svg_path.segment_bounding_box(left_piece))
+-  use right_box <- result.try(svg_path.segment_bounding_box(right_piece))
+   // Bounding boxes are an enclosure test, not a coincidence test. Expanding
+   // them by the geometric certification tolerance creates a two-dimensional
+   // band of surviving windows around a tangency.
+   // Exact extrema formulas still incur floating-point rounding when two boxes
+   // merely touch at a tangency. This fixed enclosure slack is independent of
+   // the caller's geometric coincidence tolerance.
+-  case window_preserving_boxes_overlap(left_box, right_box, 0.000000000001) {
++  use overlapping <- result.try(window_bounds_overlap(
++    left,
++    right,
++    window,
++    left_box,
++    right_box,
++  ))
++  case overlapping {
+     False -> Ok(Disjoint)
+     True -> {
+       use left_start <- result.try(svg_path.segment_point(left, at: left_from))
+@@ -4801,6 +5016,34 @@ fn window_preserving_inspect_window(
+   }
+ }
+ 
++fn window_segment_bounding_box(
++  segment: Segment,
++  from: Float,
++  to: Float,
++) -> Result(BoundingBox, svg_path.Error) {
++  case segment {
++    Arc(..) -> {
++      // Do not round-trip a short arc portion through endpoint encoding:
++      // distinct parameters can produce identical rounded endpoints. These
++      // enclosures evaluate the original ellipse and remain meaningful there.
++      use points <- result.try(segment_enclosing_points(segment, from, to))
++      let assert [first, ..rest] = points
++      Ok(
++        list.fold(rest, svg_path.BoundingBox(first, first), fn(box, p) {
++          svg_path.BoundingBox(
++            Point(float.min(box.min.x, p.x), float.min(box.min.y, p.y)),
++            Point(float.max(box.max.x, p.x), float.max(box.max.y, p.y)),
++          )
++        }),
++      )
++    }
++    _ -> {
++      use piece <- result.try(svg_path.segment_between(segment, from, to))
++      svg_path.segment_bounding_box(piece)
++    }
++  }
++}
++
+ fn window_preserving_endpoint_candidates(
+   left: svg_path.Segment,
+   right: svg_path.Segment,
+@@ -4941,6 +5184,18 @@ fn window_preserving_split_window_nine(
+     WindowPreservingWindow(left_b, left_to, right_a, right_b),
+     WindowPreservingWindow(left_b, left_to, right_b, right_to),
+   ]
++  |> list.filter(fn(child) {
++    // Rounded subdivision boundaries can coincide. Keep only nonempty
++    // rectangles that make representable progress in at least one axis.
++    child.left_from <. child.left_to
++    && child.right_from <. child.right_to
++    && {
++      child.left_from >. left_from
++      || child.left_to <. left_to
++      || child.right_from >. right_from
++      || child.right_to <. right_to
++    }
++  })
+ }
+ 
+ fn window_preserving_insert_intersection(
+@@ -4949,9 +5204,10 @@ fn window_preserving_insert_intersection(
+ ) -> List(svg_path.SegmentIntersection) {
+   case
+     list.any(intersections, fn(existing) {
+-      float.absolute_value(existing.left_t -. candidate.left_t) <=. 0.0000001
++      float.absolute_value(existing.left_t -. candidate.left_t)
++      <=. window_preserving_distinct_parameter_tolerance
+       && float.absolute_value(existing.right_t -. candidate.right_t)
+-      <=. 0.0000001
++      <=. window_preserving_distinct_parameter_tolerance
+     })
+   {
+     True -> intersections
+@@ -5016,9 +5272,27 @@ fn curve_curve_intersections(
+       max_depth: options.max_depth,
+     )
+   {
+-    Error(IntersectionTerminalWindowLimitExceeded(_)) ->
+-      legacy_curve_curve_intersections(left, right, options)
+-    result -> result
++    Ok(WindowSearchComplete(found)) -> Ok(found)
++    Ok(WindowSearchExhausted(found)) -> {
++      use fallback <- result.try(legacy_curve_curve_intersections(
++        left,
++        right,
++        options,
++      ))
++      // Retain discoveries from both searches, applying the ordinary
++      // geometric/parameter duplicate policy to the entire combined list.
++      // In particular, exact endpoints take precedence over nearby minima,
++      // including duplicates accumulated before the window search exhausted.
++      // Keep the window search's existing parameter tolerance when merging;
++      // using a tighter one here would reintroduce its parameter duplicates.
++      Ok(insert_intersections(
++        [],
++        list.append(found, fallback),
++        point_tolerance: options.tolerance,
++        parameter_tolerance: window_preserving_distinct_parameter_tolerance,
++      ))
++    }
++    Error(error) -> Error(error)
+   }
+ }
+ 
+diff --git a/test/svg_path_geometry_test.gleam b/test/svg_path_geometry_test.gleam
+index 6c35b0c..c11374b 100644
+--- a/test/svg_path_geometry_test.gleam
++++ b/test/svg_path_geometry_test.gleam
+@@ -2516,6 +2516,9 @@ pub fn segment_intersections_finds_curve_curve_crossing_test() {
+ }
+ 
+ pub fn segment_intersections_prefers_shared_endpoint_over_near_endpoint_minimum_test() {
++  // This also covers merging partial window-search results with the legacy
++  // fallback: approximate discoveries must not survive beside the exact
++  // shared endpoint, even when parameter snapping is disabled.
+   let left =
+     svg_path.CubicBezier(
+       start: svg_path.Point(2.8150000000000004, 2.8350002),
+diff --git a/test/svg_path_intersections_test.gleam b/test/svg_path_intersections_test.gleam
+index c3e381e..654bd18 100644
+--- a/test/svg_path_intersections_test.gleam
++++ b/test/svg_path_intersections_test.gleam
+@@ -6,6 +6,92 @@ import svg_path/intersections
+ import svg_path/point
+ import svg_path/transform
+ 
++pub fn ray_crossing_rejects_unmatched_clamped_endpoint_root_test() {
++  let curve =
++    svg_path.CubicBezier(
++      start: svg_path.Point(-16.041725986943476, -10.810480774525221),
++      control1: svg_path.Point(-330.65275800451764, -215.61911559176272),
++      control2: svg_path.Point(-330.65275800435217, 215.61911559210864),
++      end: svg_path.Point(-16.041725986446977, 10.810480774202006),
++    )
++  let assert Ok([#(t, _)]) =
++    svg_path.segment_ray_crossings_with(
++      curve,
++      origin: svg_path.Point(0.0, -10.810480773800316),
++      direction: svg_path.Point(1.0, 0.0),
++      options: svg_path.CrossingOptions(
++        samples: 100,
++        signed_line_distance_tolerance: 0.00000000025,
++        max_iterations: 100,
++      ),
++    )
++  should.be_true(t >. 0.46 && t <. 0.48)
++}
++
++pub fn arc_window_subdivision_preserves_original_ellipse_test() {
++  let curve =
++    svg_path.CubicBezier(
++      start: svg_path.Point(-100.9882874507623, -19.817662984205167),
++      control1: svg_path.Point(-98.39429354181092, -11.553611592855663),
++      control2: svg_path.Point(-94.47604615998095, -2.517586549964266),
++      end: svg_path.Point(-89.11764705882354, 7.529411764705882),
++    )
++  let arc =
++    svg_path.Arc(
++      start: curve.end,
++      radius: svg_path.Point(16.0, 16.0),
++      x_axis_rotation: 0.0,
++      large_arc: False,
++      sweep: True,
++      end: svg_path.Point(-89.11764705882354, -7.529411764705882),
++    )
++  let assert Ok(found) = intersections.segment(curve, arc)
++  should.be_true(
++    list.any(found, fn(hit) { hit.left_t == 1.0 && hit.right_t == 0.0 }),
++  )
++}
++
++pub fn clustered_cubic_crossings_are_all_found_test() {
++  assert_three_cubic_crossings(0.2, 0.21, 0.22)
++}
++
++pub fn nearby_cubic_crossings_do_not_hide_distant_crossing_test() {
++  assert_three_cubic_crossings(0.2, 0.21, 0.8)
++}
++
++fn assert_three_cubic_crossings(a: Float, b: Float, c: Float) {
++  let constant = 0.0 -. a *. b *. c
++  let linear = a *. b +. a *. c +. b *. c
++  let quadratic = 0.0 -. a -. b -. c
++  let curve =
++    svg_path.CubicBezier(
++      start: svg_path.Point(0.0, constant),
++      control1: svg_path.Point(1.0 /. 3.0, constant +. linear /. 3.0),
++      control2: svg_path.Point(
++        2.0 /. 3.0,
++        constant +. 2.0 *. linear /. 3.0 +. quadratic /. 3.0,
++      ),
++      end: svg_path.Point(1.0, constant +. linear +. quadratic +. 1.0),
++    )
++  let axis =
++    svg_path.QuadraticBezier(
++      start: svg_path.Point(0.0, 0.0),
++      control: svg_path.Point(0.5, 0.0),
++      end: svg_path.Point(1.0, 0.0),
++    )
++  list.each([#(curve, axis), #(axis, curve)], fn(pair) {
++    let assert Ok(found) = intersections.segment(pair.0, pair.1)
++    list.length(found) |> should.equal(3)
++    list.each([a, b, c], fn(expected) {
++      list.any(found, fn(hit) {
++        float.absolute_value(hit.left_t -. expected) <. 0.0000001
++        && float.absolute_value(hit.right_t -. expected) <. 0.0000001
++      })
++      |> should.be_true
++    })
++  })
++}
++
+ pub fn circular_arc_intersections_respect_local_axis_rotation_test() {
+   list.each([False, True], fn(sweep) {
+     list.each([0.0, 30.0, 90.0, -90.0], fn(left_rotation) {
+@@ -157,6 +243,9 @@ pub fn production_symmetric_kissing_quadratics_test() {
+ }
+ 
+ pub fn production_off_center_kissing_quadratics_test() {
++  // Also guards retention across fallback: the window search can discover
++  // this contact and then exhaust its budget while searching the remainder.
++  // An empty legacy result must not erase the discovered intersection.
+   // left(t) = #(t, (t - 0.37)^2)
+   let left =
+     svg_path.QuadraticBezier(

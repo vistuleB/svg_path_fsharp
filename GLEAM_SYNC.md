@@ -323,4 +323,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   passed. This ports the source diagnostic's enclosure assertions; its
   JavaScript module-rewriting comparison harness is not a library component.
 
-Next: `71f18fe` (archive the historical residual-window experiment).
+- `71f18fe` — retain the original Gleam experimental patch explicitly labeled
+  as a historical Gleam artifact, with F# checkpoint links and diagnostic
+  instructions. No production changes; preceding fast result: 1739 passed.
+
+Next: `6679aa6` (preserve retraced offset contours without interior probes).

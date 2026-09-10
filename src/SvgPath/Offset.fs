@@ -536,6 +536,7 @@ type internal OffsetCurvatureZone =
 /// Construction of signed left-normal offsets, two-sided bands, and
 /// local offset coordinate maps. Positive offsets lie on the visual left of
 /// the source traversal; negative offsets lie on its visual right.
+/// The separate Stroke module constructs strokes from these band operations.
 module Offset =
     /// Convert internal offset failures at public API boundaries.
     let internal publicError (error: InternalError) =
@@ -681,6 +682,7 @@ module Offset =
 
     let defaultOptions =
         { Fitting = defaultFittingOptions
+          // Projection options use the trimming pipeline's sampling budget.
           DistanceOptions =
             { Segment.defaultDistanceOptions with Samples = defaultTrimmingSamples }
           StalledOffsetDiameter = defaultStalledOffsetDiameter
@@ -805,6 +807,8 @@ module Offset =
               Side = side
               SourceSubpathIndex = sourceSubpathIndex })
 
+    // Adapt to the cusp trimmer's structural input, preserving geometry,
+    // H-preimages and intervals. The caller retains the source-subpath index.
     let private iSubpathFromTraced (traced: TracedOffsetSubpath) : ICulledOffsetSubpath =
         { Segments =
             traced.Segments
@@ -3353,6 +3357,7 @@ module Offset =
           Closed = closedValue
           Side = side }
 
+    // Map a local parameter into its enclosing preimage interval.
     let private intervalParameter
         (fromParameter: float<parameter>)
         (toParameter: float<parameter>)

@@ -283,4 +283,7 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `93b5880` — clarify greedy clustering's insertion-order dependence. F# had
   no misplaced parity docs on atomic insertion. `git diff --check` passes.
 
-Next: `ddad3c4` (offset provenance documentation).
+- `ddad3c4` — clarify Stroke ownership, cusp-trimmer adaptation, projection
+  sampling budget, and interval mapping. `git diff --check` passes.
+
+Next: `7d37623` (support-based degenerate line runs).

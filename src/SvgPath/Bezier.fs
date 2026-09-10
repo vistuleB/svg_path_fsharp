@@ -484,13 +484,26 @@ module Bezier =
             let left, right = split curve (parameter 0.5)
             approximateLength left (remainingDepth - 1) + approximateLength right (remainingDepth - 1)
 
+    let private cubicPowerCoefficients p0 p1 p2 p3 =
+        Point.add (Point.subtract p3 (Point.scale 3.0 p2)) (Point.subtract (Point.scale 3.0 p1) p0),
+        Point.add (Point.subtract (Point.scale 3.0 p0) (Point.scale 6.0 p1)) (Point.scale 3.0 p2),
+        Point.subtract (Point.scale 3.0 p1) (Point.scale 3.0 p0)
+
+    // Factor the known start root from B(t)-B(0). Verify the other coordinate
+    // and arc-length separation afterward, as for ordinary candidates.
+    let private cubicStartReturnParameters (a: BezierPoint) (b: BezierPoint) (c: BezierPoint) =
+        if InternalNumber.isZero (Point.cross a b) then []
+        else
+            let xScale = abs a.X + abs b.X + abs c.X
+            let yScale = abs a.Y + abs b.Y + abs c.Y
+            let a,b,c = if xScale >= yScale then a.X,b.X,c.X else a.Y,b.Y,c.Y
+            Root.quadraticWith { CoefficientTolerance=0.0<length>; RepeatedRootPolicy=PreserveRepeatedRoot } a b c
+            |> List.filter (fun t -> t > 0.0<parameter> && t < 1.0<parameter>)
+
     let private selfIntersectionCandidate curve =
         match curve with
         | CubicBezierData(startPoint, control1, control2, endPoint) ->
-            let p0, p1, p2, p3 = startPoint, control1, control2, endPoint
-            let a = Point.add (Point.subtract p3 (Point.scale 3.0 p2)) (Point.subtract (Point.scale 3.0 p1) p0)
-            let b = Point.add (Point.subtract (Point.scale 3.0 p0) (Point.scale 6.0 p1)) (Point.scale 3.0 p2)
-            let c = Point.subtract (Point.scale 3.0 p1) (Point.scale 3.0 p0)
+            let a,b,c = cubicPowerCoefficients startPoint control1 control2 endPoint
             let crossAB = Point.cross a b
             let squaredA = Point.squaredNorm a
             if crossAB = 0.0<length^2> || squaredA = 0.0<length^2> then
@@ -507,6 +520,18 @@ module Bezier =
                     Some(if first <= second then first, second else second, first)
         | _ -> None
 
+    let private filterSelfIntersectionCandidates curve options candidates =
+        candidates
+        |> List.fold (fun found (s,t) ->
+            if not (s >= 0.0<parameter> && t <= 1.0<parameter>) then found
+            else
+                let leftPoint,rightPoint = point curve s,point curve t
+                if not (Point.squaredDistance leftPoint rightPoint <= options.DistanceTolerance * options.DistanceTolerance) then found
+                elif not (approximateLength (between curve s t) 16 >= options.MinimumArcLengthSeparation) then found
+                elif found |> List.exists (fun hit -> abs(hit.S-s) <= 1e-9<parameter> && abs(hit.T-t) <= 1e-9<parameter>) then found
+                else { S=s; T=t; Point=Point.midpoint leftPoint rightPoint }::found) []
+        |> List.rev
+
     let cubicSelfIntersectionsWith curve options =
         let minimum = Length.toFloat options.MinimumArcLengthSeparation
         let tolerance = Length.toFloat options.DistanceTolerance
@@ -515,18 +540,20 @@ module Bezier =
         elif tolerance <= 0.0 || not (System.Double.IsFinite tolerance) then
             Error(InvalidCubicSelfIntersectionDistanceTolerance options.DistanceTolerance)
         else
-            match selfIntersectionCandidate curve with
-            | None -> Ok []
-            | Some(s, t) when s < parameter 0.0 || t > parameter 1.0 -> Ok []
-            | Some(s, t) ->
-                let leftPoint = point curve s
-                let rightPoint = point curve t
-                let arcLength = approximateLength (between curve s t) 16
-                if arcLength >= options.MinimumArcLengthSeparation
-                   && Point.squaredDistance leftPoint rightPoint <= options.DistanceTolerance * options.DistanceTolerance then
-                    Ok [ { S = s; T = t; Point = Point.midpoint leftPoint rightPoint } ]
-                else
-                    Ok []
+            let boundaryCandidates =
+                match curve with
+                | CubicBezierData(startPoint,control1,control2,endPoint) ->
+                    if InternalNumber.isZero(startPoint.X-endPoint.X) && InternalNumber.isZero(startPoint.Y-endPoint.Y) then
+                        [0.0<parameter>,1.0<parameter>]
+                    else
+                        let a,b,c = cubicPowerCoefficients startPoint control1 control2 endPoint
+                        let ra,rb,rc = cubicPowerCoefficients endPoint control2 control1 startPoint
+                        (cubicStartReturnParameters a b c |> List.map (fun t -> 0.0<parameter>,t))
+                        @ (cubicStartReturnParameters ra rb rc |> List.map (fun t -> 1.0<parameter> - t,1.0<parameter>))
+                | _ -> []
+            match filterSelfIntersectionCandidates curve options boundaryCandidates with
+            | [] -> selfIntersectionCandidate curve |> Option.toList |> filterSelfIntersectionCandidates curve options |> Ok
+            | found -> Ok found
 
     let cubicSelfIntersections curve =
         cubicSelfIntersectionsWith curve (defaultCubicSelfIntersectionOptions ())

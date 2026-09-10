@@ -161,4 +161,9 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `89a4617` — canonical signed-zero overlap endpoint aliases; one source
   regression added. `scripts/test-fast`: 1675 passed.
 
-Next: `838b78d` (boundary cubic self-intersections).
+- `838b78d` — closed endpoint and endpoint/interior cubic self-intersections
+  preserve known boundary parameters, validate coordinate roots geometrically,
+  and deduplicate validated pairs. Five source regressions added one-to-one.
+  `scripts/test-fast`: 1680 passed.
+
+Next: `fd10a21` (underdetermined tangent fits).

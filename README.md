@@ -60,6 +60,16 @@ let prepareForArcAverseConsumer input =
         |> Serialize.path)
 ```
 
+## Contents
+
+- [Module map](#module-map), [numeric model](#numeric-model), and [core model](#core-model)
+- [Subpath building](#subpath-building), [curve conversion](#converting-arcs-and-curves), and [ellipses](#arcs-and-the-ellipse-module)
+- [Geometry helpers](#geometry-helpers), [areas](#areas), and [intersections](#crossings-intersections-and-overlaps)
+- [Parsing](#parsing), [serialization](#serialization), and [transforms](#transforming-paths)
+- [Offsets and bands](#offsets-bands-and-stroke-outlines) and [strokes](#stroke-outlines-and-dashes)
+- [Arrangement graphs](#arrangement-graphs) and [Boolean operations](#path-csg)
+- [README figures](#readme-figures) and [development](#development)
+
 ## Module Map
 
 - `SvgPath`: core `Path`, `Subpath`, `Segment`, `Point`, `FillRule`, and shared
@@ -725,6 +735,13 @@ Intersections.pathSelf path
 Results are ordered by parameter, and boundary aliases are canonicalized. Use
 `With` variants to supply `IntersectionOptions` or `SelfIntersectionOptions`.
 
+These are numerical results, not exact algebraic root certificates. Candidates
+satisfy the geometric tolerance, but several distinct parameter pairs can
+approximate one mathematical contact, especially at tangencies or nearly
+coincident curves. Candidate counts need not equal mathematical root counts.
+The bounded, heuristic curve-pair search can error when refinement cannot
+finish; success does not prove that every mathematical root was found.
+
 Known subpath intersection addresses can be classified afterward with
 `Intersections.classifySubpathIntersection` as crossings, nontransverse
 contacts, endpoint contacts, or indeterminate cases. Contact order uses
@@ -1310,7 +1327,9 @@ Arrangement.build [ left; right ] 0.000001<length> 0.00001<length>
 image records, in original path, subpath, and segment order, the graph-edge
 identifiers produced from one source segment and whether each traversal reverses
 the stored edge direction. An image can be empty when all pieces of an input
-segment are shorter than `MinimumChord`.
+segment have a length upper bound below `MinimumChord`. Despite its historical
+name, this threshold is not endpoint chord length: a loop is not discarded
+merely because its endpoints coincide.
 
 The graph, vertex, and edge representations are transparent for inspection.
 Vertices retain their clustered source endpoints and use the center of the
@@ -1318,6 +1337,23 @@ smallest circle enclosing those endpoints as their representative point. Edges
 retain their segment geometry, endpoint vertex identifiers, directional
 multiplicities, and bounds. Cyclic edge order around a vertex is derived from
 geometry and stored as ordered groups.
+
+The order between groups is geometrically separated; within unresolved groups
+it is deterministic and best-effort.
+
+### Dual Faces
+
+`Arrangement.dual build.Graph` computes a separate face representation without
+modifying the original graph. `DualArrangementGraph.Faces` contains the infinite
+face first, marked `Outer = true`. For bounded faces, the enclosing boundary
+walk comes first and is marked outer; remaining walks surround islands. The
+infinite face has no enclosing walk. Each walk keeps its face on its visual left.
+
+`dual.EdgeFaces` identifies the faces on the visual left/right of each stored
+edge. A bridge can have the same face on both sides. The dual describes topology,
+not a winding assignment or fill rule, and does not require closed source paths.
+
+### Construction and Drawing
 
 Arrangement construction compares segment geometry rather than requiring
 structurally equal segment values. In the following case, two equal circles run
@@ -1406,7 +1442,8 @@ For points away from a boundary:
 | `symmetricDifference(left, right)` | it is inside exactly one operand |
 
 Use the `With` variants with `CsgOptions` to choose the endpoint tolerance and
-minimum atomic-edge chord. Returned segments retain their source type where
+minimum atomic-edge length-upper-bound threshold (historically `MinimumChord`).
+Returned segments retain their source type where
 possible: lines remain lines, Beziers remain Beziers, and arcs remain arcs after
 splitting.
 

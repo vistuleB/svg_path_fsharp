@@ -600,4 +600,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   consolidating the existing duplicate F# case. `scripts/test-fast`: 1793 passed,
   the same 5 historical assertions failed, 1798 total.
 
-Next: `7f7f241` (README contracts/navigation).
+- `7f7f241` — README navigation, numerical-intersection contract, segment-size
+  threshold and dual-face semantics aligned to source. Existing F# development
+  commands already name the fast/slow/full/release profiles. Documentation only.
+
+Next: `a78128f` (package documentation).

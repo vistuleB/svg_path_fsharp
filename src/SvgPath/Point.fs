@@ -23,18 +23,28 @@ module Point =
     let direction (degrees: float<degree>) : Point<1> =
         create (Trig.cosDegrees degrees) (Trig.sinDegrees degrees)
 
+    // Adding 360 to a representable negative angle can round to exactly 360,
+    // where Float spacing is coarser. Canonicalize after the final arithmetic;
+    // no epsilon is used, so representable values below 360 are unchanged.
+    let private canonicalTurnEndpoint degrees =
+        if degrees >= 360.0<degree> then 0.0<degree> else degrees
+
     /// Return the clockwise heading in the range [0, 360).
     /// The zero pair has heading zero.
     let heading (point: Point<'Unit>) : float<degree> =
         if InternalNumber.isZero point.X && InternalNumber.isZero point.Y then 0.0<degree>
         else
             let raw = Trig.atan2Degrees point.Y point.X
-            if raw < 0.0<degree> then raw + Degree.fromFloat 360.0 else raw
+            let turns = floor (raw / 360.0<degree>)
+            let normalized = raw - turns * 360.0<degree>
+            (if normalized < 0.0<degree> then normalized + 360.0<degree> else normalized)
+            |> canonicalTurnEndpoint
 
     /// Return the clockwise aperture from one coordinate pair to another in [0, 360).
     let clockwiseAperture (fromPoint: Point<'From>) (toPoint: Point<'To>) : float<degree> =
         let difference = Degree.toFloat (heading toPoint) - Degree.toFloat (heading fromPoint)
         Degree.fromFloat (if difference < 0.0 then difference + 360.0 else difference)
+        |> canonicalTurnEndpoint
 
     let add (left: Point<'Unit>) (right: Point<'Unit>) : Point<'Unit> =
         create (left.X + right.X) (left.Y + right.Y)

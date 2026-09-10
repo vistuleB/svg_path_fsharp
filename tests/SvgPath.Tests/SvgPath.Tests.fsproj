@@ -60,6 +60,7 @@
     <Compile Include="SourceStripSeedTests.fs" />
     <Compile Include="HullLoopPieceTests.fs" />
     <Compile Include="PointEndpointTests.fs" />
+    <Compile Include="PointTurnEndpointTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

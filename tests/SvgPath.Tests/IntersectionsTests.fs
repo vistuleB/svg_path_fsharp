@@ -179,9 +179,10 @@ let ``production symmetric kissing quadratics`` () =
 let ``flat cubic crossing regression`` () =
     let rising = CubicBezier(point 0.0 -0.125, point (1.0 / 3.0) 0.125, point (2.0 / 3.0) -0.125, point 1.0 0.125)
     let falling = CubicBezier(point 0.0 0.125, point (1.0 / 3.0) -0.125, point (2.0 / 3.0) 0.125, point 1.0 -0.125)
-    let intersection = Intersections.segment rising falling |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
-    assertParameterNear 0.5<parameter> intersection.LeftT 1.0e-5
-    assertParameterNear 0.5<parameter> intersection.RightT 1.0e-5
+    let found = Intersections.segment rising falling |> Result.defaultWith (failwithf "%A")
+    IntersectionContractSupport.assertKnown found 0.5<parameter> 0.5<parameter> 1e-7<parameter>
+    IntersectionContractSupport.assertCandidates found rising falling 1e-13<length>
+    Assert.Equal(9, found.Length) // Numerical candidate-count snapshot.
 
 [<Fact>]
 let ``disjoint quadratics regression`` () =
@@ -193,9 +194,10 @@ let ``disjoint quadratics regression`` () =
 let ``production off center kissing quadratics`` () =
     let left = QuadraticBezier(point 0.0 0.1369, point 0.5 -0.2331, point 1.0 0.3969)
     let right = QuadraticBezier(point -0.26 -0.3969, point 0.24 0.2331, point 0.74 -0.1369)
-    let intersection = Intersections.segment left right |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
-    assertParameterNear 0.37<parameter> intersection.LeftT 2.0e-5
-    assertParameterNear 0.63<parameter> intersection.RightT 2.0e-5
+    let found = Intersections.segment left right |> Result.defaultWith (failwithf "%A")
+    IntersectionContractSupport.assertKnown found 0.37<parameter> 0.63<parameter> 1e-7<parameter>
+    IntersectionContractSupport.assertCandidates found left right 1e-13<length>
+    Assert.Equal(4, found.Length) // Numerical candidate-count snapshot.
 
 [<Fact>]
 let ``production two close quadratic crossings`` () =

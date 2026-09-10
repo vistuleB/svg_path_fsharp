@@ -971,13 +971,16 @@ let ``segment intersections prefers shared endpoint over near endpoint minimum``
             point 2.823382761239994 2.914671758602366,
             point 2.816706698732441 2.9041808032333547,
             point 2.8162911593757998 2.903741355683332)
-    let raw = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = NoParameterSnap } |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
-    let snapped = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = DecimalParameterSnap 7 } |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
-    Assert.Equal(1.0<parameter>, raw.LeftT)
-    Assert.Equal(0.0<parameter>, raw.RightT)
-    Assert.Equal(1.0<parameter>, snapped.LeftT)
-    Assert.Equal(0.0<parameter>, snapped.RightT)
-    Assert.True(Point.distance snapped.Point (point 2.8236048558813205 2.9152343073348637) <= 1.0e-9<length>)
+    let raw = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = NoParameterSnap } |> Result.defaultWith (failwithf "%A")
+    let snapped = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = DecimalParameterSnap 7 } |> Result.defaultWith (failwithf "%A")
+    for found in [raw;snapped] do
+        IntersectionContractSupport.assertCandidates found left right 1e-9<length>
+        Assert.Equal(4, found.Length) // Numerical candidate-count snapshot.
+        let endpoint = found |> List.find (fun hit -> hit.LeftT=1.0<parameter> && hit.RightT=0.0<parameter>)
+        Assert.Equal(point 2.8236048558813205 2.9152343073348637, endpoint.Point)
+        for hit in found do
+            if hit <> endpoint then
+                Assert.True(abs(hit.LeftT-1.0<parameter>)>1e-7<parameter> || abs hit.RightT>1e-7<parameter>)
 
 [<Fact>]
 let ``segment intersections with rejects invalid options`` () =

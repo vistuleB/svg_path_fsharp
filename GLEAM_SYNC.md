@@ -616,4 +616,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   their resolved findings are preserved by this commit ledger instead. No
   production changes or additional tests at this documentation checkpoint.
 
-Next: `bf5341d` (intersection candidate contract tests).
+- `bf5341d` — port candidate geometry/separation/known-contact assertions and
+  exact numerical count snapshots, including endpoint preference after snapping.
+  `scripts/test-fast`: 1797 passed, 1 failed, 1798 total. All four historical
+  intersection assertions now pass with the exact Gleam snapshots (6/9/4/4).
+  The sole failure remains the obsolete F#-only single-offset nesting assertion.
+
+Next: `785df2f` (clockwise segment bounding polygons).

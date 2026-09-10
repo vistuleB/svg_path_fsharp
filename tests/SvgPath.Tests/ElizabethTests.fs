@@ -52,8 +52,10 @@ let ``elizabeth_beam_flat_crossing_completes_with_explicit_loss_test`` () =
     let report = beam curve horizontal options |> unwrap
     Assert.True(report.DiscardedOther>0)
     Assert.True(report.PeakRetained<=250)
-    Assert.Equal(1,report.Intersections.Length)
-    Assert.Equal(0,report.DiscardedCandidates)
+    // Count snapshot, not a mathematical root count.
+    Assert.Equal(6,report.Intersections.Length)
+    Assert.True(report.DiscardedCandidates>0)
+    IntersectionContractSupport.assertCandidates report.Intersections curve horizontal options.Tolerance
     Assert.True(report.Intersections |> List.exists (fun hit -> near 0.5<parameter> hit 1e-7<parameter>))
     residuals curve horizontal options.Tolerance report.Intersections
 

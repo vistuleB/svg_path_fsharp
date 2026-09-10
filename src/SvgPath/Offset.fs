@@ -906,13 +906,34 @@ module Offset =
         | _ -> left, right
 
     let private colinearizeSourceTangentPolicy tolerance =
-        Custom(fun previous next context ->
+        Custom(fun previous next _context ->
             let previous, next = colinearizeSourceTangentBoundary previous next tolerance
-            if context.Closing then [ previous ] else [ previous; next ])
+            [ previous; next ])
+
+    let private colinearizeSourceSeam segments tolerance =
+        match segments with
+        | [] -> []
+        | [only] ->
+            let atEnd,atStart = colinearizeSourceTangentBoundary only only tolerance
+            match atEnd,atStart with
+            | CubicBezier(_,_,control2,_),CubicBezier(start,control1,_,finish) ->
+                [CubicBezier(start,control1,control2,finish)]
+            | _ -> [only]
+        | first :: rest ->
+            let reversed = List.rev rest
+            let last,first = colinearizeSourceTangentBoundary (List.head reversed) first tolerance
+            first :: List.rev(last :: List.tail reversed)
 
     let private colinearizeOffsetSourceTangents subpath tolerance =
-        Subpath.rebuildWith (colinearizeSourceTangentPolicy tolerance) subpath
-        |> Result.mapError InternalPathError
+        match Subpath.segments subpath with
+        | [] -> Ok subpath
+        | segments ->
+            let closed = Subpath.isClosed subpath
+            let segments = if closed then colinearizeSourceSeam segments tolerance else segments
+            // A closing Custom call owns only the tail; align the seam beforehand.
+            Subpath.createWith (colinearizeSourceTangentPolicy tolerance) segments
+            |> Result.bind (Subpath.setClosedWith Strict closed)
+            |> Result.mapError InternalPathError
 
     let private segmentDiameter segment =
         Segment.boundingBox segment

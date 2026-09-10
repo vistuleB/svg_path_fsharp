@@ -368,4 +368,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   direction queries. All three source regressions and their coordinatewise
   tolerances ported. `scripts/test-fast`: 1750 passed.
 
-Next: `2c09bb6` (retain both source seam tangent alignment edits).
+- `2c09bb6` — align the closed source seam explicitly before rebuilding,
+  retaining both control-handle edits, including on a single cubic. Both
+  source regressions ported. `scripts/test-fast`: 1752 passed.
+
+Next: `80809a9` (clamp offset-map local distances and regenerate text fixtures).

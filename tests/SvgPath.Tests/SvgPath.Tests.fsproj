@@ -73,6 +73,7 @@
     <Compile Include="ZeroParameterRegressionTests.fs" />
     <Compile Include="CubicBoundaryIntersectionTests.fs" />
     <Compile Include="EllipseReviewTests.fs" />
+    <Compile Include="CurvatureExtremaTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

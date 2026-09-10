@@ -176,4 +176,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   added; two source expectations and one additional F# expectation updated for
   the new traversal contract. `scripts/test-fast`: 1686 passed.
 
-Next: `25c25d9` (curvature-extrema cusp discovery).
+- `25c25d9` — replace sampled cusp discovery with polynomial curvature extrema,
+  stationary-velocity partitions, touching-root checks, and crossing bisection.
+  Geometry units are retained in polynomial coefficients; derivative parameter
+  units are restored when evaluating the normalized residual. All eight source
+  regressions added one-to-one. `scripts/test-fast`: 1694 passed.
+
+Next: `2b9eda3` (curvature bisection depth errors).

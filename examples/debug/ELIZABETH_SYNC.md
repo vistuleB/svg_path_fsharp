@@ -1,5 +1,9 @@
 # Elizabeth historical integration checkpoint
 
+Update at Gleam `f730fc1`: depth-first Elizabeth, its total-window budget, and
+alternating terminal refinement have been removed. Production tests now use
+the beam route directly. The historical description below records `fac1bc2`.
+
 This ports Gleam `fac1bc2`, not the later cleanup commits. Production curve
 pairs use the breadth-first beam; Henry and Edward and depth-first Elizabeth
 remain internal comparisons at this checkpoint. Analytic Line dispatch and

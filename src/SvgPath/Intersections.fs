@@ -9,7 +9,6 @@ type SegmentIntersection =
 type internal ExperimentalSolver = Henry | Edward | Elizabeth
 type internal ExperimentalSolverError =
     | ExperimentalPathError of error: SegmentError
-    | ExperimentalWindowLimit of limit: int
     | ExperimentalDepthLimit of leftFrom: float<parameter> * leftTo: float<parameter> * rightFrom: float<parameter> * rightTo: float<parameter>
 type internal ElizabethBeamReport =
     { Intersections: SegmentIntersection list; Examined: int
@@ -1215,34 +1214,8 @@ module Intersections =
                             then elizabethTerminalNewton left right window nextT nextU tolerance (remaining-1)
                             else Ok None))))
 
-    let rec private elizabethTerminalAlternating left right window t u previous useChords tolerance remaining =
-        Segment.point left t |> Result.bind (fun p ->
-            Segment.point right u |> Result.bind (fun q ->
-                if elizabethPointDistance p q <= tolerance then Ok(Some {LeftT=t;RightT=u;Point=midpoint p q})
-                elif remaining <= 0 then Ok None
-                else Segment.derivative left t |> Result.bind (fun derivativeV ->
-                    Segment.derivative right u |> Result.bind (fun derivativeW ->
-                        let v,w = Point.scale 1.0<parameter> derivativeV,Point.scale 1.0<parameter> derivativeW
-                        (match previous,useChords with
-                         | Some(oldT,oldU),true when oldT <> t && oldU <> u ->
-                             Segment.point left oldT |> Result.bind (fun oldP ->
-                                 Segment.point right oldU |> Result.map (fun oldQ ->
-                                     let cv,cw = Point.displacement oldP p,Point.displacement oldQ q
-                                     if directionsIndependent cv cw then cv,cw,t-oldT,u-oldU
-                                     else v,w,1.0<parameter>,1.0<parameter>))
-                         | _ -> Ok(v,w,1.0<parameter>,1.0<parameter>))
-                        |> Result.bind (fun (v,w,dt,du) ->
-                            if not(directionsIndependent v w) then Ok None
-                            else
-                                let determinant = cross v w
-                                let delta = Point.displacement p q
-                                let nextT = t + cross delta w / determinant * dt
-                                let nextU = u - cross v delta / determinant * du
-                                if nextT >= window.LeftFrom && nextT <= window.LeftTo && nextU >= window.RightFrom && nextU <= window.RightTo && (nextT <> t || nextU <> u)
-                                then elizabethTerminalAlternating left right window nextT nextU (Some(t,u)) (not useChords) tolerance (remaining-1)
-                                else Ok None)))))
 
-    let private elizabethTerminalCandidatesWith left right window tolerance alternating =
+    let private elizabethTerminalCandidates left right window tolerance =
         let a,b,c,d = window.LeftFrom,window.LeftTo,window.RightFrom,window.RightTo
         Segment.point left a |> Result.bind (fun p ->
             Segment.point left b |> Result.bind (fun q ->
@@ -1251,11 +1224,7 @@ module Intersections =
                         let t,u = chordCrossing p q r s |> Option.defaultWith (fun () -> chordClosestParameters p q r s)
                         [a,c;a,d;b,c;b,d;(a+b)/2.0,(c+d)/2.0;interpolate a b t,interpolate c d u]
                         |> elizabethTryMap (fun (t,u) ->
-                            elizabethTerminalNewton left right window t u tolerance 8
-                            |> Result.bind (function
-                                | Some _ as hit -> Ok hit
-                                | None when not alternating -> Ok None
-                                | None -> elizabethTerminalAlternating left right window t u None false tolerance 8))
+                            elizabethTerminalNewton left right window t u tolerance 8)
                         |> Result.map (List.choose id)))))
 
     // Enclosing points are constructed once; no curve extrema or axis boxes.
@@ -1264,25 +1233,6 @@ module Intersections =
             segmentEnclosingPoints right window.RightFrom window.RightTo |> Result.map (fun b ->
                 not(enclosingPointsDisjoint a b)))
 
-    let private elizabethDepthFirstIntersections left right options maxWindows =
-        let tolerance = min options.Tolerance 1e-12<length>
-        let rec search pending candidates examined =
-            match pending with
-            | [] -> Ok candidates
-            | _ when examined >= maxWindows -> Error(ExperimentalWindowLimit maxWindows)
-            | window :: rest ->
-                elizabethWindowOverlaps left right window
-                |> Result.mapError ExperimentalPathError
-                |> Result.bind (fun overlaps ->
-                    if not overlaps then search rest candidates (examined+1)
-                    elif window.LeftTo-window.LeftFrom <= elizabethParameterResolution && window.RightTo-window.RightFrom <= elizabethParameterResolution then
-                        elizabethTerminalCandidatesWith left right window tolerance true |> Result.mapError ExperimentalPathError
-                        |> Result.bind (fun found -> search rest (found @ candidates) (examined+1))
-                    else
-                        let children = splitNine window
-                        if window.Depth <= 0 || List.isEmpty children then Error(ExperimentalDepthLimit(window.LeftFrom,window.LeftTo,window.RightFrom,window.RightTo))
-                        else search (List.fold (fun pending child -> child :: pending) rest children) candidates (examined+1))
-        search (initialWindows options.MaxDepth) [] 0 |> Result.bind (elizabethFinishCandidates left right)
 
     type private ElizabethEvaluationCache =
         { Samples: Map<float<parameter>*float<parameter>,Point<length>*Point<length>*float<length>>
@@ -1378,7 +1328,7 @@ module Intersections =
                                 let report = {report with Examined=report.Examined+List.length pending;DiscardedCrossing=report.DiscardedCrossing+crossingLost;DiscardedOther=report.DiscardedOther+otherLost;PeakRetained=max report.PeakRetained (List.length kept)}
                                 kept |> List.fold (fun state window -> state |> Result.bind (fun (next,candidates) ->
                                     if window.LeftTo-window.LeftFrom <= elizabethParameterResolution && window.RightTo-window.RightFrom <= elizabethParameterResolution then
-                                        elizabethTerminalCandidatesWith left right window tolerance false |> Result.mapError ExperimentalPathError
+                                        elizabethTerminalCandidates left right window tolerance |> Result.mapError ExperimentalPathError
                                         |> Result.map (fun found -> next,found @ candidates)
                                     else
                                         let children = splitNine window
@@ -1400,12 +1350,12 @@ module Intersections =
                     let initial = List.fold (fun found candidate -> insertWindowCandidate candidate found) endpoints crossings
                     search left right options initial (initialWindows options.MaxDepth)))
 
-    let internal experimentalCurveIntersections left right solver options maxWindows =
+    let internal experimentalCurveIntersections left right solver options =
         validateOptions options |> Result.mapError ExperimentalPathError |> Result.bind (fun () ->
             match solver with
             | Henry -> legacySearch left right options |> Result.mapError ExperimentalPathError
             | Edward -> edwardCurveIntersections left right options |> Result.mapError ExperimentalPathError
-            | Elizabeth -> elizabethDepthFirstIntersections left right options maxWindows)
+            | Elizabeth -> elizabethBeamIntersections left right options |> Result.map (fun report -> report.Intersections))
 
     let private useElizabethBeam = true
     let private curveCurveIntersections left right options =
@@ -1413,7 +1363,6 @@ module Intersections =
             elizabethBeamIntersections left right options |> Result.map (fun report -> report.Intersections)
             |> Result.mapError (function
                 | ExperimentalPathError error -> error
-                | ExperimentalWindowLimit limit -> IntersectionTerminalWindowLimitExceeded limit
                 | ExperimentalDepthLimit(a,b,c,d) -> IntersectionDepthLimitReached(a,b,c,d))
         else
             match edwardCurveIntersections left right options with

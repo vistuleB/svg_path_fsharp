@@ -135,7 +135,7 @@ let ``arc arc crossing regression`` () =
 let ``elizabeth_terminal_newton_recovers_loop8_arc_crossing_test`` () =
     let left,right = arcPair()
     let options = {Intersections.defaultOptions with Tolerance=1e-16<length>}
-    let hit = Intersections.experimentalCurveIntersections left right Elizabeth options 1000
+    let hit = Intersections.segmentWith left right options
               |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.True(hit.LeftT>0.998<parameter> && hit.LeftT<1.0<parameter>)
     Assert.True(hit.RightT>0.0<parameter> && hit.RightT<0.001<parameter>)

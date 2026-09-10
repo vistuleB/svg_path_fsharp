@@ -9,7 +9,6 @@ let private diagonal = QuadraticBezier(p 0.0 -0.5,p 0.5 0.0,p 1.0 0.5)
 let private tangent = QuadraticBezier(p 0.0 0.25,p 0.5 -0.25,p 1.0 0.25)
 let private unwrap result = Result.defaultWith (failwithf "%A") result
 let private options = Intersections.defaultOptions
-let private depth left right options budget = Intersections.experimentalCurveIntersections left right Elizabeth options budget
 let private beam left right options = Intersections.elizabethBeamIntersections left right options
 let private near value (hit:SegmentIntersection) tolerance = abs(hit.LeftT-value)<=tolerance && abs(hit.RightT-value)<=tolerance
 let private residuals left right tolerance found =
@@ -50,7 +49,6 @@ let ``elizabeth_beam_still_reports_depth_exhaustion_test`` () =
 let ``elizabeth_beam_flat_crossing_completes_with_explicit_loss_test`` () =
     let curve = CubicBezier(p 0.0 -0.125,p (1.0/3.0) 0.125,p (2.0/3.0) -0.125,p 1.0 0.125)
     let options = {options with Tolerance=5e-14<length>;MaxDepth=48}
-    Assert.True(depth curve horizontal options 100000 = Error(ExperimentalWindowLimit 100000))
     let report = beam curve horizontal options |> unwrap
     Assert.True(report.DiscardedOther>0)
     Assert.True(report.PeakRetained<=250)
@@ -76,23 +74,20 @@ let ``elizabeth_beam_join_line_selection_keeps_endpoint_test`` () =
 
 [<Fact>]
 let ``elizabeth_transverse_crossing_test`` () =
-    let found = depth horizontal diagonal options 10000 |> unwrap
+    let found = Intersections.segmentWith horizontal diagonal options |> unwrap
     Assert.Single(found) |> ignore
     Assert.True(near 0.5<parameter> found.Head 1e-9<parameter>)
 
 [<Fact>]
 let ``elizabeth_candidate_does_not_finish_coarse_window_test`` () =
-    match depth horizontal diagonal {options with MaxDepth=1} 10000 with
-    | Error(ExperimentalDepthLimit _) -> ()
+    match Intersections.segmentWith horizontal diagonal {options with MaxDepth=1} with
+    | Error(IntersectionDepthLimitReached _) -> ()
     | result -> failwithf "%A" result
 
-[<Fact>]
-let ``elizabeth_window_budget_is_explicit_test`` () =
-    Assert.True(depth horizontal diagonal options 0 = Error(ExperimentalWindowLimit 0))
 
 [<Fact>]
 let ``elizabeth_clustered_crossings_test`` () =
-    let found = depth (clustered 0.0) horizontal options 1000 |> unwrap
+    let found = Intersections.segmentWith (clustered 0.0) horizontal options |> unwrap
     Assert.Equal(3,found.Length)
     for t in [0.2<parameter>;0.21<parameter>;0.22<parameter>] do
         Assert.True(found |> List.exists (fun hit -> near t hit 1e-7<parameter>))
@@ -100,17 +95,14 @@ let ``elizabeth_clustered_crossings_test`` () =
 [<Fact>]
 let ``elizabeth_endpoint_preference_test`` () =
     let rising = QuadraticBezier(p 0.0 0.0,p 0.5 0.5,p 1.0 1.0)
-    let found = depth horizontal rising options 10000 |> unwrap
+    let found = Intersections.segmentWith horizontal rising options |> unwrap
     Assert.Single(found) |> ignore
     Assert.True(found.Head.LeftT=0.0<parameter> && found.Head.RightT=0.0<parameter>)
 
-[<Fact>]
-let ``elizabeth_kissing_root_reports_budget_exhaustion_test`` () =
-    Assert.True(depth horizontal tangent options 1000 = Error(ExperimentalWindowLimit 1000))
 
 [<Fact>]
 let ``elizabeth_kissing_candidates_obey_resolution_contract_test`` () =
-    let found = depth horizontal tangent options 100000 |> unwrap
+    let found = Intersections.segmentWith horizontal tangent options |> unwrap
     Assert.NotEmpty(found)
     Assert.True(found |> List.exists (fun hit -> hit.LeftT=0.5<parameter> && hit.RightT=0.5<parameter>))
     residuals horizontal tangent 1e-12<length> found
@@ -121,15 +113,4 @@ let ``elizabeth_kissing_candidates_obey_resolution_contract_test`` () =
 [<Fact>]
 let ``elizabeth_disjoint_windows_need_no_refinement_test`` () =
     let other = QuadraticBezier(p 0.0 1.0,p 0.5 1.0,p 1.0 1.0)
-    Assert.True(depth horizontal other {options with MaxDepth=1} 64 = Ok [])
-
-[<Fact>]
-let ``elizabeth_terminal_newton_recovers_strict_translated_candidates_test`` () =
-    let curve = clustered 100.0
-    let flat = QuadraticBezier(p 100.0 100.0,p 100.5 100.0,p 101.0 100.0)
-    let options = {options with Tolerance=1e-14<length>}
-    let found = depth curve flat options 10000 |> unwrap
-    Assert.True(found.Length>=2)
-    for hit in found do
-        Assert.True([0.2<parameter>;0.21<parameter>;0.22<parameter>] |> List.exists (fun t -> near t hit 1e-7<parameter>))
-    residuals curve flat options.Tolerance found
+    Assert.True(Intersections.segmentWith horizontal other {options with MaxDepth=1} = Ok [])

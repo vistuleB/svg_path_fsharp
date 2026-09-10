@@ -549,4 +549,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   depth-first experiment now exhausts 10000 windows. The following upstream
   commit removes that experimental solver/test rather than changing production.
 
-Next: `f730fc1` (remove depth-first Elizabeth).
+- `f730fc1` — remove depth-first Elizabeth and alternating terminal refinement;
+  retain the production beam and its regressions. `scripts/test-fast`: 1806
+  passed, 5 failed, 1811 total. The four historical candidate-count assertions
+  and obsolete single-offset nesting assertion remain; no additional failures.
+
+Next: `5d6e8bc` (review documentation), then `caab926` (remove old orientator).

@@ -261,6 +261,17 @@ module ConvexHull =
         let sample = supportSample segment direction
         Ok(sample.T, sample.Point, sample.Value)
 
+    /// Maximize raw dot(point, direction). Direction need not have unit length.
+    /// Search rescales by the largest component; the returned dot product must
+    /// remain representable. Zero direction selects the start with zero support.
+    let internal internalSegmentSupportInDirection segment (direction: Point<1>) =
+        let scale = max (abs direction.X) (abs direction.Y)
+        if InternalNumber.isZero scale then Ok(0.0<parameter>, Segment.start segment, 0.0<length>)
+        else
+            let searchDirection = Point.create (direction.X / scale) (direction.Y / scale)
+            let sample = supportSample segment searchDirection
+            Ok(sample.T, sample.Point, Point.dot sample.Point direction)
+
     let private mergeCircularRuns (runs: SupportRun list) =
         match runs with
         | [] | [ _ ] -> runs
@@ -1531,6 +1542,7 @@ module ConvexHull =
         search initialSamples (intervalsFromSamples initialSamples) 0 None
 
     let private minimumWidthDecision support diameter tolerance maxDepth =
+        let roundoff = widthLowerBoundRoundoff diameter
         let initialSamples =
             [ 0.0; 36.0; 72.0; 108.0; 144.0; 180.0 ]
             |> List.map (fun value ->
@@ -1548,7 +1560,7 @@ module ConvexHull =
                       LowerSupport = Point.dot best.Support.LowerPoint direction
                       UpperSupport = Point.dot best.Support.UpperPoint direction }
             else
-                let inventoryBound = inventoryLowerBound samples
+                let inventoryBound = max 0.0<length> (inventoryLowerBound samples - roundoff)
                 if inventoryBound > tolerance then MinimumWidthExceeds inventoryBound
                 else
                     let intervalBound =
@@ -1556,13 +1568,16 @@ module ConvexHull =
                         |> List.map (intervalLowerBound diameter)
                         |> tryMinimum
                         |> Option.defaultValue inventoryBound
+                        |> fun bound -> max 0.0<length> (bound - roundoff)
                     let active =
                         intervals
-                        |> List.filter (fun interval -> intervalLowerBound diameter interval <= tolerance)
+                        // Prune only after subtracting roundoff: pruning is irreversible.
+                        |> List.filter (fun interval -> intervalLowerBound diameter interval - roundoff <= tolerance)
                     let certifiedBound = max inventoryBound intervalBound
                     match active with
                     | [] -> MinimumWidthExceeds certifiedBound
-                    | _ when depth >= maxDepth -> MinimumWidthUnresolved(certifiedBound, best.Support.Width)
+                    | _ when depth >= maxDepth || best.Support.Width - tolerance <= roundoff ->
+                        MinimumWidthUnresolved(certifiedBound, best.Support.Width)
                     | _ ->
                         let divided, added = subdivideIntervals support active
                         search (samples @ added) divided (depth + 1)
@@ -1570,6 +1585,9 @@ module ConvexHull =
 
     let internal internalConvexPolygonMinimumWidthDecision vertices tolerance maxDepth =
         minimumWidthDecision (extent vertices) (polygonDiameter vertices).Width tolerance maxDepth
+
+    let internal internalMinimumWidthSearch support diameter tolerance maxDepth =
+        minimumWidthDecision (fun direction -> support (Point.heading direction)) diameter tolerance maxDepth
 
     let private adaptiveMaximum support diameter accuracy maxDepth initialSamples =
         let rec search samples intervals depth discardedUpperBound =

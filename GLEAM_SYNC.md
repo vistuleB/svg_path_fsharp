@@ -25,5 +25,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   passed, 18 failed. Failures include hull assembly and its downstream offset
   callers; do not invent repairs here. The committed repair is `21c8b7f`.
 
-Next: `1584d30` (vector support and conservative width-decision bounds), then
-`c40509a` (geometry-derived seed), then `21c8b7f` (full/point/portion hull repair).
+- `1584d30` — vector support with search rescaling and raw dot-product output;
+  roundoff-adjusted lower bounds applied before irreversible interval pruning.
+  All eight source regressions added one-to-one. `scripts/test-fast`: 1568
+  passed, the same 20 historical hull/downstream failures remain.
+
+Next: `c40509a` (geometry-derived seed), then `21c8b7f` (full/point/portion hull repair).

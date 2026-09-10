@@ -380,4 +380,25 @@ Do not substitute the final Gleam tree for the historical source commit.
   gallery-lazy-dog-offset-decaying-spiral.svg` completed successfully; both
   generated SVGs, generator, and documentation committed together.
 
-Next: `5a5261d` (regenerate Gallery figures; distinguish archived output).
+- `5a5261d` — Gallery refresh attempted using `scripts/generate-gallery-figures`.
+  Exit status 1: 25 calculated figures succeeded, three failed, and the one
+  still-archived arrangement SVG was explicitly reported/copied. Successful
+  changed assets are committed; failed figures retain their previous SVGs and
+  are **not** verified against this source checkpoint.
+  - `gallery-recursive-dashes.svg`: second dash stroke,
+    `StrokeOffsetError ConstructionFailed`.
+  - `gallery-intersection-circle-rectangle.svg`: `CsgArrangementError`.
+  - `gallery-difference-circle-rectangle.svg`: `CsgArrangementError`.
+  All nine successive package-title offsets completed. Full log:
+  `/tmp/fsharp-sync-gallery-refresh.log` (local diagnostic, not committed).
+
+## Paused for a decision
+
+Next source: `95a29d2` (production-traced second-offset Gallery fixture).
+Gleam uses Erlang private-function call/return tracing. There is no directly
+equivalent built-in .NET tracer available here. Faithful F# capture requires a
+choice: internal observation hooks or a diagnostic-only instrumented build.
+No observer, alternate solver, or manually duplicated pipeline has been added.
+Parent requested a stop at this boundary after the Gallery run completed.
+The three Gallery failures above also remain for diagnosis; do not describe
+this checkpoint as passing Gallery verification.

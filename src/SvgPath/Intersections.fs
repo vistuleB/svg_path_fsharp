@@ -777,6 +777,9 @@ module Intersections =
           (baseValue + 1.0 / 3.0) * scale, 1
           (baseValue + 2.0 / 3.0) * scale, 1
           1.0<parameter>, -1 ]
+        |> List.map (fun (candidate, rank) ->
+            let candidate = InternalNumber.normalizeZero candidate
+            candidate, (if candidate = 0.0<parameter> || candidate = 1.0<parameter> then -1 else rank))
         |> List.filter (fun (candidate, _) ->
             candidate >= 0.0<parameter> && candidate <= 1.0<parameter> && abs (candidate - t) <= scale)
 
@@ -1340,7 +1343,7 @@ module Intersections =
                 ({ LeftT = intersection.S
                    RightT = intersection.T
                    Point = intersection.Point } : SegmentIntersection)))
-        | Arc arc when arc.Start = arc.End && arc.Radius.X <> 0.0<length> && arc.Radius.Y <> 0.0<length> ->
+        | Arc arc when arc.Start = arc.End && not (InternalNumber.isZero arc.Radius.X) && not (InternalNumber.isZero arc.Radius.Y) ->
             Ok [ ({ LeftT = 0.0<parameter>; RightT = 1.0<parameter>; Point = arc.Start } : SegmentIntersection) ]
         | Line _
         | QuadraticBezier _

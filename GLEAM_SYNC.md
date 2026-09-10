@@ -147,10 +147,15 @@ Do not substitute the final Gleam tree for the historical source commit.
   semantic no-op. Last unchanged-code `scripts/test-fast`: 1674 passed;
   `git diff --check` passes.
 
-- `078868f` — Clip.uniqueParameters canonicalizes through
-  Subpath.parameterCanonicalize, and cut reconstruction canonicalizes again
-  before endpoint filtering. Source's local zero normalization is therefore
-  already satisfied. Last unchanged-code `scripts/test-fast`: 1674 passed;
+- `078868f` — Clip's early endpoint filter uses .NET equality, which already
+  equates both zero signs. Clip.uniqueParameters and cut reconstruction also
+  canonicalize through Subpath.parameterCanonicalize afterward. Source's local
+  normalization is semantically redundant. Last unchanged-code
+  `scripts/test-fast`: 1674 passed;
   `git diff --check` passes.
 
-Next: `c01da6a` (intersection snap normalization and arc zero radii).
+- `c01da6a` — normalize snap candidates before endpoint-ranking, and accept
+  either zero sign in arc-radius guards. Source adds no tests.
+  `scripts/test-fast`: 1674 passed.
+
+Next: `89a4617` (overlap endpoint alias normalization).

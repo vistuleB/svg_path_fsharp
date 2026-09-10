@@ -521,4 +521,13 @@ Do not substitute the final Gleam tree for the historical source commit.
   nesting-orientation expectation failed. `scripts/generate-readme-figures`:
   all nine generated. This completes the initial 109-commit source queue.
 
-Next: `f571cd7` (concurrent Gallery jobs), then committed Elizabeth integration.
+- `f571cd7` — concurrent Gallery scheduling with per-file progress, timings,
+  immediate writes, failure reports and success-only generated index. Workers
+  are isolated processes, preserving the diagnostic tracer isolation. .NET
+  elapsed time is reported; Erlang reduction counts have no fabricated analogue.
+  `scripts/generate-gallery-figures gallery-dashed-strokes.svg
+  gallery-stroke-caps.svg`: 2 generated, 0 failed. `dotnet fsi
+  examples/debug/gallery_runner_checks.fsx`: concurrent start, immediate writes,
+  exception/error isolation and report checks passed (intentional failures).
+
+Next: `fac1bc2` (committed Elizabeth integration).

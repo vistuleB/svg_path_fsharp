@@ -15,6 +15,9 @@ TestResults/
 
 # Release packages
 artifacts/
+docs/gallery/timings.tsv
+docs/gallery/*.log
+docs/gallery/*.error.txt
 
 # OS metadata
 .DS_Store

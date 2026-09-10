@@ -19,6 +19,12 @@ There is a dedicated audience distinction:
 ## Gallery Figures
 
 Run `scripts/generate-gallery-figures` to regenerate all Gallery figures.
+The build completes once, then figure jobs run concurrently in isolated worker
+processes. START/DONE/FAILED and ten-second RUNNING messages identify each file.
+`docs/gallery/timings.tsv` records status and elapsed milliseconds; .NET has no
+Erlang reductions counter, so that metric is not fabricated. Per-file logs and
+error reports are local diagnostics. The generated README links only successes
+from this run, so stale failed SVGs are not presented as fresh results.
 It enables `GalleryDiagnostics=true` for compile-time-only capture of actual
 private calls used by the second-offset fixture. Diagnostic outputs and
 intermediates are isolated under `bin/gallery-diagnostics` and

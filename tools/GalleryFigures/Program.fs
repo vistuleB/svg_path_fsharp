@@ -4,10 +4,11 @@ open System
 open System.IO
 open System.Xml.Linq
 open System.Text.RegularExpressions
+open System.Diagnostics
+open System.Reflection
 
 module Program =
-    [<EntryPoint>]
-    let main arguments =
+    let private generate arguments =
         let output = Path.Combine(Fixtures.root,"docs/gallery")
         Directory.CreateDirectory(output) |> ignore
         let check = Array.contains "--check" arguments
@@ -43,3 +44,31 @@ module Program =
                 printfn "archived snapshot %s (not regenerated geometry)" name
                 save name (File.ReadAllText(Path.Combine(Fixtures.root,"tools/GalleryFigures/Snapshots",name)))
         if failed then 1 else 0
+
+    [<EntryPoint>]
+    let main arguments =
+        if Array.contains "--worker" arguments then
+            generate (Array.filter ((<>) "--worker") arguments)
+        else
+            let names = (Fixtures.all() |> List.map fst) @ Fixtures.snapshots
+            let selected = arguments |> Array.filter ((<>) "--check")
+            for name in selected do
+                if not(List.contains name names) then invalidArg "arguments" ("Unknown figure: " + name)
+            let jobs = names |> List.filter (fun name -> selected.Length=0 || Array.contains name selected)
+                       |> List.map (fun name -> name, fun () ->
+                           let start = ProcessStartInfo("dotnet")
+                           start.ArgumentList.Add(Assembly.GetExecutingAssembly().Location)
+                           start.ArgumentList.Add("--worker")
+                           start.ArgumentList.Add(name)
+                           if Array.contains "--check" arguments then start.ArgumentList.Add("--check")
+                           start.UseShellExecute <- false
+                           start.RedirectStandardOutput <- true
+                           start.RedirectStandardError <- true
+                           use worker = Process.Start(start)
+                           let stdout = worker.StandardOutput.ReadToEndAsync()
+                           let stderr = worker.StandardError.ReadToEndAsync()
+                           worker.WaitForExit()
+                           let log = stdout.Result + stderr.Result
+                           File.WriteAllText(Path.Combine(Fixtures.root,"docs/gallery",name+".log"),log)
+                           if worker.ExitCode=0 then Ok () else Error log)
+            if GalleryJobs.run (Path.Combine(Fixtures.root,"docs/gallery")) jobs then 0 else 1

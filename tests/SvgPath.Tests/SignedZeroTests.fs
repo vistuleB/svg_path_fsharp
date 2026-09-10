@@ -8,6 +8,12 @@ let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap x = Result.defaultWith (failwithf "%A") x
 
 [<Fact>]
+let ``signed zero dash patterns are continuous`` () =
+    let subpath = Subpath.create [Line(p 0. 0.,p 1. 0.)] |> unwrap
+    for pattern in [[-0.0<length>];[0.0<length>;-0.0<length>];[-0.0<length>;0.0<length>;-0.0<length>]] do
+        Assert.Equal(Ok [subpath],Stroke.subpathDashes subpath pattern 0.0<length>)
+
+[<Fact>]
 let ``is_zero_accepts_both_signs_without_a_tolerance_test`` () =
     for x in [0.0; -0.0; 0.0 * -1.0] do Assert.True(InternalNumber.isZero x)
     for x in [1.0; -1.0; 1e-310; -1e-310] do Assert.False(InternalNumber.isZero x)

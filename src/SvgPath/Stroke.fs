@@ -63,7 +63,7 @@ module Stroke =
     let private normalizeDashPattern pattern =
         validateDashPattern pattern
         |> Result.bind (fun () ->
-            if List.isEmpty pattern || List.forall ((=) 0.0<length>) pattern then Ok []
+            if List.isEmpty pattern || List.forall InternalNumber.isZero pattern then Ok []
             else
                 let normalized = if List.length pattern % 2 = 1 then pattern @ pattern else pattern
                 validateDashPatternLength normalized |> Result.map (fun () -> normalized))

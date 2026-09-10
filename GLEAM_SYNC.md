@@ -100,4 +100,7 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `ba24ca4` — canonical signed-zero segment parameters and subpath addresses.
   Seven source regressions added one-to-one. `scripts/test-fast`: 1665 passed.
 
-Next: `8d3dd27` (signed-zero dash patterns).
+- `8d3dd27` — either signed-zero dash pattern is continuous; one source
+  regression added. `scripts/test-fast`: 1666 passed.
+
+Next: `ac66040` (signed-zero ellipse parameters and directions).

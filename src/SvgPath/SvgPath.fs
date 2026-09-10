@@ -88,6 +88,7 @@ type SegmentError =
     | InvalidIntersectionMaxDepth of maxDepth: int
     | InvalidIntersectionParameterSnapExponent of exponent: int
     | IntersectionTerminalWindowLimitExceeded of limit: int
+    | IntersectionDepthLimitReached of leftFrom: float<parameter> * leftTo: float<parameter> * rightFrom: float<parameter> * rightTo: float<parameter>
     | OverlappingSegments
     | InternalOverlapClassificationInconsistency
     | InternalUncertifiedSegmentIntersection of

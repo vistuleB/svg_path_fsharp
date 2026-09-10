@@ -132,6 +132,18 @@ let ``arc arc crossing regression`` () =
     Assert.Single(found) |> ignore
 
 [<Fact>]
+let ``elizabeth_terminal_newton_recovers_loop8_arc_crossing_test`` () =
+    let left,right = arcPair()
+    let options = {Intersections.defaultOptions with Tolerance=1e-16<length>}
+    let hit = Intersections.experimentalCurveIntersections left right Elizabeth options 1000
+              |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    Assert.True(hit.LeftT>0.998<parameter> && hit.LeftT<1.0<parameter>)
+    Assert.True(hit.RightT>0.0<parameter> && hit.RightT<0.001<parameter>)
+    let p = Segment.point left hit.LeftT |> Result.defaultWith (failwithf "%A")
+    let q = Segment.point right hit.RightT |> Result.defaultWith (failwithf "%A")
+    Assert.True(Point.squaredDistance p q <= options.Tolerance*options.Tolerance)
+
+[<Fact>]
 let ``production arc arc crossing regression both orders`` () =
     let left, right = arcPair ()
     let forward = Intersections.segment left right |> Result.defaultWith (failwithf "%A") |> List.exactlyOne

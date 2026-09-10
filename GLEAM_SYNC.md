@@ -530,4 +530,17 @@ Do not substitute the final Gleam tree for the historical source commit.
   examples/debug/gallery_runner_checks.fsx`: concurrent start, immediate writes,
   exception/error isolation and report checks passed (intentional failures).
 
-Next: `fac1bc2` (committed Elizabeth integration).
+- `fac1bc2` — production Elizabeth beam, endpoint-on-segment inventory, terminal
+  Newton/experimental alternating refinement, fixed-representative selection,
+  exact evaluation cache and depth-window errors. All 15 source tests ported.
+  Aligned inherited window order/cut arithmetic and Edward-only circular-arc
+  dispatch to the source; traversal helpers remain stack-safe on .NET.
+  `scripts/test-fast`: 1809 passed, 5 failed: the known obsolete orientation
+  test and four numerical-candidate count assumptions (flat cubic, off-center
+  kissing, shared endpoint, flat beam). Later source `bf5341d` addresses those
+  intersection contracts; no tolerances or assertions changed here.
+  `scripts/generate-gallery-figures gallery-intersection-circle-rectangle.svg
+  gallery-difference-circle-rectangle.svg gallery-symmetric-figure-eight-bands.svg`:
+  all three generated. The two previously failing Boolean figures now succeed.
+
+Next: `78c263b` (polygon-only Elizabeth rejection).

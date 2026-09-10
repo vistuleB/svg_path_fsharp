@@ -143,7 +143,7 @@ module internal OverlapDetection =
         | Error(CrossingMaxIterationsReached _ as error),Ok(ys,_) -> if completeCoordinate y then Ok ys else Error error
         | Error error,_ | _,Error error -> Error error
 
-    let private endpointProjection source sourceT sample target tolerance =
+    let internal pointParameters target sample tolerance =
         // A complete coordinate inventory can replace failed projection;
         // an arbitrary partial collection of geometric matches cannot.
         let x = coordinateMatches target sample true tolerance
@@ -156,11 +156,14 @@ module internal OverlapDetection =
                     if completeCoordinate x || completeCoordinate y then Ok[] else Error error
                 | Error error -> Error error
             projected |> Result.bind (fun projected ->
-                matchingParameters target sample ([0.0<parameter>;1.0<parameter>] @ coordinates @ projected) tolerance)
-            |> Result.bind (fun matches ->
+                matchingParameters target sample ([0.0<parameter>;1.0<parameter>] @ coordinates @ projected) tolerance))
+
+    let private endpointProjection source sourceT sample target tolerance =
+        pointParameters target sample tolerance
+        |> Result.bind (fun matches ->
                 matches |> List.fold (fun state t -> state |> Result.bind (fun found ->
                     Segment.point target t |> Result.map (fun at ->
-                        found @ [{Source=source;SourceT=sourceT;TargetT=t;Distance=Point.distance sample at}]))) (Ok [])))
+                        found @ [{Source=source;SourceT=sourceT;TargetT=t;Distance=Point.distance sample at}]))) (Ok []))
 
     let private endpointProjections left right tolerance =
         [ endpointProjection LeftEndpoint 0.0<parameter> (Segment.start left) right tolerance

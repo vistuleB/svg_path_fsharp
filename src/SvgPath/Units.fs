@@ -41,7 +41,7 @@ module Degree =
     let toFloat (value: float<degree>) : float = float value
 
     let toRadians (value: float<degree>) : float<radian> =
-        LanguagePrimitives.FloatWithMeasure<radian> (float value * System.Math.PI / 180.0)
+        LanguagePrimitives.FloatWithMeasure<radian> (float value * (System.Math.PI / 180.0))
 
 [<RequireQualifiedAccess>]
 module Radian =
@@ -51,4 +51,4 @@ module Radian =
     let toFloat (value: float<radian>) : float = float value
 
     let toDegrees (value: float<radian>) : float<degree> =
-        LanguagePrimitives.FloatWithMeasure<degree> (float value * 180.0 / System.Math.PI)
+        LanguagePrimitives.FloatWithMeasure<degree> (float value * (180.0 / System.Math.PI))

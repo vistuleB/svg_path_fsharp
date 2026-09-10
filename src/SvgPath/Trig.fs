@@ -3,65 +3,34 @@ namespace SvgPath
 /// Trigonometry helpers for SVG-facing degree angles.
 [<RequireQualifiedAccess>]
 module Trig =
-    let private positiveRemainder (value: float<degree>) (modulus: float<degree>) : float<degree> =
-        let remainder = value % modulus
-        if remainder < 0.0<degree> then remainder + modulus else remainder
-
-    let private normalizedQuarterTurn (degrees: float<degree>) : float<degree> option =
-        if not (System.Double.IsFinite(Degree.toFloat degrees)) then
-            None
+    let private reducedDegrees (degrees: float<degree>) : float<degree> =
+        if not (System.Double.IsFinite(float degrees)) then degrees
         else
-            let normalized = positiveRemainder degrees (Degree.fromFloat 360.0)
-
-            match Degree.toFloat normalized with
-            | 0.0
-            | 90.0
-            | 180.0
-            | 270.0 -> Some normalized
-            | _ -> None
-
-    let private normalizedEighthTurn (degrees: float<degree>) : float<degree> option =
-        if not (System.Double.IsFinite(Degree.toFloat degrees)) then
-            None
-        else
-            let normalized = positiveRemainder degrees (Degree.fromFloat 360.0)
-
-            match Degree.toFloat normalized with
-            | 0.0
-            | 45.0
-            | 90.0
-            | 135.0
-            | 180.0
-            | 225.0
-            | 270.0
-            | 315.0 -> Some normalized
-            | _ -> None
+            // Signed remainder avoids losing a small negative angle by adding
+            // 360, and avoids cancellation from floor(value/360)*360.
+            let reduced = degrees % 360.0<degree>
+            if InternalNumber.isZero reduced then 0.0<degree> else reduced
 
     let sinDegrees (degrees: float<degree>) : float =
-        match normalizedQuarterTurn degrees |> Option.map Degree.toFloat with
-        | Some 0.0
-        | Some 180.0 -> 0.0
-        | Some 90.0 -> 1.0
-        | Some 270.0 -> -1.0
-        | _ -> sin (Degree.toRadians degrees |> Radian.toFloat)
+        match reducedDegrees degrees |> Degree.toFloat with
+        | 0.0 | 180.0 | -180.0 -> 0.0
+        | 90.0 | -270.0 -> 1.0
+        | 270.0 | -90.0 -> -1.0
+        | reduced -> sin (Degree.toRadians (Degree.fromFloat reduced) |> Radian.toFloat)
 
     let cosDegrees (degrees: float<degree>) : float =
-        match normalizedQuarterTurn degrees |> Option.map Degree.toFloat with
-        | Some 0.0 -> 1.0
-        | Some 90.0
-        | Some 270.0 -> 0.0
-        | Some 180.0 -> -1.0
-        | _ -> cos (Degree.toRadians degrees |> Radian.toFloat)
+        match reducedDegrees degrees |> Degree.toFloat with
+        | 0.0 -> 1.0
+        | 90.0 | -90.0 | 270.0 | -270.0 -> 0.0
+        | 180.0 | -180.0 -> -1.0
+        | reduced -> cos (Degree.toRadians (Degree.fromFloat reduced) |> Radian.toFloat)
 
     let tanDegrees (degrees: float<degree>) : float =
-        match normalizedEighthTurn degrees |> Option.map Degree.toFloat with
-        | Some 0.0
-        | Some 180.0 -> 0.0
-        | Some 45.0
-        | Some 225.0 -> 1.0
-        | Some 135.0
-        | Some 315.0 -> -1.0
-        | _ -> tan (Degree.toRadians degrees |> Radian.toFloat)
+        match reducedDegrees degrees |> Degree.toFloat with
+        | 0.0 | 180.0 | -180.0 -> 0.0
+        | 45.0 | -315.0 | 225.0 | -135.0 -> 1.0
+        | 135.0 | -225.0 | 315.0 | -45.0 -> -1.0
+        | reduced -> tan (Degree.toRadians (Degree.fromFloat reduced) |> Radian.toFloat)
 
     let atanDegrees (value: float) : float<degree> =
         atan value |> Radian.fromFloat |> Radian.toDegrees

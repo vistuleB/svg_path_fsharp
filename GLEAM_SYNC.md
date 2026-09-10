@@ -81,4 +81,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   opposite-sign weighted interpolation; checked sums preserve F# units.
   Five source regressions added one-to-one. `scripts/test-fast`: 1644 passed.
 
-Next: `f8922a9` (reduce angles before trigonometry).
+- `f8922a9` — signed remainder before degree trigonometry; precomputed conversion
+  factors avoid intermediate overflow. Replaced the old large-angle source test
+  and added its three new regressions. `scripts/test-fast`: 1647 passed.
+
+Next: `7227f07` (root multiplicity evidence and exact bisection success).

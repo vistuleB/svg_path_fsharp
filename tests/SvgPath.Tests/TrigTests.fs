@@ -67,11 +67,36 @@ let ``acos degrees rejects values outside its domain`` () =
     Assert.Equal(None, Trig.acosDegrees 1.000001)
 
 [<Fact>]
-let ``degree functions accept large finite angles`` () =
-    let sine = Trig.sinDegrees (degrees 1.0e20)
-    let cosine = Trig.cosDegrees (degrees -1.0e20)
-    let tangent = Trig.tanDegrees (degrees 1.0e20)
+let ``degree functions reduce large finite angles`` () =
+    for angle,reduced in [1e20,280.;1e100,64.;1e308,296.;System.Double.MaxValue,128.] do
+        for sign in [1.;-1.] do
+            Assert.Equal(Trig.sinDegrees (degrees (sign*reduced)),Trig.sinDegrees (degrees (sign*angle)))
+            Assert.Equal(Trig.cosDegrees (degrees (sign*reduced)),Trig.cosDegrees (degrees (sign*angle)))
+            Assert.Equal(Trig.tanDegrees (degrees (sign*reduced)),Trig.tanDegrees (degrees (sign*angle)))
 
-    Assert.InRange(sine, -1.0, 1.0)
-    Assert.InRange(cosine, -1.0, 1.0)
-    Assert.False(System.Double.IsNaN tangent)
+[<Fact>]
+let ``degree functions preserve small negative angles`` () =
+    let angle = degrees 1e-16
+    Assert.True(Trig.sinDegrees -angle < 0.)
+    Assert.True(Trig.tanDegrees -angle < 0.)
+    Assert.Equal(-Trig.sinDegrees angle,Trig.sinDegrees -angle)
+    Assert.Equal(-Trig.tanDegrees angle,Trig.tanDegrees -angle)
+
+[<Fact>]
+let ``degree functions preserve exact negative turns`` () =
+    Assert.Equal(0.,Trig.sinDegrees (degrees -360.))
+    Assert.Equal(1.,Trig.cosDegrees (degrees -360.))
+    Assert.Equal(0.,Trig.tanDegrees (degrees -360.))
+    Assert.Equal(1.,Trig.sinDegrees (degrees -270.))
+    Assert.Equal(-1.,Trig.cosDegrees (degrees -180.))
+    Assert.Equal(1.,Trig.tanDegrees (degrees -135.))
+    Assert.Equal(-1.,Trig.tanDegrees (degrees -225.))
+    Assert.Equal(1.,Trig.tanDegrees (degrees -315.))
+
+[<Fact>]
+let ``angle conversions avoid intermediate overflow`` () =
+    for sign in [1.;-1.] do
+        let radians = Degree.toRadians (degrees (sign*1e308)) |> Radian.toFloat
+        Assert.True(abs(radians/1e308-sign*0.017453292519943295) < 1e-16)
+        let value = Radian.toDegrees (Radian.fromFloat (sign*1e306)) |> Degree.toFloat
+        Assert.True(abs(value/1e306-sign*57.29577951308232) < 1e-12)

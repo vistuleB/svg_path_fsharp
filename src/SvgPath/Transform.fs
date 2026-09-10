@@ -18,6 +18,9 @@ module Transform =
     type Error =
         | DegenerateArcTransform
         | InvalidMatrix
+        | InvalidTolerance of tolerance: float<length>
+        | AffineError of error: Affine.Error
+        | CorrespondenceOutsideTolerance of mapped: Point<length> * target: Point<length> * tolerance: float<length>
         | PathError of error: SegmentError
 
     let matrix = Affine.matrix
@@ -36,30 +39,35 @@ module Transform =
     let skewY = Affine.skewY
     let point = Affine.point
 
+    let private checkCorrespondence mapped target tolerance =
+        if Point.distance mapped target <= tolerance then Ok ()
+        else Error(CorrespondenceOutsideTolerance(mapped, target, tolerance))
+
     /// Construct a translation, rotation, and uniform scale mapping a point pair.
-    /// Delegates to Affine, then checks both mapped endpoints against tolerance.
+    /// Errors distinguish invalid tolerance, Affine failure, and failed correspondence.
     let pointPairSimilarity sourceStart sourceEnd targetStart targetEnd tolerance =
-        if tolerance < 0.0<length> then Error()
+        if not (tolerance >= 0.0<length>) then Error(InvalidTolerance tolerance)
         else
             Affine.pointPairSimilarity sourceStart sourceEnd targetStart targetEnd
-            |> Result.mapError (fun _ -> ())
+            |> Result.mapError AffineError
             |> Result.bind (fun transform ->
                 let mappedStart = point transform sourceStart
                 let mappedEnd = point transform sourceEnd
-                if Point.distance mappedStart targetStart <= tolerance
-                   && Point.distance mappedEnd targetEnd <= tolerance then Ok transform
-                else Error())
+                checkCorrespondence mappedStart targetStart tolerance
+                |> Result.bind (fun () -> checkCorrespondence mappedEnd targetEnd tolerance)
+                |> Result.map (fun () -> transform))
 
+    /// Map three points, preserving construction and correspondence failure details.
     let pointTripleMap sourceA sourceB sourceC targetA targetB targetC tolerance =
-        if tolerance < 0.0<length> then Error()
+        if not (tolerance >= 0.0<length>) then Error(InvalidTolerance tolerance)
         else
             Affine.pointTripleMap sourceA sourceB sourceC targetA targetB targetC
-            |> Result.mapError (fun _ -> ())
+            |> Result.mapError AffineError
             |> Result.bind (fun transform ->
-                if Point.distance (point transform sourceA) targetA <= tolerance
-                   && Point.distance (point transform sourceB) targetB <= tolerance
-                   && Point.distance (point transform sourceC) targetC <= tolerance then Ok transform
-                else Error())
+                checkCorrespondence (point transform sourceA) targetA tolerance
+                |> Result.bind (fun () -> checkCorrespondence (point transform sourceB) targetB tolerance)
+                |> Result.bind (fun () -> checkCorrespondence (point transform sourceC) targetC tolerance)
+                |> Result.map (fun () -> transform))
 
     let translatePoint input x y = point (translate x y) input
     let scalePoint input factor = point (scale factor) input

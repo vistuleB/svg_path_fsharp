@@ -74,6 +74,7 @@ module Congruency =
                     else
                         Transform.pointPairSimilarity
                             first.Source second.Source first.Target second.Target tolerance
+                        |> Result.mapError (fun _ -> ())
                         |> Result.bind (fun transform -> checkPoints indexed transform tolerance))
 
     let private centroids points =

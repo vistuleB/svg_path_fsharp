@@ -1,8 +1,7 @@
 # F# public API / error-contract review — 2026-09-10
 
 This is an F#-first review, separate from the join parity changes. The public
-type-ownership finding has since been resolved as recorded below; the remaining
-findings have not changed behavior. This is a first pass, not a completed
+findings are tracked below. This is a first pass, not a completed
 whole-library algorithm audit.
 
 ## Scope and reproducibility
@@ -19,7 +18,7 @@ whole-library algorithm audit.
 - Fast profile after join changes: 1827 passed. See GLEAM_SYNC.md for exact
   generation/test commands and the source commit order.
 
-## 1. Point-correspondence wrappers erase useful errors
+## 1. Point-correspondence wrappers erase useful errors — resolved
 
 `Transform.pointPairSimilarity` and `Transform.pointTripleMap` delegate to
 Affine, then map every construction error to unit. Their tolerance failure
@@ -31,10 +30,11 @@ Confirmed with coincident source points: Affine returns
 also gives `Error ()`. A caller cannot distinguish invalid tolerance,
 degeneracy, non-finite construction, or excessive residual.
 
-Recommendation: agree on a typed wrapper error retaining Affine.Error plus
-invalid tolerance / residual failure before changing it. This is not a port
-mistake: Gleam transform.gleam also explicitly returns Result(Matrix, Nil).
-Do not silently change only F# if parallel contracts remain a goal.
+Both languages now return Transform.Error: AffineError preserves the original
+construction error, InvalidTolerance identifies negative tolerance, and
+CorrespondenceOutsideTolerance records the mapped point, target, and tolerance.
+The historical unit-error behavior above is removed. Congruency retains its
+separate existing unit-error contract, matching Gleam.
 
 ## 2. Namespace-wide operation names — resolved
 

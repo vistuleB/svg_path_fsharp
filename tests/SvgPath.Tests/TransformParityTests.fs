@@ -88,12 +88,12 @@ let ``point_pair_similarity_handles_large_finite_vectors_test`` () =
     Assert.Equal((1.0, 0.0, -0.0, 1.0, 0.0<length>, 0.0<length>), Transform.toTuple matrix)
 
 [<Fact>]
-let ``point_pair_similarity_rejects_points_outside_tolerance_test`` () =
-    Assert.Equal(Error(), Transform.pointPairSimilarity (point 1.0 2.0) (point 1.0 2.0) (point 10.0 -5.0) (point 10.0 1.0) tolerance)
+let ``point_pair_similarity_preserves_degenerate_source_error_test`` () =
+    Assert.Equal(Error(Transform.AffineError Affine.DegenerateSourcePair), Transform.pointPairSimilarity (point 1.0 2.0) (point 1.0 2.0) (point 10.0 -5.0) (point 10.0 1.0) tolerance)
 
 [<Fact>]
 let ``point_pair_similarity_rejects_negative_tolerance_test`` () =
-    Assert.Equal(Error(), Transform.pointPairSimilarity (point 0.0 0.0) (point 1.0 0.0) (point 0.0 0.0) (point 1.0 0.0) -0.001<length>)
+    Assert.Equal(Error(Transform.InvalidTolerance -0.001<length>), Transform.pointPairSimilarity (point 0.0 0.0) (point 1.0 0.0) (point 0.0 0.0) (point 1.0 0.0) -0.001<length>)
 
 [<Fact>]
 let ``point_triple_map_maps_source_points_to_targets_test`` () =
@@ -110,10 +110,26 @@ let ``point_triple_map_maps_source_points_to_targets_test`` () =
     Assert.Equal((2.0, 1.0, -1.0, 2.0, 10.0<length>, -10.0<length>), Transform.toTuple matrix)
 
 [<Fact>]
-let ``point_triple_map_rejects_points_outside_tolerance_test`` () =
+let ``point_triple_map_preserves_degenerate_source_error_test`` () =
     Assert.Equal(
-        Error(),
+        Error(Transform.AffineError Affine.DegenerateSourceTriple),
         Transform.pointTripleMap (point 1.0 2.0) (point 1.0 2.0) (point 1.0 2.0) (point 10.0 -5.0) (point 14.0 -3.0) (point 7.0 1.0) tolerance)
+
+[<Fact>]
+let ``point_pair_similarity_reports_failed_correspondence_test`` () =
+    let targetStart, targetEnd = point 10.1 -5.2, point 7.3 8.7
+    match Transform.pointPairSimilarity (point 0.1 0.2) (point 0.4 0.6) targetStart targetEnd 0.0<length> with
+    | Error(Transform.CorrespondenceOutsideTolerance(mapped, target, tol)) ->
+        Assert.Equal(0.0<length>, tol)
+        Assert.True(target = targetStart || target = targetEnd)
+        Assert.NotEqual(target, mapped)
+    | other -> failwithf "Expected correspondence failure, got %A" other
+
+[<Fact>]
+let ``point_triple_map_rejects_negative_tolerance_test`` () =
+    Assert.Equal(Error(Transform.InvalidTolerance -0.001<length>),
+        Transform.pointTripleMap (point 0.0 0.0) (point 1.0 0.0) (point 0.0 1.0)
+            (point 0.0 0.0) (point 1.0 0.0) (point 0.0 1.0) -0.001<length>)
 
 [<Fact>]
 let ``rotate_matrix_uses_degrees_test`` () =

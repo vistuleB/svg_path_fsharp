@@ -17,6 +17,21 @@ let private check source tolerance expected =
     Assert.Equal<Point<length> list>(expected |> List.map (fun (x,y) -> point x y), normalize source tolerance)
 
 [<Fact>]
+let ``transverse line step does not hide longitudinal extent`` () =
+    match normalize "M0 0 L10 0 L10 0.0001 L1 0" 0.001 with
+    | [start;extremum;finish] ->
+        Assert.Equal(point 0. 0.,start)
+        Assert.Equal(10.0<length>,extremum.X)
+        Assert.Equal(point 1. 0.,finish)
+    | other -> failwithf "%A" other
+[<Fact>]
+let ``line run preserves global extrema not every local reversal`` () =
+    check "M0 0 L4 0 L2 0 L10 0 L-3 0 L-1 0 L-10 0 L3 0" 0.0 [0.,0.;10.,0.;-10.,0.;3.,0.]
+[<Fact>]
+let ``line and quadratic encoding use same protrusion policy`` () =
+    Assert.Equal<Point<length> list>(normalize "M0 0 L4 0 L2 0 L10 0 L-10 0 L3 0" 0.0,normalize "M0 0 Q2 0 4 0 L2 0 L10 0 L-10 0 L3 0" 0.0)
+
+[<Fact>]
 let ``zero line does not introduce a middle stop`` () =
     check "M0 0 L0 0 L1 0 L2 0" 0.0 [0.,0.; 2.,0.]
 [<Fact>]

@@ -286,4 +286,9 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `ddad3c4` — clarify Stroke ownership, cusp-trimmer adaptation, projection
   sampling budget, and interval mapping. `git diff --check` passes.
 
-Next: `7d37623` (support-based degenerate line runs).
+- `7d37623` — remove the line-run shortcut, using support extrema for all
+  thin windows. Three source regressions added; the F#-only local-reversal test
+  now reflects the explicit global-extrema contract. `scripts/test-fast`:
+  1726 passed.
+
+Next: `126e79c` (shared endpoint interior intersections).

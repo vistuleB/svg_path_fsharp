@@ -105,7 +105,7 @@ let ``zero tolerance keeps near-collinear cubic`` () =
     Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 3.0 3.0) ], loose.Segments)
 
 [<Fact>]
-let ``near-collinear line window preserves axial backtracking`` () =
+let ``near-collinear line window preserves global extent rather than local backtracking`` () =
     let source =
         Subpath.create
             [ Line(point 0.0 0.0, point 3.0 0.01)
@@ -115,8 +115,9 @@ let ``near-collinear line window preserves axial backtracking`` () =
     let normalized =
         Degeneracy.normalizeDegenerateSegments source 0.03<length>
         |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(3, List.length normalized.Segments)
-    Assert.All(normalized.Segments, fun segment -> Assert.True(match segment with Line _ -> true | _ -> false))
+    // F#-specific coverage: the new support-based contract deliberately drops
+    // local reversals between the global extrema (here the two endpoints).
+    Assert.Equal<Segment list>([Line(point 0.0 0.0,point 5.0 0.0)],normalized.Segments)
 
 [<Fact>]
 let ``thin quadratic becomes a line traversal`` () =

@@ -32,8 +32,8 @@ module InternalNumber =
         let result = first * second
         if Double.IsFinite result then Ok result else Error()
 
-    let checkedSum first second =
+    let checkedSum (first: float<'Unit>) (second: float<'Unit>) =
         let result = first + second
-        if Double.IsFinite result then Ok result else Error()
+        if Double.IsFinite(float result) then Ok result else Error()
 
     let isFinite value = Double.IsFinite value

@@ -81,13 +81,21 @@ module Point =
             let magnitude = norm scaled
             Some(create (scaled.X / magnitude) (scaled.Y / magnitude))
 
+    /// Project onto a vector; None for zero target or nonfinite output.
     let project (point: Point<'Projected>) (onto: Point<'Onto>) : Point<'Projected> option =
-        let denominator = squaredNorm onto
-        if float denominator = 0.0 then None else Some(scale (dot point onto / denominator) onto)
+        normalize onto |> Option.bind (fun unit ->
+            let xContribution,yContribution = point.X * unit.X, point.Y * unit.Y
+            // Distribute before summing: the scalar may overflow even when
+            // both vector coordinates are representable. Do not rescale source.
+            match InternalNumber.checkedSum (xContribution * unit.X) (yContribution * unit.X),
+                  InternalNumber.checkedSum (xContribution * unit.Y) (yContribution * unit.Y) with
+            | Ok x,Ok y -> Some(create x y)
+            | _ -> None)
 
+    /// Scalar projection; None for zero target or nonfinite output.
     let scalarProjection (point: Point<'Projected>) (onto: Point<'Onto>) : float<'Projected> option =
-        let magnitude = norm onto
-        if float magnitude = 0.0 then None else Some(dot point onto / magnitude)
+        normalize onto |> Option.bind (fun unit ->
+            InternalNumber.checkedSum (point.X * unit.X) (point.Y * unit.Y) |> Result.toOption)
 
     /// Rotate by 90 degrees clockwise in displayed SVG coordinates.
     let rotateClockwise (point: Point<'Unit>) : Point<'Unit> = create -point.Y point.X
@@ -107,14 +115,20 @@ module Point =
     let distance (left: Point<'Unit>) (right: Point<'Unit>) : float<'Unit> =
         displacement left right |> norm
 
+    let private interpolateCoordinate a b t =
+        // Opposite-sign endpoints can overflow b-a, while weighted interior
+        // terms and their opposite-sign sum remain representable.
+        if t > 0.0 && t < 1.0 && ((a < 0.0<_> && b > 0.0<_>) || (a > 0.0<_> && b < 0.0<_>)) then
+            a * (1.0 - t) + b * t
+        else a + (b - a) * t
+
     let interpolate (startPoint: Point<'Unit>) (endPoint: Point<'Unit>) (t: float<parameter>) : Point<'Unit> =
         // Preserve supplied endpoints without cancellation or overflowing b-a.
         if InternalNumber.isZero t then startPoint
         elif t = 1.0<parameter> then endPoint
         else
-            displacement startPoint endPoint
-            |> scale (Parameter.ratio t)
-            |> fun offset -> translate offset startPoint
+            create (interpolateCoordinate startPoint.X endPoint.X (Parameter.ratio t))
+                   (interpolateCoordinate startPoint.Y endPoint.Y (Parameter.ratio t))
 
     let midpoint (left: Point<'Unit>) (right: Point<'Unit>) : Point<'Unit> =
         interpolate left right (Parameter.fromFloat 0.5)
@@ -122,6 +136,13 @@ module Point =
     /// Test Euclidean nearness. Negative, infinite, and NaN tolerances are rejected.
     let near (tolerance: float<'Unit>) (left: Point<'Unit>) (right: Point<'Unit>) : bool =
         let rawTolerance = float tolerance
-        rawTolerance >= 0.0
-        && System.Double.IsFinite rawTolerance
-        && squaredDistance left right <= tolerance * tolerance
+        if rawTolerance < 0.0 || not (System.Double.IsFinite rawTolerance) then false
+        else
+            match InternalNumber.checkedSum left.X -right.X, InternalNumber.checkedSum left.Y -right.Y with
+            | Ok dx,Ok dy ->
+                if InternalNumber.isZero tolerance then InternalNumber.isZero dx && InternalNumber.isZero dy
+                else
+                    abs dx <= tolerance && abs dy <= tolerance
+                    && (let x,y = dx / tolerance,dy / tolerance
+                        x*x + y*y <= 1.0)
+            | _ -> false

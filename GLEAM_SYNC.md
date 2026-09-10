@@ -77,4 +77,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   directly. Three source regressions added one-to-one. `scripts/test-fast`:
   1639 passed.
 
-Next: `7dbfee4` (projection/proximity/interpolation arithmetic).
+- `7dbfee4` — stable distributed projection, tolerance-scaled proximity, and
+  opposite-sign weighted interpolation; checked sums preserve F# units.
+  Five source regressions added one-to-one. `scripts/test-fast`: 1644 passed.
+
+Next: `f8922a9` (reduce angles before trigonometry).

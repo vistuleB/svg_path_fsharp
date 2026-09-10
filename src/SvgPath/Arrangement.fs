@@ -648,13 +648,6 @@ module Arrangement =
         |> Result.bind (fun _ -> uniqueVertexForEndpoint graph.Vertices (Segment.finish piece.Segment) tolerance)
         |> Result.map ignore
 
-    let private edgeMatchesIncomingEndpoints (edge: ArrangementEdge) startMatch endMatch =
-        match startMatch, endMatch with
-        | Some startVertex, Some endVertex ->
-            edge.StartVertex = startVertex && edge.EndVertex = endVertex
-            || edge.StartVertex = endVertex && edge.EndVertex = startVertex
-        | _ -> false
-
     let private sharesIncomingEndpoint (edge: ArrangementEdge) startMatch endMatch =
         [ startMatch; endMatch ]
         |> List.choose id
@@ -779,8 +772,8 @@ module Arrangement =
                     | result -> result
             | edge :: rest when edgeIsImageOfSource context.Piece.SourceIndex edge.Id images -> compare graph images rest
             | edge :: rest when not (boundingBoxesOverlap context.Bounds edge.Bounds tolerance) -> compare graph images rest
-            | edge :: rest when edgeMatchesIncomingEndpoints edge context.StartMatch context.EndMatch -> compare graph images rest
             | edge :: rest ->
+                // Shared endpoint vertices do not exclude interior intersections.
                 pairCuts context edge tolerance endpointSliverTolerance
                 |> Result.bind (fun (existingCuts, incomingCuts) ->
                     progressiveCompareEdgeCuts context edge graph images existingCuts incomingCuts tolerance minimumChord)

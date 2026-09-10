@@ -7,6 +7,36 @@ let private tolerance = 0.000001<length>
 let private minimumChord = 0.00001<length>
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private line ax ay bx by = Line(point ax ay, point bx by)
+
+[<Fact>]
+let ``shared endpoints do not hide an interior crossing`` () =
+    let start,finish = point 0. 0.,point 1. 0.
+    let curve = CubicBezier(start,point (1./3.) (1./6.),point (2./3.) (-1./6.),finish)
+    let line = Line(start,finish)
+    for line in [line;Segment.reverse line] do
+        for segments in [[curve;line];[line;curve]] do
+            let build = Arrangement.buildWith segments 1e-9<length> 1e-8<length> 0.0<parameter> |> Result.defaultWith (failwithf "%A")
+            Assert.Equal(3,List.length build.Graph.Vertices)
+            Assert.Equal(4,List.length build.Graph.Edges)
+            Assert.True(build.Graph.Vertices |> List.exists (fun vertex -> Point.distance vertex.Point (point 0.5 0.)<1e-9<length>))
+            Assert.Equal(Ok(),Arrangement.validate build.Graph 1e-9<length> 1e-8<length>)
+
+[<Fact>]
+let ``shared endpoint lens keeps distinct edges`` () =
+    let a,b = point 0. 0.,point 2. 0.
+    let build = Arrangement.buildWith [QuadraticBezier(a,point 1. 1.,b);QuadraticBezier(a,point 1. -1.,b)] tolerance minimumChord 0.0<parameter> |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(2,List.length build.Graph.Vertices)
+    Assert.Equal(2,List.length build.Graph.Edges)
+
+[<Fact>]
+let ``progressive duplicate curves preserve directional multiplicity`` () =
+    let curve = QuadraticBezier(point 0. 0.,point 1. 1.,point 2. 0.)
+    let build = Arrangement.buildWith [curve;curve;Segment.reverse curve] tolerance minimumChord 0.0<parameter> |> Result.defaultWith (failwithf "%A")
+    let edge = List.exactlyOne build.Graph.Edges
+    Assert.Equal(2,List.length build.Graph.Vertices)
+    Assert.Equal(2,edge.ForwardMultiplicity)
+    Assert.Equal(1,edge.ReverseMultiplicity)
+
 let private arc start radius largeArc sweep finish =
     Arc
         { Start = start

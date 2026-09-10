@@ -291,4 +291,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   now reflects the explicit global-extrema contract. `scripts/test-fast`:
   1726 passed.
 
-Next: `126e79c` (shared endpoint interior intersections).
+- `126e79c` — remove shared-endpoint intersection skipping. All three source
+  regressions ported. `scripts/test-fast`: 1729 passed.
+
+Next: `8b43c68` (late self-intersection subdivision and length bounds).

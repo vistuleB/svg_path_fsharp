@@ -186,6 +186,12 @@ module Encounters =
                     { Overlaps = overlaps
                       Intersections = intersections })))
 
+    /// Return overlaps alongside isolated parameter-pair intersections.
+    /// Overlapping pairs are partitioned at overlap boundaries; corresponding
+    /// windows are skipped. Self-intersections supply off-diagonal pairs that
+    /// reach the same point without following the overlap correspondence.
+    /// Intersections explained by overlaps are removed; the remainder is
+    /// deduplicated and sorted by LeftT.
     let segment left right = segmentWith left right Intersections.defaultOptions
 
     let subpathWith left right options =

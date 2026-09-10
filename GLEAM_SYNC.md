@@ -232,4 +232,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   subpaths, reconstructing only interior extrema trigonometrically. Ported
   documentation and source regression. `scripts/test-fast`: 1709 passed.
 
-Next: `d92b75e` (encounters documentation).
+- `d92b75e` — document overlap-window partitioning, off-diagonal pairs, and
+  encounter filtering/order. Documentation-only; `git diff --check` passes.
+
+Next: `918e167` (stable transformed ellipse minor eigenvalue).

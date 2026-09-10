@@ -495,4 +495,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   The helper is now explicitly a function. Completed `scripts/test-fast`:
   1779 passed, the same one obsolete nesting-orientation expectation failed.
 
-Next: `c45b249` (analytic endpoint investigation record).
+- `c45b249` — documentation-only analytic endpoint investigation. The saved
+  Gleam join/line pair reaches the analytic arc-ray path, not a window solver.
+  Reconstructed angle candidates can fall beyond an exact stored endpoint.
+  No algorithm change in this checkpoint; the subsequent `6362abe` ports the
+  endpoint candidate fix and exact source regression geometry.
+
+Next: `76ad87a` (signed-unit dual final orientation).

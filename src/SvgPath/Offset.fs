@@ -3486,6 +3486,11 @@ module Offset =
                 | Some first -> first :: replaceLastCulledOffset rest last
                 | None -> replaceLastCulledOffset rest last)
 
+    // Embedded culling runs only when cusp trimming runs, not independently
+    // during offside or final trimming. Retain the established default.
+    type private SmallLoopCullingStage = BeforeCuspTrimming | InsideCuspTrimming
+    let private smallLoopCullingStage = BeforeCuspTrimming
+
     let private cullAdjacentPreimageLoops
         (subpath: HPreimageSubpath)
         : Result<ICulledOffsetSubpath, InternalError> =
@@ -3496,9 +3501,12 @@ module Offset =
                   Preimage = preimage
                   PreimageFrom = 0.0<parameter>
                   PreimageTo = 1.0<parameter> })
-        cullAdjacentOffsetSegmentLoops segments
+        (match smallLoopCullingStage with
+         | BeforeCuspTrimming -> cullAdjacentOffsetSegmentLoops segments
+         | InsideCuspTrimming -> Ok segments)
         |> Result.bind (fun segments ->
-            if subpath.Closed then cullWrappingOffsetSegmentLoop segments
+            if subpath.Closed && smallLoopCullingStage = BeforeCuspTrimming then
+                cullWrappingOffsetSegmentLoop segments
             else Ok segments)
         |> Result.map (fun (segments: ICulledOffsetSegment list) ->
             ({ Segments = segments; Closed = subpath.Closed; Side = subpath.Side }
@@ -4628,6 +4636,63 @@ module Offset =
             | _ -> rescued
         rescued |> List.collect (fun run -> run.Segments)
 
+    let rec private adjacentCuspLoopEdges left right =
+        match left with
+        | [] -> []
+        | (_, startVertex, _) :: rest ->
+            let matches =
+                right |> List.indexed
+                |> List.filter (fun (_, (_, _, finishVertex)) -> finishVertex = startVertex)
+            match List.tryLast matches with
+            | None -> adjacentCuspLoopEdges rest right
+            | Some (index, _) ->
+                List.map (fun (id, _, _) -> id) left
+                @ (right |> List.take (index + 1) |> List.map (fun (id, _, _) -> id))
+
+    // Source-ordered arrangement images own all geometry and noding. Select
+    // the earliest previous start and latest next end at a common vertex.
+    let internal cuspSmallLoopEdges
+        (graph: ArrangementGraph)
+        (images: ArrangementSourceSegmentImage list)
+        (reversed: bool list) closedValue =
+        let rec sequenceResults results =
+            match results with
+            | [] -> Ok []
+            | head :: tail -> head |> Result.bind (fun head ->
+                sequenceResults tail |> Result.map (fun tail -> head :: tail))
+        if List.length images <> List.length reversed then
+            Error InternalSegmentImageCountMismatch
+        else
+            images
+            |> List.map (fun image ->
+                image.Edges |> List.map (fun image ->
+                    arrangementEdgeById graph.Edges image.EdgeId
+                    |> Result.mapError (Arrangement.publicError >> InternalArrangementGraphError)
+                    |> Result.map (fun edge ->
+                        if image.Reversed then edge.Id, edge.EndVertex, edge.StartVertex
+                        else edge.Id, edge.StartVertex, edge.EndVertex))
+                |> sequenceResults)
+            |> sequenceResults
+            |> Result.map (fun walks ->
+                let groups = List.zip walks reversed
+                let pairs =
+                    match groups with
+                    | [] -> []
+                    | first :: rest ->
+                        if closedValue then List.zip groups (rest @ [first])
+                        else List.zip (List.truncate (List.length rest) groups) rest
+                pairs |> List.collect (fun ((left, leftReversed), (right, rightReversed)) ->
+                    let connected =
+                        match List.tryLast left, right with
+                        | Some (_, _, finishVertex), (_, startVertex, _) :: _ ->
+                            finishVertex = startVertex
+                        | _ -> false
+                    if leftReversed = rightReversed || not connected then []
+                    else adjacentCuspLoopEdges
+                            (List.skip 1 left)
+                            (List.truncate (max 0 (List.length right - 1)) right))
+                |> List.distinct)
+
     let private cuspTrimISubpath
         (subpath: ICulledOffsetSubpath)
         (zeroSource: Subpath)
@@ -4655,10 +4720,19 @@ module Offset =
                             arrangementSplitSubpathFromIArrangement
                                 subpath build winding
                             |> Result.bind (fun split ->
-                                finishCuspTrimWithParity
-                                    split
-                                    (rescueArrangementSplitSubmergedRuns split)
-                                    build))))))
+                                let rescued = rescueArrangementSplitSubmergedRuns split
+                                (match smallLoopCullingStage with
+                                 | BeforeCuspTrimming -> Ok []
+                                 | InsideCuspTrimming ->
+                                     takeSegmentImages build.SegmentImages (List.length subpath.Segments)
+                                     |> Result.bind (fun (images, _) ->
+                                         cuspSmallLoopEdges build.Graph images
+                                             (subpath.Segments |> List.map (fun s -> hPreimageIsReversed s.Preimage))
+                                             subpath.Closed))
+                                |> Result.bind (fun loopEdges ->
+                                    let rescued = rescued |> List.map (fun s ->
+                                        { s with DeletionCandidate = s.DeletionCandidate || List.contains s.EdgeId loopEdges })
+                                    finishCuspTrimWithParity split rescued build)))))))
 
     let private offsideSegmentSpan (segment: ArrangementSplitTracedSegment) =
         abs (segment.PreimageTo - segment.PreimageFrom)

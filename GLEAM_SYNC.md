@@ -488,4 +488,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   907 vertices, 1181 edges, 783 eligible, 471 submerged, 185 final positive
   capacities. Log: `/tmp/fsharp-sync-unified-gallery.log`.
 
-Next: `211076f` (optional cusp-stage small-loop culling).
+- `211076f` — private before/inside-cusp small-loop placement switch and
+  source-image-based loop-edge selection. Default remains before cusp trimming.
+  All four source regressions ported; no extra geometric intersection pass.
+  `scripts/test-fast`: 1779 passed, the same one obsolete F# nesting-orientation
+  expectation failed. No additional failures.
+
+Next: `c45b249` (analytic endpoint investigation record).

@@ -55,6 +55,7 @@
     <Compile Include="ConvexHullSlowSupport.fs" />
     <Compile Include="ConvexHullSlowParityTests.fs" />
     <Compile Include="DegeneracyTests.fs" />
+    <Compile Include="DegeneracyProtrusionsTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

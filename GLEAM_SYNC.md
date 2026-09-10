@@ -18,7 +18,12 @@ Do not substitute the final Gleam tree for the historical source commit.
   normal contract. `WidthExtremum.Direction` remains unchanged, as in Gleam.
   Validation: `scripts/test-fast`: 1568 passed.
 
-Next: `2d71317` (longitudinal protrusions and hull piece compaction removal).
-That source commit deliberately recorded a failing Gleam checkpoint (1370
-passed, 18 failed); the loop point/portion/full-loop repair occurs later at
-`21c8b7f`. Preserve this sequence and report intermediate failures explicitly.
+- `2d71317` — source-parameter-ordered longitudinal protrusions, preservation of
+  endpoint anchors, and removal of hull piece compaction. Added all 12 source
+  regression tests one-to-one. `scripts/test-fast`: 1560 passed, 20 failed.
+  This is an intentionally failing historical checkpoint: Gleam recorded 1370
+  passed, 18 failed. Failures include hull assembly and its downstream offset
+  callers; do not invent repairs here. The committed repair is `21c8b7f`.
+
+Next: `1584d30` (vector support and conservative width-decision bounds), then
+`c40509a` (geometry-derived seed), then `21c8b7f` (full/point/portion hull repair).

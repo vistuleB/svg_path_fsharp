@@ -137,29 +137,41 @@ module Degeneracy =
             if pointAlreadyPresent point unique tolerance then unique else point :: unique) []
         |> List.rev
 
-    let private pointOrderInSegments point segments tolerance =
-        let rec loop index remaining =
+    // Query source segments and retain occurrence parameters; ties keep the first.
+    let private traversalSupport segments angle =
+        let rec loop index best remaining =
             match remaining with
-            | [] -> float index
+            | [] -> Ok best
             | first :: rest ->
-                match Segment.projection first point with
-                | Ok(t, _, distance) when distance <= tolerance -> float index + float t
-                | _ -> loop (index + 1) rest
-        loop 0 segments
+                ConvexHull.internalSegmentSupport first angle
+                |> Result.bind (fun (t, supportPoint, value) ->
+                    let (_, _, _, bestValue) = best
+                    let next = if value > bestValue then (index, t, supportPoint, value) else best
+                    loop (index + 1) next rest)
+        let first = List.head segments
+        ConvexHull.internalSegmentSupport first angle
+        |> Result.bind (fun (t, supportPoint, value) ->
+            loop 1 (0, t, supportPoint, value) (List.tail segments))
 
     let private stripPointsInTraversalOrder segments (strip: MinimumWidthStrip) tolerance =
-        match segments with
-        | [] -> Error()
-        | first :: _ ->
+        let angle = strip.Normal |> Point.rotateClockwise |> Point.heading
+        traversalSupport segments (angle + 180.0<degree>)
+        |> Result.bind (fun (minIndex, minT, minPoint, _) ->
+            traversalSupport segments angle
+            |> Result.map (fun (maxIndex, maxT, maxPoint, _) ->
+            let first = List.head segments
             let startPoint = Segment.start first
             let endPoint = segments |> List.last |> Segment.finish
-            let points = [ strip.LowerPoint; strip.UpperPoint ]
+            let ordered =
+                if minIndex < maxIndex || (minIndex = maxIndex && minT <= maxT) then [ minPoint; maxPoint ]
+                else [ maxPoint; minPoint ]
+            // Both endpoint anchors take priority, even when they coincide.
             let protrusions =
-                (match points with
-                 | [ a; b ] when pointOrderInSegments a segments tolerance > pointOrderInSegments b segments tolerance -> [ b; a ]
-                 | _ -> points)
+                ordered
+                |> List.filter (fun candidate ->
+                    Point.distance candidate startPoint > tolerance && Point.distance candidate endPoint > tolerance)
                 |> uniquePoints tolerance
-            Ok(uniquePoints tolerance (startPoint :: (protrusions @ [ endPoint ])))
+            startPoint :: (protrusions @ [ endPoint ])))
 
     let rec private degenerateTraversal tolerance segments =
         match segments with
@@ -177,7 +189,8 @@ module Degeneracy =
         | Some strip ->
             match stripPointsInTraversalOrder prefix.Segments strip tolerance with
             | Error _ -> degenerateTraversal tolerance prefix.Segments
-            | Ok points -> Ok(traversalLines tolerance points)
+            // Candidate extrema are already deduplicated against both anchors.
+            | Ok points -> Ok(traversalLines 0.0<length> points)
 
     let rec private normalizeSegments tolerance segments converted =
         match segments with

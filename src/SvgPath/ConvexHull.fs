@@ -153,7 +153,6 @@ module ConvexHull =
     let private loopUnionSampleCount = 360
     let private loopUnionTieTolerance = 1.0e-7<length>
     let private loopUnionAngleTolerance = 0.02<degree>
-    let private loopUnionPointTolerance = 1.0e-6<length>
     let private sameT = 1.0e-6<parameter>
     let private seededWorstDirectionStep = 0.1<degree>
     let private seededWorstDirectionRefinedStep = 0.01<degree>
@@ -536,17 +535,6 @@ module ConvexHull =
         Segment.point loop.Segments[parameter.SegmentIndex] parameter.T
         |> Result.defaultWith (failwithf "%A")
 
-    let private loopPointsFar left right =
-        Point.squaredDistance left right > loopUnionPointTolerance * loopUnionPointTolerance
-
-    let private compactLoopPieces loopA loopB pieces =
-        pieces
-        |> List.filter (function
-            | LoopPieceA(fromParameter, toParameter) -> loopPointsFar (loopPoint loopA fromParameter) (loopPoint loopA toParameter)
-            | LoopPieceB(fromParameter, toParameter) -> loopPointsFar (loopPoint loopB fromParameter) (loopPoint loopB toParameter)
-            | HullLineAB(a, b) -> loopPointsFar (loopPoint loopA a) (loopPoint loopB b)
-            | HullLineBA(b, a) -> loopPointsFar (loopPoint loopB b) (loopPoint loopA a))
-
     let private allOneLoop samples =
         match samples with
         | [] -> []
@@ -561,7 +549,7 @@ module ConvexHull =
             |> List.map (loopSample loopA loopB)
         match loopTransitionBoundaries loopA loopB samples with
         | [] -> allOneLoop samples
-        | boundaries -> boundaries |> loopPiecesFromBoundaries |> compactLoopPieces loopA loopB
+        | boundaries -> loopPiecesFromBoundaries boundaries
 
     let private nextIndex index count = if index + 1 >= count then 0 else index + 1
 

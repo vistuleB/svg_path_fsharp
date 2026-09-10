@@ -46,7 +46,8 @@ type WidthExtremum =
 [<Struct>]
 type internal MinimumWidthStrip =
     { Width: float<length>
-      Direction: Point<1>
+      /// Unit normal pointing from lower support toward upper support.
+      Normal: Point<1>
       LowerPoint: Point<length>
       UpperPoint: Point<length>
       LowerSupport: float<length>
@@ -1414,7 +1415,7 @@ module ConvexHull =
 
     let private stripFromExtremum (extremum: WidthExtremum) =
         { Width = extremum.Width
-          Direction = extremum.Direction
+          Normal = extremum.Direction
           LowerPoint = extremum.LowerPoint
           UpperPoint = extremum.UpperPoint
           LowerSupport = Point.dot extremum.LowerPoint extremum.Direction
@@ -1553,7 +1554,7 @@ module ConvexHull =
                 let direction = Point.direction best.Angle
                 MinimumWidthFits
                     { Width = best.Support.Width
-                      Direction = direction
+                      Normal = direction
                       LowerPoint = best.Support.LowerPoint
                       UpperPoint = best.Support.UpperPoint
                       LowerSupport = Point.dot best.Support.LowerPoint direction

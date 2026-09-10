@@ -14,4 +14,11 @@ Do not substitute the final Gleam tree for the historical source commit.
   --filter FullyQualifiedName~SignedZeroTests`: 8 passed. `scripts/test-fast`:
   1568 passed (baseline 1560).
 
-Next: `0bdac79` (minimum-width strip `direction` → `normal`).
+- `0bdac79` — minimum-width strip `Direction` → `Normal`, including its unit
+  normal contract. `WidthExtremum.Direction` remains unchanged, as in Gleam.
+  Validation: `scripts/test-fast`: 1568 passed.
+
+Next: `2d71317` (longitudinal protrusions and hull piece compaction removal).
+That source commit deliberately recorded a failing Gleam checkpoint (1370
+passed, 18 failed); the loop point/portion/full-loop repair occurs later at
+`21c8b7f`. Preserve this sequence and report intermediate failures explicitly.

@@ -147,4 +147,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   semantic no-op. Last unchanged-code `scripts/test-fast`: 1674 passed;
   `git diff --check` passes.
 
-Next: `078868f` (clip boundary zero normalization).
+- `078868f` — Clip.uniqueParameters canonicalizes through
+  Subpath.parameterCanonicalize, and cut reconstruction canonicalizes again
+  before endpoint filtering. Source's local zero normalization is therefore
+  already satisfied. Last unchanged-code `scripts/test-fast`: 1674 passed;
+  `git diff --check` passes.
+
+Next: `c01da6a` (intersection snap normalization and arc zero radii).

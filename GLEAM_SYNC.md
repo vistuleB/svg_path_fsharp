@@ -40,4 +40,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   All five source regressions added one-to-one. `scripts/test-fast`: 1598 passed;
   `scripts/test-slow`: 26 passed. All 20 intermediate failures are resolved.
 
-Next: `8f8173d` (exact point interpolation endpoints).
+- `8f8173d` — exact endpoint branches in Point.interpolate, with three one-to-one
+  regressions (signed-zero coordinates checked by bits on .NET).
+  `scripts/test-fast`: 1601 passed.
+
+Next: `2854585` (heading/aperture full-turn canonicalization).

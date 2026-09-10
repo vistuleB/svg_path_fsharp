@@ -91,9 +91,13 @@ module Point =
         displacement left right |> norm
 
     let interpolate (startPoint: Point<'Unit>) (endPoint: Point<'Unit>) (t: float<parameter>) : Point<'Unit> =
-        displacement startPoint endPoint
-        |> scale (Parameter.ratio t)
-        |> fun offset -> translate offset startPoint
+        // Preserve supplied endpoints without cancellation or overflowing b-a.
+        if InternalNumber.isZero t then startPoint
+        elif t = 1.0<parameter> then endPoint
+        else
+            displacement startPoint endPoint
+            |> scale (Parameter.ratio t)
+            |> fun offset -> translate offset startPoint
 
     let midpoint (left: Point<'Unit>) (right: Point<'Unit>) : Point<'Unit> =
         interpolate left right (Parameter.fromFloat 0.5)

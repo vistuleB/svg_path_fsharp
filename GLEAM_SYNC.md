@@ -197,4 +197,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   unresolved sign-changing bracket. `scripts/test-fast`: 1697 passed; the
   historical intermediate failure is resolved.
 
-Next: `eda3e14` (area contract documentation).
+- `eda3e14` — document visual signed-area orientation and separate internal
+  arrangement-merging tolerance. Documentation-only; `git diff --check` passes.
+
+Next: `e6eae1b` (enclosing-circle boundary supports).

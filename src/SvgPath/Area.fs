@@ -6,10 +6,16 @@ type private CrossingGroup = { Edge: AreaEdge; Y: float<length>; Winding: int; C
 type private AreaMode = FillRuleArea of FillRule | AbsoluteWindingArea
 
 /// Signed SVG area and clockwiseness calculations.
+/// Fill-rule and absolute-winding area merge slab boundaries and crossings
+/// within 1e-12 times the larger width/height of the linearized path's box,
+/// including line-only inputs. This differs from curve-to-line tolerance;
+/// neither tolerance directly bounds final area error.
 [<RequireQualifiedAccess>]
 module Area =
     let private relativeTolerance = 1.0e-12
 
+    /// Polygon area with implicit final-to-first closure. Fewer than three
+    /// points give zero; positive is visually clockwise in SVG coordinates.
     let signedPoints points : float<length^2> =
         match points with
         | [] | [ _ ] | [ _; _ ] -> 0.0<length^2>
@@ -41,6 +47,8 @@ module Area =
          + Point.cross startPoint b
          + Point.cross startPoint c) / 2.0
 
+    /// Segment contribution: a clockwise closed-loop sum is positive and a
+    /// counterclockwise sum negative in SVG coordinates.
     let signedSegment segment : float<length^2> =
         match segment with
         | Line(startPoint, endPoint) -> Point.cross startPoint endPoint / 2.0

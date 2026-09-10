@@ -223,4 +223,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   containment for rejected affine candidates. Source regression added.
   `scripts/test-fast`: 1706 passed.
 
-Next: `cf70b23` (arc geometry in congruency fitting).
+- `cf70b23` — retain arc midpoint transverse extent in fitting clouds; pass
+  transform family through container clouds and allow reflected sweep for
+  affine fitting only. Documentation and both source regressions ported.
+  `scripts/test-fast`: 1708 passed.
+
+Next: `b5a6cab` (exact collapsed arc subpath endpoints).

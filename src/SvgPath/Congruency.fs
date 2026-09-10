@@ -14,7 +14,8 @@ type CongruencyFit =
     { Transform: Affine
       Error: float<length> }
 
-/// Similarity and affine congruency tests and fitted transforms.
+/// Congruency checks allow translation, rotation, and uniform scale, not
+/// reflection or shear. Best-fit queries also support the affine family.
 [<RequireQualifiedAccess>]
 module Congruency =
     let private defaultAngleTolerance = 1.0e-9<degree>
@@ -187,7 +188,7 @@ module Congruency =
             |> Result.mapError (fun _ -> ())
         | _ -> Error()
 
-    let private segmentPoints source target =
+    let private segmentPoints source target family =
         match source, target with
         | Line(_, sourceEnd), Line(_, targetEnd) -> Ok([ sourceEnd ], [ targetEnd ], false)
         | QuadraticBezier(_, sourceControl, sourceEnd), QuadraticBezier(_, targetControl, targetEnd) ->
@@ -195,20 +196,22 @@ module Congruency =
         | CubicBezier(_, sourceControl1, sourceControl2, sourceEnd),
           CubicBezier(_, targetControl1, targetControl2, targetEnd) ->
             Ok([ sourceControl1; sourceControl2; sourceEnd ], [ targetControl1; targetControl2; targetEnd ], false)
-        | Arc sourceArc, Arc targetArc when sourceArc.LargeArc = targetArc.LargeArc && sourceArc.Sweep = targetArc.Sweep ->
-            match arcOppositePoint source, arcOppositePoint target with
-            | Ok sourceOpposite, Ok targetOpposite -> Ok([ sourceOpposite; sourceArc.End ], [ targetOpposite; targetArc.End ], true)
+        | Arc sourceArc, Arc targetArc when sourceArc.LargeArc = targetArc.LargeArc && (family=Affine || sourceArc.Sweep = targetArc.Sweep) ->
+            // The antipodal point of a semicircle is its endpoint. The
+            // midpoint retains the transverse extent missing from its diameter.
+            match arcOppositePoint source, arcOppositePoint target, Segment.point source 0.5<parameter>, Segment.point target 0.5<parameter> with
+            | Ok sourceOpposite, Ok targetOpposite, Ok sourceMidpoint, Ok targetMidpoint -> Ok([ sourceOpposite;sourceMidpoint; sourceArc.End ], [ targetOpposite;targetMidpoint; targetArc.End ], true)
             | _ -> Error()
         | _ -> Error()
 
-    let private segmentPointCloud source target =
-        segmentPoints source target
+    let private segmentPointCloud source target family =
+        segmentPoints source target family
         |> Result.map (fun (sourceExtra, targetExtra, hasArc) ->
             { SourcePoints = Segment.start source :: sourceExtra
               TargetPoints = Segment.start target :: targetExtra
               HasArc = hasArc })
 
-    let private subpathPointCloud source target =
+    let private subpathPointCloud source target family =
         let sourceSegments = Subpath.segments source
         let targetSegments = Subpath.segments target
         if List.length sourceSegments <> List.length targetSegments then Error()
@@ -217,14 +220,14 @@ module Congruency =
             |> List.fold (fun state (sourceSegment, targetSegment) ->
                 state
                 |> Result.bind (fun cloud ->
-                    segmentPoints sourceSegment targetSegment
+                    segmentPoints sourceSegment targetSegment family
                     |> Result.map (fun (sourceExtra, targetExtra, hasArc) ->
                         { SourcePoints = cloud.SourcePoints @ sourceExtra
                           TargetPoints = cloud.TargetPoints @ targetExtra
                           HasArc = cloud.HasArc || hasArc })))
                 (Ok { SourcePoints = [ Subpath.start source ]; TargetPoints = [ Subpath.start target ]; HasArc = false })
 
-    let private pathPointCloud source target =
+    let private pathPointCloud source target family =
         let sourceSubpaths = Path.subpaths source
         let targetSubpaths = Path.subpaths target
         if List.length sourceSubpaths <> List.length targetSubpaths then Error()
@@ -233,7 +236,7 @@ module Congruency =
             |> List.fold (fun state (sourceSubpath, targetSubpath) ->
                 state
                 |> Result.bind (fun cloud ->
-                    subpathPointCloud sourceSubpath targetSubpath
+                    subpathPointCloud sourceSubpath targetSubpath family
                     |> Result.map (fun next ->
                         { SourcePoints = cloud.SourcePoints @ next.SourcePoints
                           TargetPoints = cloud.TargetPoints @ next.TargetPoints
@@ -267,7 +270,7 @@ module Congruency =
 
     let segmentWith source target tolerance =
         if not (validTolerance tolerance) then Error()
-        else segmentPointCloud source target
+        else segmentPointCloud source target Similar
         |> Result.bind (fun cloud ->
             points cloud.SourcePoints cloud.TargetPoints tolerance.Distance
             |> Result.bind (fun transform ->
@@ -276,12 +279,16 @@ module Congruency =
     let segment source target (tolerance: float<length>) =
         segmentWith source target { Distance = tolerance; Angle = defaultAngleTolerance }
 
+    /// Fit ordered semantic points. Arc clouds contain start, its antipodal
+    /// ellipse point, parameter midpoint, and end. Affine permits reflected
+    /// sweep flags; Similar requires matching flags. Large-arc flags must match.
+    /// Error measures these fitting points, not the entire curve.
     let fitSegment source target family =
-        segmentPointCloud source target |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)
+        segmentPointCloud source target family |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)
 
     let subpathWith source target tolerance =
         if not (validTolerance tolerance) then Error()
-        else subpathPointCloud source target
+        else subpathPointCloud source target Similar
         |> Result.bind (fun cloud ->
             points cloud.SourcePoints cloud.TargetPoints tolerance.Distance
             |> Result.bind (fun transform ->
@@ -292,12 +299,13 @@ module Congruency =
     let subpath source target (tolerance: float<length>) =
         subpathWith source target { Distance = tolerance; Angle = defaultAngleTolerance }
 
+    /// Uses the fitting points and arc-flag policy documented by fitSegment.
     let fitSubpath source target family =
-        subpathPointCloud source target |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)
+        subpathPointCloud source target family |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)
 
     let pathWith source target tolerance =
         if not (validTolerance tolerance) then Error()
-        else pathPointCloud source target
+        else pathPointCloud source target Similar
         |> Result.bind (fun cloud ->
             points cloud.SourcePoints cloud.TargetPoints tolerance.Distance
             |> Result.bind (fun transform ->
@@ -309,5 +317,6 @@ module Congruency =
     let path source target (tolerance: float<length>) =
         pathWith source target { Distance = tolerance; Angle = defaultAngleTolerance }
 
+    /// Uses the fitting points and arc-flag policy documented by fitSegment.
     let fitPath source target family =
-        pathPointCloud source target |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)
+        pathPointCloud source target family |> Result.bind (fun cloud -> fitPoints cloud.SourcePoints cloud.TargetPoints family)

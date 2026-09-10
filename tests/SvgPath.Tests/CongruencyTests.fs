@@ -7,6 +7,38 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private tolerance = { Distance = 1.0e-6<length>; Angle = 1.0e-6<degree> }
 let private near expected actual = abs (expected - actual) <= 1.0e-6<length>
 
+let private assertMatrixNear expected actual =
+    let a,b,c,d,e,f = Affine.toTuple expected
+    let aa,bb,cc,dd,ee,ff = Affine.toTuple actual
+    for left,right in [a,aa;b,bb;c,cc;d,dd;float e,float ee;float f,float ff] do
+        Assert.True(abs(left-right)<=1e-6)
+
+[<Fact>]
+let ``affine arc fit accepts reflection at every container level`` () =
+    let source = Arc {Start=point 10. 0.;Radius=point 10. 10.;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=point 0. 10.}
+    let expected = Affine.fromTuple(-1.,0.,0.,1.,0.0<length>,0.0<length>)
+    let target = Transform.segment source expected |> Result.defaultWith (failwithf "%A")
+    let sourceSubpath = Subpath.ofSegment source
+    let targetSubpath = Subpath.ofSegment target
+    let fits = [Congruency.fitSegment source target TransformFamily.Affine;Congruency.fitSubpath sourceSubpath targetSubpath TransformFamily.Affine;Congruency.fitPath (Path.ofSubpaths[sourceSubpath]) (Path.ofSubpaths[targetSubpath]) TransformFamily.Affine]
+    for result in fits do
+        let fit = result |> Result.defaultWith (failwithf "%A")
+        Assert.True(near 0.0<length> fit.Error)
+        assertMatrixNear expected fit.Transform
+    Assert.Equal(Error(),Congruency.segment source target 1e-6<length>)
+    Assert.Equal(Error(),Congruency.fitSegment source target Similar)
+
+[<Fact>]
+let ``semicircle fit retains transverse extent`` () =
+    let source = Arc {Start=point -10. 0.;Radius=point 10. 10.;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=point 10. 0.}
+    let expected = Affine.fromTuple(1.,0.,0.,2.,0.0<length>,0.0<length>)
+    let target = Transform.segment source expected |> Result.defaultWith (failwithf "%A")
+    let fit = Congruency.fitSegment source target TransformFamily.Affine |> Result.defaultWith (failwithf "%A")
+    Assert.True(near 0.0<length> fit.Error)
+    assertMatrixNear expected fit.Transform
+    let similar = Congruency.fitSegment source target Similar |> Result.defaultWith (failwithf "%A")
+    Assert.True(similar.Error>1.0<length>)
+
 [<Fact>]
 let ``segment rejects different constructors`` () =
     let line = Line(point 0.0 0.0, point 10.0 0.0)

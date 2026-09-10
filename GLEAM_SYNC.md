@@ -51,4 +51,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   closure policy application, adapted Effects/Offset callers and README.
   Nine source regressions added one-to-one. `scripts/test-fast`: 1613 passed.
 
-Next: `9215e47` (preserve nonconstant hull segments during cleanup).
+- `9215e47` — discard only exact constant segments in hull/tangent reconstruction;
+  retain short nonconstant curves and arc errors. Three source regressions added
+  one-to-one. `scripts/test-fast`: 1616 passed.
+
+Next: `0590b19` (Custom policy README clarification).

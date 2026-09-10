@@ -653,6 +653,15 @@ module ConvexHull =
         | OnePoint _ -> []
         | Portion(fromParameter,toParameter) -> loopPortionSegments loop fromParameter toParameter
 
+    // Remove only exact constants. Short nonconstant pieces may carry endpoints
+    // or extrema. Equal endpoints alone do not make a Bezier constant; invalid
+    // endpoint-form arcs must retain their error rather than being swallowed.
+    let private segmentIsExactlyConstant = function
+        | Line(a,b) -> a = b
+        | QuadraticBezier(a,b,c) -> a = b && a = c
+        | CubicBezier(a,b,c,d) -> a = b && a = c && a = d
+        | Arc _ -> false
+
     let private unionPieceSegments loopA loopB pieces =
         pieces
         |> List.collect (function
@@ -660,7 +669,7 @@ module ConvexHull =
             | LoopPieceB piece -> loopPieceSegments loopB piece
             | HullLineAB(a, b) -> [ Line(loopPoint loopA a, loopPoint loopB b) ]
             | HullLineBA(b, a) -> [ Line(loopPoint loopB b, loopPoint loopA a) ])
-        |> List.filter (segmentIsPointLike >> not)
+        |> List.filter (segmentIsExactlyConstant >> not)
 
     let private loopSupportDominance loopA loopB =
         [ 0 .. loopUnionSampleCount - 1 ]
@@ -1071,7 +1080,7 @@ module ConvexHull =
 
     let private buildOpenSubpathFromSegments segments =
         segments
-        |> List.filter (segmentIsPointLike >> not)
+        |> List.filter (segmentIsExactlyConstant >> not)
         |> function
             | [] -> Error InternalTangentSearchDegenerateLoop
             | segments -> Subpath.createWith WiggleThenBridge segments |> Result.mapError InternalConstructionPathError

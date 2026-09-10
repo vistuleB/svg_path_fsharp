@@ -62,6 +62,7 @@
     <Compile Include="PointEndpointTests.fs" />
     <Compile Include="PointTurnEndpointTests.fs" />
     <Compile Include="EndpointContextTests.fs" />
+    <Compile Include="HullConstantCleanupTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

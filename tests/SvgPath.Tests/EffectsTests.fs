@@ -11,6 +11,18 @@ let private arcCount (subpath: Subpath) =
     subpath.Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length
 
 [<Fact>]
+let ``leave corner preserves untrimmed zero length segments`` () =
+    let options = { Effects.defaultRoundCornerOptions with Failure=LeaveCorner }
+    let a,b,c = point 0. 0.,point 10. 0.,point 10. 10.
+    for points in [[a;a;b;c];[a;b;b;c];[a;b;c;c]] do
+        let source = Subpath.polyline points |> Result.defaultWith (failwithf "%A")
+        let rounded = Effects.roundSubpathCornersWith source 1.0<length> options |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(Subpath.start source,Subpath.start rounded)
+        Assert.Equal(Subpath.finish source,Subpath.finish rounded)
+        let zero subpath = Subpath.segments subpath |> List.filter (fun segment -> Segment.start segment=Segment.finish segment)
+        Assert.Equal<Segment list>(zero source,zero rounded)
+
+[<Fact>]
 let ``stretch to join endpoint policy meets at midpoint`` () =
     let source =
         Subpath.createWith

@@ -227,7 +227,9 @@ module Effects =
                     let before = cornerFor (previousIndex info.Index infos.Length closed) active
                     let after = cornerFor info.Index active
                     let trim corner = corner |> Option.map _.Trim |> Option.defaultValue 0.0<length>
-                    trim before + trim after >= info.Length - options.DistanceTolerance)
+                    let startTrim,endTrim = trim before,trim after
+                    (startTrim>0.0<length> || endTrim>0.0<length>)
+                    && startTrim + endTrim >= info.Length - options.DistanceTolerance)
             match overlap with
             | None -> active
             | Some info ->
@@ -251,9 +253,12 @@ module Effects =
                 let after = cornerFor info.Index corners
                 let startTrim = before |> Option.map _.Trim |> Option.defaultValue 0.0<length>
                 let endTrim = after |> Option.map _.Trim |> Option.defaultValue 0.0<length>
-                if startTrim + endTrim >= info.Length - options.DistanceTolerance then Error(CornerTrimsOverlap info.Index)
+                let hasTrim = startTrim>0.0<length> || endTrim>0.0<length>
+                if hasTrim && startTrim + endTrim >= info.Length - options.DistanceTolerance then Error(CornerTrimsOverlap info.Index)
                 else
-                    Segment.betweenLengthsWith info.Segment startTrim (info.Length - endTrim) options.LengthOptions
+                    // Untouched segments are not consumed and need no inverse-length rebuild.
+                    (if not hasTrim then Ok info.Segment
+                     else Segment.betweenLengthsWith info.Segment startTrim (info.Length - endTrim) options.LengthOptions)
                     |> Result.mapError EffectsPathError
                     |> Result.map (fun shortened ->
                         let next = shortened :: (after |> Option.map (fun corner -> [ corner.Arc ]) |> Option.defaultValue [])

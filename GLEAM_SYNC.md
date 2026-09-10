@@ -258,4 +258,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   inventing full-loop geometry. Updated source regression and added zero-radius
   termination regression. `scripts/test-fast`: 1718 passed.
 
-Next: `61bbbe3` (untouched corner-trim segments).
+- `61bbbe3` — leave untouched segments out of corner-overlap resolution and
+  inverse-length reconstruction. Source regression added. `scripts/test-fast`:
+  1719 passed.
+
+Next: `fd9d26a` (empty endpoint arc splits).

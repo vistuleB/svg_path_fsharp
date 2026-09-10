@@ -611,4 +611,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   disabled-test paths do not apply to .NET trait-based test selection.
   Documentation only; no additional tests run for this checkpoint.
 
-Next: `19d2949` (archive superseded notes).
+- `19d2949` — separate current Elizabeth notes from historical experiments.
+  The large Gleam review/archive documents were never copied into this repo;
+  their resolved findings are preserved by this commit ledger instead. No
+  production changes or additional tests at this documentation checkpoint.
+
+Next: `bf5341d` (intersection candidate contract tests).

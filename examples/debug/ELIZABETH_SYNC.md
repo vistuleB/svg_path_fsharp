@@ -1,4 +1,15 @@
-# Elizabeth historical integration checkpoint
+# Elizabeth synchronization notes
+
+## Current contract
+
+Elizabeth is the sole production general curve-pair search. It is bounded and
+heuristic, not a mathematical completeness certificate. Analytic Line handling
+and overlap prechecks remain outside this solver. Projection continues to use
+separate distance minimization. Endpoint-on-segment candidates are collected
+before beam selection; terminal windows use Newton refinement. Historical
+experimental alternatives below are no longer executable policies.
+
+## Historical checkpoints
 
 Update at Gleam `18fc6f3`: Henry and Edward and their comparison switches have
 also been removed. Elizabeth is the sole general curve-pair intersection route;

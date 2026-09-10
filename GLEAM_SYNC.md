@@ -166,4 +166,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   and deduplicate validated pairs. Five source regressions added one-to-one.
   `scripts/test-fast`: 1680 passed.
 
-Next: `fd10a21` (underdetermined tangent fits).
+- `fd10a21` — reject endpoint-only tangent fits without handle information;
+  document the contract and add the source regression. `scripts/test-fast`:
+  1681 passed.
+
+Next: `fddb38e` (ellipse collapse orientation and multi-turn extrema).

@@ -387,7 +387,9 @@ module Bezier =
             count + 1
         let ata00, ata01, ata11, atb0, atb1, count =
             List.fold folder (0.0, 0.0, 0.0, 0.0<length>, 0.0<length>, 0) samples
-        if count = 0 then Error UnderdeterminedCubicFit
+        // Endpoint samples contribute no handle basis information. Do not let
+        // the nonnegative solver's zero-handle candidate conceal that fact.
+        if count = 0 || (InternalNumber.isZero ata00 && InternalNumber.isZero ata11) then Error UnderdeterminedCubicFit
         else solveNonnegativeCubicFit ata00 ata01 ata11 atb0 atb1
 
     let private fitError samples curve =
@@ -411,6 +413,8 @@ module Bezier =
               StartHandle = UnconstrainedHandle
               EndHandle = UnconstrainedHandle }
 
+    /// Returns UnderdeterminedCubicFit when samples provide no handle
+    /// information, including empty and endpoint-only sample lists.
     let fitCubicWithEndpointTangents
         startPoint
         endPoint

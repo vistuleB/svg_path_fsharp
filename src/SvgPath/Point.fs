@@ -70,9 +70,16 @@ module Point =
         InternalNumber.hypot (float point.X) (float point.Y)
         |> LanguagePrimitives.FloatWithMeasure<'Unit>
 
+    /// Normalize finite nonzero vectors after rescaling to avoid overflow and
+    /// underflow. A zero vector returns None. Divide coordinates directly:
+    /// the reciprocal of a subnormal scale can itself overflow.
     let normalize (point: Point<'Unit>) : Point<1> option =
-        let magnitude = norm point
-        if float magnitude = 0.0 then None else Some(create (point.X / magnitude) (point.Y / magnitude))
+        let largest = max (abs point.X) (abs point.Y)
+        if InternalNumber.isZero largest then None
+        else
+            let scaled = create (point.X / largest) (point.Y / largest)
+            let magnitude = norm scaled
+            Some(create (scaled.X / magnitude) (scaled.Y / magnitude))
 
     let project (point: Point<'Projected>) (onto: Point<'Onto>) : Point<'Projected> option =
         let denominator = squaredNorm onto

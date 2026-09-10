@@ -73,4 +73,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   rounded preflight bounds. The Erlang-only exception wrapper has no .NET role.
   Five source regressions added one-to-one. `scripts/test-fast`: 1636 passed.
 
-Next: `ada3613` (scale-safe vector normalization).
+- `ada3613` — rescale vectors before normalization and divide coordinates
+  directly. Three source regressions added one-to-one. `scripts/test-fast`:
+  1639 passed.
+
+Next: `7dbfee4` (projection/proximity/interpolation arithmetic).

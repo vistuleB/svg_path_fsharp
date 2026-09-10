@@ -287,7 +287,7 @@ let ``path_offsets_straight_subpaths_test`` () =
     Assert.Equal("M 0 -2 H 8 V -10 M 0 18 H 8 V 10", Serialize.path result)
 
 [<Fact>]
-let ``path offset orients nested closed contours by depth`` () =
+let ``single offset retains traversal rather than assigning nesting orientation`` () =
     let square size inset =
         Subpath.polygon
             [ point inset inset
@@ -295,13 +295,17 @@ let ``path offset orients nested closed contours by depth`` () =
               point (inset + size) (inset + size)
               point inset (inset + size) ]
         |> Result.defaultWith (failwithf "%A")
-    let result =
-        Offset.path (Path.ofSubpaths [ square 20.0 0.0; square 6.0 7.0 ]) 0.5<length> (Miter Offset.defaultMiterLimit) Butt
-        |> Result.defaultWith (failwithf "%A")
-    let areas = result.Subpaths |> List.map Area.signedSubpath
-    Assert.Equal(2, areas.Length)
-    Assert.Equal(1, areas |> List.filter (fun area -> area > 0.0<length^2>) |> List.length)
-    Assert.Equal(1, areas |> List.filter (fun area -> area < 0.0<length^2>) |> List.length)
+    let source = [square 20.0 0.0; square 6.0 7.0]
+    for contours in [source; List.map Subpath.reverse source] do
+        let result =
+            Offset.path (Path.ofSubpaths contours) 0.5<length> (Miter Offset.defaultMiterLimit) Butt
+            |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(2, result.Subpaths.Length)
+        let sourceArea = Area.signedSubpath contours.Head
+        // This is one-sided offset geometry, not a filled band: nesting must
+        // not reverse the inner result into a hole. Check both source directions.
+        for contour in result.Subpaths do
+            Assert.True(Area.signedSubpath contour * sourceArea > 0.0<length^4>)
 
 [<Fact>]
 let ``path_offsets_closed_subpaths_test`` () =

@@ -622,4 +622,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   intersection assertions now pass with the exact Gleam snapshots (6/9/4/4).
   The sole failure remains the obsolete F#-only single-offset nesting assertion.
 
-Next: `785df2f` (clockwise segment bounding polygons).
+- `785df2f` — public Segment.boundingPolygon/Between faithfully use Bezier
+  control hulls and corrected-ellipse tangent triangles, returning visual
+  clockwise hulls with source-start preference. All five source tests ported.
+  `scripts/test-fast`: 1802 passed, the obsolete F# orientation assertion failed,
+  1803 total; all bounding-polygon regressions pass.
+
+Next: `55b738f` (ordered polygons in Elizabeth).

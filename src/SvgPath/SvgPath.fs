@@ -1186,6 +1186,71 @@ module Segment =
         | CubicBezier(a,b,c,d) -> Ok(Point.distance a b + Point.distance b c + Point.distance c d)
         | Arc _ -> derivativeScale segment
 
+    let rec private boundingHullPush (stack: Point<length> list) p =
+        match stack with
+        | b::a::rest ->
+            let cross = (b.X-a.X)*(p.Y-a.Y) - (b.Y-a.Y)*(p.X-a.X)
+            if cross <= 0.0<length^2> then boundingHullPush (a::rest) p
+            else p::stack
+        | _ -> p::stack
+
+    let rec private boundingArcPoints (arc: CenterArcData) (fromT: float<parameter>) (toT: float<parameter>) =
+        let middle = fromT + (toT-fromT)/2.0
+        let span = arc.DeltaAngle * Parameter.ratio (toT-fromT)
+        if abs span > 90.0<degree> then
+            boundingArcPoints arc fromT middle @ boundingArcPoints arc middle toT
+        else
+            let a,b,m = Ellipse.arcPoint arc fromT, Ellipse.arcPoint arc toT, Ellipse.arcPoint arc middle
+            // Tangent intersection without a nearly-parallel line solve.
+            let divisor = Trig.cosDegrees (span/2.0)
+            [a;b;Point.create (arc.Center.X+(m.X-arc.Center.X)/divisor) (arc.Center.Y+(m.Y-arc.Center.Y)/divisor)]
+
+    /// Convex enclosure for a portion in 0..1, including reversed intervals.
+    /// Boundary order is visually clockwise; prefer the point at fromT first
+    /// when it is a hull vertex. Equal parameters return one point. Bounds use
+    /// ordinary floating-point arithmetic, not outward-rounded arithmetic.
+    let boundingPolygonBetween segment fromT toT =
+        if fromT < 0.0<parameter> || fromT > 1.0<parameter> || toT < 0.0<parameter> || toT > 1.0<parameter> then
+            Error SplitOutsideSegment
+        else
+            point segment fromT |> Result.bind (fun start ->
+                if fromT=toT then Ok [start]
+                else
+                    let points =
+                        match segment with
+                        | Arc _ ->
+                            arcCenterData segment |> Result.bind (fun arc ->
+                                point segment toT |> Result.map (fun finish ->
+                                    start::finish::boundingArcPoints arc fromT toT))
+                        | _ ->
+                            between segment fromT toT |> Result.map (function
+                                | Line(a,b) -> [a;b]
+                                | QuadraticBezier(a,b,c) -> [a;b;c]
+                                | CubicBezier(a,b,c,d) -> [a;b;c;d]
+                                | Arc _ -> [])
+                    points |> Result.map (fun points ->
+                        let sorted = points
+                                     |> List.map (fun p -> Point.create (InternalNumber.normalizeZero p.X) (InternalNumber.normalizeZero p.Y))
+                                     |> List.sortBy (fun p -> p.X,p.Y)
+                                     |> List.distinct
+                        let hull =
+                            match sorted with
+                            | [] | [_] -> sorted
+                            | _ ->
+                                let lower = List.fold boundingHullPush [] sorted |> List.rev
+                                let upper = List.fold boundingHullPush [] (List.rev sorted) |> List.rev
+                                List.take (lower.Length-1) lower @ List.take (upper.Length-1) upper
+                        let before = hull |> List.takeWhile (fun p -> p.X<>start.X || p.Y<>start.Y)
+                        let after = List.skip before.Length hull
+                        if List.isEmpty after then hull else after @ before))
+
+    /// Visually clockwise convex enclosure. Beziers use their control-point
+    /// hull; arcs use corrected-ellipse tangent triangles spanning at most 90°.
+    /// Start is first when a hull vertex, otherwise the lexicographic minimum.
+    /// The first vertex is not repeated; point/line degeneracies return 1/2
+    /// vertices. Invalid arcs return DegenerateArc.
+    let boundingPolygon segment = boundingPolygonBetween segment 0.0<parameter> 1.0<parameter>
+
     let private tangentialErrorIsImproving segment previousT previousValue proposalT proposalValue =
         derivative segment previousT
         |> Result.bind (fun previousDerivative ->

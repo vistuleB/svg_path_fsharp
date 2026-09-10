@@ -7,7 +7,7 @@ let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private pair =
     [ QuadraticBezier(p 0.0 0.0, p 2.0 3.0, p 4.0 0.0)
       Line(p 4.0 0.0, p 0.0 1.0) ]
-let private unwrap = Result.defaultWith (failwithf "%A")
+let private unwrap result = Result.defaultWith (failwithf "%A") result
 let private build segments = Arrangement.buildWith segments 2e-9<length> 2e-9<length> 0.0001<parameter> |> unwrap
 
 [<Fact>]

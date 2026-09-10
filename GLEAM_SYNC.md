@@ -491,7 +491,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `211076f` — private before/inside-cusp small-loop placement switch and
   source-image-based loop-edge selection. Default remains before cusp trimming.
   All four source regressions ported; no extra geometric intersection pass.
-  `scripts/test-fast`: 1779 passed, the same one obsolete F# nesting-orientation
-  expectation failed. No additional failures.
+  Initial validation exposed a test-helper value-restriction compilation error.
+  The helper is now explicitly a function. Completed `scripts/test-fast`:
+  1779 passed, the same one obsolete nesting-orientation expectation failed.
 
 Next: `c45b249` (analytic endpoint investigation record).

@@ -29,7 +29,7 @@ let private assertValidInAllModes points =
     |> Result.defaultWith (failwithf "%A")
     |> assertValidHull points
     let path = points |> List.map Subpath.empty |> Path.ofSubpaths
-    for mode in [ "dumb"; "ambitious" ] do
+    for mode in [ PointRepair; LoopRepair ] do
         ConvexHull.internalPathHullWithRepairMode path mode
         |> Result.defaultWith (failwithf "%A")
         |> assertValidHull points

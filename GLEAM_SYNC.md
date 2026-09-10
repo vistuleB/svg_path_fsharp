@@ -579,4 +579,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   pattern normalization already used the simplified value shape. `scripts/test-fast`:
   1795 passed, the same 5 historical assertions failed, 1800 total.
 
-Next: `1bd85ab` (typed hull repair policies).
+- `1bd85ab` — typed PointRepair/LoopRepair/NoRepair policies replace strings.
+  The F# prefilter was already unconditional; pairwise unions already used the
+  no-repair policy directly. Fast and slow test call sites use the typed cases.
+  `scripts/test-fast`: 1795 passed, the same 5 historical assertions failed,
+  1800 total. Slow profile not rerun at this checkpoint.
+
+Next: `18fc6f3` (retire alternative intersection solvers).

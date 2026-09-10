@@ -119,7 +119,7 @@ let ``path hull handles scaled two arc probe`` () =
 [<Fact>]
 let ``path hull with dumb repair mode handles line arc probe`` () =
     let hull =
-        ConvexHull.internalPathHullWithRepairMode (lineArcProbePath ()) "dumb"
+        ConvexHull.internalPathHullWithRepairMode (lineArcProbePath ()) PointRepair
         |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     assertProbeEndpointsInside hull
@@ -127,7 +127,7 @@ let ``path hull with dumb repair mode handles line arc probe`` () =
 [<Fact>]
 let ``path hull with ambitious repair mode handles line arc probe`` () =
     let hull =
-        ConvexHull.internalPathHullWithRepairMode (lineArcProbePath ()) "ambitious"
+        ConvexHull.internalPathHullWithRepairMode (lineArcProbePath ()) LoopRepair
         |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     assertProbeEndpointsInside hull

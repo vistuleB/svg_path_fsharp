@@ -22,6 +22,9 @@ type internal PointLoopView =
     | OutsidePoint
     | InsidePoint
 
+// Internal comparison policies covered by the repair tests.
+type internal RepairMode = PointRepair | LoopRepair | NoRepair
+
 [<Struct>]
 type DirectionalExtent =
     { LowerPoint: Point<length>
@@ -1326,11 +1329,11 @@ module ConvexHull =
 
     let private finalRepairLoop current sourceLoops repairMode =
         (match repairMode with
-        | "ambitious" ->
+        | LoopRepair ->
             sourceLoops
             |> List.fold (fun state addition ->
                 state |> Result.bind (fun repaired -> ambitiousRepairLoopWithLoop repaired addition)) (Ok current)
-        | "dumb" ->
+        | PointRepair ->
             sourceLoops
             |> List.collect loopEndpoints
             |> List.fold (fun distinct point ->
@@ -1338,7 +1341,7 @@ module ConvexHull =
                 else point :: distinct) []
             |> List.rev
             |> dumbRepairLoopWithPoints current
-        | _ -> Ok current)
+        | NoRepair -> Ok current)
 
     let private prefilterLoops loops =
         match loops with
@@ -1400,7 +1403,7 @@ module ConvexHull =
         | _ -> ConvexHullConstructionFailed
 
     let private segmentsHullCore segments =
-        segmentsHullWithRepairMode segments "ambitious" |> Result.mapError publicError
+        segmentsHullWithRepairMode segments LoopRepair |> Result.mapError publicError
 
     let private constructSegmentHull segment =
         constructSegmentHullInternal segment |> Result.mapError publicError

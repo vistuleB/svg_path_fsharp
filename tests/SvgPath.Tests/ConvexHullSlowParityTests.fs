@@ -9,7 +9,7 @@ let private tolerance = 1.0e-6<length>
 let private supportUnitDiameterTolerance = 2.0e-8
 let private smartSupportBaseTolerance = 1.0e-9<length>
 let private smartSupportUnitDiameterTolerance = 1.0e-9
-let private repairModesToCheck = [ "dumb"; "ambitious" ]
+let private repairModesToCheck = [ PointRepair; LoopRepair ]
 let private scaleCovarianceRelativeTolerance = 1.0e-7
 
 let private directionOf angle = angleDirection angle

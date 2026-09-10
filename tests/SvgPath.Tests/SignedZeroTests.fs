@@ -7,6 +7,22 @@ open Xunit
 let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap x = Result.defaultWith (failwithf "%A") x
 
+let private zeroTestArc =
+    { Center=p 0. 0.; Radius=p 1. 1.; XAxisRotation=0.0<degree>; StartAngle=0.0<degree>; DeltaAngle=360.0<degree> }
+[<Fact>]
+let ``signed zero ellipse split parameters are canonical`` () =
+    let arc = zeroTestArc
+    Assert.Equal<CenterArcData list>([arc],Ellipse.splitArcMany arc [-0.0<parameter>;0.0<parameter>])
+    Assert.Equal(Ok [arc],Ellipse.splitArcInsideMany arc [-0.0<parameter>;0.0<parameter>])
+    let expected = Ellipse.splitArcMany arc [-0.5<parameter>;0.0<parameter>;0.5<parameter>]
+    Assert.Equal(4,List.length expected)
+    Assert.Equal<CenterArcData list>(expected,Ellipse.splitArcMany arc [-0.5<parameter>;-0.0<parameter>;0.0<parameter>;0.5<parameter>])
+[<Fact>]
+let ``either zero direction has no ellipse projection extrema`` () =
+    for x in [0.0;-0.0] do
+        for y in [0.0;-0.0] do
+            Assert.Empty(Ellipse.arcProjectionExtrema zeroTestArc (Point.create x y))
+
 [<Fact>]
 let ``signed zero dash patterns are continuous`` () =
     let subpath = Subpath.create [Line(p 0. 0.,p 1. 0.)] |> unwrap

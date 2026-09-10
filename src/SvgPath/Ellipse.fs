@@ -204,6 +204,7 @@ module Ellipse =
 
     let private normalizedProgresses points =
         points
+        |> List.map InternalNumber.normalizeZero
         |> List.distinct
         |> List.sort
         |> List.skipWhile ((=) (parameter 0.0))
@@ -252,7 +253,7 @@ module Ellipse =
         let yAxisY = arc.Radius.Y * Trig.cosDegrees arc.XAxisRotation
         let alpha = direction.X * xAxisX + direction.Y * xAxisY
         let beta = direction.X * yAxisX + direction.Y * yAxisY
-        if alpha = 0.0<_> && beta = 0.0<_> then []
+        if InternalNumber.isZero alpha && InternalNumber.isZero beta then []
         else
             let supportAngle = Trig.atan2Degrees beta alpha
             [ supportAngle; supportAngle + halfTurn ]

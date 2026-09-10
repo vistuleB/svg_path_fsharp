@@ -103,4 +103,7 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `8d3dd27` — either signed-zero dash pattern is continuous; one source
   regression added. `scripts/test-fast`: 1666 passed.
 
-Next: `ac66040` (signed-zero ellipse parameters and directions).
+- `ac66040` — ellipse split parameter canonicalization and zero-direction
+  predicates. Two source regressions added. `scripts/test-fast`: 1668 passed.
+
+Next: `5f6eddf` (offset signed-zero predicates).

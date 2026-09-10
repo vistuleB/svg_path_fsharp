@@ -84,7 +84,7 @@ module Curvature =
     /// DegenerateCurvatureDerivative.
     let segmentLeftNormalRadius segment t : Result<float<length>, CurvatureError> =
         segmentLeftNormalCurvature segment t
-        |> Result.bind (fun curvature -> if curvature = 0.0<1 / length> then Error InfiniteRadiusOfCurvature else Ok(1.0 / curvature))
+        |> Result.bind (fun curvature -> if InternalNumber.isZero curvature then Error InfiniteRadiusOfCurvature else Ok(1.0 / curvature))
 
     let private cuspResidualFromDerivatives data (offset: float<length>) =
         let speedSquared = Point.dot data.First data.First
@@ -117,7 +117,7 @@ module Curvature =
                 let cross = Point.cross data.First data.Second
                 if speedSquared <= 0.0<length^2 / parameter^2>
                    || not (System.Double.IsFinite(float speedSquared)) then Error DegenerateCurvatureDerivative
-                elif cross = 0.0<length^2 / parameter^3> then Error InfiniteRadiusOfCurvature
+                elif InternalNumber.isZero cross then Error InfiniteRadiusOfCurvature
                 else
                     let speed = sqrt (float speedSquared) * 1.0<length / parameter>
                     Ok(abs (speedSquared * speed + offset * cross) < margin * abs cross))
@@ -138,7 +138,7 @@ module Curvature =
             let midpoint = (a + b) / 2.0
             match f midpoint with
             | Error error -> Error error
-            | Ok vm when vm = 0.0<_> -> Ok midpoint
+            | Ok vm when InternalNumber.isZero vm -> Ok midpoint
             | Ok vm when signChange va vm -> refineRoot f a midpoint va vm options (depth + 1)
             | Ok vm when signChange vm vb -> refineRoot f midpoint b vm vb options (depth + 1)
             | Ok _ -> Ok midpoint
@@ -162,12 +162,12 @@ module Curvature =
                 let a = parameter (float index / float options.Samples)
                 let b = parameter (float (index + 1) / float options.Samples)
                 match f a, f b with
-                | Ok va, Ok _ when va = 0.0<_> -> a :: roots
+                | Ok va, Ok _ when InternalNumber.isZero va -> a :: roots
                 | Ok va, Ok vb when signChange va vb ->
                     match refineRoot f a b va vb options 0 with
                     | Ok root -> root :: roots
                     | Error _ -> roots
-                | _, Ok vb when index = options.Samples - 1 && vb = 0.0<_> -> b :: roots
+                | _, Ok vb when index = options.Samples - 1 && InternalNumber.isZero vb -> b :: roots
                 | _ -> roots) []
             |> uniqueSorted options.Tolerance
             |> Ok

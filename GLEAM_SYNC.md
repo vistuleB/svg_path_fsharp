@@ -117,4 +117,7 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `e69b71b` — either signed-zero primitive size disables rendering. One source
   regression added. `scripts/test-fast`: 1672 passed.
 
-Next: `22b8376` (curvature signed-zero predicates).
+- `22b8376` — curvature and bisection zero predicates; one source regression
+  added. `scripts/test-fast`: 1673 passed.
+
+Next: `7d735a0` (transform serialization zero entries).

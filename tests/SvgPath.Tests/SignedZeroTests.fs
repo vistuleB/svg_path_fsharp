@@ -8,6 +8,13 @@ let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap x = Result.defaultWith (failwithf "%A") x
 
 [<Fact>]
+let ``reversed line still has infinite radius`` () =
+    let line = Line(p 1. 0.,p 0. 0.)
+    Assert.Equal(Error InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadius line 0.5<parameter>)
+    Assert.Equal(Error InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadiusCloseTo line 1.0<length> 0.1<length> 0.5<parameter>)
+    Assert.Equal(Error InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadiusCloseTo (Segment.reverse line) 1.0<length> 0.1<length> 0.5<parameter>)
+
+[<Fact>]
 let ``negative zero sizes disable rendering`` () =
     Assert.Equal(Error DisabledRendering,BasicShapes.circle 0.0<length> 0.0<length> -0.0<length>)
     Assert.Equal(Error DisabledRendering,BasicShapes.ellipse 0.0<length> 0.0<length> -0.0<length> 1.0<length>)

@@ -574,4 +574,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   construction. Ported pipeline/small-loop switch comments. `scripts/test-fast`:
   1795 passed, the same 5 historical assertions failed, 1800 total.
 
-Next: `44db918` (stroke validation/helper errors).
+- `44db918` — stroke entry points validate once; internal subpath/dash traversal
+  reuses that validation. Zero-length helpers return path errors directly. Dash
+  pattern normalization already used the simplified value shape. `scripts/test-fast`:
+  1795 passed, the same 5 historical assertions failed, 1800 total.
+
+Next: `1bd85ab` (typed hull repair policies).

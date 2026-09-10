@@ -95,8 +95,7 @@ module Stroke =
               Arc { Start = left; Radius = radial; XAxisRotation = 0.0<degree>
                     LargeArc = false; Sweep = true; End = right } ]
         Subpath.create segments
-        |> Result.mapError InternalPathError
-        |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError InternalPathError)
+        |> Result.bind (Subpath.setClosed true)
         |> Result.map Path.singleton
 
     let private zeroLengthSquareStrokePath center radius direction =
@@ -108,8 +107,7 @@ module Stroke =
         let bottomLeft = Point.add (Point.subtract center along) across
         lineSegmentsBetween [ topLeft; topRight; bottomRight; bottomLeft; topLeft ]
         |> Subpath.create
-        |> Result.mapError InternalPathError
-        |> Result.bind (fun outline -> Subpath.setClosed true outline |> Result.mapError InternalPathError)
+        |> Result.bind (Subpath.setClosed true)
         |> Result.map Path.singleton
 
     let private zeroLengthStrokePath subpath radius cap =
@@ -119,12 +117,9 @@ module Stroke =
         | RoundCap -> zeroLengthRoundStrokePath center radius
         | Square -> zeroLengthSquareStrokePath center radius (Point.create 1.0 0.0)
 
-    /// Delegate nonzero strokes to symmetric bands. For compatibility strokes
-    /// disable side cusp trimming and enable final trimming regardless of the
-    /// supplied band trimming settings; band construction owns caps and topology.
-    let subpathWith subpath join cap (options: StrokeOptions) =
-        validateOptions options join
-        |> Result.bind (fun () ->
+    // Entry points validate even empty geometry. Internal traversal reuses that
+    // validation for each subpath/dash rather than repeating it.
+    let private strokeValidatedSubpath subpath join cap (options: StrokeOptions) =
             let radius = options.Width / 2.0
             match Subpath.segments subpath with
                 | [] -> Ok Path.empty
@@ -133,17 +128,24 @@ module Stroke =
                     |> Result.mapError (PathError >> StrokeOffsetError)
                     |> Result.bind (fun zeroLength ->
                         if zeroLength then
-                            zeroLengthStrokePath subpath radius cap |> Result.mapError (Offset.publicError >> StrokeOffsetError)
+                            zeroLengthStrokePath subpath radius cap |> Result.mapError (PathError >> StrokeOffsetError)
                         else
                             Offset.subpathBandWith subpath -radius radius join cap
                                 {options.Offset with BandTrimming={InnerCusps=false;OuterCusps=false;InBand=true}}
-                            |> Result.mapError StrokeOffsetError))
+                            |> Result.mapError StrokeOffsetError)
+
+    /// Delegate nonzero strokes to symmetric bands. For compatibility strokes
+    /// disable side cusp trimming and enable final trimming regardless of the
+    /// supplied band trimming settings; band construction owns caps and topology.
+    let subpathWith subpath join cap (options: StrokeOptions) =
+        validateOptions options join
+        |> Result.bind (fun () -> strokeValidatedSubpath subpath join cap options)
 
     let rec private strokeSubpaths subpaths join cap options reversedStroked =
         match subpaths with
         | [] -> Ok(List.rev reversedStroked)
         | first :: rest ->
-            subpathWith first join cap options
+            strokeValidatedSubpath first join cap options
             |> Result.bind (fun path ->
                 strokeSubpaths rest join cap options (List.rev path.Subpaths @ reversedStroked))
 
@@ -154,7 +156,7 @@ module Stroke =
         |> Result.bind (fun () ->
             Subpath.create [ segment ]
             |> Result.mapError StrokePathError
-            |> Result.bind (fun subpath -> subpathWith subpath join cap options))
+            |> Result.bind (fun subpath -> strokeValidatedSubpath subpath join cap options))
 
     let segment segment width join cap = segmentWith segment join cap { defaultOptions with Width = width }
 
@@ -299,8 +301,8 @@ module Stroke =
                                     | Some direction, _ | None, Some direction -> direction
                                     | None, None -> Point.create 1.0 0.0
                                 zeroLengthSquareStrokePath (Subpath.start piece) (options.Width / 2.0) direction
-                                |> Result.mapError (Offset.publicError >> StrokeOffsetError))
-                        else subpathWith piece join cap options
+                                |> Result.mapError (PathError >> StrokeOffsetError))
+                        else strokeValidatedSubpath piece join cap options
                     stroked |> Result.map (fun path -> path :: paths))) (Ok [])
             |> Result.map (List.rev >> List.collect Path.subpaths >> Path.ofSubpaths))
 

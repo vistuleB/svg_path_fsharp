@@ -357,4 +357,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   together; immutable source and REVERSED label remain unchanged.
   `scripts/test-fast`: 1746 passed.
 
-Next: `316f9dd` (closing joins for a single open offset portion).
+- `316f9dd` — inspect the wraparound seam before marking a sole join-free
+  portion closed; construct the closing correspondence even with one open
+  portion. Exact source regression ported. `scripts/test-fast`: 1747 passed.
+
+Next: `f57dd01` (apply width-bound allowance before interval pruning).

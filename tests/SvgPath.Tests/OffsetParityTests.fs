@@ -11,6 +11,16 @@ let private point x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
 let private direction degrees = Point.direction (Degree.fromFloat degrees)
 
 [<Fact>]
+let ``closed offset preserves corner at single portion seam`` () =
+    let line = Line(point 0. 0.,point 1. 0.)
+    let curve = CubicBezier(point 1. 0.,point 2. 0.,point 0. 1.,point 0. 0.)
+    for segments in [[line;curve];[curve;line]] do
+        let source = Subpath.create segments |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+        let actual = Offset.subpathUntrimmed source 0.1<length> Round |> Result.defaultWith (failwithf "%A")
+        Assert.True(Subpath.isClosed actual)
+        Assert.Equal(1,Subpath.segments actual |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
+
+[<Fact>]
 let ``open c offset preserves closed retraced line`` () =
     let source = Subpath.polyline [point 2. 0.;point 0. 0.;point 0. 2.;point 2. 2.] |> Result.defaultWith (failwithf "%A")
     let actual = Offset.subpath source 1.0<length> Round Butt |> Result.defaultWith (failwithf "%A")

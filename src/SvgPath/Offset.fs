@@ -2516,9 +2516,12 @@ module Offset =
     let private splitJoinFreePortions segments options =
         splitJoinFreePortionsLoop segments options [] []
 
-    let private markClosedJoinFreePortion (portions: JoinFreePortion list) closedValue =
+    let private markClosedJoinFreePortion (portions: JoinFreePortion list) closedValue options =
         match closedValue, portions with
-        | true, [ portion ] -> [ { portion with Closed = true } ]
+        | true, [ portion ] ->
+            let segments = Subpath.segments portion.Subpath
+            // The linear partition did not inspect the wraparound corner.
+            [ { portion with Closed = sourceBoundaryIsSmooth (List.last segments) (List.head segments) options } ]
         | _ -> portions
 
     let private indexJoinFreePortions (portions: JoinFreePortion list) =
@@ -2923,7 +2926,7 @@ module Offset =
         | segments ->
             splitJoinFreePortions segments options
             |> Result.map (fun portions ->
-                markClosedJoinFreePortion portions (Subpath.isClosed subpath)
+                markClosedJoinFreePortion portions (Subpath.isClosed subpath) options
                 |> indexJoinFreePortions)
 
     let private buildSynchronizedOffsetPortion
@@ -3090,11 +3093,10 @@ module Offset =
 
     let private synchronizedJoinCorrespondences portions distances join closedValue =
         match portions with
-        | []
-        | [ _ ] -> Ok []
-        | first :: second :: rest ->
+        | [] -> Ok []
+        | first :: rest ->
             synchronizedJoinCorrespondencesLoop
-                first first (second :: rest) distances join closedValue []
+                first first rest distances join closedValue []
 
     let private segmentWithStart segment startPoint = Segment.withStart startPoint segment
 

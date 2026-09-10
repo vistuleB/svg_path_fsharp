@@ -182,4 +182,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   units are restored when evaluating the normalized residual. All eight source
   regressions added one-to-one. `scripts/test-fast`: 1694 passed.
 
-Next: `2b9eda3` (curvature bisection depth errors).
+- `2b9eda3` — explicit remaining-bracket depth error, checking exact-root and
+  interval success first. Three source regressions added. `scripts/test-fast`:
+  1696 passed, one failed: the historical zero-tolerance success expectation.
+  This same checkpoint is corrected by source `1045251`; do not alter it early.
+
+Next: `a2caa2d` (remove sampled curvature band discovery).

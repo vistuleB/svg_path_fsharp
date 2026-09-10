@@ -10,6 +10,7 @@ type CurvatureError =
     | DegenerateCurvatureDerivative
     | InfiniteRadiusOfCurvature
     | CurvatureRootIsolationFailed
+    | CurvatureMaxDepthReached of lower: float<parameter> * upper: float<parameter>
 
 /// Options for cusp/root/band discovery. Discovery functions validate
 /// every field. Band discovery uses only Samples; algebraic inflection discovery
@@ -134,15 +135,14 @@ module Curvature =
         options
         depth
         : Result<float<parameter>, CurvatureError> =
-        if depth >= options.MaxDepth || abs (b - a) <= options.Tolerance then Ok((a + b) / 2.0)
-        else
-            let midpoint = (a + b) / 2.0
-            match f midpoint with
-            | Error error -> Error error
-            | Ok vm when InternalNumber.isZero vm -> Ok midpoint
-            | Ok vm when signChange va vm -> refineRoot f a midpoint va vm options (depth + 1)
-            | Ok vm when signChange vm vb -> refineRoot f midpoint b vm vb options (depth + 1)
-            | Ok _ -> Ok midpoint
+        let midpoint = (a + b) / 2.0
+        match f midpoint with
+        | Error error -> Error error
+        | Ok vm when InternalNumber.isZero vm || abs (b-a) <= options.Tolerance -> Ok midpoint
+        | Ok _ when depth >= options.MaxDepth -> Error(CurvatureMaxDepthReached(a,b))
+        | Ok vm when signChange va vm -> refineRoot f a midpoint va vm options (depth + 1)
+        | Ok vm when signChange vm vb -> refineRoot f midpoint b vm vb options (depth + 1)
+        | Ok _ -> Ok midpoint
 
     let private uniqueSorted tolerance values =
         values
@@ -233,7 +233,8 @@ module Curvature =
     /// tolerance 1e-12 and bisect crossings. Samples is unused. Zero-speed points
     /// are excluded; lines/zero offsets return []; matching circles return [0;1].
     /// Completeness depends on isolation and floating-point accuracy. At MaxDepth
-    /// this version returns the midpoint without an accuracy guarantee.
+    /// return CurvatureMaxDepthReached with the remaining bracket unless an exact
+    /// midpoint root or an interval within tolerance succeeds first.
     let segmentLeftNormalCuspParameters segment offset options =
         validateOptions options |> Result.bind (fun () ->
             match segment with

@@ -6,6 +6,18 @@ let private get result = result |> Result.defaultWith (failwithf "%A")
 let private options tolerance samples = { Tolerance=Parameter.fromFloat tolerance; Samples=samples; MaxDepth=48 }
 let private arch = CubicBezier(p 0. 0.,p 1. 0.,p 1. 0.,p 1. -1.)
 let private near tolerance expected actual = Assert.True(abs(actual-expected)<Parameter.fromFloat tolerance)
+let private parabola = QuadraticBezier(p 0. 0.,p 0.5 0.,p 1. 1.)
+[<Fact>]
+let ``cusp depth exhaustion reports remaining bracket`` () =
+    Assert.Equal(Error(CurvatureMaxDepthReached(0.0<parameter>,0.5<parameter>)),
+        Curvature.segmentLeftNormalCuspParameters parabola -1.0<length> { Tolerance=1e-12<parameter>; Samples=1; MaxDepth=1 })
+[<Fact>]
+let ``cusp exact root at depth limit succeeds`` () =
+    let offset = -1.25 * sqrt 1.25 / 2.0 |> Length.fromFloat
+    Assert.Equal(Ok [0.25<parameter>],Curvature.segmentLeftNormalCuspParameters parabola offset { Tolerance=0.0<parameter>; Samples=1; MaxDepth=1 })
+[<Fact>]
+let ``cusp interval converged at depth limit succeeds`` () =
+    Assert.Equal(Ok [0.25<parameter>],Curvature.segmentLeftNormalCuspParameters parabola -1.0<length> { Tolerance=0.5<parameter>; Samples=1; MaxDepth=1 })
 [<Fact>]
 let ``shifted stationary cubics keep both neighboring intervals`` () =
     let offset = -4.09 * sqrt 4.09 * 0.1 / 6.0 |> Length.fromFloat

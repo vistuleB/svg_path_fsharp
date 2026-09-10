@@ -460,4 +460,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   nesting-based pass. `scripts/test-fast`: 1767 passed, the same one obsolete
   single-offset orientation expectation failed; no additional failures.
 
-Next: `1f6c347` (delete unused outline orientation helpers).
+- `1f6c347` — delete unused outline nesting probes/depth/orientation helpers.
+  `dotnet build src/SvgPath/SvgPath.fsproj --no-restore`: succeeded, zero
+  warnings/errors. No behavioral change from the preceding tested checkpoint.
+
+Next: `ac5feb9` (signed dual-face winding propagation).

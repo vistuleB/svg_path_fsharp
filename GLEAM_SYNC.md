@@ -200,4 +200,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `eda3e14` — document visual signed-area orientation and separate internal
   arrangement-merging tolerance. Documentation-only; `git diff --check` passes.
 
-Next: `e6eae1b` (enclosing-circle boundary supports).
+- `e6eae1b` — fixed supports remain boundary supports in enclosing-circle
+  construction; computed radii include every support's rounded distance.
+  Two source regressions added. `scripts/test-fast`: 1699 passed.
+
+Next: `6082627` (projection isolation endpoint candidates).

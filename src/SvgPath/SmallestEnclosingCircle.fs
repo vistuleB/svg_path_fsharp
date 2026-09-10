@@ -17,7 +17,7 @@ module SmallestEnclosingCircle =
         else
             let center = Point.midpoint first second
             { Center = center
-              RadiusSquared = Point.squaredDistance center first }
+              RadiusSquared = max (Point.squaredDistance center first) (Point.squaredDistance center second) }
 
     let private contains circle sample =
         Point.squaredDistance circle.Center sample <= circle.RadiusSquared
@@ -39,6 +39,13 @@ module SmallestEnclosingCircle =
         |> List.sortWith compareCircles
         |> List.last
 
+    let private withExactRadius circle samples =
+        { circle with
+            RadiusSquared =
+                samples
+                |> List.map (Point.squaredDistance circle.Center)
+                |> List.fold max 0.0<length^2> }
+
     let private circumcircle first second third =
         // Work in coordinates relative to the first point. This avoids the
         // cancellation in the expanded absolute-coordinate formula when a
@@ -56,24 +63,15 @@ module SmallestEnclosingCircle =
                     ((aNorm * b.Y - bNorm * a.Y) / denominator)
                     ((a.X * bNorm - b.X * aNorm) / denominator)
             let center = Point.translate offset first
-            { Center = center
-              RadiusSquared = Point.squaredDistance center first }
-
-    let private threePointCircle first second third =
-        let samples = [ first; second; third ]
-        let pairCircle =
-            [ twoPointCircle first second
-              twoPointCircle first third
-              twoPointCircle second third ]
-            |> List.filter (fun candidate -> samples |> List.forall (contains candidate))
-            |> List.sortWith compareCircles
-            |> List.tryHead
-        pairCircle |> Option.defaultWith (fun () -> circumcircle first second third)
+            // Include every support despite slightly different rounded radii.
+            withExactRadius { Center=center; RadiusSquared=0.0<length^2> } [first;second;third]
 
     let private enclosingWithTwo processed first second =
         (twoPointCircle first second, List.rev processed)
         ||> List.fold (fun circle third ->
-            if contains circle third then circle else threePointCircle first second third)
+            // Both fixed supports must remain on the boundary; selecting a
+            // different diameter for the triple could discard earlier points.
+            if contains circle third then circle else circumcircle first second third)
 
     let private enclosingWithOne processed first =
         let folder (circle, seen) second =
@@ -98,13 +96,6 @@ module SmallestEnclosingCircle =
             |> List.fold folder (pointCircle first, [ first ])
             |> fst
             |> Some
-
-    let private withExactRadius circle samples =
-        { circle with
-            RadiusSquared =
-                samples
-                |> List.map (Point.squaredDistance circle.Center)
-                |> List.fold max 0.0<length^2> }
 
     /// Return the deterministic smallest circle containing a non-empty point set.
     let points samples =

@@ -241,13 +241,12 @@ module Stroke =
                         if zeroLength then zeroLengthStrokePath subpath radius cap
                         elif Subpath.isClosed subpath then
                             closedStrokePath subpath radius join cap options.Offset
-                            |> Result.bind Offset.orientOutlinePath
                         else
                             untrimmedStrokeOutline subpath radius join cap options.Offset
                             |> Result.bind (fun untrimmed ->
                                 Offset.topologicalBandPath
                                     [ untrimmed ] [ OpenSubpathBand untrimmed ] options.Offset)
-                            |> Result.bind Offset.orientOutlinePath)
+                            )
             result |> Result.mapError (Offset.publicError >> StrokeOffsetError))
 
     let rec private strokeSubpaths subpaths join cap options reversedStroked =

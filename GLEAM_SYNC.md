@@ -456,4 +456,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   Recorded for final test reconciliation, not repaired out of sequence.
   `scripts/generate-readme-figures`: all nine figures generated successfully.
 
-Next: `506be97` (stroke uses band orientation directly).
+- `506be97` — stroke returns the band's orientation without an additional
+  nesting-based pass. `scripts/test-fast`: 1767 passed, the same one obsolete
+  single-offset orientation expectation failed; no additional failures.
+
+Next: `1f6c347` (delete unused outline orientation helpers).

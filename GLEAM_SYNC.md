@@ -211,4 +211,10 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `d4aaffd` — validate both supplied overlap endpoint pairs before interior
   samples. Both source regressions added. `scripts/test-fast`: 1703 passed.
 
-Next: `602d2f0` (alternative overlap endpoint correspondences).
+- `602d2f0` — retain endpoint alternatives and reject non-affine candidates
+  only when accepted correspondences do not cover their domains. Both source
+  regressions added; corrected the old F# full-overlap assertion helper to use
+  actual endpoints and the source's exact assertions. `scripts/test-fast`:
+  1705 passed.
+
+Next: `2fd732c` (interior overlap endpoint addresses).

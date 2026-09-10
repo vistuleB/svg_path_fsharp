@@ -20,6 +20,8 @@ type private EndpointProjection =
 
 type private OverlapMerge = Disjoint | Merged of RawOverlap | Contradiction
 
+type private OverlapCandidates = { Affine: RawOverlap list; NonAffine: RawOverlap list }
+
 [<RequireQualifiedAccess>]
 module internal OverlapDetection =
     let private parameterTolerance = 1.0e-12<parameter>
@@ -97,7 +99,10 @@ module internal OverlapDetection =
 
     let private endpointProjection source sourceT sample target =
         Segment.projection target sample
-        |> Result.map (fun (targetT, _, distance) -> { Source = source; SourceT = sourceT; TargetT = targetT; Distance = distance })
+        |> Result.map (fun (targetT, _, distance) ->
+            [ { Source=source; SourceT=sourceT; TargetT=targetT; Distance=distance }
+              { Source=source; SourceT=sourceT; TargetT=0.0<parameter>; Distance=Point.distance sample (Segment.start target) }
+              { Source=source; SourceT=sourceT; TargetT=1.0<parameter>; Distance=Point.distance sample (Segment.finish target) } ])
 
     let private endpointProjections left right =
         [ endpointProjection LeftEndpoint 0.0<parameter> (Segment.start left) right
@@ -109,7 +114,7 @@ module internal OverlapDetection =
             | Ok items, Ok item -> Ok(item :: items)
             | Error error, _ -> Error error
             | _, Error error -> Error error) (Ok [])
-        |> Result.map List.rev
+        |> Result.map (List.rev >> List.concat >> List.distinct)
 
     let private fromProjectionPair first second left =
         let leftFrom, leftTo, rightFrom, rightTo =
@@ -176,6 +181,18 @@ module internal OverlapDetection =
                         else affineValid overlap left right tolerance samples
                              |> Result.bind (fun affine -> if affine then Ok(Some overlap) else Error NonAffineOverlapCorrespondence))
 
+    let private candidateCovered candidate accepted =
+        let rec intervalsCover intervals fromT toT =
+            if fromT >= toT then true
+            else
+                match intervals with
+                | [] -> false
+                | (start,finish)::rest -> if start > fromT then false else intervalsCover rest (max fromT finish) toT
+        let left = accepted |> List.map (fun item -> min item.LeftFrom item.LeftTo,max item.LeftFrom item.LeftTo) |> List.sortBy fst
+        let right = accepted |> List.map (fun item -> min item.RightFrom item.RightTo,max item.RightFrom item.RightTo) |> List.sortBy fst
+        intervalsCover left (min candidate.LeftFrom candidate.LeftTo) (max candidate.LeftFrom candidate.LeftTo)
+        && intervalsCover right (min candidate.RightFrom candidate.RightTo) (max candidate.RightFrom candidate.RightTo)
+
     let detectWithSamples left right tolerance samples =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then Error(InvalidOverlapTolerance tolerance)
         elif samples <= 0 then Error(InvalidOverlapSamples samples)
@@ -198,11 +215,16 @@ module internal OverlapDetection =
                                     if not valid then Ok candidates
                                     else affineValid overlap left right tolerance samples
                                          |> Result.bind (fun affine ->
-                                            if affine then Ok(overlap :: candidates)
-                                            else Error NonAffineOverlapCorrespondence))))) (Ok [])
-                |> Result.map (fun candidates ->
-                    match mergeAll tolerance candidates with
-                    | Ok merged -> merged
-                    | Error _ -> []))
+                                            if affine then Ok { candidates with Affine=overlap::candidates.Affine }
+                                            else Ok { candidates with NonAffine=overlap::candidates.NonAffine }))))) (Ok { Affine=[]; NonAffine=[] })
+                |> Result.bind (fun candidates ->
+                    // A rejected orientation is not evidence of non-affinity if
+                    // accepted alternatives cover both parameter domains.
+                    if candidates.NonAffine |> List.exists (fun rejected -> not(candidateCovered rejected candidates.Affine)) then
+                        Error NonAffineOverlapCorrespondence
+                    else
+                        match mergeAll tolerance candidates.Affine with
+                        | Ok merged -> Ok merged
+                        | Error _ -> Ok []))
 
     let detect left right tolerance = detectWithSamples left right tolerance 5

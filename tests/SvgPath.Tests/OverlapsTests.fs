@@ -48,13 +48,14 @@ let private assertOverlapContract left right expectedOverlap =
         Intersections.segmentWith left right (intersectionOptions tolerance) = Error OverlappingSegments)
 
 let private assertFullOverlap left right expectedRightFrom expectedRightTo =
+    Assert.Equal(Error OverlappingSegments, Intersections.segment left right)
     let overlap = Overlaps.segment left right |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
-    assertParameterNear (parameter 0.0) overlap.LeftFrom
-    assertParameterNear (parameter 1.0) overlap.LeftTo
-    assertParameterNear (parameter expectedRightFrom) overlap.RightFrom
-    assertParameterNear (parameter expectedRightTo) overlap.RightTo
-    Assert.True(Point.near 1.0e-9<length> overlap.Start (point 0.0 0.0))
-    Assert.True(Point.near 1.0e-9<length> overlap.Finish (point 10.0 0.0))
+    Assert.Equal(parameter 0.0, overlap.LeftFrom)
+    Assert.Equal(parameter 1.0, overlap.LeftTo)
+    Assert.Equal(parameter expectedRightFrom, overlap.RightFrom)
+    Assert.Equal(parameter expectedRightTo, overlap.RightTo)
+    Assert.Equal(Segment.start left, overlap.Start)
+    Assert.Equal(Segment.finish left, overlap.Finish)
 
 [<Fact>]
 let ``segment overlap and intersection agree on partial line`` () =
@@ -165,6 +166,23 @@ let ``identical cubic is one full overlap`` () =
 let ``reversed cubic is one full overlap`` () =
     let segment = CubicBezier(point 0.0 0.0, point 2.0 9.0, point 8.0 -9.0, point 10.0 0.0)
     assertFullOverlap segment (Segment.reverse segment) 1.0 0.0
+
+[<Fact>]
+let ``closed cubic identity overlap keeps endpoint alternatives`` () =
+    let curve = CubicBezier(point 0.0 0.0, point 3.0 4.0, point -3.0 4.0, point 0.0 0.0)
+    assertFullOverlap curve curve 0.0 1.0
+    let found = Encounters.segment curve curve |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(1,List.length found.Overlaps)
+    Assert.Equal(2,List.length found.Intersections)
+
+[<Fact>]
+let ``closed cubic reversed overlap keeps endpoint alternatives`` () =
+    let curve = CubicBezier(point 0.0 0.0, point 3.0 4.0, point -3.0 4.0, point 0.0 0.0)
+    let reversed = Segment.reverse curve
+    assertFullOverlap curve reversed 1.0 0.0
+    let found = Encounters.segment curve reversed |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(1,List.length found.Overlaps)
+    Assert.Equal(2,List.length found.Intersections)
 
 [<Fact>]
 let ``identical arc is one full overlap`` () =

@@ -64,6 +64,7 @@ module Overlaps =
         OverlapDetection.detectWithSamples left right tolerance samples
         |> Result.map (List.map fromRaw)
 
+    // Both endpoint pairs are checked explicitly, in addition to interior samples.
     let checkParameterCorrespondence left right leftFrom leftTo rightFrom rightTo tolerance samples =
         OverlapDetection.checkParameterCorrespondence left right leftFrom leftTo rightFrom rightTo tolerance samples
         |> Result.map (Option.map fromRaw)

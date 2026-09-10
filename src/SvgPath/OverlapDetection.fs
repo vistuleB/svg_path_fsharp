@@ -154,6 +154,7 @@ module internal OverlapDetection =
                     | Error error, _
                     | _, Error error -> Error error)) (Ok true)
 
+    // Check both endpoint pairs explicitly as well as interior samples.
     let checkParameterCorrespondence left right leftFrom leftTo rightFrom rightTo tolerance samples =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then Error(InvalidOverlapTolerance tolerance)
         elif samples <= 0 then Error(InvalidOverlapSamples samples)
@@ -165,7 +166,11 @@ module internal OverlapDetection =
                 let overlap = canonical { LeftFrom = leftFrom; LeftTo = leftTo; RightFrom = rightFrom; RightTo = rightTo; Start = startPoint; Finish = finish }
                 if not (positiveSpan overlap) then Ok None
                 else
-                    sampledOverlapValid overlap left right tolerance samples
+                    Segment.point right rightFrom |> Result.bind (fun rightStart ->
+                        Segment.point right rightTo |> Result.bind (fun rightEnd ->
+                            if pointsNear tolerance startPoint rightStart && pointsNear tolerance finish rightEnd then
+                                sampledOverlapValid overlap left right tolerance samples
+                            else Ok false))
                     |> Result.bind (fun sampled ->
                         if not sampled then Ok None
                         else affineValid overlap left right tolerance samples

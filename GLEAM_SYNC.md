@@ -208,4 +208,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   there is no sign bracket. Both source regressions added.
   `scripts/test-fast`: 1701 passed.
 
-Next: `d4aaffd` (explicit overlap endpoint validation).
+- `d4aaffd` — validate both supplied overlap endpoint pairs before interior
+  samples. Both source regressions added. `scripts/test-fast`: 1703 passed.
+
+Next: `602d2f0` (alternative overlap endpoint correspondences).

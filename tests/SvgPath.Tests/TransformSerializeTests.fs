@@ -5,6 +5,18 @@ open Xunit
 
 module TransformSerializeTests =
     [<Fact>]
+    let ``transform serialization preserves small shear`` () =
+        let options = {DecimalPlaces=None;FixedDecimals=false;ForceMatrix=false}
+        for scale,shear in [2.0,1e-6;2.0,-1e-6;2000000.0,1.0] do
+            let matrix = Transform.fromTuple (scale,0.0,shear,scale,0.0<length>,0.0<length>)
+            let text = TransformSerialize.toStringWith matrix options
+            Assert.StartsWith("matrix(",text)
+            let decoded = TransformParse.attribute text |> Result.defaultWith (failwithf "%A")
+            let a,b,c,d,e,f = Transform.toTuple decoded
+            Assert.True(a=scale && b=0.0 && d=scale && e=0.0<length> && f=0.0<length>)
+            Assert.True(abs(c-shear) <= abs shear * 1e-12)
+
+    [<Fact>]
     let ``transform translate serializes nicely`` () =
         Assert.Equal("translate(10)", Transform.translate 10.0<length> 0.0<length> |> TransformSerialize.toString)
         Assert.Equal("translate(10 20)", Transform.translate 10.0<length> 20.0<length> |> TransformSerialize.toString)

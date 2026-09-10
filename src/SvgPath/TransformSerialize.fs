@@ -78,7 +78,9 @@ module TransformSerialize =
         | _, "" -> first
         | _ -> first + " " + second
 
-    let private closeToZero value = abs value <= rotationScaleEpsilon
+    // Compare columns independently so a large axis cannot hide a shear.
+    let private rotationScaleCoefficientMatches original reconstructed columnScale =
+        abs (original - reconstructed) <= columnScale * 1e-12
 
     let private analyzeRotationScale a b c d =
         let scaleX = sqrt (a * a + b * b)
@@ -88,10 +90,14 @@ module TransformSerialize =
         if scaleX > rotationScaleEpsilon
            && scaleY > rotationScaleEpsilon
            && determinant > rotationScaleEpsilon then
-            let normalizedDotProduct =
-                a / scaleX * (c / scaleY) + b / scaleX * (d / scaleY)
-            if closeToZero normalizedDotProduct then
-                RotateScale2x2(Trig.atan2Degrees b a, scaleX, scaleY)
+            let rotation = Trig.atan2Degrees b a
+            let cosine = Trig.cosDegrees rotation
+            let sine = Trig.sinDegrees rotation
+            if rotationScaleCoefficientMatches a (cosine * scaleX) scaleX
+               && rotationScaleCoefficientMatches b (sine * scaleX) scaleX
+               && rotationScaleCoefficientMatches c (-sine * scaleY) scaleY
+               && rotationScaleCoefficientMatches d (cosine * scaleY) scaleY then
+                RotateScale2x2(rotation, scaleX, scaleY)
             else
                 Matrix2x2
         else

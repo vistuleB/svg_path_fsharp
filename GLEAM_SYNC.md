@@ -337,4 +337,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `3bf9b2a` — parity-erased cusp results return None like initially empty
   classifications. `scripts/test-fast`: 1742 passed.
 
-Next: `5ec5fd2` (rotation-scale reconstruction validation).
+- `5ec5fd2` — column-scale reconstruction checks preserve small shear during
+  transform serialization. Source regression ported. `scripts/test-fast`:
+  1743 passed.
+
+Next: `c91e527` (remove unreachable position-only offset fitting policies).

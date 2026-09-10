@@ -9,6 +9,21 @@ module Subject = Offset
 
 let private point x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
 let private direction degrees = Point.direction (Degree.fromFloat degrees)
+
+[<Fact>]
+let ``open c offset preserves closed retraced line`` () =
+    let source = Subpath.polyline [point 2. 0.;point 0. 0.;point 0. 2.;point 2. 2.] |> Result.defaultWith (failwithf "%A")
+    let actual = Offset.subpath source 1.0<length> Round Butt |> Result.defaultWith (failwithf "%A")
+    let expected = Parse.path "M 2 1 H 1 H 2 Z" |> Result.defaultWith (failwithf "%A")
+    Assert.True((actual=expected), sprintf "%A" actual)
+
+[<Fact>]
+let ``closed c and reversal offset preserves retraced line and outline`` () =
+    let source = Subpath.polyline [point 2. 0.;point 0. 0.;point 0. 2.;point 2. 2.;point 0. 2.;point 0. 0.;point 2. 0.]
+                 |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    let actual = Offset.subpath source 1.0<length> Round Butt |> Result.defaultWith (failwithf "%A")
+    let expected = Parse.path "M 2 1 H 1 H 2 A 1 1 0 0 1 2 3 H 0 A 1 1 0 0 1 -1 2 V 0 A 1 1 0 0 1 0 -1 H 2 A 1 1 0 0 1 2 1 Z" |> Result.defaultWith (failwithf "%A")
+    Assert.True((actual=expected), sprintf "%A" actual)
 let private squareLoop () =
     Subpath.polygon [
         point 0.0 0.0

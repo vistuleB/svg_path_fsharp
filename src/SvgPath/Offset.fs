@@ -5172,7 +5172,7 @@ module Offset =
     let rec private outlineContourProbeSegments
         subpath (segments: Segment list) =
         match segments with
-        | [] -> Error(InternalPathError EmptySubpath)
+        | [] -> Ok None
         | first :: rest ->
             Segment.point first 0.5<parameter>
             |> Result.mapError InternalPathError
@@ -5189,8 +5189,8 @@ module Offset =
                               left (Path.ofSubpaths [ subpath ]) Nonzero,
                           WindingField.pathContainment
                               right (Path.ofSubpaths [ subpath ]) Nonzero with
-                    | Ok Inside, Ok Outside -> Ok left
-                    | Ok Outside, Ok Inside -> Ok right
+                    | Ok Inside, Ok Outside -> Ok(Some left)
+                    | Ok Outside, Ok Inside -> Ok(Some right)
                     | Ok _, Ok _ -> outlineContourProbeSegments subpath rest
                     | Error error, _
                     | _, Error error -> Error(InternalPathError error))
@@ -5209,18 +5209,19 @@ module Offset =
                 outlineContourDepthLoop probe rest
                     (if containment = Inside then depth + 1 else depth))
 
-    let private outlineContourDepth subpath all =
-        outlineContourProbe subpath
-        |> Result.bind (fun probe ->
-            outlineContourDepthLoop probe all 0
-            |> Result.map (fun count -> max 0 (count - 1)))
+    let private outlineContourDepth probe all =
+        outlineContourDepthLoop probe all 0
+        |> Result.map (fun count -> max 0 (count - 1))
 
     let private orientOutlineSubpathFromDepth subpath all =
         if not (Subpath.isClosed subpath) then Ok subpath
         else
-            outlineContourDepth subpath all
-            |> Result.map (fun depth ->
-                orientOutlineSubpath subpath (depth % 2 = 0))
+            outlineContourProbe subpath
+            |> Result.bind (function
+                // Retraced closed survivors have no interior; preserve their traversal.
+                | None -> Ok subpath
+                | Some probe -> outlineContourDepth probe all
+                                |> Result.map (fun depth -> orientOutlineSubpath subpath (depth % 2 = 0)))
 
     let rec private orientOutlineSubpaths subpaths all oriented =
         match subpaths with

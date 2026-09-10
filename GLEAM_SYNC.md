@@ -327,4 +327,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   as a historical Gleam artifact, with F# checkpoint links and diagnostic
   instructions. No production changes; preceding fast result: 1739 passed.
 
-Next: `6679aa6` (preserve retraced offset contours without interior probes).
+- `6679aa6` — retain retraced closed contours when no interior probe exists.
+  Both exact C-shape source regressions ported. `scripts/test-fast`: 1741 passed.
+
+Next: `c2e8865` (arrangement drawing containment tolerance).

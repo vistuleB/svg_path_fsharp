@@ -309,4 +309,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   This is an intentionally unsuccessful upstream checkpoint, immediately
   reverted by the next source commit; no independent repair is invented here.
 
-Next: `e5f4a66` (revert the preceding experiment).
+- `e5f4a66` — revert the preceding unsuccessful experiment. Runtime and tests
+  exactly match the pre-experiment F# commit `59374d6` (1737 fast tests passed
+  there); verified by `git diff 59374d6 -- src tests` producing no changes.
+
+Next: `46b3cd6` (validate crossing brackets and reject unmatched endpoint roots).

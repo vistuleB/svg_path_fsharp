@@ -263,15 +263,13 @@ module Intersections =
         | Some _ -> existing
         | None -> candidate :: existing
 
-    let private distinctWindowParameterTolerance = 1.0e-7<parameter>
-
     let private insertWindowCandidate
         (candidate: SegmentIntersection)
         (existing: SegmentIntersection list) =
         if existing
            |> List.exists (fun (found: SegmentIntersection) ->
-               abs (found.LeftT - candidate.LeftT) <= distinctWindowParameterTolerance
-               && abs (found.RightT - candidate.RightT) <= distinctWindowParameterTolerance) then existing
+               abs (found.LeftT - candidate.LeftT) <= 1.0e-7<parameter>
+               && abs (found.RightT - candidate.RightT) <= 1.0e-7<parameter>) then existing
         else candidate :: existing
 
     let private endpointCandidates left right tolerance =
@@ -348,7 +346,7 @@ module Intersections =
         && rightSquared > 0.0<_>
         && determinant * determinant > 1.0e-18 * leftSquared * rightSquared
 
-    let private refineCrossingIterations left right tolerance leftT rightT iterations =
+    let private refineCrossing left right tolerance leftT rightT =
         let rec loop leftT rightT remaining =
             Segment.point left leftT
             |> Result.bind (fun leftPoint ->
@@ -373,10 +371,7 @@ module Intersections =
                                     if nextLeft < -1.0e-12<parameter> || nextLeft > 1.0<parameter> + 1.0e-12<parameter>
                                        || nextRight < -1.0e-12<parameter> || nextRight > 1.0<parameter> + 1.0e-12<parameter> then Ok None
                                     else loop (clamp01 nextLeft) (clamp01 nextRight) (remaining - 1)))))
-        loop leftT rightT iterations
-
-    let private refineCrossing left right tolerance leftT rightT =
-        refineCrossingIterations left right tolerance leftT rightT 20
+        loop leftT rightT 20
 
     let private candidateAt left right tolerance leftT rightT =
         refineCrossing left right tolerance leftT rightT
@@ -450,45 +445,34 @@ module Intersections =
                 | _, _, Error error, _
                 | _, _, _, Error error -> Error error
 
-    let private residualWindows window intersections =
-        intersections |> List.tryPick (fun (hit: SegmentIntersection) ->
-            let d = distinctWindowParameterTolerance
-            let a = max window.LeftFrom (hit.LeftT - d)
-            let b = min window.LeftTo (hit.LeftT + d)
-            let c = max window.RightFrom (hit.RightT - d)
-            let e = min window.RightTo (hit.RightT + d)
-            if a < b && c < e then
-                Some ([ { window with LeftTo = a }
-                        { window with LeftFrom = b }
-                        { window with LeftFrom = a; LeftTo = b; RightTo = c }
-                        { window with LeftFrom = a; LeftTo = b; RightFrom = e } ]
-                      |> List.filter (fun w -> w.LeftFrom < w.LeftTo && w.RightFrom < w.RightTo))
-            else None)
+    let private windowResolved window intersections =
+        let leftWidth = window.LeftTo - window.LeftFrom
+        let rightWidth = window.RightTo - window.RightFrom
+        leftWidth <= 0.125<parameter>
+        && rightWidth <= 0.125<parameter>
+        && intersections
+           |> List.exists (fun (intersection: SegmentIntersection) ->
+               intersection.LeftT >= window.LeftFrom - leftWidth * 2.0
+               && intersection.LeftT <= window.LeftTo + leftWidth * 2.0
+               && intersection.RightT >= window.RightFrom - rightWidth * 2.0
+               && intersection.RightT <= window.RightTo + rightWidth * 2.0)
 
     let private search left right options initialIntersections initial =
         let rec loop pending (found: SegmentIntersection list) examined =
             match pending with
             | [] -> Ok(found |> List.sortBy (fun item -> item.LeftT, item.RightT))
+            | _ when examined >= maximumWindows -> Error(IntersectionTerminalWindowLimitExceeded maximumWindows)
             | window :: rest ->
-                match residualWindows window found with
-                | Some residuals -> loop ((List.rev residuals) @ rest) found examined
-                | None when examined >= maximumWindows -> Error(IntersectionTerminalWindowLimitExceeded maximumWindows)
-                | None ->
+                if windowResolved window found then loop rest found examined
+                else
                     inspectWindow left right options.Tolerance window
                     |> Result.bind (fun (candidate, refine) ->
-                        match candidate with
-                        | Some candidate ->
-                            refineCrossingIterations left right (min options.Tolerance 1.0e-15<length>) candidate.LeftT candidate.RightT 32
-                            |> Result.bind (fun polished ->
-                                let found = insertWindowCandidate (Option.defaultValue candidate polished) found
-                                let pending =
-                                    match residualWindows window found with
-                                    | Some residuals -> (List.rev residuals) @ rest
-                                    | None when window.Depth > 0 -> (List.rev (splitNine window)) @ rest
-                                    | None -> rest
-                                loop pending found (examined + 1))
-                        | None when refine && window.Depth > 0 -> loop ((splitNine window) @ rest) found (examined + 1)
-                        | None -> loop rest found (examined + 1))
+                        let found =
+                            candidate
+                            |> Option.map (fun value -> insertWindowCandidate value found)
+                            |> Option.defaultValue found
+                        if refine && window.Depth > 0 then loop ((splitNine window) @ rest) found (examined + 1)
+                        else loop rest found (examined + 1))
         loop initial initialIntersections 0
 
     let private sampledCrossingCandidates left right tolerance =
@@ -515,7 +499,7 @@ module Intersections =
                                 | Some(leftLocal, rightLocal) ->
                                     let leftT = interpolate leftFrom leftTo leftLocal
                                     let rightT = interpolate rightFrom rightTo rightLocal
-                                    refineCrossingIterations left right (min tolerance 1.0e-15<length>) leftT rightT 32
+                                    refineCrossing left right tolerance leftT rightT
                                     |> Result.map (function
                                         | Some candidate -> insertWindowCandidate candidate found
                                         | None -> found))))))) (Ok [])

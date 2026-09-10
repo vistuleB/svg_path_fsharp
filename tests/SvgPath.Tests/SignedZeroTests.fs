@@ -13,6 +13,12 @@ let ``is_zero_accepts_both_signs_without_a_tolerance_test`` () =
     for x in [1.0; -1.0; 1e-310; -1e-310] do Assert.False(InternalNumber.isZero x)
 
 [<Fact>]
+let ``normalize_zero_canonicalizes_only_exact_zeros_test`` () =
+    for x in [0.0; -0.0; 0.0 * -1.0] do
+        Assert.Equal(0L,System.BitConverter.DoubleToInt64Bits(InternalNumber.normalizeZero x))
+    for x in [1.0; -1.0; 1e-310; -1e-310] do Assert.Equal(x,InternalNumber.normalizeZero x)
+
+[<Fact>]
 let ``signed_zero_vectors_have_zero_heading_and_no_direction_test`` () =
     for x in [0.0; -0.0] do
         for y in [0.0; -0.0] do

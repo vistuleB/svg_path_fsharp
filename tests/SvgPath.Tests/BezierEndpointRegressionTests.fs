@@ -23,3 +23,17 @@ let ``endpoint splits preserve whole curve and collapse all controls`` () =
         let whole,collapsed = Bezier.splitInside curve 1.0<parameter> |> Result.defaultWith (failwithf "%A")
         Assert.Equal(curve,whole)
         Assert.Equal(Bezier.mapPoints (fun _ -> Bezier.finish curve) curve,collapsed)
+
+[<Fact>]
+let ``split many trims both signed zero boundaries`` () =
+    let curve = LinearBezierData(p 1. 0.,p 0.1 0.2)
+    Assert.Equal<BezierData list>([curve],Bezier.splitMany curve [-0.0<parameter>])
+    Assert.Equal<BezierData list>([curve],Bezier.splitMany curve [0.0<parameter>;-0.0<parameter>;0.0<parameter>;1.0<parameter>])
+    Assert.Equal(Ok [curve],Bezier.splitInsideMany curve [-0.0<parameter>;0.0<parameter>;-0.0<parameter>;1.0<parameter>])
+
+[<Fact>]
+let ``split many deduplicates signed zero inside extrapolated range`` () =
+    let curve = LinearBezierData(p 0. 0.,p 1. 0.)
+    let expected = Bezier.splitMany curve [-0.5<parameter>;0.0<parameter>;0.5<parameter>]
+    Assert.Equal(4,List.length expected)
+    Assert.Equal<BezierData list>(expected,Bezier.splitMany curve [0.5<parameter>;-0.0<parameter>;-0.5<parameter>;0.0<parameter>;-0.0<parameter>])

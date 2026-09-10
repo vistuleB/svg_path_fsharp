@@ -202,6 +202,7 @@ module Bezier =
 
     let private normalizedProgresses points =
         points
+        |> List.map InternalNumber.normalizeZero
         |> List.distinct
         |> List.sort
         |> List.skipWhile ((=) (parameter 0.0))

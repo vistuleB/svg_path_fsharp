@@ -9,6 +9,10 @@ module InternalNumber =
     /// exact equality, .NET equality already equates positive and negative zero.
     let inline isZero (value: float<'Unit>) = value = 0.0<_>
 
+    /// Canonicalize either signed zero, leaving every nonzero value unchanged.
+    let inline normalizeZero (value: float<'Unit>) =
+        if isZero value then 0.0<_> else value
+
     let hypot x y =
         let x, y = abs x, abs y
         let largest = max x y

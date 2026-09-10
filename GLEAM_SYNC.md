@@ -94,4 +94,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   Gleam does, instead of inheriting Point's separate arithmetic policy.
   `scripts/test-fast`: 1655 passed.
 
-Next: `1d32ade` (canonical signed zero before Bezier split deduplication).
+- `1d32ade` — canonical signed-zero helper and Bezier split deduplication.
+  Three source regressions added one-to-one. `scripts/test-fast`: 1658 passed.
+
+Next: `ba24ca4` (signed-zero segment and subpath parameters).

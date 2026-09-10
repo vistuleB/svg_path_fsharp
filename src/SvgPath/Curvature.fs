@@ -4,7 +4,6 @@ namespace SvgPath
 type CurvatureError =
     | CurvaturePathError of error: SegmentError
     | InvalidCurvatureTolerance of tolerance: float<parameter>
-    | InvalidCurvatureSamples of samples: int
     | InvalidCurvatureMaxDepth of maxDepth: int
     | InvalidCurvatureMargin of margin: float<length>
     | DegenerateCurvatureDerivative
@@ -12,13 +11,11 @@ type CurvatureError =
     | CurvatureRootIsolationFailed
     | CurvatureMaxDepthReached of lower: float<parameter> * upper: float<parameter>
 
-/// Options for cusp/root/band discovery. Discovery functions validate
-/// every field. Band discovery uses only Samples; algebraic inflection discovery
-/// uses none of the fields after validation.
+/// Cusp discovery options. Every field is validated; algebraic inflection
+/// discovery uses none of the fields after validation.
 [<Struct>]
 type CurvatureOptions =
     { Tolerance: float<parameter>
-      Samples: int
       MaxDepth: int }
 
 /// First and second parameter derivatives at a segment parameter.
@@ -27,24 +24,17 @@ type SegmentDerivatives =
     { First: Point<length / parameter>
       Second: Point<length / parameter^2> }
 
-/// A sampled parameter interval where signed radius is close to a target offset.
-[<Struct>]
-type CurvatureBand =
-    { From: float<parameter>
-      To: float<parameter> }
-
 /// Signed curvature, radius, inflection points, and offset-cusp diagnostics.
 /// Signs refer to the visual left normal in SVG coordinates (positive y down).
 /// Curvature has inverse-length units; radius, offsets, and margins have length
 /// units. Parameters refer to the segment's 0..1 interval.
 /// Pointwise queries evaluate derivatives directly. Cusp discovery partitions at
-/// curvature extrema before bisection; near-radius band discovery stays sampled.
+/// curvature extrema before bisection. Individual contracts describe limitations.
 [<RequireQualifiedAccess>]
 module Curvature =
-    /// Default sampling and refinement options.
+    /// Default refinement options.
     let defaultOptions =
         { Tolerance = 1.0e-9<parameter>
-          Samples = 100
           MaxDepth = 32 }
 
     let private parameter value = Parameter.fromFloat value
@@ -53,7 +43,6 @@ module Curvature =
         if options.Tolerance < 0.0<parameter>
            || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidCurvatureTolerance options.Tolerance)
-        elif options.Samples <= 0 then Error(InvalidCurvatureSamples options.Samples)
         elif options.MaxDepth <= 0 then Error(InvalidCurvatureMaxDepth options.MaxDepth)
         else Ok()
 
@@ -230,7 +219,7 @@ module Curvature =
 
     /// Partition Beziers at polynomial curvature extrema and zero-speed points;
     /// partition ellipses at their axes. Check touches with relative residual
-    /// tolerance 1e-12 and bisect crossings. Samples is unused. Zero-speed points
+    /// tolerance 1e-12 and bisect crossings. Zero-speed points
     /// are excluded; lines/zero offsets return []; matching circles return [0;1].
     /// Completeness depends on isolation and floating-point accuracy. At MaxDepth
     /// return CurvatureMaxDepthReached with the remaining bracket unless an exact
@@ -272,34 +261,3 @@ module Curvature =
                 CubicBezierData(startPoint, control1, control2, endPoint)
                 |> Bezier.cubicInflectionParameters
                 |> Ok
-
-    /// Merge adjacent close samples on a uniform grid into parameter bands.
-    /// A band starts at its first close sample and ends at the first subsequent
-    /// non-close sample (or 1). Evaluation errors count as non-close samples.
-    /// Bands are approximate: narrow intervals may be missed, and not every point
-    /// inside a returned band is guaranteed to satisfy the predicate.
-    let segmentLeftNormalRadiusCloseBands segment offset margin options =
-        match validateOptions options with
-        | Error error -> Error error
-        | Ok _ ->
-            if margin < 0.0<length> || not (System.Double.IsFinite(float margin)) then Error(InvalidCurvatureMargin margin)
-            else
-                let samples =
-                    [ 0 .. options.Samples ]
-                    |> List.map (fun index ->
-                        let t = parameter (float index / float options.Samples)
-                        let close = segmentLeftNormalRadiusCloseTo segment offset margin t = Ok true
-                        t, close)
-                let bands, openStart =
-                    samples
-                    |> List.fold (fun (bands, openStart) (t, close) ->
-                        match close, openStart with
-                        | true, None -> bands, Some t
-                        | true, Some _ -> bands, openStart
-                        | false, Some start -> { From = start; To = t } :: bands, None
-                        | false, None -> bands, None) ([], None)
-                let bands =
-                    match openStart with
-                    | Some start -> { From = start; To = parameter 1.0 } :: bands
-                    | None -> bands
-                Ok(List.rev bands)

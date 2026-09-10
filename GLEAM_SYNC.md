@@ -187,4 +187,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   1696 passed, one failed: the historical zero-tolerance success expectation.
   This same checkpoint is corrected by source `1045251`; do not alter it early.
 
-Next: `a2caa2d` (remove sampled curvature band discovery).
+- `a2caa2d` — remove sampled radius bands, their type, Samples option, and
+  validation error. Remove corresponding assertions from the existing bundled
+  F# tests; source's removed test was not a standalone F# test. Offset already
+  uses defaultOptions and needs no constructor change. `scripts/test-fast`:
+  1696 passed, the same historical zero-tolerance expectation fails.
+
+Next: `1045251` (zero-tolerance bracket regression).

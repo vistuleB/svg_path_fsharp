@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Cusp discovery now partitions at curvature extrema and reports depth
+  exhaustion with its remaining parameter bracket.
+- Removed unused sampled near-radius band discovery, `CurvatureBand`,
+  `CurvatureOptions.Samples`, and its validation error. Pointwise radius
+  proximity and cusp discovery remain available.
+
 ## 0.5.0
 
 - Allowed `0.0` tolerance for degenerate-line normalization, collapsing only

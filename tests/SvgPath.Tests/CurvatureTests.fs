@@ -73,8 +73,6 @@ let ``curvature options report offending values`` () =
     let defaults = Curvature.defaultOptions
     Assert.Equal(Error(InvalidCurvatureTolerance -0.5<parameter>),
         Curvature.segmentLeftNormalCuspParameters upwardCubic 0.27<length> { defaults with Tolerance = -0.5<parameter> })
-    Assert.Equal(Error(InvalidCurvatureSamples 0),
-        Curvature.segmentInflectionParameters upwardCubic { defaults with Samples = 0 })
     Assert.Equal(Error(InvalidCurvatureMaxDepth 0),
         Curvature.segmentInflectionParameters upwardCubic { defaults with MaxDepth = 0 })
 
@@ -87,13 +85,9 @@ let ``zero curvature tolerance accepts cusp discovery`` () =
     Assert.Equal(0.5213021719455719, float roots[1], 9)
 
 [<Fact>]
-let ``radius proximity validates options before margin`` () =
+let ``radius proximity validates margin`` () =
     Assert.Equal(Error(InvalidCurvatureMargin -1.0<length>),
         Curvature.segmentLeftNormalRadiusCloseTo upwardCubic 0.27<length> -1.0<length> (parameter 0.5))
-    Assert.Equal(Error(InvalidCurvatureMargin -1.0<length>),
-        Curvature.segmentLeftNormalRadiusCloseBands upwardCubic 0.27<length> -1.0<length> Curvature.defaultOptions)
-    Assert.Equal(Error(InvalidCurvatureSamples 0),
-        Curvature.segmentLeftNormalRadiusCloseBands upwardCubic 0.27<length> -1.0<length> { Curvature.defaultOptions with Samples = 0 })
 
 [<Fact>]
 let ``collapsed derivative differs from infinite radius`` () =

@@ -89,4 +89,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   it during deduplication, and accept exact zeros on the final bisection step.
   Six source regressions added one-to-one. `scripts/test-fast`: 1653 passed.
 
-Next: `72add87` (exact Bezier interpolation endpoints).
+- `72add87` — exact Bezier evaluation and split endpoints, with two source
+  regressions one-to-one. Bezier now retains its own interpolation helper, as
+  Gleam does, instead of inheriting Point's separate arithmetic policy.
+  `scripts/test-fast`: 1655 passed.
+
+Next: `1d32ade` (canonical signed zero before Bezier split deduplication).

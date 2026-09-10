@@ -53,6 +53,14 @@ module Bezier =
     let private parameter value = Parameter.fromFloat value
     let private ratio value = Parameter.ratio value
 
+    // Mirror bezier.gleam's own interpolation, not point.gleam's separate
+    // opposite-sign arithmetic policy. Preserve the stored endpoint values.
+    let private interpolate (startPoint: BezierPoint) (endPoint: BezierPoint) t =
+        if InternalNumber.isZero t then startPoint
+        elif t = 1.0<parameter> then endPoint
+        else Point.create (startPoint.X + (endPoint.X - startPoint.X) * ratio t)
+                          (startPoint.Y + (endPoint.Y - startPoint.Y) * ratio t)
+
     let start curve =
         match curve with
         | LinearBezierData(startPoint, _)
@@ -67,17 +75,17 @@ module Bezier =
 
     let point curve (t: float<parameter>) =
         match curve with
-        | LinearBezierData(startPoint, endPoint) -> Point.interpolate startPoint endPoint t
+        | LinearBezierData(startPoint, endPoint) -> interpolate startPoint endPoint t
         | QuadraticBezierData(startPoint, control, endPoint) ->
-            Point.interpolate
-                (Point.interpolate startPoint control t)
-                (Point.interpolate control endPoint t)
+            interpolate
+                (interpolate startPoint control t)
+                (interpolate control endPoint t)
                 t
         | CubicBezierData(startPoint, control1, control2, endPoint) ->
-            let left = Point.interpolate startPoint control1 t
-            let middle = Point.interpolate control1 control2 t
-            let right = Point.interpolate control2 endPoint t
-            Point.interpolate (Point.interpolate left middle t) (Point.interpolate middle right t) t
+            let left = interpolate startPoint control1 t
+            let middle = interpolate control1 control2 t
+            let right = interpolate control2 endPoint t
+            interpolate (interpolate left middle t) (interpolate middle right t) t
 
     let derivative curve (t: float<parameter>) : Point<length / parameter> =
         let perParameter = 1.0<1 / parameter>
@@ -156,21 +164,21 @@ module Bezier =
     let split curve (t: float<parameter>) =
         match curve with
         | LinearBezierData(startPoint, endPoint) ->
-            let splitPoint = Point.interpolate startPoint endPoint t
+            let splitPoint = interpolate startPoint endPoint t
             LinearBezierData(startPoint, splitPoint), LinearBezierData(splitPoint, endPoint)
         | QuadraticBezierData(startPoint, control, endPoint) ->
-            let startControl = Point.interpolate startPoint control t
-            let controlEnd = Point.interpolate control endPoint t
-            let splitPoint = Point.interpolate startControl controlEnd t
+            let startControl = interpolate startPoint control t
+            let controlEnd = interpolate control endPoint t
+            let splitPoint = interpolate startControl controlEnd t
             QuadraticBezierData(startPoint, startControl, splitPoint),
             QuadraticBezierData(splitPoint, controlEnd, endPoint)
         | CubicBezierData(startPoint, control1, control2, endPoint) ->
-            let startControl = Point.interpolate startPoint control1 t
-            let controls = Point.interpolate control1 control2 t
-            let controlEnd = Point.interpolate control2 endPoint t
-            let leftControl = Point.interpolate startControl controls t
-            let rightControl = Point.interpolate controls controlEnd t
-            let splitPoint = Point.interpolate leftControl rightControl t
+            let startControl = interpolate startPoint control1 t
+            let controls = interpolate control1 control2 t
+            let controlEnd = interpolate control2 endPoint t
+            let leftControl = interpolate startControl controls t
+            let rightControl = interpolate controls controlEnd t
+            let splitPoint = interpolate leftControl rightControl t
             CubicBezierData(startPoint, startControl, leftControl, splitPoint),
             CubicBezierData(splitPoint, rightControl, controlEnd, endPoint)
 

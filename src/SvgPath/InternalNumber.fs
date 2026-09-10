@@ -27,15 +27,13 @@ module InternalNumber =
             | _ -> Error()
 
     let checkedProduct first second =
-        let absoluteSecond = abs second
-        if first = 0.0 || second = 0.0 then Ok 0.0
-        elif absoluteSecond <= 1.0 then Ok(first * second)
-        elif abs first > Double.MaxValue / absoluteSecond then Error()
-        else Ok(first * second)
+        // A divided overflow threshold can round upward. Check the actual
+        // result; .NET yields infinity rather than Erlang's arithmetic error.
+        let result = first * second
+        if Double.IsFinite result then Ok result else Error()
 
     let checkedSum first second =
-        let sameSign = (first > 0.0 && second > 0.0) || (first < 0.0 && second < 0.0)
-        if sameSign && abs first > Double.MaxValue - abs second then Error()
-        else Ok(first + second)
+        let result = first + second
+        if Double.IsFinite result then Ok result else Error()
 
     let isFinite value = Double.IsFinite value

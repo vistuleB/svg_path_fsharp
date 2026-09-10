@@ -65,6 +65,7 @@
     <Compile Include="HullConstantCleanupTests.fs" />
     <Compile Include="LengthUpperBoundTests.fs" />
     <Compile Include="OffsetShortRunsTests.fs" />
+    <Compile Include="CheckedArithmeticTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

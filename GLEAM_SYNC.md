@@ -69,4 +69,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   bounded by three tolerances; preserve source/portion endpoints. Eight source
   regressions added one-to-one. `scripts/test-fast`: 1631 passed.
 
-Next: `3c072a9` (checked arithmetic rejects actual overflow).
+- `3c072a9` — checked product/sum validate actual finite results instead of
+  rounded preflight bounds. The Erlang-only exception wrapper has no .NET role.
+  Five source regressions added one-to-one. `scripts/test-fast`: 1636 passed.
+
+Next: `ada3613` (scale-safe vector normalization).

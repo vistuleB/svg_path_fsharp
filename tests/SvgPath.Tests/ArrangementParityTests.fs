@@ -158,6 +158,50 @@ let private buildGraph subpaths =
     Arrangement.build (subpaths |> List.map Path.singleton) tolerance minimumChord
     |> Result.map _.Graph
 
+let private sweepGraph subpaths =
+    Arrangement.build (subpaths |> List.map Path.singleton) 1e-9<length> 1e-9<length>
+    |> Result.map _.Graph |> Result.defaultWith (failwithf "%A")
+
+[<Fact>]
+let ``dual narrow nested squares do not skip annular face`` () =
+    let graph = sweepGraph [square 0. 0. 10.; square 0.00001 0.00001 9.99998]
+    let dual = Arrangement.dual graph |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(3, dual.Faces.Length)
+    let annulus = dual.Faces |> List.find (fun f -> f.Walks.Length=2)
+    Assert.False(annulus.Outer)
+    Assert.True(annulus.Walks[0].Outer && not annulus.Walks[1].Outer)
+
+[<Fact>]
+let ``dual mixed nested and separate components`` () =
+    let graph = sweepGraph [square 0. 0. 20.;square 0.00001 0.00001 19.99998;square 5. 5. 2.;square 10. 5. 2.;square 30. 0. 4.]
+    let dual = Arrangement.dual graph |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(6, dual.Faces.Length)
+    Assert.True(dual.Faces.Head.Outer && dual.Faces.Head.Walks.Length=2)
+    Assert.True(dual.Faces |> List.exists (fun f -> not f.Outer && f.Walks.Length=3))
+    Assert.Equal(Ok dual, Arrangement.dual graph)
+
+let private dualTestCircle radius =
+    let a,b,r = point radius 0., point -radius 0., point radius radius
+    closedSubpath [Arc {Start=a;End=b;Radius=r;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true}
+                   Arc {Start=b;End=a;Radius=r;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true}]
+
+[<Fact>]
+let ``dual curved nested components ignore traversal orientation`` () =
+    let outer, inner = dualTestCircle 10., dualTestCircle 9.99999
+    for inner in [inner;Subpath.reverse inner] do
+        let dual = sweepGraph [outer;inner] |> Arrangement.dual |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(3,dual.Faces.Length)
+        Assert.True(dual.Faces |> List.exists (fun f -> not f.Outer && f.Walks.Length=2))
+
+[<Fact>]
+let ``dual closed cubic and disconnected bridge`` () =
+    let loop = closedSubpath [CubicBezier(point 0. 0.,point 4. 6.,point -4. 6.,point 0. 0.)]
+    let bridge = Segment.asSubpath(Line(point -0.2 2.,point 0.2 2.))
+    let dual = buildGraph [loop;bridge] |> Result.bind Arrangement.dual |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(2,dual.Faces.Length)
+    Assert.True(dual.Faces |> List.exists (fun f -> not f.Outer && f.Walks.Length=2))
+    Assert.True(dual.EdgeFaces |> List.exists (fun e -> e.LeftFace=e.RightFace))
+
 let private buildSegments segments =
     Arrangement.buildWith segments tolerance minimumChord 0.0<parameter>
     |> Result.defaultWith (failwithf "%A")

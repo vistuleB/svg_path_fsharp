@@ -127,7 +127,8 @@ type internal ArrangementInternalError =
     | InternalDualMissingCyclicOrder of vertex: int
     | InternalDualMissingIncidentEdge of vertex: int * edge: int
     | InternalDualWalkDidNotClose of edge: int * left: bool
-    | InternalDualFaceSampleUnavailable of edge: int * left: bool
+    | InternalDualSweepContradiction of walk: int
+    | InternalDualSweepExhausted of unresolved: int
     | InternalDualInvalidOuterWalkCount of count: int
     | InternalDualMissingEdgeFace of edge: int * left: bool
     | InternalDualInvalidOuterFaceCount of count: int
@@ -1070,99 +1071,226 @@ module Arrangement =
                     else loop next visited (remaining - 1))
         loop start [] (graph.Edges.Length * 2 + 1)
 
-    let private walkArea (graph: ArrangementGraph) (walk: ArrangementFaceEdge list) =
-        walk
-        |> List.sumBy (fun (faceEdge: ArrangementFaceEdge) ->
-            let edge = graph.Edges |> List.find (fun (edge: ArrangementEdge) -> edge.Id = faceEdge.EdgeId)
-            let segment = if faceEdge.Left then edge.Segment else Segment.reverse edge.Segment
-            Area.signedSegment segment)
-
-    let private remapSegmentEndpoints segment newStart newFinish =
-        match segment with
-        | Line _ -> Ok(Line(newStart, newFinish))
-        | _ ->
-            Affine.pointPairSimilarity (Segment.start segment) (Segment.finish segment) newStart newFinish
-            |> Result.mapError (fun _ -> InternalArrangementSegmentError SplitOutsideSegment)
-            |> Result.bind (fun transform ->
-                Transform.segment segment transform
-                |> Result.mapError (fun _ -> InternalArrangementSegmentError CannotMapArcNonlinearly))
-            |> Result.map (Segment.withStart newStart >> Segment.withFinish newFinish)
-
-    let private faceEdgeSegment (graph: ArrangementGraph) (reference: ArrangementFaceEdge) =
-        match graph.Edges |> List.tryFind (fun edge -> edge.Id = reference.EdgeId) with
-        | None -> Error(InternalMissingArrangementEdge reference.EdgeId)
-        | Some edge ->
-            let segment, startVertex, endVertex =
-                if reference.Left then edge.Segment, edge.StartVertex, edge.EndVertex
-                else Segment.reverse edge.Segment, edge.EndVertex, edge.StartVertex
-            match graph.Vertices |> List.tryFind (fun vertex -> vertex.Id = startVertex),
-                  graph.Vertices |> List.tryFind (fun vertex -> vertex.Id = endVertex) with
-            | None, _ -> Error(InternalMissingArrangementVertex startVertex)
-            | _, None -> Error(InternalMissingArrangementVertex endVertex)
-            | Some startPoint, Some endPoint -> remapSegmentEndpoints segment startPoint.Point endPoint.Point
-
-    let private faceWalkSubpath graph edges =
-        edges
-        |> List.fold (fun state edge ->
-            state
-            |> Result.bind (fun segments -> faceEdgeSegment graph edge |> Result.map (fun segment -> segments @ [ segment ]))) (Ok [])
-        |> Result.bind (fun segments ->
-            Subpath.create segments
-            |> Result.mapError InternalArrangementSegmentError
-            |> Result.bind (fun subpath -> Subpath.setClosed true subpath |> Result.mapError InternalArrangementSegmentError))
-
-    let private containmentSignature sample subpaths options =
-        subpaths
-        |> List.fold (fun state subpath ->
-            state
-            |> Result.bind (function
-                | None -> Ok None
-                | Some signature ->
-                    WindingField.pathContainmentWith sample (Path.ofSubpaths [ subpath ]) Nonzero options
-                    |> Result.mapError InternalArrangementSegmentError
-                    |> Result.map (function
-                        | Boundary -> None
-                        | Inside -> Some(signature @ [ true ])
-                        | Outside -> Some(signature @ [ false ])))) (Ok(Some []))
-
-    let private faceWalkSignature graph allSubpaths edges subpath =
-        match edges with
-        | [] -> Error(InternalDualFaceSampleUnavailable(-1, true))
-        | first :: _ ->
-            faceEdgeSegment graph first
-            |> Result.bind (fun segment ->
-                Segment.point segment 0.5<parameter>
-                |> Result.mapError InternalArrangementSegmentError
-                |> Result.bind (fun midpoint ->
-                    Segment.derivative segment 0.5<parameter>
-                    |> Result.mapError InternalArrangementSegmentError
-                    |> Result.bind (fun derivative ->
-                        let direction =
-                            Point.normalize derivative
-                            |> Option.orElseWith (fun () -> Point.displacement (Segment.start segment) (Segment.finish segment) |> Point.normalize)
-                            |> Option.defaultValue (Point.create 1.0 0.0)
-                        let normal = Point.rotateCounterclockwise direction
-                        let rec sample distance remaining =
-                            if remaining <= 0 || distance <= 0.0<length> then Error(InternalDualFaceSampleUnavailable(first.EdgeId, first.Left))
-                            else
-                                let point = Point.translate (Point.scale distance normal) midpoint
-                                let options = { WindingField.defaultOptions with Tolerance = distance * 0.01 }
-                                WindingField.pathContainmentWith point (Path.ofSubpaths [ subpath ]) Nonzero options
-                                |> Result.mapError InternalArrangementSegmentError
-                                |> Result.bind (function
-                                    | Boundary -> sample (distance * 0.5) (remaining - 1)
-                                    | _ ->
-                                        containmentSignature point allSubpaths options
-                                        |> Result.bind (function
-                                            | Some signature -> Ok signature
-                                            | None -> sample (distance * 0.5) (remaining - 1)))
-                        sample (Segment.chordLength segment * 0.0001) 12)))
-
     type private FaceCandidate =
         { Walk: ArrangementFaceWalk
           Signature: bool list }
 
-    let private facesFromCandidates candidates =
+    // Acceptance and confirmation are separate: repeating a rejected tangent,
+    // vertex, overlap or inseparable crossing does not make it usable.
+    let private dualSweepConfirmations = 2
+    let private dualSweepAttemptsPerQuestion = 64
+    let private dualSweepMinimumSine = 0.000001
+
+    type private DualSweepEdge =
+        { Id: int; Component: int; LeftWalk: int; RightWalk: int
+          Segment: Segment; Bounds: BoundingBox }
+    type private DualSweepHit =
+        { EdgeId: int; Position: float<length>; Uncertainty: float<length>
+          Component: int; Before: int; After: int }
+    type private DualExterior = { Component: int; Walk: int; Confirmations: int }
+    type private DualPlacement = { Walk: int; Signature: bool list; Confirmations: int }
+    type private DualSweepLine = { Origin: Point<length>; Direction: Point<1> }
+
+    let private dualTryMap f values =
+        values |> List.fold (fun state value ->
+            state |> Result.bind (fun reversed -> f value |> Result.map (fun v -> v::reversed))) (Ok [])
+        |> Result.map List.rev
+
+    // Components use graph vertex identity, never geometric proximity.
+    let private dualComponents (edges: ArrangementEdge list) =
+        let rec grow current remaining =
+            let vertices = current |> List.collect (fun (e: ArrangementEdge) -> [e.StartVertex;e.EndVertex])
+            let attached, rest = remaining |> List.partition (fun e -> List.contains e.StartVertex vertices || List.contains e.EndVertex vertices)
+            if List.isEmpty attached then current, rest else grow (current @ attached) rest
+        let rec loop remaining found =
+            match remaining with
+            | [] -> List.rev found
+            | first::rest ->
+                let connected, rest = grow [first] rest
+                loop rest ((connected |> List.map _.Id)::found)
+        loop edges []
+
+    let private dualWalkIndex (walks: ArrangementFaceWalk list) edge left =
+        walks |> List.tryFindIndex (fun walk -> walk.Edges |> List.exists (fun e -> e.EdgeId=edge && e.Left=left))
+        |> function Some id -> Ok id | None -> Error(InternalDualMissingEdgeFace(edge,left))
+
+    let private dualSweepEdges (edges: ArrangementEdge list) components walks =
+        edges |> dualTryMap (fun edge ->
+            dualWalkIndex walks edge.Id true |> Result.bind (fun left ->
+                dualWalkIndex walks edge.Id false |> Result.bind (fun right ->
+                    Segment.boundingBox edge.Segment |> Result.mapError InternalArrangementSegmentError
+                    |> Result.map (fun bounds ->
+                        { Id=edge.Id; Component=components |> List.findIndex (List.contains edge.Id)
+                          LeftWalk=left; RightWalk=right; Segment=edge.Segment; Bounds=bounds }))))
+
+    let private dualSweepTolerance (graph: ArrangementGraph) =
+        graph.Vertices |> List.fold (fun tolerance vertex ->
+            let rounding = 7.2e-15 * max 1.0<length> (max (abs vertex.Point.X) (abs vertex.Point.Y))
+            vertex.EndpointSamples |> List.fold (fun tolerance sample ->
+                max tolerance (2.0 * Point.distance vertex.Point sample + rounding)) (max tolerance rounding)) 1e-9<length>
+
+    // Int64 preserves the Park-Miller product, as Gleam's exact integer does.
+    let private dualRandom seed = seed * 48271L % 2147483647L
+    let private dualRandomPoint (edges: DualSweepEdge list) seed =
+        let edge = edges[int(seed % int64 edges.Length)]
+        let t = 0.15 + 0.7 * float(dualRandom seed % 10000L) / 10000.0
+        Segment.point edge.Segment (Parameter.fromFloat t) |> Result.mapError InternalArrangementSegmentError
+
+    let private dualOuterLine edges componentId seed =
+        dualRandomPoint (edges |> List.filter (fun e -> e.Component=componentId)) seed
+        |> Result.map (fun origin ->
+            { Origin=origin; Direction=Point.direction (Degree.fromFloat(float(dualRandom seed % 360000L)/1000.0)) })
+
+    let private dualPairLine (edges: DualSweepEdge list) walk seed =
+        let own = edges |> List.filter (fun e -> e.LeftWalk=walk || e.RightWalk=walk)
+        let others = edges |> List.filter (fun e -> e.Component<>own.Head.Component)
+        if List.isEmpty others || seed % 3L = 0L then
+            dualRandomPoint own seed |> Result.map (fun origin ->
+                { Origin=origin; Direction=Point.direction(Degree.fromFloat(float(dualRandom seed % 360000L)/1000.0)) })
+        else
+            let other = others[int(dualRandom seed % int64 others.Length)]
+            let target = others |> List.filter (fun e -> e.LeftWalk=other.LeftWalk || e.RightWalk=other.LeftWalk)
+            dualRandomPoint own seed |> Result.bind (fun origin ->
+                dualRandomPoint target (dualRandom seed) |> Result.map (fun finish ->
+                    { Origin=origin
+                      Direction=Point.displacement origin finish |> Point.normalize
+                                |> Option.defaultValue (Point.direction 37.0<degree>) }))
+
+    let private dualSignedLineDistance p line =
+        let delta = Point.subtract p line.Origin
+        line.Direction.X * delta.Y - line.Direction.Y * delta.X
+
+    let private dualSweepEdgeHits edge line tolerance =
+        let box = edge.Bounds
+        let distances = [box.Min;box.Max;Point.create box.Min.X box.Max.Y;Point.create box.Max.X box.Min.Y]
+                        |> List.map (fun p -> dualSignedLineDistance p line)
+        if List.forall (fun d -> d > tolerance) distances || List.forall (fun d -> d < -tolerance) distances then Ok []
+        else
+            Segment.rayCrossingsWith edge.Segment line.Origin line.Direction
+                { Segment.defaultCrossingOptions with SignedLineDistanceTolerance=tolerance*0.01 }
+            |> Result.mapError (fun _ -> ())
+            |> Result.bind (dualTryMap (fun (t, position) ->
+                Segment.point edge.Segment t |> Result.mapError (fun _ -> ()) |> Result.bind (fun p ->
+                    Segment.derivative edge.Segment t |> Result.mapError (fun _ -> ()) |> Result.bind (fun derivative ->
+                        match Point.normalize derivative with
+                        | None -> Error()
+                        | Some tangent ->
+                            let determinant = tangent.X * line.Direction.Y - tangent.Y * line.Direction.X
+                            if t <= 1e-9<parameter> || t >= 0.999999999<parameter>
+                               || not(System.Double.IsFinite(float position)) || not(System.Double.IsFinite determinant)
+                               || abs(dualSignedLineDistance p line)>tolerance || abs determinant<=dualSweepMinimumSine then Error()
+                            else
+                                let before, after = if determinant>0.0 then edge.LeftWalk,edge.RightWalk else edge.RightWalk,edge.LeftWalk
+                                Ok { EdgeId=edge.Id; Position=position; Uncertainty=tolerance/abs determinant
+                                     Component=edge.Component; Before=before; After=after }))))
+
+    let private dualCheckHitSeparation (hits: DualSweepHit list) tolerance =
+        if hits |> List.pairwise |> List.exists (fun (a,b) -> b.Position-a.Position <= max tolerance (a.Uncertainty+b.Uncertainty)) then Error()
+        else Ok()
+
+    // No conclusions escape before the complete infinite line is validated.
+    let private dualSweepIntersections edges (vertices: ArrangementVertex list) line tolerance =
+        if vertices |> List.exists (fun v -> abs(dualSignedLineDistance v.Point line)<=tolerance) then Error()
+        else
+            dualTryMap (fun edge -> dualSweepEdgeHits edge line tolerance) edges
+            |> Result.bind (fun batches ->
+                let hits = List.concat batches |> List.sortBy _.Position
+                dualCheckHitSeparation hits tolerance |> Result.map (fun () -> hits))
+
+    let private dualCheckLocalSequence hits current exterior =
+        let rec loop hits current =
+            match hits with
+            | [] -> if current=exterior then Ok() else Error(InternalDualSweepContradiction current)
+            | hit::rest -> if hit.Before=current then loop rest hit.After else Error(InternalDualSweepContradiction hit.Before)
+        loop hits current
+
+    let rec private dualLineExteriors (hits: DualSweepHit list) =
+        match hits with
+        | [] -> Ok []
+        | first::_ ->
+            let own, rest = hits |> List.partition (fun h -> h.Component=first.Component)
+            dualCheckLocalSequence own first.Before first.Before |> Result.bind (fun () ->
+                dualLineExteriors rest |> Result.map (fun others ->
+                    { Component=first.Component; Walk=first.Before; Confirmations=1 }::others))
+
+    let rec private dualMergeExteriors (newClaims: DualExterior list) (old: DualExterior list) =
+        match newClaims with
+        | [] -> Ok old
+        | e::rest ->
+            let merged =
+                match old |> List.tryFind (fun p -> p.Component=e.Component) with
+                | None -> Ok(e::old)
+                | Some previous when previous.Walk<>e.Walk -> Error(InternalDualSweepContradiction e.Walk)
+                | Some _ -> old |> List.map (fun p -> if p.Component=e.Component then {p with Confirmations=p.Confirmations+1} else p) |> Ok
+            merged |> Result.bind (dualMergeExteriors rest)
+
+    let rec private dualFindExteriors edges vertices tolerance count found seed remaining =
+        let unresolved = [0..count-1] |> List.filter (fun id -> not(found |> List.exists (fun e -> e.Component=id && e.Confirmations>=dualSweepConfirmations)))
+        match unresolved with
+        | [] -> Ok found
+        | _ when remaining<=0 -> Error(InternalDualSweepExhausted unresolved.Length)
+        | id::_ ->
+            dualOuterLine edges id seed |> Result.bind (fun line ->
+                let next =
+                    match dualSweepIntersections edges vertices line tolerance with
+                    | Error _ -> Ok found
+                    | Ok hits -> dualLineExteriors hits |> Result.bind (fun claims -> dualMergeExteriors claims found)
+                next |> Result.bind (fun next -> dualFindExteriors edges vertices tolerance count next (dualRandom seed) (remaining-1)))
+
+    let private dualSignature states (exteriors: DualExterior list) (walks: ArrangementFaceWalk list) =
+        walks |> List.mapi (fun id _ -> not(exteriors |> List.exists (fun e -> e.Walk=id)) && List.exists (fun (_,walk) -> walk=id) states)
+
+    let rec private dualMergePlacements (newClaims: DualPlacement list) (old: DualPlacement list) confirm =
+        match newClaims with
+        | [] -> Ok old
+        | p::rest ->
+            let merged =
+                match old |> List.tryFind (fun q -> q.Walk=p.Walk) with
+                | None -> Ok(p::old)
+                | Some previous when previous.Signature<>p.Signature -> Error(InternalDualSweepContradiction p.Walk)
+                | Some _ -> old |> List.map (fun q -> if q.Walk=p.Walk && confirm then {q with Confirmations=q.Confirmations+1} else q) |> Ok
+            merged |> Result.bind (fun merged -> dualMergePlacements rest merged confirm)
+
+    let rec private dualLinePlacements hits states exteriors walks found =
+        match hits with
+        | [] -> Ok found
+        | hit::rest ->
+            let before = {Walk=hit.Before; Signature=dualSignature states exteriors walks; Confirmations=1}
+            let states = states |> List.map (fun (id,walk) -> id,(if id=hit.Component then hit.After else walk))
+            let after = {Walk=hit.After; Signature=dualSignature states exteriors walks; Confirmations=1}
+            dualMergePlacements [before;after] found false
+            |> Result.bind (dualLinePlacements rest states exteriors walks)
+
+    let rec private dualFindPlacements edges vertices tolerance (walks: ArrangementFaceWalk list) (exteriors: DualExterior list) found seed remaining =
+        let unresolved = [0..walks.Length-1] |> List.filter (fun id -> not(found |> List.exists (fun p -> p.Walk=id && p.Confirmations>=dualSweepConfirmations)))
+        match unresolved with
+        | [] -> Ok found
+        | _ when remaining<=0 -> Error(InternalDualSweepExhausted unresolved.Length)
+        | walk::_ ->
+            dualPairLine edges walk seed |> Result.bind (fun line ->
+                let next =
+                    match dualSweepIntersections edges vertices line tolerance with
+                    | Error _ -> Ok found
+                    | Ok hits ->
+                        dualLineExteriors hits |> Result.bind (fun claims -> dualMergeExteriors claims exteriors)
+                        |> Result.bind (fun _ -> dualLinePlacements hits (exteriors |> List.map (fun e -> e.Component,e.Walk)) exteriors walks [])
+                        |> Result.bind (fun placements -> dualMergePlacements placements found true)
+                next |> Result.bind (fun next -> dualFindPlacements edges vertices tolerance walks exteriors next (dualRandom seed) (remaining-1)))
+
+    let private dualWalkCandidates (graph: ArrangementGraph) walks =
+        let components = dualComponents graph.Edges
+        dualSweepEdges graph.Edges components walks |> Result.bind (fun edges ->
+            let tolerance = dualSweepTolerance graph
+            let budget = dualSweepAttemptsPerQuestion * (List.length walks + components.Length)
+            dualFindExteriors edges graph.Vertices tolerance components.Length [] 1729L budget
+            |> Result.bind (fun exteriors ->
+                dualFindPlacements edges graph.Vertices tolerance walks exteriors [] 7919L budget
+                |> Result.map (fun placements ->
+                    walks |> List.mapi (fun id walk ->
+                        let placement = placements |> List.find (fun p -> p.Walk=id)
+                        { Walk={walk with Outer=not(exteriors |> List.exists (fun e -> e.Walk=id))}; Signature=placement.Signature }))))
+
+    let private facesFromCandidates (candidates: FaceCandidate list) =
         let groups =
             candidates
             |> List.groupBy _.Signature
@@ -1185,8 +1313,9 @@ module Arrangement =
         | groups -> Error(InternalDualInvalidOuterFaceCount groups.Length)
 
     /// Derive face boundary walks and the face on each side of every edge.
-    /// Walks with the same containment signature are grouped into one face;
-    /// the enclosing walk precedes any island walks.
+    /// Accepted infinite-line sweeps group walks; ambiguous vertex, tangent,
+    /// overlap and inseparable crossing lines are rejected. Independent lines
+    /// must agree. No displaced containment probes are used.
     /// Walks all faces and constructs the dual incidence representation.
     let private dualInternal (graph: ArrangementGraph) =
         if List.isEmpty graph.Edges then
@@ -1206,23 +1335,8 @@ module Arrangement =
                         let remaining = remaining |> List.filter (fun candidate -> edges |> List.exists (faceEdgeEqual candidate) |> not)
                         gather remaining (edges :: walks))
             gather allSides []
-            |> Result.bind (fun walks ->
-                walks
-                |> List.fold (fun state edges ->
-                    state
-                    |> Result.bind (fun prepared ->
-                        faceWalkSubpath graph edges
-                        |> Result.map (fun subpath -> prepared @ [ edges, subpath ]))) (Ok []))
-            |> Result.bind (fun prepared ->
-                let subpaths = prepared |> List.map snd
-                prepared
-                |> List.fold (fun state (edges, subpath) ->
-                    state
-                    |> Result.bind (fun candidates ->
-                        faceWalkSignature graph subpaths edges subpath
-                        |> Result.map (fun signature ->
-                            let walk = { Outer = Area.signedSubpath subpath < 0.0<length^2>; Edges = edges }
-                            candidates @ [ { Walk = walk; Signature = signature } ]))) (Ok []))
+            |> Result.map (List.map (fun edges -> {Outer=false;Edges=edges}))
+            |> Result.bind (dualWalkCandidates graph)
             |> Result.bind facesFromCandidates
             |> Result.bind (fun faces ->
                 let findFace edgeId left =

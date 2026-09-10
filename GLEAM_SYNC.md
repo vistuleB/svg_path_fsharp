@@ -439,4 +439,13 @@ Do not substitute the final Gleam tree for the historical source commit.
   synchronization rather than silently skipping their failures.
   `scripts/test-fast`: 1763 passed.
 
-Next: `7a41f3e` (validated line sweeps for dual-face construction).
+- `7a41f3e` — dual construction now uses the original deterministic line
+  proposals, complete-line validation, two confirmations, exterior/placement
+  propagation, contradiction and exhaustion errors. Removed displaced probes.
+  Ported all four source regressions. `scripts/test-fast`: 1767 passed.
+  `dotnet fsi examples/debug/dual_sweep_checks.fsx`: source diagnostic checks
+  for acceptance, confirmations, contradictions, exhaustion, vertex/touching
+  rejection and inseparable hits passed. Park-Miller uses Int64 so its product
+  remains exact instead of overflowing F# Int32.
+
+Next: `8e3a44e` (remove final single-offset nesting orientation).

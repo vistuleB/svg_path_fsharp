@@ -5,6 +5,9 @@ namespace SvgPath
 
 [<Struct>]
 /// A topological vertex and the source endpoints represented by it.
+/// Point is the smallest enclosing circle's center for EndpointSamples.
+/// Every sample is within endpoint tolerance. A cluster's center is determined
+/// by its samples, but greedy endpoint-to-cluster assignment can depend on order.
 type ArrangementVertex =
     { Id: int
       Point: Point<length>

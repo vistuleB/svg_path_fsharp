@@ -280,4 +280,7 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `842ca9a` — document nonnegative distance tolerance and one-pass radius
   adaptation. Documentation-only; `git diff --check` passes.
 
-Next: `93b5880` (arrangement clustering documentation).
+- `93b5880` — clarify greedy clustering's insertion-order dependence. F# had
+  no misplaced parity docs on atomic insertion. `git diff --check` passes.
+
+Next: `ddad3c4` (offset provenance documentation).

@@ -628,4 +628,11 @@ Do not substitute the final Gleam tree for the historical source commit.
   `scripts/test-fast`: 1802 passed, the obsolete F# orientation assertion failed,
   1803 total; all bounding-polygon regressions pass.
 
-Next: `55b738f` (ordered polygons in Elizabeth).
+- `55b738f` — Elizabeth uses public ordered bounding polygons and boundary
+  normals, retaining along-line axes for two-point hulls. Removed duplicate
+  enclosing-point construction; ported the collinear-degeneracy regression.
+  `scripts/test-fast`: 1803 passed, the obsolete F# orientation assertion failed,
+  1804 total. Candidate-count snapshots remain unchanged and passing.
+
+Next: `ed94708` (Gleam 0.46.0 release/docs/assets); authorized F# obsolete-test
+cleanup precedes final verification. No later/uncommitted Gleam work is in scope.

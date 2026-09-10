@@ -2,6 +2,10 @@
 
 ## Current contract
 
+At `55b738f`, rejection uses the public clockwise bounding polygon helper and
+its side normals, with an along-line axis for a two-point hull. The enclosing
+point-cloud/all-pairs direction experiment is no longer used.
+
 Elizabeth is the sole production general curve-pair search. It is bounded and
 heuristic, not a mathematical completeness certificate. Analytic Line handling
 and overlap prechecks remain outside this solver. Projection continues to use

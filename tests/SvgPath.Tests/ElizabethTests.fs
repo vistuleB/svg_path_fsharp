@@ -32,6 +32,13 @@ let ``elizabeth_endpoint_keeps_multiple_target_parameters_test`` () =
         Assert.True(report.Intersections |> List.exists (fun hit -> hit.LeftT=0.0<parameter> && abs(hit.RightT-t)<1e-7<parameter>))
 
 [<Fact>]
+let ``elizabeth_polygon_axes_separate_collinear_degeneracies_test`` () =
+    let left = QuadraticBezier(p 0.0 0.0,p 0.5 0.5,p 1.0 1.0)
+    let right = QuadraticBezier(p 2.0 2.0,p 2.5 2.5,p 3.0 3.0)
+    let report = beam left right {Intersections.defaultOptions with MaxDepth=1} |> unwrap
+    Assert.Empty(report.Intersections)
+
+[<Fact>]
 let ``elizabeth_beam_simple_crossing_needs_no_culling_test`` () =
     let report = beam horizontal diagonal options |> unwrap
     Assert.Equal(1,report.Intersections.Length)

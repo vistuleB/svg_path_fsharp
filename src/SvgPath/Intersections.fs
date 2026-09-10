@@ -356,38 +356,19 @@ module Intersections =
                 || child.RightFrom > window.RightFrom || child.RightTo < window.RightTo))
 
 
-    let rec private arcEnclosingPoints (arc: CenterArcData) (fromT: float<parameter>) (toT: float<parameter>) =
-        let middle = fromT + (toT - fromT) / 2.0
-        let span = arc.DeltaAngle * float (toT - fromT)
-        if abs span > 90.0<degree> then
-            arcEnclosingPoints arc fromT middle @ arcEnclosingPoints arc middle toT
-        else
-            let a = Ellipse.arcPoint arc fromT
-            let b = Ellipse.arcPoint arc toT
-            let m = Ellipse.arcPoint arc middle
-            let divisor = Trig.cosDegrees (span / 2.0)
-            [ a; b; Point.create (arc.Center.X + (m.X - arc.Center.X) / divisor)
-                                (arc.Center.Y + (m.Y - arc.Center.Y) / divisor) ]
+    let rec private polygonSideAxes (a: Point<length>) (rest: Point<length> list) (first: Point<length>) =
+        match rest with
+        | [] -> [Point.create (a.Y-first.Y) (first.X-a.X)]
+        | b::tail -> Point.create (a.Y-b.Y) (b.X-a.X) :: polygonSideAxes b tail first
 
-    // The points' convex hull encloses the portion; boundary ordering is unnecessary.
-    let private segmentEnclosingPoints segment fromT toT =
-        match segment with
-        | Arc arc -> Ellipse.endpointToCenter arc |> Result.mapError (fun _ -> DegenerateArc)
-                     |> Result.map (fun center -> arcEnclosingPoints center fromT toT)
-        | _ -> Segment.between segment fromT toT |> Result.bind (function
-                   | Line(a,b) -> Ok [a;b]
-                   | QuadraticBezier(a,b,c) -> Ok [a;b;c]
-                   | CubicBezier(a,b,c,d) -> Ok [a;b;c;d]
-                   | Arc _ -> Error DegenerateArc)
-
-    let rec private enclosingPointAxes (points: Point<length> list) =
+    // Polygon boundary normals suffice; retain along-line axes for two-point hulls.
+    let private enclosingPointAxes (points: Point<length> list) =
         match points with
-        | [] -> []
-        | a :: rest ->
-            List.fold (fun axes b ->
-                let dx = b.X - a.X
-                let dy = b.Y - a.Y
-                Point.create -dy dx :: Point.create dx dy :: axes) (enclosingPointAxes rest) rest
+        | [] | [_] -> []
+        | [a;b] ->
+            let dx,dy = b.X-a.X,b.Y-a.Y
+            [Point.create -dy dx;Point.create dx dy]
+        | first::rest -> polygonSideAxes first rest first
 
     let private enclosingProjectionInterval (points: Point<length> list) (origin: Point<length>) (axis: Point<length>) =
         let value (p: Point<length>) = (p.X - origin.X) * axis.X + (p.Y - origin.Y) * axis.Y
@@ -917,8 +898,8 @@ module Intersections =
 
     // Enclosing points are constructed once; no curve extrema or axis boxes.
     let private elizabethWindowOverlaps left right window =
-        segmentEnclosingPoints left window.LeftFrom window.LeftTo |> Result.bind (fun a ->
-            segmentEnclosingPoints right window.RightFrom window.RightTo |> Result.map (fun b ->
+        Segment.boundingPolygonBetween left window.LeftFrom window.LeftTo |> Result.bind (fun a ->
+            Segment.boundingPolygonBetween right window.RightFrom window.RightTo |> Result.map (fun b ->
                 not(enclosingPointsDisjoint a b)))
 
 

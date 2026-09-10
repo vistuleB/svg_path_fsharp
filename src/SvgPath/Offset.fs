@@ -5456,7 +5456,9 @@ module Offset =
             |> Result.bind (fun distance ->
                 lengthSpanAt spans distance
                 |> Result.bind (fun span ->
-                    let localDistance = distance - span.StartDistance
+                    // Cumulative endpoint subtraction can round past the independently
+                    // stored span length; the global distance was already validated.
+                    let localDistance = max 0.0<length> (min span.Length (distance - span.StartDistance))
                     Segment.parameterAtLengthWith span.Segment localDistance options
                     |> Result.mapError InternalPathError
                     |> Result.bind (fun t ->

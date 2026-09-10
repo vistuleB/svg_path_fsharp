@@ -372,4 +372,12 @@ Do not substitute the final Gleam tree for the historical source commit.
   retaining both control-handle edits, including on a single cubic. Both
   source regressions ported. `scripts/test-fast`: 1752 passed.
 
-Next: `80809a9` (clamp offset-map local distances and regenerate text fixtures).
+- `80809a9` — clamp selected-span local distances without weakening global
+  validation. Source regression ported. `scripts/test-fast`: 1753 passed.
+  Replaced both text-map Gallery snapshots with the original fixture algorithms
+  and repository-local source SVG. `dotnet run --project
+  tools/GalleryFigures/GalleryFigures.fsproj -- gallery-lazy-dog-offset-coil.svg
+  gallery-lazy-dog-offset-decaying-spiral.svg` completed successfully; both
+  generated SVGs, generator, and documentation committed together.
+
+Next: `5a5261d` (regenerate Gallery figures; distinguish archived output).

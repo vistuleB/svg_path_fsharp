@@ -169,8 +169,8 @@ module Fixtures =
          "gallery-package-title-first-offset.svg",packageFirst
          "gallery-package-title-nine-offsets.svg",packageNine
          "gallery-crescent-hull.svg",crescent
-         "gallery-cut-radiator.svg",radiator] @ csgCases()
+         "gallery-cut-radiator.svg",radiator
+         "gallery-lazy-dog-offset-coil.svg",OffsetText.generate false
+         "gallery-lazy-dog-offset-decaying-spiral.svg",OffsetText.generate true] @ csgCases()
     let snapshots =
-        ["gallery-package-title-second-offset-arrangement.svg"
-         "gallery-lazy-dog-offset-coil.svg"
-         "gallery-lazy-dog-offset-decaying-spiral.svg"]
+        ["gallery-package-title-second-offset-arrangement.svg"]

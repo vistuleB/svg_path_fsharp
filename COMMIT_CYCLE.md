@@ -19,7 +19,7 @@ There is a dedicated audience distinction:
 ## Gallery Figures
 
 Run `scripts/generate-gallery-figures` to regenerate the calculated Gallery
-figures and copy the three explicitly archived historical illustrations.
+figures and copy the explicitly archived second-offset arrangement illustration.
 The self-contained, non-packable generator lives in `tools/GalleryFigures`.
 Use `--check` to compare outputs without rewriting them, or pass SVG filenames
 to run selected figures. Commit the generator, `GALLERY.md`, and `docs/gallery`

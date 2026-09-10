@@ -5,9 +5,9 @@ source geometry. Run `scripts/generate-gallery-figures` from this repository.
 The generator is a non-packable project under `tools/GalleryFigures`; it requires
 no neighboring Gleam checkout. Panel framing is computed from F# geometry bounds.
 
-Twenty-six figures are calculated by F#. Three historical illustrations are
-explicitly archived snapshots, as in the Gleam generator; those entries are
-marked below and are not evidence of current F# computation.
+Twenty-eight figures are calculated by F#. The second-offset arrangement is
+an explicitly archived snapshot, marked below; it is not evidence of current
+F# computation.
 
 ### Rounded Rectangle Union
 
@@ -135,16 +135,15 @@ Archived snapshot, also loaded as a pre-rendered SVG by the Gleam generator.
 
 ![Lazy dog offset coil](docs/gallery/gallery-lazy-dog-offset-coil.svg)
 
-Archived snapshot of a path extracted from an SVG text sample mapped into
-`(distance, offset)` space and then onto a fixed-radius coil. Both galleries
-reuse this historical illustration rather than rerunning its construction.
+An included SVG text sample mapped into `(distance, offset)` space and then
+onto a fixed-radius coil. The F# generator recomputes this geometry.
 
 ![Lazy dog offset decaying spiral](docs/gallery/gallery-lazy-dog-offset-decaying-spiral.svg)
 
 Uses the same text sample on a decaying spiral, with both radius and local
 offset shrinking by the same factor per turn.
 
-Archived snapshot, with the same status as the coil illustration above.
+The F# generator recomputes this geometry from the same included text sample.
 
 ### Crescent Hull
 

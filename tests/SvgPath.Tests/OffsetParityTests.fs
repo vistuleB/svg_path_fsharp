@@ -11,6 +11,16 @@ let private point x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
 let private direction degrees = Point.direction (Degree.fromFloat degrees)
 
 [<Fact>]
+let ``subpath offset map preserves rounded cumulative boundaries`` () =
+    let first = Line(point 0. 0.,point 10. 0.)
+    let second = Line(point 10. 0.,point 10. 0.3)
+    let third = Line(point 10. 0.3,point 11. 0.3)
+    for segments in [[first;second];[first;second;third]] do
+        let source = Subpath.create segments |> Result.defaultWith (failwithf "%A")
+        let map = Offset.subpathOffsetMap source |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(Ok(point 10. 0.3),map (point (10.0+0.3) 0.0))
+
+[<Fact>]
 let ``source alignment preserves first handle edit at closed seam`` () =
     let curve = CubicBezier(point 0. 0.,point 1. 0.01,point 2. 1.,point 2. 2.)
     let a = Line(point 2. 2.,point -1. 0.)

@@ -123,4 +123,9 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `7d735a0` — canonical transform entries before compact serialization.
   One source regression added. `scripts/test-fast`: 1674 passed.
 
-Next: `e5c1399` (Bezier zero predicates).
+- `e5c1399` — verified Bezier quadratic-extrema denominator and cubic
+  self-intersection cross determinant already accept both signs through .NET
+  equality. Semantic no-op; no source tests added. Last unchanged-code
+  `scripts/test-fast`: 1674 passed; `git diff --check` passes.
+
+Next: `b6655e5` (area zero denominator).

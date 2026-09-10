@@ -64,6 +64,7 @@
     <Compile Include="EndpointContextTests.fs" />
     <Compile Include="HullConstantCleanupTests.fs" />
     <Compile Include="LengthUpperBoundTests.fs" />
+    <Compile Include="OffsetShortRunsTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

@@ -65,4 +65,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `ba7159d` — cheap segment/subpath/path length upper bounds, README docs, and
   seven source regressions one-to-one. `scripts/test-fast`: 1623 passed.
 
-Next: `e341c79` (bounded and balanced short source runs).
+- `e341c79` — replace unbounded displacement swallowing with balanced runs
+  bounded by three tolerances; preserve source/portion endpoints. Eight source
+  regressions added one-to-one. `scripts/test-fast`: 1631 passed.
+
+Next: `3c072a9` (checked arithmetic rejects actual overflow).

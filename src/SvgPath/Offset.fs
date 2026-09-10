@@ -914,58 +914,66 @@ module Offset =
         |> Result.mapError InternalPathError
         |> Result.map BoundingBox.diameter
 
-    let private segmentIsShort segment tolerance =
-        match segmentDiameter segment with
-        | Ok diameter -> diameter < tolerance
-        | Error _ -> false
+    let rec private splitShortRunNearHalf remaining target before beforeBound =
+        match remaining with
+        | [] -> List.rev before, []
+        | [last] -> List.rev before, [last]
+        | ((_,nextBound) as next) :: rest ->
+            let afterBound = beforeBound + nextBound
+            if afterBound >= target then
+                if List.isEmpty before || afterBound - target <= target - beforeBound then
+                    List.rev (next :: before), rest
+                else List.rev before, remaining
+            else splitShortRunNearHalf rest target (next :: before) afterBound
 
-    let private remapSegmentEndpoints segment targetStart targetEnd =
-        Segment.remapEndpoints segment targetStart targetEnd
-        |> Result.defaultValue (Line(targetStart, targetEnd))
-
-    let private stretchSegmentStart segment targetStart =
-        remapSegmentEndpoints segment targetStart (Segment.finish segment)
-
-    let private stretchSegmentEnd segment targetEnd =
-        remapSegmentEndpoints segment (Segment.start segment) targetEnd
-
-    let private carryDeletedSmallSegment previous deleted =
-        let displacement = Point.displacement (Segment.start deleted) (Segment.finish deleted)
-        let target = Point.translate (Point.scale (1.0 / 3.0) displacement) (Segment.finish previous)
-        stretchSegmentEnd previous target
-
-    let private bridgeDeletedSmallSegmentGap previous next =
-        let target = Point.interpolate (Segment.finish previous) (Segment.start next) 0.25<parameter>
-        stretchSegmentEnd previous target, stretchSegmentStart next target
-
-    let private eliminateSmallSegments segments tolerance =
-        let rec loop previous rest normalized deletedSinceBridge =
-            match rest with
-            | [] -> List.rev (previous :: normalized)
-            | next :: remaining when not (segmentIsShort next tolerance) ->
-                let previous, next =
-                    if deletedSinceBridge then bridgeDeletedSmallSegmentGap previous next
-                    else previous, next
-                loop next remaining (previous :: normalized) false
-            | next :: [] -> loop next [] (previous :: normalized) false
-            | next :: remaining ->
-                loop (carryDeletedSmallSegment previous next) remaining normalized true
-
-        match segments with
-        | [] -> []
-        | first :: rest -> loop first rest [] false
-
-    let private eliminateSmallOffsetSourceSegments (subpath: Subpath) tolerance =
-        match eliminateSmallSegments subpath.Segments tolerance with
-        | [] -> Ok subpath
-        | normalized ->
-            Subpath.createWith (WiggleElseBridgeWith tolerance) normalized
-            |> Result.bind (fun normalizedSubpath ->
-                Subpath.setClosedWith (WiggleElseBridgeWith tolerance) subpath.Closed normalizedSubpath)
+    // Balanced splits limit each cleanup's travel without stranding a short
+    // remainder. Curved/backtracking portions may still return multiple edges.
+    let rec private normalizeShortRun run bound tolerance normalized =
+        match run with
+        | [] -> Ok normalized
+        | _ when bound / 3.0 <= tolerance ->
+            Subpath.create (List.map fst run)
             |> Result.mapError InternalPathError
+            |> Result.bind (fun subpath ->
+                Degeneracy.normalizeDegenerateSegments subpath tolerance
+                |> Result.mapError InternalSourceNormalizationError)
+            |> Result.map (fun simplified -> List.rev simplified.Segments @ normalized)
+        | _ ->
+            let left,right = splitShortRunNearHalf run (bound / 2.0) [] 0.0<length>
+            let leftBound,rightBound = List.sumBy snd left,List.sumBy snd right
+            normalizeShortRun left leftBound tolerance normalized
+            |> Result.bind (normalizeShortRun right rightBound tolerance)
+
+    let rec private normalizeShortSourceRunsLoop remaining tolerance pending pendingBound normalized =
+        match remaining with
+        | [] -> Ok(List.rev normalized)
+        | [last] ->
+            normalizeShortRun (List.rev pending) pendingBound tolerance normalized
+            |> Result.map (fun normalized -> List.rev (last :: normalized))
+        | next :: rest ->
+            Segment.lengthUpperBound next |> Result.mapError InternalPathError
+            |> Result.bind (fun bound ->
+                if System.Double.IsFinite(float bound) && bound < tolerance then
+                    normalizeShortSourceRunsLoop rest tolerance ((next,bound) :: pending) (pendingBound + bound) normalized
+                else
+                    normalizeShortRun (List.rev pending) pendingBound tolerance normalized
+                    |> Result.bind (fun normalized -> normalizeShortSourceRunsLoop rest tolerance [] 0.0<length> (next :: normalized)))
+
+    /// Normalize short interior runs, bisecting near half the accumulated length
+    /// bound until each portion is at most three tolerances. Preserve first/last
+    /// segments and portion endpoints; then use ordinary degeneracy cleanup.
+    let internal normalizeShortSourceRuns (subpath: Subpath) tolerance =
+        if tolerance <= 0.0<length> || not (System.Double.IsFinite(float tolerance)) then Error(InternalInvalidTolerance tolerance)
+        else
+            match subpath.Segments with
+            | [] | [_] -> Ok subpath
+            | first :: rest ->
+                normalizeShortSourceRunsLoop rest tolerance [] 0.0<length> [first]
+                |> Result.bind (fun segments -> Subpath.create segments |> Result.mapError InternalPathError)
+                |> Result.bind (fun normalized -> Subpath.setClosed subpath.Closed normalized |> Result.mapError InternalPathError)
 
     let internal normalizeSourceSubpath subpath options =
-        eliminateSmallOffsetSourceSegments subpath 0.001<length>
+        normalizeShortSourceRuns subpath 0.001<length>
         |> Result.bind (fun subpath ->
             Degeneracy.normalizeDegenerateSegments subpath options.Fitting.Tolerance
             |> Result.mapError InternalSourceNormalizationError)

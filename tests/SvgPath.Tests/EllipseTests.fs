@@ -182,8 +182,8 @@ let ``collapsed arc produces a line on its surviving transformed axis`` () =
             (point -4.0 0.0)
             collapseY
         |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(point -4.0 0.0, startPoint)
-    Assert.Equal(point 4.0 0.0, endPoint)
+    Assert.Equal(point 4.0 0.0, startPoint)
+    Assert.Equal(point -4.0 0.0, endPoint)
 
 [<Fact>]
 let ``collapsed arc collinearity is scale relative`` () =

@@ -154,7 +154,8 @@ module Ellipse =
         : Result<CenterArcData, EllipseError> =
         let rx = abs radius.X
         let ry = abs radius.Y
-        if rx <= lengthTolerance || ry <= lengthTolerance || startPoint = endPoint then
+        let coincident = InternalNumber.isZero(startPoint.X-endPoint.X) && InternalNumber.isZero(startPoint.Y-endPoint.Y)
+        if rx <= lengthTolerance || ry <= lengthTolerance || coincident then
             Error DegenerateInputArc
         else
             let cosPhi = Trig.cosDegrees xAxisRotation
@@ -246,6 +247,8 @@ module Ellipse =
                   Max = Point.create (max box.Max.X candidate.X) (max box.Max.Y candidate.Y) })
             { Min = first; Max = first }
 
+    /// Parameters of every stationary projection visit, including multi-turn
+    /// sweeps. Zero sweeps and constant projections have no isolated extrema.
     let arcProjectionExtrema arc (direction: Point<'Direction>) =
         let xAxisX = arc.Radius.X * Trig.cosDegrees arc.XAxisRotation
         let xAxisY = arc.Radius.X * Trig.sinDegrees arc.XAxisRotation
@@ -253,13 +256,16 @@ module Ellipse =
         let yAxisY = arc.Radius.Y * Trig.cosDegrees arc.XAxisRotation
         let alpha = direction.X * xAxisX + direction.Y * xAxisY
         let beta = direction.X * yAxisX + direction.Y * yAxisY
-        if InternalNumber.isZero alpha && InternalNumber.isZero beta then []
+        if InternalNumber.isZero arc.DeltaAngle || (InternalNumber.isZero alpha && InternalNumber.isZero beta) then []
         else
             let supportAngle = Trig.atan2Degrees beta alpha
+            let sweep = abs arc.DeltaAngle
+            let rec repeated progress found =
+                if progress > sweep then List.rev found
+                else repeated (progress + fullTurn) (parameter (float(progress / sweep))::found)
             [ supportAngle; supportAngle + halfTurn ]
-            |> List.filter (fun angle -> angleInSweep angle arc.StartAngle arc.DeltaAngle)
-            |> List.map (fun angle -> parameter (Degree.toFloat (angleProgress angle arc.StartAngle arc.DeltaAngle) / abs (Degree.toFloat arc.DeltaAngle)))
-            |> List.filter (fun t -> t >= parameter 0.0 && t <= parameter 1.0)
+            |> List.collect (fun angle -> repeated (angleProgress angle arc.StartAngle arc.DeltaAngle) [])
+            |> List.sort
 
     let private cubicSplitProgresses arc =
         let delta = abs (Degree.toFloat arc.DeltaAngle)
@@ -308,6 +314,8 @@ module Ellipse =
         : Point<1> =
         let matrixScale = max (abs sxx) (abs syy)
         if abs sxy > scalarTolerance * matrixScale then
+            // Point.normalize rescales first; the squared-size magnitude of
+            // this eigenvector must not be mistaken for a zero direction.
             Point.normalize (Point.create sxy (lambda - sxx)) |> Option.defaultValue Point.right
         elif sxx >= syy then Point.right else Point.down
 
@@ -346,20 +354,15 @@ module Ellipse =
         elif xLength >= yLength then Ok(Point.scale (1.0 / xLength) xAxis)
         else Ok(Point.scale (1.0 / yLength) yAxis)
 
-    let private collapsedAngles arc alpha beta interiorOnly =
+    let private collapsedAngles arc alpha beta =
         let maximumAngle = Trig.atan2Degrees beta alpha
         let candidates = [ maximumAngle + halfTurn; maximumAngle ]
-        if interiorOnly then
-            candidates
-            |> List.filter (fun angle ->
-                let progress = angleProgress angle arc.StartAngle arc.DeltaAngle
-                progress > degreeTolerance && progress < abs arc.DeltaAngle - degreeTolerance)
-            |> List.sortBy (fun angle -> angleProgress angle arc.StartAngle arc.DeltaAngle)
-            |> fun angles -> arc.StartAngle :: angles @ [ arcEndAngle arc ]
-        else
-            candidates
-            |> List.filter (fun angle -> angleInSweep angle arc.StartAngle arc.DeltaAngle)
-            |> fun angles -> arc.StartAngle :: arcEndAngle arc :: angles
+        candidates
+        |> List.filter (fun angle ->
+            let progress = angleProgress angle arc.StartAngle arc.DeltaAngle
+            progress > degreeTolerance && progress < abs arc.DeltaAngle - degreeTolerance)
+        |> List.sortBy (fun angle -> angleProgress angle arc.StartAngle arc.DeltaAngle)
+        |> fun angles -> arc.StartAngle :: angles @ [ arcEndAngle arc ]
 
     let private collapsedArcPoints startPoint radius xAxisRotation largeArc sweep endPoint transform =
         match doEndpointToCenter startPoint radius xAxisRotation largeArc sweep endPoint with
@@ -376,7 +379,7 @@ module Ellipse =
                     | Ok axis ->
                         let center = transformedPoint transform arc.Center
                         let alpha, beta = Point.dot xAxis axis, Point.dot yAxis axis
-                        collapsedAngles arc alpha beta true
+                        collapsedAngles arc alpha beta
                         |> List.map (fun angle ->
                             let scalar = alpha * Trig.cosDegrees angle + beta * Trig.sinDegrees angle
                             Point.translate (Point.scale scalar axis) center)
@@ -385,6 +388,8 @@ module Ellipse =
     let collapsedArcSubpath startPoint radius xAxisRotation largeArc sweep endPoint transform =
         collapsedArcPoints startPoint radius xAxisRotation largeArc sweep endPoint transform
 
+    /// Monotone collapses preserve exact endpoints in traversal order. Other
+    /// collapses span their extrema, oriented by net endpoint displacement.
     let collapsedArcLine startPoint radius xAxisRotation largeArc sweep endPoint transform =
         match doEndpointToCenter startPoint radius xAxisRotation largeArc sweep endPoint with
         | Error error -> Error error
@@ -400,9 +405,14 @@ module Ellipse =
                     | Ok axis ->
                         let center = transformedPoint transform arc.Center
                         let alpha, beta = Point.dot xAxis axis, Point.dot yAxis axis
-                        let points =
-                            collapsedAngles arc alpha beta false
-                            |> List.map (fun angle ->
-                                let scalar = alpha * Trig.cosDegrees angle + beta * Trig.sinDegrees angle
-                                Point.translate (Point.scale scalar axis) center)
-                        Ok(List.minBy (Point.dot axis) points, List.maxBy (Point.dot axis) points)
+                        let angles = collapsedAngles arc alpha beta
+                        let scalars = angles |> List.map (fun angle -> alpha * Trig.cosDegrees angle + beta * Trig.sinDegrees angle)
+                        let first = List.head scalars
+                        let low,high = scalars |> List.fold (fun (low,high) value -> min low value,max high value) (first,first)
+                        let transformedStart,transformedEnd = transformedPoint transform startPoint,transformedPoint transform endPoint
+                        match angles with
+                        | [_;_] -> Ok(transformedStart,transformedEnd)
+                        | _ ->
+                            let lowPoint,highPoint = Point.translate (Point.scale low axis) center,Point.translate (Point.scale high axis) center
+                            if Point.dot transformedEnd axis >= Point.dot transformedStart axis then Ok(lowPoint,highPoint)
+                            else Ok(highPoint,lowPoint)

@@ -256,7 +256,7 @@ let ``strict_subpath_transform_errors_on_collapsed_arc_test`` () =
 let ``graceful_arc_transform_returns_collapsed_line_test`` () =
     let arc = Arc { Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }
     let segment = Transform.segmentGracefully arc (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
-    Assert.Equal("M -5 0 H 5", Serialize.segment segment)
+    Assert.Equal("M 5 0 H -5", Serialize.segment segment)
 
 [<Fact>]
 let ``graceful_arc_transform_follows_full_collapse_to_point_test`` () =
@@ -320,7 +320,7 @@ let ``graceful_path_transform_converts_collapsed_arcs_in_each_subpath_test`` () 
 let ``graceful_arc_transform_returns_vertical_collapsed_line_test`` () =
     let arc = Arc { Start = point 0.0 5.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = false; End = point 0.0 -5.0 }
     let segment = Transform.segmentGracefully arc (Transform.matrix 0.0 0.0 0.0 1.0 10.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
-    Assert.Equal("M 10 -5 V 5", Serialize.segment segment)
+    Assert.Equal("M 10 5 V -5", Serialize.segment segment)
 
 [<Fact>]
 let ``graceful_non_degenerate_arc_transform_returns_arc_test`` () =

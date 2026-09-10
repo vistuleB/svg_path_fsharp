@@ -170,4 +170,10 @@ Do not substitute the final Gleam tree for the historical source commit.
   document the contract and add the source regression. `scripts/test-fast`:
   1681 passed.
 
-Next: `fddb38e` (ellipse collapse orientation and multi-turn extrema).
+- `fddb38e` — preserve collapsed-line traversal and exact monotone endpoints;
+  enumerate every multi-turn projection extremum. Rescaled eigenvector
+  normalization is already supplied by Point.normalize. Five source regressions
+  added; two source expectations and one additional F# expectation updated for
+  the new traversal contract. `scripts/test-fast`: 1686 passed.
+
+Next: `25c25d9` (curvature-extrema cusp discovery).

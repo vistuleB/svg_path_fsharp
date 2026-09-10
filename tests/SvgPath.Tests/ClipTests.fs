@@ -36,6 +36,14 @@ module ClipTests =
         Path.singleton (rectangleAt minX minY maxX maxY)
 
     [<Fact>]
+    let ``whole subpaths survive coincident boundary cuts unchanged`` () =
+        let source = rectangleAt 0.0<length> 0.0<length> 10.0<length> 10.0<length>
+        let region = rectanglePath 0.0<length> 0.0<length> 20.0<length> 20.0<length>
+        Assert.Equal(Ok[source],Clip.subpath source region Nonzero)
+        let openSource = Subpath.polyline [point 1.0<length> 0.0<length>;point 2.0<length> 0.0<length>;point 3.0<length> 2.0<length>] |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(Ok[openSource],Clip.subpath openSource region Nonzero)
+
+    [<Fact>]
     let ``open line clips to inside piece`` () =
         match rectangle () with
         | Error error -> failwithf "%A" error

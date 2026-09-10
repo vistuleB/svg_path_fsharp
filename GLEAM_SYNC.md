@@ -274,4 +274,7 @@ Do not substitute the final Gleam tree for the historical source commit.
   discovery, leaving subject curves open. Source regression and docs ported.
   `scripts/test-fast`: 1722 passed.
 
-Next: `ed500a2` (whole clipped subpaths across incidental cuts).
+- `ed500a2` — restore original subpaths if all pieces survive incidental
+  boundary cuts. Source regression added. `scripts/test-fast`: 1723 passed.
+
+Next: `842ca9a` (corner-rounding documentation).

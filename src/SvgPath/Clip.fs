@@ -139,7 +139,13 @@ module Clip =
                             |> Result.bind (fun kept ->
                                 isInside clipRegion fillRule options piece
                                 |> Result.map (fun keep -> if keep then piece :: kept else kept))) (Ok [])
-                        |> Result.map List.rev)))
+                        |> Result.map (fun reversed ->
+                            let kept = List.rev reversed
+                            // Restore original segmentation/closure if every
+                            // piece survived incidental boundary encounters.
+                            if List.isEmpty kept then []
+                            elif List.length kept=List.length pieces then [input]
+                            else kept))))
 
     let subpath input clipRegion fillRule = subpathWith input clipRegion fillRule defaultOptions
 

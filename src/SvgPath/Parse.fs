@@ -135,8 +135,9 @@ module Parse =
         if relative then Point.create (state.Current.X + x) (state.Current.Y + y)
         else Point.create x y
 
-    let private ensureActive state =
-        if state.Active && state.HasCurrent then Ok() else Error(ExpectedMove, state.At)
+    let private ensureCurrent state =
+        // Closepath retains its start as the current point for subsequent drawing.
+        if state.HasCurrent then Ok() else Error(ExpectedMove, state.At)
 
     let private finishActive state =
         if state.Active then
@@ -235,7 +236,7 @@ module Parse =
         | _ -> parseTokens tokens state
 
     and private parsePairs tokens state relative append =
-        ensureActive state
+        ensureCurrent state
         |> Result.bind (fun () ->
             let rec loop current rest parsed =
                 match rest with
@@ -252,7 +253,7 @@ module Parse =
             loop state tokens false)
 
     and private parseSingles tokens state append =
-        ensureActive state
+        ensureCurrent state
         |> Result.bind (fun () ->
             let rec loop current rest parsed =
                 match rest with
@@ -262,7 +263,7 @@ module Parse =
             loop state tokens false)
 
     and private parseQuadratics tokens state relative smooth =
-        ensureActive state
+        ensureCurrent state
         |> Result.bind (fun () ->
             let arity = if smooth then 2 else 4
             let rec loop current rest parsed =
@@ -286,7 +287,7 @@ module Parse =
             loop state tokens false)
 
     and private parseCubics tokens state relative smooth =
-        ensureActive state
+        ensureCurrent state
         |> Result.bind (fun () ->
             let arity = if smooth then 4 else 6
             let rec loop current rest parsed =
@@ -312,7 +313,7 @@ module Parse =
             loop state tokens false)
 
     and private parseArcs tokens state relative =
-        ensureActive state
+        ensureCurrent state
         |> Result.bind (fun () ->
             let rec loop current rest parsed =
                 match rest with
@@ -340,23 +341,27 @@ module Parse =
             loop state tokens false)
 
     and private parseClose tokens state =
-        ensureActive state
+        ensureCurrent state
         |> Result.bind (fun () ->
-            let startPoint = Subpath.start state.Subpath
-            Subpath.setClosedWith Bridge true state.Subpath
-            |> Result.mapError (fun error -> ParsedPathError error, state.At)
-            |> Result.bind (fun subpath ->
-                parseTokens tokens
-                    { state with
-                        Subpaths = subpath :: state.Subpaths
-                        Subpath = Subpath.empty startPoint
-                        Current = startPoint
-                        HasCurrent = true
-                        Active = false
-                        LastCubicControl = None
-                        LastQuadraticControl = None }))
+            if not state.Active then parseTokens tokens state
+            else
+                let startPoint = Subpath.start state.Subpath
+                Subpath.setClosedWith Bridge true state.Subpath
+                |> Result.mapError (fun error -> ParsedPathError error, state.At)
+                |> Result.bind (fun subpath ->
+                    parseTokens tokens
+                        { state with
+                            Subpaths = subpath :: state.Subpaths
+                            Subpath = Subpath.empty startPoint
+                            Current = startPoint
+                            HasCurrent = true
+                            Active = false
+                            LastCubicControl = None
+                            LastQuadraticControl = None }))
 
     /// Parse an SVG path-data string. Empty input and `none` produce an empty path.
+    /// Drawing after closepath begins a new subpath at the retained start point.
+    /// Repeated closepath commands do not append empty subpaths.
     let path (input: string) =
         if input.Trim() = "none" then Ok Path.empty
         else

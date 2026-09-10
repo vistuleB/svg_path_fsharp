@@ -349,4 +349,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   above. The document's Gleam-specific reproducers and image links remain in
   the source repository; it is not presented as an F# audit. No F# code change.
 
-Next: `cbc802b` (drawing commands after closepath).
+- `cbc802b` — resume drawing at the retained current point after closepath;
+  repeated closepath is a no-op. Three source regressions ported.
+  `scripts/test-fast`: 1746 passed.
+
+Next: `0d8f613` (reverse survivor provenance with geometry).

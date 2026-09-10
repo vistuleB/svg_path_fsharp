@@ -8,6 +8,25 @@ let private parsed input = Parse.path input |> Result.defaultWith (failwithf "%A
 let private onlySubpath input = (parsed input).Subpaths |> List.exactlyOne
 
 [<Fact>]
+let ``drawing after close starts at closed subpath start`` () =
+    let prefix = "M 10 20 L 30 40 Z "
+    for command in ["L 15 25";"l 5 5";"H 15";"h 5";"V 25";"v 5";"C 11 20 12 22 15 25";
+                    "c 1 0 2 2 5 5";"S 12 22 15 25";"s 2 2 5 5";"Q 12 22 15 25";
+                    "q 2 2 5 5";"T 15 25";"t 5 5";"A 10 10 0 0 1 15 25";"a 10 10 0 0 1 5 5"] do
+        Assert.Equal(parsed(prefix+"M 10 20 "+command), parsed(prefix+command))
+
+[<Fact>]
+let ``close resets smooth curve controls before continuation`` () =
+    for prefix,command in ["M10 20 C11 21 12 22 13 23 Z","S14 24 15 25";
+                           "M10 20 Q11 21 13 23 Z","T15 25"] do
+        Assert.Equal(parsed(prefix+"M10 20"+command),parsed(prefix+command))
+
+[<Fact>]
+let ``repeated close does not duplicate completed subpath`` () =
+    Assert.Equal(parsed "M10 20L30 40Z M10 20l5 5z",parsed "M10 20L30 40ZzZl5 5z")
+    Assert.Equal(Error(ParseError(ExpectedMove,"Z")),Parse.path "Z")
+
+[<Fact>]
 let ``quadratic cubic and smooth controls reflect`` () =
     let subpath = onlySubpath "M0 0 Q10 0 10 10 T20 20 C20 30 30 30 30 20 S40 10 50 20"
     match subpath.Segments with

@@ -590,4 +590,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   curve errors to CurveSolverError. `scripts/test-fast`: 1795 passed, the same
   5 historical assertions failed, 1800 total.
 
-Next: `8ea88ff` (machinery documentation).
+- `8ea88ff` — clarify that cyclic embedding is used by graph construction and
+  describe the established sampled overlap detector without experimental wording.
+  Comments only; last completed fast results remain recorded above.
+
+Next: `bc2396e` (remove unused offset distance options).

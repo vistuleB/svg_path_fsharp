@@ -254,6 +254,8 @@ module internal OverlapDetection =
         intervalsCover left (min candidate.LeftFrom candidate.LeftTo) (max candidate.LeftFrom candidate.LeftTo)
         && intervalsCover right (min candidate.RightFrom candidate.RightTo) (max candidate.RightFrom candidate.RightTo)
 
+    // Sampled overlap detection proposes intervals from endpoint matches;
+    // every overlap boundary is assumed to be an input segment endpoint.
     let detectWithSamples left right tolerance samples =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then Error(InvalidOverlapTolerance tolerance)
         elif samples <= 0 then Error(InvalidOverlapSamples samples)

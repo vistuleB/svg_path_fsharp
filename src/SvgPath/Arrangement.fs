@@ -394,7 +394,8 @@ module Arrangement =
                             attempts radius maxAttempts [] None)
 
     /// Compute clockwise SVG-space incident-edge orders by sampling each edge
-    /// on common shrinking circles around its vertex.
+    /// on common shrinking circles around its vertex. Graph construction uses
+    /// this embedding helper.
     let internal cyclicOrdersWith (graph: ArrangementGraph) tolerance maxAttempts =
         if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
         elif maxAttempts <= 0 then Error(InternalInvalidCyclicOrderAttempts maxAttempts)

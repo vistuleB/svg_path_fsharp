@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="430" viewBox="0 0 1280 430">
+  <rect x="0" y="0" width="1280" height="430" fill="white"/>
+  <text x="640" y="30" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">Continuation circles initially disjoint</text>  <text x="160" y="75" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">MiterClip(4)</text>  <g transform="translate(160 245) scale(38.57142857142857) translate(0.5 -0.5)">
+  <path d="M 0 -1 H 1 V 0 A 2 2 0 0 0 3 2 V 4 A 4 4 0 0 1 -0.89792 0.89792 A 4 4 0 0 1 -4 -3 H -2 A 2 2 0 0 0 0 -1 Z" style="fill:#9573dc;fill-opacity:0.3;stroke:#7343de;stroke-width:0.02592592592592593"/>  <path d="M -3 -3 A 3 3 0 0 0 0 0 A 3 3 0 0 0 3 3" style="fill:none;stroke:#666;stroke-width:0.02203703703703704"/>
+  </g>
+  <text x="480" y="75" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">Round</text>  <g transform="translate(480 245) scale(38.57142857142857) translate(0.5 -0.5)">
+  <path d="M 0 -1 A 1 1 0 0 1 1 0 A 2 2 0 0 0 3 2 V 4 A 4 4 0 0 1 -0.89792 0.89792 A 4 4 0 0 1 -4 -3 H -2 A 2 2 0 0 0 0 -1 Z" style="fill:#9573dc;fill-opacity:0.3;stroke:#7343de;stroke-width:0.02592592592592593"/>  <path d="M -3 -3 A 3 3 0 0 0 0 0 A 3 3 0 0 0 3 3" style="fill:none;stroke:#666;stroke-width:0.02203703703703704"/>
+  </g>
+  <text x="800" y="75" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">Arcs(4)</text>  <g transform="translate(800 245) scale(38.57142857142857) translate(0.5 -0.5)">
+  <path d="M 0 -1 A 2.41421 2.41421 0 0 0 1.70711 -1.70711 A 2.41421 2.41421 0 0 0 1 0 A 2 2 0 0 0 3 2 V 4 A 4 4 0 0 1 -0.89792 0.89792 A 4 4 0 0 1 -4 -3 H -2 A 2 2 0 0 0 0 -1 Z" style="fill:#9573dc;fill-opacity:0.3;stroke:#7343de;stroke-width:0.02592592592592593"/>  <path d="M -3 -3 A 3 3 0 0 0 0 0 A 3 3 0 0 0 3 3" style="fill:none;stroke:#666;stroke-width:0.02203703703703704"/>
+  </g>
+  <text x="1120" y="75" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">Arcs(1.1)</text>  <g transform="translate(1120 245) scale(38.57142857142857) translate(0.5 -0.5)">
+  <path d="M 0 -1 A 2.41421 2.41421 0 0 0 0.50271 -1.05292 L 1.05292 -0.50271 A 2.41421 2.41421 0 0 0 1 0 A 2 2 0 0 0 3 2 V 4 A 4 4 0 0 1 -0.89792 0.89792 A 4 4 0 0 1 -4 -3 H -2 A 2 2 0 0 0 0 -1 Z" style="fill:#9573dc;fill-opacity:0.3;stroke:#7343de;stroke-width:0.02592592592592593"/>  <path d="M -3 -3 A 3 3 0 0 0 0 0 A 3 3 0 0 0 3 3" style="fill:none;stroke:#666;stroke-width:0.02203703703703704"/>
+  </g>  <text x="640" y="418" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">Gray: source · purple: computed stroke · width 2 · Butt caps</text>
+</svg>

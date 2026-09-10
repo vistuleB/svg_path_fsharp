@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="430" viewBox="0 0 1280 430">
+  <rect x="0" y="0" width="1280" height="430" fill="white"/>
+  <text x="640" y="30" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">MiterClip: varying the limit</text>  <text x="160" y="75" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">MiterClip(0.5)</text>  <g transform="translate(160 245) scale(19.686494971625873) translate(-0 -5)">
+  <path d="M -0.85749 -0.5145 H 0.85749 L 6.85749 9.4855 L 5.14251 10.5145 L 0 1.94365 L -5.14251 10.5145 L -6.85749 9.4855 Z" style="fill:#9573dc;fill-opacity:0.3;stroke:#7343de;stroke-width:0.050796243894166995"/>  <path d="M -6 10 L 0 0 L 6 10" style="fill:none;stroke:#666;stroke-width:0.04317680731004195"/>
+  </g>
+  <text x="480" y="75" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">MiterClip(1)</text>  <g transform="translate(480 245) scale(19.686494971625873) translate(-0 -4.7572478777137635)">
+  <path d="M -0.85749 -0.5145 L -0.56619 -1 H 0.56619 L 0.85749 -0.5145 L 6.85749 9.4855 L 5.14251 10.5145 L 0 1.94365 L -5.14251 10.5145 L -6.85749 9.4855 Z" style="fill:#9573dc;fill-opacity:0.3;stroke:#7343de;stroke-width:0.050796243894166995"/>  <path d="M -6 10 L 0 0 L 6 10" style="fill:none;stroke:#666;stroke-width:0.04317680731004195"/>
+  </g>
+  <text x="800" y="75" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">MiterClip(1.5)</text>  <g transform="translate(800 245) scale(19.686494971625873) translate(-0 -4.5072478777137635)">
+  <path d="M -0.85749 -0.5145 L -0.26619 -1.5 H 0.26619 L 0.85749 -0.5145 L 6.85749 9.4855 L 5.14251 10.5145 L 0 1.94365 L -5.14251 10.5145 L -6.85749 9.4855 Z" style="fill:#9573dc;fill-opacity:0.3;stroke:#7343de;stroke-width:0.050796243894166995"/>  <path d="M -6 10 L 0 0 L 6 10" style="fill:none;stroke:#666;stroke-width:0.04317680731004195"/>
+  </g>
+  <text x="1120" y="75" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">MiterClip(2)</text>  <g transform="translate(1120 245) scale(19.686494971625873) translate(-0 -4.285422561906213)">
+  <path d="M -0.85749 -0.5145 L 0 -1.94365 L 0.85749 -0.5145 L 6.85749 9.4855 L 5.14251 10.5145 L 0 1.94365 L -5.14251 10.5145 L -6.85749 9.4855 Z" style="fill:#9573dc;fill-opacity:0.3;stroke:#7343de;stroke-width:0.050796243894166995"/>  <path d="M -6 10 L 0 0 L 6 10" style="fill:none;stroke:#666;stroke-width:0.04317680731004195"/>
+  </g>  <text x="640" y="418" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#172033">Gray: source · purple: computed stroke · width 2 · Butt caps</text>
+</svg>

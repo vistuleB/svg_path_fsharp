@@ -85,4 +85,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   factors avoid intermediate overflow. Replaced the old large-angle source test
   and added its three new regressions. `scripts/test-fast`: 1647 passed.
 
-Next: `7227f07` (root multiplicity evidence and exact bisection success).
+- `7227f07` — carry vanishing-derivative evidence with root candidates, preserve
+  it during deduplication, and accept exact zeros on the final bisection step.
+  Six source regressions added one-to-one. `scripts/test-fast`: 1653 passed.
+
+Next: `72add87` (exact Bezier interpolation endpoints).

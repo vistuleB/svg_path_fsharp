@@ -68,6 +68,7 @@
     <Compile Include="CheckedArithmeticTests.fs" />
     <Compile Include="PointNormalizationTests.fs" />
     <Compile Include="PointArithmeticTests.fs" />
+    <Compile Include="RootClassificationRegressionTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

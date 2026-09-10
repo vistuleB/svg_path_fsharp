@@ -11,6 +11,8 @@ type internal QuadraticOptions<[<Measure>] 'Value> =
 type internal PolynomialOptions = { MaxIterations: int }
 
 [<Struct>]
+/// Crossing brackets are retained unless evaluation hits exact zero. Exact,
+/// direct, and repeated roots receive centered, domain/neighbour-clamped windows.
 type internal RootIsolation =
     { Lower: float<parameter>
       Estimate: float<parameter>
@@ -39,6 +41,10 @@ type internal RootError<[<Measure>] 'Value> =
 
 [<RequireQualifiedAccess>]
 module internal Root =
+    // Preserve the evidence that f' vanished even if its approximate parameter
+    // gives a small nonzero derivative on reevaluation.
+    type private RootCandidate = { Isolation: RootIsolation; VanishingDerivatives: int }
+
     let private parameterTolerance = Parameter.fromFloat 1.0e-9
     let private relativeValueTolerance = 1.0e-12
 
@@ -165,14 +171,15 @@ module internal Root =
 
         loop coefficients
 
-    let private distinctIsolations isolations =
-        isolations
-        |> List.sortBy _.Estimate
+    let private distinctCandidates (candidates: RootCandidate list) =
+        candidates
+        |> List.sortBy (fun candidate -> candidate.Isolation.Estimate)
         |> List.fold
-            (fun kept isolation ->
+            (fun kept candidate ->
                 match kept with
-                | previous :: _ when isolation.Estimate = previous.Estimate -> kept
-                | _ -> isolation :: kept)
+                | previous :: older when candidate.Isolation.Estimate = previous.Isolation.Estimate ->
+                    (if candidate.VanishingDerivatives > previous.VanishingDerivatives then candidate else previous) :: older
+                | _ -> candidate :: kept)
             []
         |> List.rev
 
@@ -187,12 +194,12 @@ module internal Root =
         let midpoint = left + (right - left) / 2.0
         let midpointValue = evaluatePolynomial coefficients midpoint
 
-        if right - left <= tolerance then
+        if InternalNumber.isZero midpointValue then
+            Ok { Lower = midpoint; Estimate = midpoint; Upper = midpoint }
+        elif right - left <= tolerance then
             Ok { Lower = left; Estimate = midpoint; Upper = right }
         elif remainingIterations <= 1 then
             Error(MaxIterationsReached(midpoint, midpointValue))
-        elif midpointValue = 0.0<_> then
-            Ok { Lower = left; Estimate = midpoint; Upper = right }
         elif sameSign leftValue midpointValue then
             refinePolynomialBracket coefficients midpoint midpointValue right tolerance (remainingIterations - 1)
         else
@@ -237,14 +244,14 @@ module internal Root =
         (lower: float<parameter>)
         (upper: float<parameter>)
         (options: PolynomialOptions)
-        : Result<RootIsolation list, RootError<'Value>> =
+        : Result<RootCandidate list, RootError<'Value>> =
         match coefficients with
         | []
         | [ _ ] -> Ok []
         | [ a; b ] ->
             linearWithTolerance a b (polynomialCoefficientTolerance coefficients)
             |> fun roots -> inside roots lower upper
-            |> List.map (fun root -> { Lower = root; Estimate = root; Upper = root })
+            |> List.map (fun root -> { Isolation = { Lower = root; Estimate = root; Upper = root }; VanishingDerivatives = 0 })
             |> Ok
         | [ a; b; c ] ->
             quadraticWith
@@ -254,40 +261,42 @@ module internal Root =
                 b
                 c
             |> fun roots -> inside roots lower upper
-            |> List.map (fun root -> { Lower = root; Estimate = root; Upper = root })
+            |> List.map (fun root ->
+                let repeated = not (coefficientIsZero a (polynomialCoefficientTolerance coefficients)) && InternalNumber.isZero (b*b - 4.0*a*c)
+                { Isolation = { Lower = root; Estimate = root; Upper = root }; VanishingDerivatives = if repeated then 1 else 0 })
             |> Ok
         | _ ->
             match polynomialRootIsolationsValid (polynomialDerivative coefficients) lower upper options with
             | Error error -> Error error
             | Ok derivativeRoots ->
-                let critical = distinctIsolations derivativeRoots
-                let criticalValues = critical |> List.map _.Estimate
+                let critical = distinctCandidates derivativeRoots
+                let criticalValues = critical |> List.map (fun candidate -> candidate.Isolation.Estimate)
                 let valueScale = polynomialValueScale coefficients
 
                 let repeated =
                     critical
-                    |> List.filter (fun isolation ->
-                        valueIsCloseToZero (evaluatePolynomial coefficients isolation.Estimate) valueScale)
-                    |> List.map (fun isolation ->
-                        { Lower = isolation.Estimate
-                          Estimate = isolation.Estimate
-                          Upper = isolation.Estimate })
+                    |> List.filter (fun candidate ->
+                        valueIsCloseToZero (evaluatePolynomial coefficients candidate.Isolation.Estimate) valueScale)
+                    |> List.map (fun candidate ->
+                        let estimate = candidate.Isolation.Estimate
+                        { Isolation = { Lower = estimate; Estimate = estimate; Upper = estimate }
+                          VanishingDerivatives = candidate.VanishingDerivatives + 1 })
 
                 let endpoints =
                     [ lower; upper ]
                     |> List.filter (fun value ->
                         valueIsCloseToZero (evaluatePolynomial coefficients value) valueScale)
-                    |> List.map (fun root -> { Lower = root; Estimate = root; Upper = root })
+                    |> List.map (fun root -> { Isolation = { Lower = root; Estimate = root; Upper = root }; VanishingDerivatives = 0 })
 
                 match crossingRoots coefficients (lower :: (criticalValues @ [ upper ])) options with
                 | Error error -> Error error
                 | Ok crossing ->
-                    endpoints @ repeated @ crossing
-                    |> distinctIsolations
+                    endpoints @ repeated @ (crossing |> List.map (fun isolation -> { Isolation = isolation; VanishingDerivatives = 0 }))
+                    |> distinctCandidates
                     |> Ok
 
     let private finalizeRootWindows isolations domainLower domainUpper =
-        let isolations = distinctIsolations isolations
+        // Candidates were sorted/deduplicated before dropping their evidence.
 
         let rec loop remaining previousEstimate finalized =
             match remaining with
@@ -336,15 +345,18 @@ module internal Root =
             let normalized = normalizePolynomialCoefficients coefficients
             let lower, upper = orderedBracket lower upper
             polynomialRootIsolationsValid normalized lower upper options
-            |> Result.map (fun isolations -> finalizeRootWindows isolations lower upper)
+            |> Result.map (fun candidates -> finalizeRootWindows (distinctCandidates candidates |> List.map _.Isolation) lower upper)
 
     let polynomialRootsWith
         (coefficients: float<'Value> list)
         (lower: float<parameter>)
         (upper: float<parameter>)
         (options: PolynomialOptions) =
-        polynomialRootIsolationsWith coefficients lower upper options
-        |> Result.map (List.map _.Estimate)
+        validatePolynomialOptions options |> Result.bind (fun () ->
+            let normalized = normalizePolynomialCoefficients coefficients
+            let lower,upper = orderedBracket lower upper
+            polynomialRootIsolationsValid normalized lower upper options
+            |> Result.map (List.map (fun candidate -> candidate.Isolation.Estimate)))
 
     let private signedNonzero<[<Measure>] 'Value>
         (value: float<'Value>)
@@ -364,14 +376,15 @@ module internal Root =
 
     let private classifyRootFromDerivatives<[<Measure>] 'Value>
         (coefficients: float<'Value> list)
-        (estimate: float<parameter>) =
+        (estimate: float<parameter>)
+        (vanishingDerivatives: int) =
         let rec loop derivative order =
             match derivative with
             | [] -> Ambiguous
             | _ ->
                 let value = evaluatePolynomial derivative estimate
 
-                if valueIsCloseToZero value (polynomialValueScale derivative) then
+                if order <= vanishingDerivatives || valueIsCloseToZero value (polynomialValueScale derivative) then
                     loop (polynomialDerivative derivative) (order + 1)
                 else
                     match order % 2 = 1, value > 0.0<_> with
@@ -385,13 +398,14 @@ module internal Root =
     let private classifyRoot
         (coefficients: float<'Value> list)
         (isolation: RootIsolation)
+        (vanishingDerivatives: int)
         : RootKind =
         let valueScale = polynomialValueScale coefficients
         let leftValue = evaluatePolynomial coefficients isolation.Lower
         let rightValue = evaluatePolynomial coefficients isolation.Upper
 
         match classifyRootSigns leftValue rightValue valueScale with
-        | Ambiguous -> classifyRootFromDerivatives coefficients isolation.Estimate
+        | Ambiguous -> classifyRootFromDerivatives coefficients isolation.Estimate vanishingDerivatives
         | kind -> kind
 
     let classifiedPolynomialRootsWith
@@ -403,12 +417,13 @@ module internal Root =
         let normalized = normalizePolynomialCoefficients coefficients
         let lower, upper = orderedBracket lower upper
 
-        polynomialRootIsolationsWith normalized lower upper options
-        |> Result.map (
-            List.map (fun isolation ->
-                { Isolation = isolation
-                  Kind = classifyRoot normalized isolation })
-        )
+        validatePolynomialOptions options |> Result.bind (fun () ->
+            polynomialRootIsolationsValid normalized lower upper options
+            |> Result.map (fun found ->
+                let candidates = distinctCandidates found
+                let isolations = finalizeRootWindows (List.map _.Isolation candidates) lower upper
+                List.map2 (fun candidate isolation ->
+                    { Isolation = isolation; Kind = classifyRoot normalized isolation candidate.VanishingDerivatives }) candidates isolations))
 
     let realLinear01Roots a b options =
         classifiedPolynomialRootsWith [ a; b ] (Parameter.fromFloat 0.0) (Parameter.fromFloat 1.0) options
@@ -473,12 +488,12 @@ module internal Root =
         let midpoint = left + (right - left) / 2.0
         let midpointValue = f midpoint
 
-        if certified left right || midpoint = left || midpoint = right then
+        if InternalNumber.isZero midpointValue then
+            Ok { Lower = midpoint; Estimate = midpoint; Upper = midpoint }
+        elif certified left right || midpoint = left || midpoint = right then
             Ok { Lower = left; Estimate = midpoint; Upper = right }
         elif remainingIterations <= 1 then
             Error(MaxIterationsReached(midpoint, midpointValue))
-        elif midpointValue = 0.0<_> then
-            Ok { Lower = midpoint; Estimate = midpoint; Upper = midpoint }
         elif sameSign leftValue midpointValue then
             bisectIsolationLoop f midpoint midpointValue right (remainingIterations - 1) certified
         else

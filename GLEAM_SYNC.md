@@ -304,4 +304,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   projection bookkeeping. Four source regressions added. `scripts/test-fast`:
   1737 passed.
 
-Next: `5e34eaa` (historical residual-window experiment, reverted by `e5f4a66`).
+- `5e34eaa` — historical residual-window experiment, including its two new
+  crossing tests. `scripts/test-fast`: 1729 passed, 10 failed (1739 total).
+  This is an intentionally unsuccessful upstream checkpoint, immediately
+  reverted by the next source commit; no independent repair is invented here.
+
+Next: `e5f4a66` (revert the preceding experiment).

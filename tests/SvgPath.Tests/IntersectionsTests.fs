@@ -5,6 +5,28 @@ open Xunit
 
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
+let private assertThreeCubicCrossings a b c =
+    let constant = -a * b * c
+    let linear = a * b + a * c + b * c
+    let quadratic = -a - b - c
+    let curve = CubicBezier(point 0.0 constant,
+                            point (1.0 / 3.0) (constant + linear / 3.0),
+                            point (2.0 / 3.0) (constant + 2.0 * linear / 3.0 + quadratic / 3.0),
+                            point 1.0 (constant + linear + quadratic + 1.0))
+    let axis = QuadraticBezier(point 0.0 0.0, point 0.5 0.0, point 1.0 0.0)
+    for left, right in [curve,axis; axis,curve] do
+        let found = Intersections.segment left right |> Result.defaultWith (failwithf "%A")
+        Assert.Equal(3, List.length found)
+        for expected in [a;b;c] do
+            Assert.True(found |> List.exists (fun hit ->
+                abs (float hit.LeftT - expected) < 1e-7 && abs (float hit.RightT - expected) < 1e-7))
+
+[<Fact>]
+let ``clustered cubic crossings are all found`` () = assertThreeCubicCrossings 0.2 0.21 0.22
+
+[<Fact>]
+let ``nearby cubic crossings do not hide distant crossing`` () = assertThreeCubicCrossings 0.2 0.21 0.8
+
 [<Fact>]
 let ``circular arc intersections respect local axis rotation`` () =
     for sweep in [false;true] do

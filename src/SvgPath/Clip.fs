@@ -7,6 +7,8 @@ type ClipOptions =
       Tolerance: float<length> }
 
 /// Clipping of subpaths and paths against filled path regions.
+/// Open clipping-region subpaths include implicit straight closure edges;
+/// open input curves remain open.
 [<RequireQualifiedAccess>]
 module Clip =
     let defaultOptions =
@@ -79,7 +81,11 @@ module Clip =
                     |> Result.map (fun seam -> if seam <= tolerance then List.take (List.length kept - 1) kept else kept)))
 
     let private splitPoints input clipRegion options =
-        Encounters.pathWith (Path.singleton input) clipRegion options.Intersection
+        // Containment includes fill closure, so encounters must include it too.
+        Path.subpaths clipRegion
+        |> List.fold (fun state subpath -> state |> Result.bind (fun boundaries ->
+            Subpath.setClosedWith Bridge true subpath |> Result.map (fun closed -> boundaries @ [closed]))) (Ok [])
+        |> Result.bind (fun boundaries -> Encounters.pathWith (Path.singleton input) (Path.ofSubpaths boundaries) options.Intersection)
         |> Result.bind (fun found ->
             let intersections =
                 found.Intersections

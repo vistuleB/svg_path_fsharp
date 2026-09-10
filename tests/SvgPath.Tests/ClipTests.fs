@@ -7,6 +7,18 @@ module ClipTests =
     let private point x y = Point.create x y
     let private line x1 y1 x2 y2 = Line(point x1 y1, point x2 y2)
 
+    [<Fact>]
+    let ``open fill region uses implicit closing edge`` () =
+        let p x y = point (Length.fromFloat x) (Length.fromFloat y)
+        let polyline points = Subpath.polyline points |> Result.defaultWith (failwithf "%A")
+        let triangle = polyline [p 0. 0.;p 10. 0.;p 0. 10.]
+        let closed = Subpath.setClosedWith Bridge true triangle |> Result.defaultWith (failwithf "%A")
+        let input = polyline [p -2. 2.;p 4. 2.]
+        let expected = polyline [p 0. 2.;p 4. 2.]
+        for fillRule in [Nonzero;EvenOdd] do
+            Assert.Equal(Ok[expected],Clip.subpath input (Path.singleton triangle) fillRule)
+            Assert.Equal(Ok[expected],Clip.subpath input (Path.singleton closed) fillRule)
+
     let private rectangle () =
         Subpath.create
             [ line 0.0<length> 0.0<length> 10.0<length> 0.0<length>

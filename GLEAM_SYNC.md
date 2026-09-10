@@ -270,4 +270,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   intersection parameters. Source regression added. `scripts/test-fast`:
   1721 passed.
 
-Next: `787c6d7` (implicit clipping-region closure).
+- `787c6d7` — close clipping-region subpaths with Bridge for encounter
+  discovery, leaving subject curves open. Source regression and docs ported.
+  `scripts/test-fast`: 1722 passed.
+
+Next: `ed500a2` (whole clipped subpaths across incidental cuts).

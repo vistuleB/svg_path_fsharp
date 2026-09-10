@@ -247,4 +247,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   radius is zero. Source regression and docs ported. `scripts/test-fast`:
   1715 passed.
 
-Next: `3c419ab` (minified numeric group boundaries).
+- `3c419ab` — separate numeric groups by their final-token-safe rule,
+  allowing only a leading sign to omit whitespace. Source regression added.
+  `scripts/test-fast`: 1716 passed.
+
+Next: `3f1a135` (repeated arguments in subpath-line serialization).

@@ -6,6 +6,13 @@ open Xunit
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
 [<Fact>]
+let ``minified number groups preserve integer decimal boundaries`` () =
+    for y in [2.0;-2.0;0.5] do
+        let source = QuadraticBezier(point 0. 0.,point 1.5 y,point 0.5 0.5) |> Subpath.ofSegment |> Path.singleton
+        let encoded = Serialize.pathWith source (Serialize.minifyingOptions 5)
+        Assert.Equal(Ok source,Parse.path encoded)
+
+[<Fact>]
 let ``empty path serializes to empty string`` () =
     Assert.Equal("", Serialize.path Path.empty)
 

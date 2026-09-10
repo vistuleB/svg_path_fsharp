@@ -111,8 +111,13 @@ module Serialize =
         elif right.StartsWith(".", StringComparison.Ordinal) && left.Contains(".", StringComparison.Ordinal) then ""
         else " "
 
-    let private groupSeparator left right options =
-        if options.MinimizeWhitespace then minimizedSeparator left right else " "
+    let private commandChunkSeparator (right: string) (options: PathSerializeOptions) =
+        if options.MinimizeWhitespace && (right.StartsWith("-") || right.StartsWith("+")) then "" else " "
+
+    let private groupSeparator _left right options =
+        // The previous group may contain multiple numbers; a decimal point
+        // in an earlier token cannot disambiguate its final integer token.
+        commandChunkSeparator right options
 
     let private pointValue point format =
         let x = number point.X format
@@ -227,9 +232,6 @@ module Serialize =
                     else current
                 compacted :: loop effective rest
         loop "" commands
-
-    let private commandChunkSeparator (right: string) (options: PathSerializeOptions) =
-        if options.MinimizeWhitespace && (right.StartsWith("-") || right.StartsWith("+")) then "" else " "
 
     let private joinOneLine commands format =
         let commands = if format.Options.RepeatCommands then commands else compactCommands commands format

@@ -608,7 +608,7 @@ module Segment =
         else Ok()
 
     /// Return singularity-safe unit traversal directions at a segment parameter.
-    let directionsWith options segment t =
+    let rec directionsWith options segment t =
         let t = InternalNumber.normalizeZero t
         validateDirectionOptions options
         |> Result.bind (fun () ->
@@ -620,6 +620,11 @@ module Segment =
                     if t = 0.0<parameter> then { Incoming = None; Outgoing = direction }
                     elif t = 1.0<parameter> then { Incoming = direction; Outgoing = None }
                     else { Incoming = direction; Outgoing = direction })
+            | _ when t < 0.0<parameter> || t > 1.0<parameter> ->
+                // Reparameterize an increasing neighborhood: an extrapolated split
+                // reverses one child and no longer samples opposite sides.
+                between segment (t - 1.0<parameter>) (t + 1.0<parameter>)
+                |> Result.bind (fun local -> directionsWith options local 0.5<parameter>)
             | _ when t = 0.0<parameter> ->
                 Ok { Incoming = None; Outgoing = endpointDirection options false segment }
             | _ when t = 1.0<parameter> ->

@@ -364,4 +364,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `f57dd01` — apply the conservative width lower-bound allowance before
   pruning optimization intervals. `scripts/test-fast`: 1747 passed.
 
-Next: `786d993` (increasing-parameter directions during extrapolation).
+- `786d993` — reparameterize an increasing neighborhood for extrapolated
+  direction queries. All three source regressions and their coordinatewise
+  tolerances ported. `scripts/test-fast`: 1750 passed.
+
+Next: `2c09bb6` (retain both source seam tangent alignment edits).

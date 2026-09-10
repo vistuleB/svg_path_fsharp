@@ -3,6 +3,34 @@ module SvgPath.Tests.DirectionTests
 open SvgPath
 open Xunit
 
+let private assertExtrapolatedDirection expected (actual: Point<1> option) =
+    let actual = Option.get actual
+    Assert.True(abs(actual.X-expected)<1e-7 && abs actual.Y<1e-7)
+
+[<Fact>]
+let ``extrapolated line directions follow increasing parameter`` () =
+    let p x = Point.create (Length.fromFloat x) 0.0<length>
+    for t in [-1.0<parameter>;2.0<parameter>] do
+        let actual = Segment.directions (Line(p 0.,p 10.)) t |> Result.defaultWith (failwithf "%A")
+        assertExtrapolatedDirection 1.0 actual.Incoming
+        assertExtrapolatedDirection 1.0 actual.Outgoing
+
+[<Fact>]
+let ``extrapolated quadratic stationary directions keep both sides`` () =
+    let p x = Point.create (Length.fromFloat x) 0.0<length>
+    for curve,t in [QuadraticBezier(p 1.,p 2.,p 4.),-1.0<parameter>;
+                    QuadraticBezier(p 4.,p 2.,p 1.),2.0<parameter>] do
+        let actual = Segment.directions curve t |> Result.defaultWith (failwithf "%A")
+        assertExtrapolatedDirection -1.0 actual.Incoming
+        assertExtrapolatedDirection 1.0 actual.Outgoing
+
+[<Fact>]
+let ``extrapolated cubic stationary direction does not reverse`` () =
+    let p x = Point.create (Length.fromFloat x) 0.0<length>
+    let actual = Segment.directions (CubicBezier(p 1.,p 2.,p 4.,p 8.)) -1.0<parameter> |> Result.defaultWith (failwithf "%A")
+    assertExtrapolatedDirection 1.0 actual.Incoming
+    assertExtrapolatedDirection 1.0 actual.Outgoing
+
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private t value = Parameter.fromFloat value
 let private at index value = { SegmentIndex = index; T = t value }

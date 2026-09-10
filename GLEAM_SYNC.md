@@ -277,4 +277,7 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `ed500a2` — restore original subpaths if all pieces survive incidental
   boundary cuts. Source regression added. `scripts/test-fast`: 1723 passed.
 
-Next: `842ca9a` (corner-rounding documentation).
+- `842ca9a` — document nonnegative distance tolerance and one-pass radius
+  adaptation. Documentation-only; `git diff --check` passes.
+
+Next: `93b5880` (arrangement clustering documentation).

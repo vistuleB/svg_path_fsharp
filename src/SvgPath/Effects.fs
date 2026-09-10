@@ -5,6 +5,7 @@ type EffectsError =
     | InvalidDegeneracyTolerance of tolerance: float<length>
     | EffectsPathError of error: SegmentError
     | InvalidRadius of radius: float<length>
+    /// The distance tolerance must be finite and non-negative.
     | InvalidDistanceTolerance of tolerance: float<length>
     | InvalidAngularTolerance of tolerance: float<degree>
     | CannotRoundCorner of index: int
@@ -14,6 +15,8 @@ type EffectsError =
 type FailureMode =
     | ErrorOnFailure
     | LeaveCorner
+    /// Measure eligible corners and collect strongest per-segment limits,
+    /// then apply them together in one scaling pass, not in visitation order.
     | AdaptRadius
 
 [<Struct>]

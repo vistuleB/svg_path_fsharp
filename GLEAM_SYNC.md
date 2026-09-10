@@ -344,4 +344,9 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `c91e527` — remove unreachable position-only fit policy, its match cases,
   and four unused fitting helpers. `scripts/test-fast`: 1743 passed.
 
-Next: `4ee430e` (Gleam audit issue record only).
+- `4ee430e` — source-only illustrated audit ledger (`REMAINING_ISSUES.md`),
+  not production behavior. Its resolved code changes have their own entries
+  above. The document's Gleam-specific reproducers and image links remain in
+  the source repository; it is not presented as an F# audit. No F# code change.
+
+Next: `cbc802b` (drawing commands after closepath).

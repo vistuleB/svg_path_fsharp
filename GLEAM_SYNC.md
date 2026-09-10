@@ -132,4 +132,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   through .NET equality. Semantic no-op; source adds no tests. Last
   unchanged-code `scripts/test-fast`: 1674 passed; `git diff --check` passes.
 
-Next: `aed3d23` (circumcircle zero determinant).
+- `aed3d23` — circumcircle determinant equality already accepts both zero
+  signs on .NET. Semantic no-op; no source tests added. Last unchanged-code
+  `scripts/test-fast`: 1674 passed; `git diff --check` passes.
+
+Next: `5a1a9da` (hull zero predicates).

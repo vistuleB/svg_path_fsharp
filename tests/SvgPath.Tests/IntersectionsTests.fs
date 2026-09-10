@@ -6,6 +6,28 @@ open Xunit
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 
 [<Fact>]
+let ``coincident cubic endpoints keep both intersection addresses`` () =
+    let cubic = CubicBezier(point 0. 0., point 1. 1., point -1. 1., point 0. 0.)
+    let line = Line(point -2. 0., point 2. 0.)
+    let found = Intersections.segment cubic line |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(2, List.length found)
+    Assert.True(found |> List.exists (fun hit -> hit.LeftT = 0.0<parameter> && hit.RightT = 0.5<parameter>))
+    Assert.True(found |> List.exists (fun hit -> hit.LeftT = 1.0<parameter> && hit.RightT = 0.5<parameter>))
+    let swapped = Intersections.segment line cubic |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(2, List.length swapped)
+    Assert.True(swapped |> List.exists (fun hit -> hit.RightT = 0.0<parameter> && hit.LeftT = 0.5<parameter>))
+    Assert.True(swapped |> List.exists (fun hit -> hit.RightT = 1.0<parameter> && hit.LeftT = 0.5<parameter>))
+
+[<Fact>]
+let ``retraced quadratic keeps both interior intersection addresses`` () =
+    let curve = QuadraticBezier(point 0. 0., point 1. 0., point 0. 0.)
+    let line = Line(point 0.375 -1., point 0.375 1.)
+    let found = Intersections.segment curve line |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(2, List.length found)
+    for t in [0.25<parameter>; 0.75<parameter>] do
+        Assert.True(found |> List.exists (fun hit -> abs(hit.LeftT-t) < 1e-8<parameter> && abs(hit.RightT-0.5<parameter>) < 1e-8<parameter>))
+
+[<Fact>]
 let ``arc window subdivision preserves original ellipse`` () =
     let finish = point -89.11764705882354 7.529411764705882
     let curve = CubicBezier(point -100.9882874507623 -19.817662984205167,

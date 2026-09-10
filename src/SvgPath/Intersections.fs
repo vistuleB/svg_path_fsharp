@@ -222,8 +222,6 @@ module Intersections =
     let private parameterTolerance = 1.0e-9<parameter>
     let private enclosureSlack = 1.0e-12<length>
     let private terminalSubdivisionTolerance = 0.01<length>
-    let private intersectionDedupeTolerance (tolerance: float<length>) =
-        max (tolerance * 1_000_000.0) 1.0e-6<length>
 
     let private parameter value = Parameter.fromFloat value
     let private ratio (value: float<parameter>) = Parameter.ratio value
@@ -251,13 +249,13 @@ module Intersections =
         + min (abs intersection.RightT) (abs (1.0<parameter> - intersection.RightT))
 
     let private insert
-        (tolerance: float<length>)
         (candidate: SegmentIntersection)
         (existing: SegmentIntersection list) =
+        // Intersection identity is an address pair, not a geometric position:
+        // a closed or retraced curve can visit that position more than once.
         match existing |> List.tryFindIndex (fun found ->
             abs (found.LeftT - candidate.LeftT) <= parameterTolerance
-            && abs (found.RightT - candidate.RightT) <= parameterTolerance
-            || pointsNear tolerance found.Point candidate.Point) with
+            && abs (found.RightT - candidate.RightT) <= parameterTolerance) with
         | Some index when endpointParameterScore candidate < endpointParameterScore existing[index] ->
             existing |> List.mapi (fun current value -> if current = index then candidate else value)
         | Some _ -> existing
@@ -286,7 +284,7 @@ module Intersections =
                 | Ok leftPoint, Ok rightPoint when pointsNear tolerance leftPoint rightPoint ->
                     let candidate: SegmentIntersection =
                         { LeftT = leftT; RightT = rightT; Point = midpoint leftPoint rightPoint }
-                    Ok(insert tolerance candidate found)
+                    Ok(insert candidate found)
                 | Ok _, Ok _ -> Ok found
                 | Error error, _
                 | _, Error error -> Error error)) (Ok [])
@@ -762,7 +760,7 @@ module Intersections =
                                             { LeftT = minimum.LeftT
                                               RightT = minimum.RightT
                                               Point = midpoint leftPoint rightPoint }
-                                        insert (intersectionDedupeTolerance options.Tolerance) candidate intersections)))) (Ok [])
+                                        insert candidate intersections)))) (Ok [])
                     |> Result.map (List.sortBy (fun item -> item.LeftT, item.RightT)))))
 
     let private boxDistanceSquared (left: BoundingBox) (right: BoundingBox) =
@@ -901,7 +899,7 @@ module Intersections =
                     state
                     |> Result.bind (fun found ->
                         polishIntersection left right exponent intersection
-                        |> Result.map (fun candidate -> insert options.Tolerance candidate found))) (Ok [])
+                        |> Result.map (fun candidate -> insert candidate found))) (Ok [])
         polished
         |> Result.bind (fun values ->
             values
@@ -1018,7 +1016,7 @@ module Intersections =
                                     { LeftT = clamp01 lineT; RightT = clamp01 segmentT; Point = pointValue }
                                 else
                                     { LeftT = clamp01 segmentT; RightT = clamp01 lineT; Point = pointValue }
-                            insert options.Tolerance intersection found) []
+                            insert intersection found) []
                 |> List.rev
                 |> Ok)
 

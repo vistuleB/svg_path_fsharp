@@ -418,4 +418,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   `dotnet fsi examples/debug/collapsed_handle_rays.fsx`: the original 12 ray
   cases passed. `scripts/test-fast`: 1756 passed.
 
-Next: `33f11eb` (intersection identity uses both parameter addresses).
+- `33f11eb` — deduplicate intersections by the pair of parameter addresses,
+  never position alone; remove the geometric deduplication tolerance. Both
+  original closed-cubic/retraced-quadratic regressions ported one-to-one.
+  `scripts/test-fast`: 1758 passed.
+
+Next: `11f9598` (smooth tangential crossings).

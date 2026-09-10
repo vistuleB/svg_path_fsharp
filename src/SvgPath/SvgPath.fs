@@ -669,8 +669,8 @@ module Segment =
                 elif sameSign leftValue middleValue then refine middle middleValue rightT (remaining - 1)
                 else refine leftT leftValue middle (remaining - 1))
         let window (previousT: float<parameter>) previousValue (nextT: float<parameter>) nextValue =
-            if previousValue = 0.0<length> then Ok(Some previousT)
-            elif nextValue = 0.0<length> then Ok(Some nextT)
+            if InternalNumber.isZero previousValue then Ok(Some previousT)
+            elif InternalNumber.isZero nextValue then Ok(Some nextT)
             elif sameSign previousValue nextValue then Ok None
             elif abs previousValue <= options.SignedLineDistanceTolerance then Ok(Some previousT)
             elif abs nextValue <= options.SignedLineDistanceTolerance then Ok(Some nextT)
@@ -1004,7 +1004,7 @@ module Segment =
         |> Result.bind (fun segmentLength ->
             validateLengthDistance distance segmentLength
             |> Result.bind (fun () ->
-                if segmentLength = 0.0<length> || distance = 0.0<length> then Ok 0.0<parameter>
+                if segmentLength = 0.0<length> || InternalNumber.isZero distance then Ok 0.0<parameter>
                 elif distance = segmentLength then Ok 1.0<parameter>
                 else
                     match segment with
@@ -1179,7 +1179,7 @@ module Segment =
                        < previousValue * previousValue * proposalSpeedSquared)))
 
     let rec private polishProjectionWindowByBisection sample segment (leftT: float<parameter>) leftValue (rightT: float<parameter>) (estimate: float<parameter>) estimateValue remaining =
-        if remaining <= 0 || estimateValue = 0.0<_> then Ok estimate
+        if remaining <= 0 || InternalNumber.isZero estimateValue then Ok estimate
         else
             let midpointT = leftT + (rightT - leftT) / 2.0
             distanceStationaryValue sample segment midpointT
@@ -1211,7 +1211,7 @@ module Segment =
                 distanceStationaryValue sample segment midpointT
                 |> Result.bind (fun midpointValue ->
                     if remainingIterations <= 1 then Error(DistanceMaxIterationsReached(midpointT, midpointValue))
-                    elif midpointValue = 0.0<_> then Ok midpointT
+                    elif InternalNumber.isZero midpointValue then Ok midpointT
                     elif sameSign leftValue midpointValue then
                         refineProjectionWindowByBisection sample segment tolerance midpointT midpointValue rightT (remainingIterations - 1) polishIterations
                     else
@@ -1453,7 +1453,7 @@ module Segment =
                 let axis = Point.displacement origin (farthest points origin)
                 let s, c, e = coordinate startPoint origin axis, coordinate control origin axis, coordinate endPoint origin axis
                 let denominator = s - 2.0 * c + e
-                let breaks = if denominator = 0.0 then [] else [ (s - c) / denominator ] |> List.filter (fun t -> t > 0.0 && t < 1.0)
+                let breaks = if InternalNumber.isZero denominator then [] else [ (s - c) / denominator ] |> List.filter (fun t -> t > 0.0 && t < 1.0)
                 bezierResult points breaks
             | CubicBezier(startPoint, control1, control2, endPoint) ->
                 let points = [ startPoint; control1; control2; endPoint ]
@@ -1468,7 +1468,7 @@ module Segment =
                 let c = 3.0*c1 - 3.0*s
                 let breaks = Root.strictlyInside (Root.quadratic (3.0*a) (2.0*b) c) 0.0<parameter> 1.0<parameter> |> List.map Parameter.ratio
                 bezierResult points breaks
-            | Arc endpoint when endpoint.Radius.X = 0.0<length> || endpoint.Radius.Y = 0.0<length> ->
+            | Arc endpoint when InternalNumber.isZero endpoint.Radius.X || InternalNumber.isZero endpoint.Radius.Y ->
                 if endpoint.Start = endpoint.End then Ok(Some []) else Ok(Some [ Line(endpoint.Start, endpoint.End) ])
             | Arc _ ->
                 toLinesWith { Tolerance = tolerance; MaxDepth = defaultLinearizeOptions.MaxDepth } segment

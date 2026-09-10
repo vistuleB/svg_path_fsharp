@@ -110,4 +110,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   accept either zero sign. One source regression added. `scripts/test-fast`:
   1669 passed.
 
-Next: `a4a80c0` (zero length requests and scalar guards).
+- `a4a80c0` — zero length requests, arc radii, and scalar guards accept both
+  zero signs. Subpath length lookup delegates to the same segment guard.
+  Two source regressions added. `scripts/test-fast`: 1671 passed.
+
+Next: `e69b71b` (disabled zero-size primitive shapes).

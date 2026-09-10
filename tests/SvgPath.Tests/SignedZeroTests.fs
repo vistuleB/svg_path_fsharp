@@ -8,6 +8,18 @@ let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap x = Result.defaultWith (failwithf "%A") x
 
 [<Fact>]
+let ``negative zero length returns exact start parameter`` () =
+    let curve = QuadraticBezier(p 0. 0.,p 1. 1.,p 2. 0.)
+    let subpath = Subpath.create [curve] |> unwrap
+    Assert.Equal(Ok 0.0<parameter>,Segment.parameterAtLength curve -0.0<length>)
+    Assert.Equal(Ok { SegmentIndex=0; T=0.0<parameter> },Subpath.parameterAtLength subpath -0.0<length>)
+[<Fact>]
+let ``negative zero radius degenerates to line`` () =
+    let start,finish = p 1. 1.,p 2. 2.
+    let arc = Arc { Start=start; Radius=p -0. 1.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }
+    Assert.Equal(Ok(Some [Line(start,finish)]),Segment.degenerateLines arc 0.0<length>)
+
+[<Fact>]
 let ``negative zero endpoint has forward offset unit tangent`` () =
     Assert.Equal(Ok(Point.create 1.0 0.0),Offset.unitTangent (Line(p 0. 0.,p 1. 0.)) -0.0<parameter>)
 

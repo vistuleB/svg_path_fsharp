@@ -82,6 +82,11 @@ module Degeneracy =
         ConvexHull.internalConvexSubpathMinimumWidthDecision hull tolerance
         |> Result.mapError DegeneracyConvexHullError
 
+    let private sourceWidthDecision segments hull tolerance =
+        match ConvexHull.internalSourceStripCandidate segments with
+        | Ok(Some strip) when strip.Width <= tolerance -> Ok(MinimumWidthFits strip)
+        | _ -> widthDecision hull tolerance
+
     let rec private longestThinPrefixLoop tolerance accepted hull strip remaining =
         match remaining with
         | [] ->
@@ -93,6 +98,10 @@ module Degeneracy =
             ConvexHull.internalConvexSubpathAddSegmentAndTestWidth hull first tolerance
             |> Result.mapError DegeneracyConvexHullError
             |> Result.bind (fun (candidateHull, decision) ->
+                let decision =
+                    match ConvexHull.internalSourceStripCandidate (first :: accepted) with
+                    | Ok(Some strip) when strip.Width <= tolerance -> MinimumWidthFits strip
+                    | _ -> decision
                 match decision with
                 | MinimumWidthFits candidateStrip ->
                     longestThinPrefixLoop tolerance (first :: accepted) candidateHull candidateStrip rest
@@ -103,7 +112,7 @@ module Degeneracy =
                         ConvexHull.subpathHull candidate
                         |> Result.mapError DegeneracyConvexHullError
                         |> Result.bind (fun rebuiltHull ->
-                            widthDecision rebuiltHull tolerance
+                            sourceWidthDecision (first :: accepted) rebuiltHull tolerance
                             |> Result.bind (function
                                 | MinimumWidthFits rebuiltStrip ->
                                     longestThinPrefixLoop tolerance (first :: accepted) rebuiltHull rebuiltStrip rest
@@ -121,7 +130,7 @@ module Degeneracy =
             ConvexHull.segmentHull first
             |> Result.mapError DegeneracyConvexHullError
             |> Result.bind (fun hull ->
-                widthDecision hull tolerance
+                sourceWidthDecision [first] hull tolerance
                 |> Result.bind (function
                     | MinimumWidthFits strip -> longestThinPrefixLoop tolerance [ first ] hull strip rest
                     | MinimumWidthExceeds _

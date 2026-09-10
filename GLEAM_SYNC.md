@@ -30,4 +30,9 @@ Do not substitute the final Gleam tree for the historical source commit.
   All eight source regressions added one-to-one. `scripts/test-fast`: 1568
   passed, the same 20 historical hull/downstream failures remain.
 
-Next: `c40509a` (geometry-derived seed), then `21c8b7f` (full/point/portion hull repair).
+- `c40509a` — source-geometry strip seed using three farthest-point passes,
+  raw normal support queries, and actual segment widths; wired into thin-prefix
+  decisions. All five source regressions added one-to-one. `scripts/test-fast`:
+  1573 passed, the same 20 historical hull/downstream failures remain.
+
+Next: `21c8b7f` (full/point/portion hull repair).

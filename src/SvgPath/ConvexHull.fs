@@ -272,6 +272,48 @@ module ConvexHull =
             let sample = supportSample segment searchDirection
             Ok(sample.T, sample.Point, Point.dot sample.Point direction)
 
+    /// Propose a strip using source endpoints/control points, then measure it on
+    /// actual segments. Arc endpoint chords propose directions, not width bounds.
+    let internal internalSourceStripCandidate segments =
+        let points =
+            segments |> List.collect (function
+                | Line(a,b) -> [a;b]
+                | QuadraticBezier(a,b,c) -> [a;b;c]
+                | CubicBezier(a,b,c,d) -> [a;b;c;d]
+                | Arc arc -> [arc.Start;arc.End])
+        match points with
+        | [] -> Ok None
+        | first :: rest ->
+            let farthest origin =
+                rest |> List.fold (fun best candidate ->
+                    if Point.distance origin candidate > Point.distance origin best then candidate else best) first
+            let a = farthest first
+            let b = farthest a
+            let c = farthest b
+            // Preserve the unnormalized components during support search.
+            let raw = Point.displacement b c |> Point.rotateClockwise
+            let normal = Point.create (float raw.X) (float raw.Y)
+            let norm = Point.norm normal
+            if InternalNumber.isZero norm || not (System.Double.IsFinite norm) then Ok None
+            else
+                let bestSupport direction =
+                    internalSegmentSupportInDirection (List.head segments) direction
+                    |> Result.bind (fun first ->
+                        List.tail segments |> List.fold (fun state segment ->
+                            state |> Result.bind (fun ((_,_,bestValue) as best) ->
+                                internalSegmentSupportInDirection segment direction
+                                |> Result.map (fun ((_,_,value) as candidate) -> if value > bestValue then candidate else best))) (Ok first))
+                    |> Result.map (fun (_,point,_) -> point)
+                bestSupport normal |> Result.bind (fun upper ->
+                    bestSupport (Point.scale -1.0 normal) |> Result.map (fun lower ->
+                        let width = Point.dot (Point.displacement lower upper) normal / norm
+                        let lowerSupport = Point.dot lower normal / norm
+                        let upperSupport = Point.dot upper normal / norm
+                        if width < 0.0<length> || not (System.Double.IsFinite(float width) && System.Double.IsFinite(float lowerSupport) && System.Double.IsFinite(float upperSupport)) then None
+                        else Some { Width = width; Normal = Point.scale (1.0 / norm) normal
+                                    LowerPoint = lower; UpperPoint = upper
+                                    LowerSupport = lowerSupport; UpperSupport = upperSupport }))
+
     let private mergeCircularRuns (runs: SupportRun list) =
         match runs with
         | [] | [ _ ] -> runs

@@ -1195,11 +1195,11 @@ Offset.pathBand path 18.0<length> 34.0<length> Round Butt
 
 `inner` and `outer` are caller-assigned roles, not a numeric-order restriction.
 Either ordering is accepted. Exchanging the values reverses the orientation of
-the resulting band. The cap closes open-source endpoints in the internal
-winding band. With `BandTrimming.InBand = false`, the returned outline exposes
-these caps: `Butt` connects the sides directly, `Square` extends the ends, and
-`RoundCap` adds semicircles. Default in-band trimming can return capless offset
-sides. Use `Offset.subpathStroke` or `Stroke.subpath` for a stroke outline.
+the resulting band. `Butt` connects open-source endpoints directly, `Square`
+extends the ends, and `RoundCap` adds semicircles. Caps belong to the assembled
+outline whether or not `BandTrimming.InBand` is enabled. With trimming enabled,
+caps participate in pruning along with the offset sides; surviving contours
+are closed.
 
 Band trimming has three independent Boolean controls:
 
@@ -1240,7 +1240,7 @@ They take a join argument but no cap.
 
 ## Stroke Outlines and Dashes
 
-`Stroke` is a small public wrapper over the offset stroke-outline machinery. It
+`Stroke` is a small public wrapper over symmetric offset bands. It
 uses `StrokeOptions` and dash options rather than exposing every
 offset-specific detail at the top level. The join and cap styles use the same
 `Join` and `Cap` types as `Offset`.
@@ -1258,6 +1258,12 @@ Stroke.subpathWith subpath Round RoundCap options
 `StrokeOptions` contains `Width` and technical `Offset` settings only.
 All outline operations require explicit join/cap arguments, including dashed
 strokes and forms without `With`. Pure dash extraction takes neither style.
+
+Nonzero strokes delegate to bands with offsets `-Width/2` and `+Width/2`.
+Band construction owns normalization, sides, caps, and trimming. For
+compatibility, strokes disable both side-cusp passes and enable final in-band
+trimming, ignoring nested `BandTrimming` settings. Zero-length strokes retain
+the cap-specific SVG point behavior.
 `DashOptions.LengthOptions` controls arc-length measurement; the corresponding
 corner-rounding field is `RoundCornerOptions.LengthOptions`.
 

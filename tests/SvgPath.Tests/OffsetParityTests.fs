@@ -49,6 +49,29 @@ let private point x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
 let private direction degrees = Point.direction (Degree.fromFloat degrees)
 
 [<Fact>]
+let ``open band caps survive both trimming modes and offset orders`` () =
+    let source = Segment.asSubpath(Line(point 0. 0.,point 10. 0.))
+    for cap in [Butt;RoundCap;Square] do
+        for inBand in [true;false] do
+            let options = {Offset.defaultOptions with BandTrimming={InnerCusps=false;OuterCusps=false;InBand=inBand}}
+            let forward = Offset.subpathBandWith source -1.0<length> 2.0<length> Round cap options |> Result.defaultWith (failwithf "%A")
+            let backward = Offset.subpathBandWith source 2.0<length> -1.0<length> Round cap options |> Result.defaultWith (failwithf "%A")
+            let outline = Path.subpaths forward |> List.exactlyOne
+            Assert.True(Subpath.isClosed outline)
+            Assert.Equal(Path.reverse forward,backward)
+            Assert.Equal((if cap=Square then 8 else 4), (Subpath.segments outline).Length)
+
+[<Fact>]
+let ``adjacent loop culling keeps hit near only one shared endpoint`` () =
+    let join = Arc {Start=point 430.66681589309076 178.69245771161582;Radius=point 3. 3.;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=false;End=point 430.670203101245 178.69477431938788}
+    let line = Line(Segment.finish join,point 430.22232031893986 178.38890397610967)
+    for a,b in [join,line;Segment.reverse line,Segment.reverse join] do
+        let left,right = Offset.internalShortCircuitAdjacentOffsetSegmentLoop a b |> Result.defaultWith (failwithf "%A")
+        Assert.NotEqual(Segment.finish a,Segment.finish left)
+        Assert.NotEqual(Segment.start b,Segment.start right)
+        Assert.Equal(Segment.finish left,Segment.start right)
+
+[<Fact>]
 let ``subpath offset map preserves rounded cumulative boundaries`` () =
     let first = Line(point 0. 0.,point 10. 0.)
     let second = Line(point 10. 0.,point 10. 0.3)
@@ -747,8 +770,8 @@ let ``path_band_offsets_every_subpath_on_both_sides_test`` () =
     let first = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let second = Subpath.ofSegment (Line(point 0.0 10.0, point 10.0 10.0))
     let result = Subject.pathBand (Path.ofSubpaths [ first; second ]) -1.0<length> 1.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(4, result.Subpaths.Length)
-    Assert.Equal("M 0 1 H 10 M 0 -1 H 10 M 0 11 H 10 M 0 9 H 10", Serialize.path result)
+    Assert.Equal(2, (Path.subpaths result).Length)
+    Assert.True(Path.subpaths result |> List.forall Subpath.isClosed)
 
 [<Fact>]
 let ``offside_trimming_keeps_square_offset_test`` () =

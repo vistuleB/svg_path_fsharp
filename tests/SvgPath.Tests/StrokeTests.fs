@@ -4,6 +4,18 @@ open SvgPath
 open Xunit
 
 [<Fact>]
+let ``stroke delegates to symmetric band for open and closed sources`` () =
+    let p x y = Point.create (x*1.0<length>) (y*1.0<length>)
+    let openSource = Subpath.polyline [p 0. 0.;p 10. 0.;p 10. 10.] |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.polygon [p 0. 0.;p 10. 0.;p 10. 10.;p 0. 10.] |> Result.defaultWith (failwithf "%A")
+    let bandOptions = {Offset.defaultOptions with BandTrimming={InnerCusps=false;OuterCusps=false;InBand=true}}
+    let strokeOptions = {Width=2.0<length>;Offset={Offset.defaultOptions with BandTrimming={InnerCusps=true;OuterCusps=true;InBand=false}}}
+    for source in [openSource;closed] do
+        for cap in [Butt;RoundCap;Square] do
+            let expected = Offset.subpathBandWith source -1.0<length> 1.0<length> Round cap bandOptions |> Result.defaultWith (failwithf "%A")
+            Assert.Equal(Ok expected,Stroke.subpathWith source Round cap strokeOptions)
+
+[<Fact>]
 let ``empty_path_stroke_validates_join_test`` () =
     Assert.Equal(Error(StrokeOffsetError(InvalidMiterLimit 0.0)), Stroke.pathWith Path.empty (Miter 0.0) Butt Stroke.defaultOptions)
     Assert.Equal(Error(InvalidStrokeOutlineWidth 0.0<length>),

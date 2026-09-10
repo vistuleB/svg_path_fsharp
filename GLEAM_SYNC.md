@@ -469,4 +469,14 @@ Do not substitute the final Gleam tree for the historical source commit.
   source regressions ported. `scripts/test-fast`: 1772 passed, the same one
   obsolete single-offset orientation expectation failed.
 
-Next: `0ec158b` (unified capped bands/strokes and face winding classification).
+- `0ec158b` — include exact winding occurrences/closure caps in the AG,
+  propagate signed face windings for classification, retain only eligible
+  reconstruction capacities, make open bands capped in both modes, and delegate
+  nonzero strokes to symmetric bands. Small-loop shared-endpoint rejection now
+  requires both parameters near the seam. README contracts and all three new
+  source regressions plus changed existing assertions ported.
+  `scripts/test-fast`: 1775 passed, the same one obsolete F# nesting-orientation
+  test failed; no additional failures. Diagnostic Gallery capture still observes
+  the actual production classification, not a parallel display construction.
+
+Next: `f3e79ab` (Gallery refresh and recursive-dash investigation record).

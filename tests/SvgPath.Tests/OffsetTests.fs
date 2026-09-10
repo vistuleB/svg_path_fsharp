@@ -211,14 +211,13 @@ let ``subpath_band_closed_square_returns_two_closed_sides_test`` () =
     Assert.All(result.Subpaths, fun subpath -> Assert.True(subpath.Closed))
 
 [<Fact>]
-let ``subpath_band_open_line_returns_two_capless_sides_test`` () =
+let ``subpath_band_open_line_returns_closed_capped_outline_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let result = Offset.subpathBand source -1.0<length> 2.0<length> (Miter Offset.defaultMiterLimit) Butt |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(2, result.Subpaths.Length)
-    Assert.All(result.Subpaths, fun subpath -> Assert.False(subpath.Closed))
+    Assert.Equal(1, result.Subpaths.Length)
+    Assert.All(result.Subpaths, fun subpath -> Assert.True(subpath.Closed))
     let segments = result.Subpaths |> List.collect Subpath.segments
-    Assert.Contains(Line(point 0.0 1.0, point 10.0 1.0), segments)
-    Assert.Contains(Line(point 0.0 -2.0, point 10.0 -2.0), segments)
+    Assert.Equal(4, segments.Length)
 
 [<Fact>]
 let ``subpath_offsets_closed_square_inset_test`` () =

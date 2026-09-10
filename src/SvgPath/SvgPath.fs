@@ -1224,7 +1224,11 @@ module Segment =
             |> Result.bind (fun lowerValue ->
                 distanceStationaryValue sample segment isolation.Upper
                 |> Result.bind (fun upperValue ->
-                    if sameSign lowerValue upperValue then Ok isolation.Estimate
+                    // No sign bracket does not imply that the estimated root
+                    // projects better than either isolation endpoint.
+                    if sameSign lowerValue upperValue then
+                        smallestProjection sample segment [isolation.Estimate;isolation.Lower;isolation.Upper]
+                        |> Result.map (fun (t,_,_) -> t)
                     else
                         refineProjectionWindowByBisection
                             sample segment options.Tolerance isolation.Lower lowerValue isolation.Upper

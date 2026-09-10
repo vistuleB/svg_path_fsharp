@@ -204,4 +204,8 @@ Do not substitute the final Gleam tree for the historical source commit.
   construction; computed radii include every support's rounded distance.
   Two source regressions added. `scripts/test-fast`: 1699 passed.
 
-Next: `6082627` (projection isolation endpoint candidates).
+- `6082627` — retain better projection candidates at isolation endpoints when
+  there is no sign bracket. Both source regressions added.
+  `scripts/test-fast`: 1701 passed.
+
+Next: `d4aaffd` (explicit overlap endpoint validation).

@@ -74,6 +74,7 @@
     <Compile Include="CubicBoundaryIntersectionTests.fs" />
     <Compile Include="EllipseReviewTests.fs" />
     <Compile Include="CurvatureExtremaTests.fs" />
+    <Compile Include="ProjectionIsolationEndpointTests.fs" />
     <Compile Include="WindingFieldTests.fs" />
     <Compile Include="CongruencyTests.fs" />
     <Compile Include="CongruencyAdditionalTests.fs" />

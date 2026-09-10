@@ -78,7 +78,7 @@ module Effects =
             | Ok stretchedNext -> [ stretchedPrevious; stretchedNext ]
             | Error _ -> [ previous; next ]
 
-    let stretchToJoinEndpointPolicy () = Custom stretchToJoin
+    let stretchToJoinEndpointPolicy () = Custom(fun previous next context -> stretchToJoin previous next context.Closing)
 
     let private validate radius options =
         if radius <= 0.0<length> || not (System.Double.IsFinite(float radius)) then Error(InvalidRadius radius)

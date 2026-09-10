@@ -284,7 +284,7 @@ type EndpointPolicy =
     | Bridge
     | WiggleThenBridge
     | WiggleThenBridgeWith of float<length>
-    | Custom of (Segment -> Segment -> bool -> Segment list)
+    | Custom of (Segment -> Segment -> EndpointPolicyContext -> Segment list)
 ```
 
 `Strict` is the behavior of `Subpath.create`, requiring exact endpoint equality.
@@ -301,8 +301,17 @@ adjacent endpoints are within tolerance, and otherwise bridges that pair.
 `WiggleThenBridgeWith tolerance` is its configurable counterpart.
 
 `Custom` gives callers a hook for bespoke endpoint reconciliation. Its third
-callback argument is `true` only for the closing join from the last segment back
-to the first segment of a closed subpath.
+callback argument is `{ First: bool; Last: bool; Closing: bool }`.
+`First` and `Last` identify the first and last forward pairs of the input;
+both are true for a two-segment input. The separate last-to-first closing call
+has only `Closing = true`. A singleton has no forward pair and is passed twice
+to the closing call. Empty subpaths have no calls.
+
+`Subpath.setClosedWith policy true subpath` applies the policy to the closing
+pair even if the subpath is already closed. It does not revisit interior pairs.
+Repeating it with a non-idempotent policy may change geometry again.
+`Subpath.rebuildWith` revisits all forward pairs and, for a closed subpath,
+the closing pair.
 
 Functions that accept an `EndpointPolicy` end in `With`:
 

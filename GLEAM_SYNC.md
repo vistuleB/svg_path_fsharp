@@ -47,4 +47,8 @@ Do not substitute the final Gleam tree for the historical source commit.
 - `2854585` — canonicalize rounded full turns after heading/aperture arithmetic;
   three source regressions added one-to-one. `scripts/test-fast`: 1604 passed.
 
-Next: `dd7362f` (endpoint-policy context and repeated closure policies).
+- `dd7362f` — public EndpointPolicyContext, forward input flags, repeated
+  closure policy application, adapted Effects/Offset callers and README.
+  Nine source regressions added one-to-one. `scripts/test-fast`: 1613 passed.
+
+Next: `9215e47` (preserve nonconstant hull segments during cleanup).

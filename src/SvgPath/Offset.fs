@@ -901,9 +901,9 @@ module Offset =
         | _ -> left, right
 
     let private colinearizeSourceTangentPolicy tolerance =
-        Custom(fun previous next closing ->
+        Custom(fun previous next context ->
             let previous, next = colinearizeSourceTangentBoundary previous next tolerance
-            if closing then [ previous ] else [ previous; next ])
+            if context.Closing then [ previous ] else [ previous; next ])
 
     let private colinearizeOffsetSourceTangents subpath tolerance =
         Subpath.rebuildWith (colinearizeSourceTangentPolicy tolerance) subpath

@@ -662,8 +662,8 @@ let ``subpath with wiggle rejects empty and accepts single segment inputs`` () =
     Assert.Equal<Segment list>([ line ], (Subpath.createWith Wiggle [ line ] |> Result.defaultWith (failwithf "%A")).Segments)
 
 let private coalesceLines =
-    Custom(fun previous next closing ->
-        match previous, next, closing with
+    Custom(fun previous next context ->
+        match previous, next, context.Closing with
         | Line(startPoint, _), Line(_, endPoint), false -> [ Line(startPoint, endPoint) ]
         | _, _, true -> [ previous ]
         | _ -> [ previous; next ])
@@ -1223,7 +1223,7 @@ let ``set_closed_with_custom_reconciles_the_closing_gap_test`` () =
 let ``custom_policy_receives_closing_join_flag_test`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c) ]
-    let policy = Custom(fun last first closing -> if closing then [ Segment.withFinish (Segment.start first) last ] else [ last; first ])
+    let policy = Custom(fun last first context -> if context.Closing then [ Segment.withFinish (Segment.start first) last ] else [ last; first ])
     let closed = Subpath.setClosedWith policy true source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed); Assert.Equal(a, Subpath.finish closed)
 
@@ -1231,7 +1231,7 @@ let ``custom_policy_receives_closing_join_flag_test`` () =
 let ``set_closed_with_custom_runs_on_exact_closing_pair_test`` () =
     let a, b, c, elbow = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 5.0 5.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a) ]
-    let policy = Custom(fun last _ closing -> if closing then [ Line(Segment.start last, elbow); Line(elbow, a) ] else [ last ])
+    let policy = Custom(fun last _ context -> if context.Closing then [ Line(Segment.start last, elbow); Line(elbow, a) ] else [ last ])
     let closed = Subpath.setClosedWith policy true source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed)
     Assert.Equal<Segment list>([ Line(a, b); Line(b, c); Line(c, elbow); Line(elbow, a) ], closed.Segments)

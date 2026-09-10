@@ -11,10 +11,17 @@ type Segment =
         endPoint: Point<length>
     | Arc of EndpointArcData
 
+/// Position of a policy call in input traversal. First and Last mark forward
+/// pairs (both for two segments). The separate closing call has only Closing.
+/// A singleton has no forward call; closing passes it twice. Empty paths have
+/// no calls. Deletions can leave no previous segment and thus no pairwise call.
+type EndpointPolicyContext = { First: bool; Last: bool; Closing: bool }
+
 /// Controls how adjacent segment endpoints are reconciled while constructing a subpath.
-/// Custom policies receive the previous segment, the next segment, and whether the
-/// pair closes the subpath. Their result replaces the pair, except that a closing
-/// result replaces only the last segment and may not move the subpath start.
+/// Custom receives previous, next, and input traversal context. Replacements
+/// are not revisited; their final segment becomes previous for the next input.
+/// Its result replaces the pair, except a closing result replaces only the last
+/// segment and may not move the subpath start.
 type EndpointPolicy =
     | Strict
     | Wiggle
@@ -22,7 +29,7 @@ type EndpointPolicy =
     | Bridge
     | WiggleThenBridge
     | WiggleThenBridgeWith of float<length>
-    | Custom of (Segment -> Segment -> bool -> Segment list)
+    | Custom of (Segment -> Segment -> EndpointPolicyContext -> Segment list)
 
 /// Constructors for endpoint policies with caller-supplied tolerances.
 [<RequireQualifiedAccess>]
@@ -1524,16 +1531,16 @@ module Subpath =
             |> Result.map (fun subpath -> subpath.Segments)
             |> Result.mapError (shiftDiscontinuity previousIndex)
 
-    let rec private reconcileCustom remaining reversedAccumulated previousIndex reconcile =
+    let rec private reconcileCustom remaining reversedAccumulated previousIndex first reconcile =
         match reversedAccumulated, remaining with
         | [], [] -> Ok []
-        | [], next :: rest -> reconcileCustom rest [ next ] previousIndex reconcile
+        | [], next :: rest -> reconcileCustom rest [ next ] previousIndex first reconcile
         | previous :: before, [] -> Ok(List.rev (previous :: before))
         | previous :: before, next :: rest ->
-            validateReplacement previousIndex previous (reconcile previous next false)
+            validateReplacement previousIndex previous (reconcile previous next { First = first; Last = List.isEmpty rest; Closing = false })
             |> Result.bind (fun replacement ->
                 let accumulated = (List.rev replacement) @ before
-                reconcileCustom rest accumulated (previousIndex + List.length replacement - 1) reconcile)
+                reconcileCustom rest accumulated (previousIndex + List.length replacement - 1) false reconcile)
 
     let private strictReconcile previous next closing =
         if closing then [ previous ] else [ previous; next ]
@@ -1599,12 +1606,12 @@ module Subpath =
 
     let private policyReconcile policy =
         match policy with
-        | Strict -> strictReconcile
-        | Wiggle -> wiggleReconcile defaultWiggleTolerance
-        | WiggleWith tolerance -> wiggleReconcile tolerance
-        | Bridge -> bridgeReconcile
-        | WiggleThenBridge -> wiggleThenBridgeReconcile defaultWiggleTolerance
-        | WiggleThenBridgeWith tolerance -> wiggleThenBridgeReconcile tolerance
+        | Strict -> fun previous next context -> strictReconcile previous next context.Closing
+        | Wiggle -> fun previous next context -> wiggleReconcile defaultWiggleTolerance previous next context.Closing
+        | WiggleWith tolerance -> fun previous next context -> wiggleReconcile tolerance previous next context.Closing
+        | Bridge -> fun previous next context -> bridgeReconcile previous next context.Closing
+        | WiggleThenBridge -> fun previous next context -> wiggleThenBridgeReconcile defaultWiggleTolerance previous next context.Closing
+        | WiggleThenBridgeWith tolerance -> fun previous next context -> wiggleThenBridgeReconcile tolerance previous next context.Closing
         | Custom reconcile -> reconcile
 
     /// Construct an open subpath while validating every endpoint-policy replacement.
@@ -1614,7 +1621,7 @@ module Subpath =
             match segments with
             | [] -> Error EmptySubpath
             | first :: _ ->
-                reconcileCustom segments [] 0 (policyReconcile policy)
+                reconcileCustom segments [] 0 true (policyReconcile policy)
                 |> Result.bind (function
                     | [] -> Ok(empty (Segment.start first))
                     | reconciled -> validateFrom (Segment.start (List.head reconciled)) reconciled))
@@ -1650,23 +1657,24 @@ module Subpath =
                         (Segment.finish last)
                 ))
 
-    /// Set semantic closure while validating any custom replacement.
+    /// Apply the closing policy once even if already closed; never revisit
+    /// interior pairs. Empty subpaths have no call. Non-idempotent policies may
+    /// change geometry on repeated calls. Setting false opens without a call.
     let setClosedWith policy closed subpath =
         validatePolicy policy
         |> Result.bind (fun _ ->
             if not closed then Ok { subpath with isClosed = false }
-            elif subpath.isClosed then Ok subpath
             else
                 let reconcile = policyReconcile policy
                 match subpath.segmentList with
                 | [] -> Ok { subpath with isClosed = true }
                 | [ only ] ->
-                    validateReplacement 0 only (reconcile only only true)
+                    validateReplacement 0 only (reconcile only only { First = false; Last = false; Closing = true })
                     |> Result.bind (validateClosed subpath.startPoint)
                 | first :: rest ->
                     let last = List.last rest
                     let middle = rest |> List.take (List.length rest - 1)
-                    validateReplacement 0 last (reconcile last first true)
+                    validateReplacement 0 last (reconcile last first { First = false; Last = false; Closing = true })
                     |> Result.bind (fun replacement -> validateClosed subpath.startPoint (first :: (middle @ replacement))))
 
     let setClosed closed subpath = setClosedWith Strict closed subpath

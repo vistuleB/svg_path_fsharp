@@ -1,5 +1,7 @@
 namespace SvgPath
 
+/// Shared decimal and padding options used by Inspect and Serialize.
+/// Formatting execution is internal to the library.
 [<RequireQualifiedAccess>]
 module NumberFormat =
 
@@ -21,11 +23,11 @@ module NumberFormat =
         | Fixed of decimalPlaces: int
 
     [<Struct>]
-    type Options =
+    type internal Options =
         { LeftDecimals: LeftDecimalOptions
           RightDecimals: RightDecimalOptions }
 
-    type NumberFormat =
+    type internal NumberFormat =
         private
             { Options: Options
               LeftPadding: (int * LeftPaddingStyle) option }
@@ -101,7 +103,7 @@ module NumberFormat =
             else scientificDecimal number decimalPlaces
         if fixedDecimals then formatted else stripTrailingDecimalZeros formatted
 
-    let rawNumber (number: float) (options: Options) =
+    let internal rawNumber (number: float) (options: Options) =
         match options.RightDecimals with
         | System ->
             number.ToString("G", invariant)
@@ -115,7 +117,7 @@ module NumberFormat =
         let dot = significand.IndexOf('.')
         if dot < 0 then significand.Length else dot
 
-    let prepare options numbers =
+    let internal prepare options numbers =
         let leftPadding =
             match options.LeftDecimals with
             | Succinct -> None
@@ -127,7 +129,7 @@ module NumberFormat =
                 |> fun width -> Some(width, style)
         { Options = options; LeftPadding = leftPadding }
 
-    let prepareRaw options numbers =
+    let internal prepareRaw options numbers =
         let leftPadding =
             match options.LeftDecimals with
             | Succinct -> None
@@ -158,9 +160,9 @@ module NumberFormat =
         | None -> number
         | Some(width, style) -> padLeftSide number width style
 
-    let number value format = rawNumber value format.Options |> fun raw -> leftPad raw format
+    let internal number value format = rawNumber value format.Options |> fun raw -> leftPad raw format
 
-    let codeNumber value format =
+    let internal codeNumber value format =
         let raw = rawNumber value format.Options
         let significand, exponent = splitExponent raw
         let significand = if significand.Contains('.') then significand else significand + ".0"

@@ -20,7 +20,9 @@ let ``operation types belong to their operation modules`` () =
           typeof<Curvature.Options>, "SvgPath.Curvature"
           typeof<Parse.Error>, "SvgPath.Parse"
           typeof<Serialize.Options>, "SvgPath.Serialize"
-          typeof<NumberFormat.Options>, "SvgPath.NumberFormat" ]
+          typeof<NumberFormat.LeftPaddingStyle>, "SvgPath.NumberFormat"
+          typeof<NumberFormat.LeftDecimalOptions>, "SvgPath.NumberFormat"
+          typeof<NumberFormat.RightDecimalOptions>, "SvgPath.NumberFormat" ]
     for actual, owner in expected do
         Assert.True(actual.IsNestedPublic, actual.FullName)
         Assert.Equal(owner, actual.DeclaringType.FullName)

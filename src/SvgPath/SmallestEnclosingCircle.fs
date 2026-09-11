@@ -2,7 +2,7 @@ namespace SvgPath
 
 /// Smallest enclosing circles for finite point collections.
 [<RequireQualifiedAccess>]
-module SmallestEnclosingCircle =
+module internal SmallestEnclosingCircle =
 
     [<Struct>]
     /// A center and squared radius.

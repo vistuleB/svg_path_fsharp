@@ -4,6 +4,19 @@ open SvgPath
 open Xunit
 
 module FormatAdditionalTests =
+    [<Fact>]
+    let ``formatting and circle implementation are not exported`` () =
+        let assembly = typeof<NumberFormat.LeftDecimalOptions>.Assembly
+        let exported = assembly.GetExportedTypes() |> Array.map (fun t -> t.FullName) |> Set.ofArray
+        for publicType in [ typeof<NumberFormat.LeftPaddingStyle>; typeof<NumberFormat.LeftDecimalOptions>; typeof<NumberFormat.RightDecimalOptions> ] do
+            Assert.Contains(publicType.FullName, exported)
+        for internalType in [ typeof<NumberFormat.Options>; typeof<NumberFormat.NumberFormat>; typeof<SmallestEnclosingCircle.EnclosingCircle> ] do
+            Assert.DoesNotContain(internalType.FullName, exported)
+        Assert.DoesNotContain("SvgPath.SmallestEnclosingCircle", exported)
+        let formatModule = assembly.GetType("SvgPath.NumberFormat", true)
+        let methods = formatModule.GetMethods(System.Reflection.BindingFlags.Public ||| System.Reflection.BindingFlags.Static)
+        Assert.Empty(methods)
+
     let private options left right : NumberFormat.Options =
         { LeftDecimals = left
           RightDecimals = right }

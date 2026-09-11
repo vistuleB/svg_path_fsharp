@@ -127,7 +127,7 @@ module Inspect =
                 + (segments |> List.map (fun segment -> doSegmentCode segment format) |> String.concat ";\n" |> indentLines)
                 + "\n]\n|> Result.defaultWith (failwithf \"%A\")"
         if subpath.Closed then
-            constructor + "\n|> Subpath.setClosed true\n|> Result.defaultWith (failwithf \"%A\")"
+            constructor + "\n|> Subpath.close\n|> Result.defaultWith (failwithf \"%A\")"
         else constructor
 
     let private doPath (path: Path) format =

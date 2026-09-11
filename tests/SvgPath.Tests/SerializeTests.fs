@@ -45,7 +45,7 @@ let ``serialization uses scientific notation when scaling is unsafe`` () =
 
 [<Fact>]
 let ``closed empty subpath serializes to move and z`` () =
-    let subpath = Subpath.empty (point 0.0 0.0) |> Subpath.setClosed true |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.empty (point 0.0 0.0) |> Subpath.close |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 Z", Serialize.subpath subpath)
 
 [<Fact>]
@@ -66,25 +66,25 @@ let ``closed subpath serializes with z`` () =
 
 [<Fact>]
 let ``closed subpath keeps final curve before z`` () =
-    let subpath = Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); QuadraticBezier(point 10.0 0.0, point 20.0 10.0, point 0.0 0.0) ] |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); QuadraticBezier(point 10.0 0.0, point 20.0 10.0, point 0.0 0.0) ] |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 H 10 Q 20 10 0 0 Z", Serialize.subpath subpath)
 
 [<Fact>]
 let ``closed subpath keeps final zero length line`` () =
     let p = point 0.0 0.0
-    let subpath = Subpath.ofSegment (Line(p, p)) |> Subpath.setClosed true |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.ofSegment (Line(p, p)) |> Subpath.close |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 H 0 Z", Serialize.subpath subpath)
 
 [<Fact>]
 let ``closed subpath keeps final zero length line after curve`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let subpath = Subpath.create [ QuadraticBezier(a, b, a); Line(a, a) ] |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.create [ QuadraticBezier(a, b, a); Line(a, a) ] |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0 Q 10 0 0 0 H 0 Z", Serialize.subpath subpath)
 
 [<Fact>]
 let ``relative closed subpath keeps final zero length line`` () =
     let a, b = point 10.0 10.0, point 20.0 10.0
-    let subpath = Subpath.create [ Line(a, b); Line(b, a); Line(a, a) ] |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.create [ Line(a, b); Line(b, a); Line(a, a) ] |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("m 10 10 h 10 h -10 h 0 z", Serialize.subpathWith subpath (Serialize.relativeDecimalOptions 0))
 
 [<Fact>]
@@ -244,12 +244,12 @@ let ``at segments with repeat commands false trails emitted commands`` () =
 
 [<Fact>]
 let ``at segments with repeat commands true starts curve lines with commands`` () =
-    let subpath = Subpath.create [ CubicBezier(point 0.0 0.0, point 10.0 0.0, point 20.0 10.0, point 30.0 0.0); CubicBezier(point 30.0 0.0, point 20.0 10.0, point 10.0 0.0, point 40.0 10.0) ] |> Result.bind (Subpath.setClosedWith Bridge true) |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.create [ CubicBezier(point 0.0 0.0, point 10.0 0.0, point 20.0 10.0, point 30.0 0.0); CubicBezier(point 30.0 0.0, point 20.0 10.0, point 10.0 0.0, point 40.0 10.0) ] |> Result.bind (Subpath.closeWith Bridge) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 0\nC 10 0 20 10 30 0\nC 20 10 10 0 40 10\nZ", Serialize.subpathWith subpath (Serialize.withNewlines Serialize.AtSegments Serialize.defaultOptions))
 
 [<Fact>]
 let ``at segments with repeat commands false trails curve commands`` () =
-    let subpath = Subpath.create [ CubicBezier(point 0.0 0.0, point 10.0 0.0, point 20.0 10.0, point 30.0 0.0); CubicBezier(point 30.0 0.0, point 20.0 10.0, point 10.0 0.0, point 40.0 10.0) ] |> Result.bind (Subpath.setClosedWith Bridge true) |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.create [ CubicBezier(point 0.0 0.0, point 10.0 0.0, point 20.0 10.0, point 30.0 0.0); CubicBezier(point 30.0 0.0, point 20.0 10.0, point 10.0 0.0, point 40.0 10.0) ] |> Result.bind (Subpath.closeWith Bridge) |> Result.defaultWith (failwithf "%A")
     let options = Serialize.defaultOptions |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments
     Assert.Equal("M\n0 0 C\n10 0 20 10 30 0\n20 10 10 0 40 10 Z", Serialize.subpathWith subpath options)
 
@@ -349,7 +349,7 @@ let ``relative options make moves relative between subpaths`` () =
 [<Fact>]
 let ``relative options move from closed subpath start after z`` () =
     let a, b = point 10.0 10.0, point 20.0 10.0
-    let first = Subpath.create [ Line(a,b); Line(b,a) ] |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    let first = Subpath.create [ Line(a,b); Line(b,a) ] |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     let second = Subpath.ofSegment (Line(point 30.0 10.0, point 40.0 10.0))
     Assert.Equal("m 10 10 h 10 z m 20 0 h 10", Serialize.pathWith (Path.ofSubpaths [ first; second ]) (Serialize.relativeDecimalOptions 0))
 
@@ -425,7 +425,7 @@ let ``relative coincident zero radius arc terminates`` () =
 [<Fact>]
 let ``parser tracked relative close resets the parser current`` () =
     let a, b = point 0.34 0.34, point 0.68 0.34
-    let first = Subpath.create [ Line(a,b); Line(b,a) ] |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    let first = Subpath.create [ Line(a,b); Line(b,a) ] |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     let second = Subpath.ofSegment (Line(point 1.02 0.34, b))
     Assert.Equal("m 0.3 0.3 h 0.4 z m 0.7 0 h -0.3", Serialize.pathWith (Path.ofSubpaths [ first; second ]) (Serialize.relativeDecimalOptions 1))
 

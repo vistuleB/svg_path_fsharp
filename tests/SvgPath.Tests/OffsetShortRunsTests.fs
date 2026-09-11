@@ -47,11 +47,11 @@ let ``short run keeps small first and last segments`` () =
 let ``short run preserves closed empty and singleton subpaths`` () =
     let empty = Subpath.empty (p 1.)
     let singleton = Subpath.create [Line(p 0.,p 0.)] |> get
-    let closed = Subpath.setClosed true singleton |> get
+    let closed = Subpath.close singleton |> get
     Assert.Equal(empty,normalize empty)
     Assert.Equal(singleton,normalize singleton)
     Assert.Equal(closed,normalize closed)
-    let source = Subpath.create [Line(p 0.,p 0.0004);Line(p 0.0004,p 0.0006);Line(p 0.0006,p 0.0008);Line(p 0.0008,p 0.)] |> get |> Subpath.setClosed true |> get
+    let source = Subpath.create [Line(p 0.,p 0.0004);Line(p 0.0004,p 0.0006);Line(p 0.0006,p 0.0008);Line(p 0.0008,p 0.)] |> get |> Subpath.close |> get
     Assert.Equal(3,(normalize source).Segments.Length)
 [<Fact>]
 let ``zero length run is handled without division by zero`` () =

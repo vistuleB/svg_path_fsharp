@@ -102,7 +102,7 @@ let ``round corners supports curve incident segments`` () =
 let ``round corners rounds closed one segment cusp`` () =
     let source =
         Subpath.ofSegment (CubicBezier(point 0.0 0.0, point -40.0 -30.0, point -40.0 30.0, point 0.0 0.0))
-        |> Subpath.setClosed true
+        |> Subpath.close
         |> Result.defaultWith (failwithf "%A")
     let options = { Effects.defaultRoundCornerOptions with Failure = Effects.AdaptRadius }
     let rounded = Effects.roundSubpathCornersWith source 4.0<length> options |> Result.defaultWith (failwithf "%A")
@@ -118,7 +118,7 @@ let ``stretch to join endpoint policy closes by dragging last end`` () =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, nearA) ]
         |> Result.defaultWith (failwithf "%A")
     let closed =
-        Subpath.setClosedWith (Effects.stretchToJoinEndpointPolicy ()) true source
+        Subpath.closeWith (Effects.stretchToJoinEndpointPolicy ()) source
         |> Result.defaultWith (failwithf "%A")
     Assert.True closed.Closed
     Assert.Equal<Segment list>([ Line(a, b); Line(b, c); Line(c, a) ], closed.Segments)
@@ -128,7 +128,7 @@ let ``stretch to join endpoint policy closes near loop single segment`` () =
     let a, nearA = point 0.0 0.0, point 0.01 0.0
     let closed =
         Subpath.ofSegment (Line(a, nearA))
-        |> Subpath.setClosedWith (Effects.stretchToJoinEndpointPolicy ()) true
+        |> Subpath.closeWith (Effects.stretchToJoinEndpointPolicy ())
         |> Result.defaultWith (failwithf "%A")
     Assert.True closed.Closed
     Assert.Equal<Segment list>([ Line(a, a) ], closed.Segments)
@@ -172,7 +172,7 @@ let ``normalize degenerate segments preserves closed one line replacement`` () =
             [ QuadraticBezier(point 0.0 0.0, point 5.0 0.0001, point 10.0 0.0)
               Line(point 10.0 0.0, point 0.0 10.0)
               Line(point 0.0 10.0, point 0.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.True cleaned.Closed
@@ -194,7 +194,7 @@ let ``normalize degenerate segments preserves closed two line backtracking`` () 
             [ QuadraticBezier(point 0.0 0.0, point 5.0 0.0, point 0.0 0.0)
               Line(point 0.0 0.0, point 0.0 10.0)
               Line(point 0.0 10.0, point 0.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.True cleaned.Closed
@@ -210,7 +210,7 @@ let ``normalize degenerate segments keeps closed three line traversal`` () =
               Line(point 10.0 0.0, point 0.0 0.0)
               Line(point 0.0 0.0, point 0.0 10.0)
               Line(point 0.0 10.0, point 0.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.True cleaned.Closed

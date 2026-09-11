@@ -69,7 +69,7 @@ module Fixtures =
                     // Matches the current Gleam display fixture's endpoint pairing heuristic.
                     let score b = Point.squaredDistance (Segment.start a) (Segment.start b) + Point.squaredDistance (Segment.finish a) (Segment.finish b)
                     let b = outer.Segments |> List.minBy score
-                    let block = Subpath.createWith Bridge [a;Segment.reverse b] |> require "block" |> Subpath.setClosedWith Bridge true |> require "close block"
+                    let block = Subpath.createWith Bridge [a;Segment.reverse b] |> require "block" |> Subpath.closeWith Bridge |> require "close block"
                     path block,sprintf "fill:%s;fill-opacity:.42;stroke:%s;stroke-opacity:.7;stroke-width:.8" colors[i%8] colors[i%8])
             | _ -> failwith "expected two untrimmed walks"
         panels 1000 450 ["Display correspondence blocks",(layer figureBand.Value "#f1f5f9" "none" 0.)::blocks@[layer figureBand.Value "none" "#0f172a" 1.5;sourceStyle figureEight]]

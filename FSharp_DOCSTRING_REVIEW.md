@@ -18,6 +18,11 @@ documentation audit, not a numerical correctness audit or a release verification
   It now opens directly, as Gleam does. A regression exercises a negative
   WiggleWith tolerance that must be ignored when opening.
 
+  Subsequent API change: the Boolean setters have been replaced by
+  `Subpath.close`, `Subpath.closeWith`, and the infallible opening function
+  (whose `open` identifier must be backtick-escaped in F# source). Opening no longer accepts a policy at all;
+  the obsolete policy-input regression was removed and opening idempotence is tested.
+
 ## Remaining findings
 
 These findings are not implemented in this audit. They need no API redesign.

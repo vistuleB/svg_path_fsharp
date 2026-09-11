@@ -107,7 +107,7 @@ let ``subpath directions report open ends and closed seam`` () =
     near (Point.create 0.0 1.0) openEnd.Incoming.Value
     let closed =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, a) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let seam = Subpath.directions closed (at 0 0.0) |> Result.defaultWith (failwithf "%A")
     near (Point.create -0.70710678 -0.70710678) seam.Incoming.Value

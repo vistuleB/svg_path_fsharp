@@ -223,7 +223,7 @@ let ``map segment points rejects arcs`` () =
 let ``map subpath points maps segments and preserves closed state`` () =
     let source =
         Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); QuadraticBezier(point 10.0 0.0, point 15.0 5.0, point 0.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let mapped = Subpath.mapPoints mapPoint source |> Result.defaultWith (failwithf "%A")
     Assert.True(mapped.Closed)
@@ -280,7 +280,7 @@ let ``try map path points maps each subpath`` () =
 let ``reverse subpath reverses segment order and preserves closed state`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 20.0 0.0
     let first, second, third = Line(a, b), Line(b, c), Line(c, a)
-    let source = Subpath.create [ first; second; third ] |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    let source = Subpath.create [ first; second; third ] |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     let reversed = Subpath.reverse source
     Assert.True(reversed.Closed)
     Assert.Equal<Segment list>([ Segment.reverse third; Segment.reverse second; Segment.reverse first ], reversed.Segments)
@@ -572,66 +572,67 @@ let ``assert subpath builds continuous segments`` () =
     Assert.Equal<Segment list>(segments, (Subpath.assertCreate segments).Segments)
 
 [<Fact>]
-let ``set closed false clears closed state without changing segments`` () =
+let ``open clears closed state without changing segments`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
     let segments = [ Line(a, b); Line(b, a) ]
-    let closed = Subpath.assertCreate segments |> Subpath.assertSetClosed true
-    let opened = Subpath.setClosed false closed |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.assertCreate segments |> Subpath.assertClose
+    let opened = Subpath.``open`` closed
     Assert.False(opened.Closed)
     Assert.Equal<Segment list>(segments, opened.Segments)
 
 [<Fact>]
-let ``set closed false accepts open and empty subpaths`` () =
+let ``open accepts open and empty subpaths`` () =
     let empty = Subpath.empty (point 0.0 0.0)
     let openSubpath = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    Assert.Equal(Ok empty, Subpath.setClosed false empty)
-    Assert.Equal(Ok openSubpath, Subpath.setClosed false openSubpath)
+    Assert.Equal(empty, Subpath.``open`` empty)
+    Assert.Equal(openSubpath, Subpath.``open`` openSubpath)
 
 [<Fact>]
-let ``set closed false opens subpath`` () =
+let ``open opens subpath`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true
-    let opened = Subpath.setClosed false closed |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose
+    let opened = Subpath.``open`` closed
     Assert.False(opened.Closed)
     Assert.Equal<Segment list>(closed.Segments, opened.Segments)
 
 [<Fact>]
-let ``set closed true closes matching subpath`` () =
+let ``close closes matching subpath`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let value = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.setClosed true |> Result.defaultWith (failwithf "%A")
+    let value = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.close |> Result.defaultWith (failwithf "%A")
     Assert.True(value.Closed)
 
 [<Fact>]
-let ``set closed true rejects uncloseable subpath`` () =
+let ``close rejects uncloseable subpath`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c) ]
-    Assert.Equal(Error(Discontinuous(1, 0, a, c, sqrt 200.0 * 1.0<length>)), Subpath.setClosed true source)
+    Assert.Equal(Error(Discontinuous(1, 0, a, c, sqrt 200.0 * 1.0<length>)), Subpath.close source)
 
 [<Fact>]
-let ``set closed with wiggle true reconciles nearby endpoints`` () =
+let ``close with wiggle reconciles nearby endpoints`` () =
     let a, b, nearA = point 0.0 0.0, point 10.0 0.0, point 0.0000000001 0.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, nearA) ]
-    let closed = Subpath.setClosedWith Wiggle true source |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.closeWith Wiggle source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed)
     Assert.Equal(Subpath.start closed, Subpath.finish closed)
 
 [<Fact>]
-let ``set closed with wiggle true rejects gaps beyond tolerance`` () =
+let ``close with wiggle rejects gaps beyond tolerance`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 0.1 0.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c) ]
-    Assert.Equal(Error(Discontinuous(1, 0, a, c, 0.1<length>)), Subpath.setClosedWith Wiggle true source)
+    Assert.Equal(Error(Discontinuous(1, 0, a, c, 0.1<length>)), Subpath.closeWith Wiggle source)
 
 [<Fact>]
-let ``set closed with wiggle false opens subpath`` () =
+let ``opening a subpath is idempotent`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true
-    let opened = Subpath.setClosedWith Wiggle false closed |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose
+    let opened = Subpath.``open`` closed
     Assert.False(opened.Closed)
+    Assert.Equal(opened, Subpath.``open`` opened)
 
 [<Fact>]
 let ``append segment rejects closed subpath`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 20.0 0.0
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose
     Assert.Equal(Error AlreadyClosed, Subpath.append (Line(a, c)) closed)
 
 [<Fact>]
@@ -679,7 +680,7 @@ let ``subpath rebuild with applies policy to existing segments`` () =
 [<Fact>]
 let ``subpath rebuild with preserves closed state`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ] |> Subpath.assertSetClosed true
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ] |> Subpath.assertClose
     let rebuilt = Subpath.rebuildWith Strict closed |> Result.defaultWith (failwithf "%A")
     Assert.True(rebuilt.Closed); Assert.Equal<Segment list>(closed.Segments, rebuilt.Segments)
 
@@ -726,7 +727,7 @@ let ``clean subpath reduces multiple zero length lines to one`` () =
 [<Fact>]
 let ``clean subpath preserves closed state`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let cleaned = Subpath.assertCreate [ Line(a, b); Line(b, a); Line(a, a) ] |> Subpath.assertSetClosed true |> Subpath.normalizeZeroLengthLines
+    let cleaned = Subpath.assertCreate [ Line(a, b); Line(b, a); Line(a, a) ] |> Subpath.assertClose |> Subpath.normalizeZeroLengthLines
     Assert.True(cleaned.Closed); Assert.Equal<Segment list>([ Line(a, b); Line(b, a) ], cleaned.Segments)
 
 [<Fact>]
@@ -753,7 +754,7 @@ let ``subpath is zero length requires non empty subpath`` () =
 let ``subpath is empty distinguishes no segments from zero length`` () =
     let p = point 2.0 3.0
     Assert.True(Subpath.isEmpty (Subpath.empty p))
-    Assert.True(Subpath.isEmpty (Subpath.empty p |> Subpath.assertSetClosed true))
+    Assert.True(Subpath.isEmpty (Subpath.empty p |> Subpath.assertClose))
     Assert.False(Subpath.isEmpty (Subpath.assertCreate [ Line(p, p) ]))
     Assert.False(Subpath.isEmpty (Subpath.assertCreate [ Line(p, point 4.0 3.0) ]))
 
@@ -842,7 +843,7 @@ let ``splice_with_wiggle_reconciles_tiny_endpoint_gaps_test`` () =
 [<Fact>]
 let ``splice_with_wiggle_preserves_closed_state_with_tiny_endpoint_gap_test`` () =
     let a, b, c, nearA = point 0.0 0.0, point 10.0 0.0, point 20.0 0.0, point 0.0000000001 0.0
-    let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a) ] |> Subpath.assertSetClosed true
+    let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a) ] |> Subpath.assertClose
     let spliced = Subpath.spliceWith Wiggle 2 1 [ Line(c, nearA) ] source |> Result.defaultWith (failwithf "%A")
     Assert.True(spliced.Closed); Assert.Equal(Subpath.start spliced, Subpath.finish spliced)
 
@@ -854,15 +855,15 @@ let ``splice with wiggle reuses splice bounds errors`` () =
 [<Fact>]
 let ``splice preserves closed state`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 20.0 0.0
-    let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a) ] |> Subpath.assertSetClosed true
+    let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a) ] |> Subpath.assertClose
     let spliced = Subpath.splice 1 1 [ Line(b, c) ] source |> Result.defaultWith (failwithf "%A")
     Assert.True(spliced.Closed)
 
 [<Fact>]
 let ``splice allows closed empty result`` () =
     let a = point 0.0 0.0
-    let source = Subpath.ofSegment (Line(a, a)) |> Subpath.assertSetClosed true
-    Assert.Equal(Ok(Subpath.empty a |> Subpath.assertSetClosed true), Subpath.splice 0 1 [] source)
+    let source = Subpath.ofSegment (Line(a, a)) |> Subpath.assertClose
+    Assert.Equal(Ok(Subpath.empty a |> Subpath.assertClose), Subpath.splice 0 1 [] source)
 
 [<Fact>]
 let ``segment arcs to cubic beziers preserves lines`` () =
@@ -913,7 +914,7 @@ let ``segment arcs to cubic beziers degenerate arc falls back to line cubic`` ()
 [<Fact>]
 let ``subpath arcs to cubic beziers preserves closed state`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let source = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true
+    let source = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose
     let converted = Subpath.arcsToCubicBeziers source
     Assert.True(converted.Closed); Assert.Equal<Segment list>(source.Segments, converted.Segments)
 
@@ -933,7 +934,7 @@ let ``subpath arcs to cubic beziers replaces only arcs`` () =
 [<Fact>]
 let ``subpath to cubic beziers preserves closed state`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let converted = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true |> Subpath.toCubicBeziers
+    let converted = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose |> Subpath.toCubicBeziers
     Assert.True(converted.Closed)
     Assert.True(converted.Segments |> List.forall (function CubicBezier _ -> true | _ -> false))
 
@@ -1016,7 +1017,7 @@ let ``segment to lines rejects invalid options and depth exhaustion`` () =
 [<Fact>]
 let ``subpath and path to lines preserve topology`` () =
     let a = point 0.0 0.0
-    let closed = Subpath.ofSegment (QuadraticBezier(a, point 10.0 20.0, a)) |> Subpath.assertSetClosed true
+    let closed = Subpath.ofSegment (QuadraticBezier(a, point 10.0 20.0, a)) |> Subpath.assertClose
     let moveOnly = Subpath.empty (point 30.0 40.0)
     let converted = Path.ofSubpaths [ moveOnly; closed ] |> Path.toLines |> Result.defaultWith (failwithf "%A")
     let convertedMove, convertedClosed = converted.Subpaths[0], converted.Subpaths[1]
@@ -1112,7 +1113,7 @@ let ``join_discontinuous_error_reports_flattened_segment_indices_test`` () =
 let ``join rejects closed inputs`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
     let opened = Subpath.ofSegment (Line(a, b))
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose
     Assert.Equal(Error AlreadyClosed, Subpath.join [ closed; opened ])
     Assert.Equal(Error AlreadyClosed, Subpath.join [ opened; closed ])
 
@@ -1127,7 +1128,7 @@ let ``join_with_wiggle_reconciles_tiny_endpoint_gap_test`` () =
 let ``join with wiggle rejects closed inputs`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
     let opened = Subpath.ofSegment (Line(a, b))
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose
     Assert.Equal(Error AlreadyClosed, Subpath.joinWith Wiggle [ closed; opened ])
     Assert.Equal(Error AlreadyClosed, Subpath.joinWith Wiggle [ opened; closed ])
 
@@ -1141,7 +1142,7 @@ let ``join_with_line_bridges_a_gap_test`` () =
 let ``join_with_line_rejects_closed_inputs_test`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
     let opened = Subpath.ofSegment (Line(a, b))
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose
     Assert.Equal(Error AlreadyClosed, Subpath.joinWith Bridge [ closed; opened ])
     Assert.Equal(Error AlreadyClosed, Subpath.joinWith Bridge [ opened; closed ])
 
@@ -1208,7 +1209,7 @@ let ``join with custom reconciles a gap`` () =
 [<Fact>]
 let ``set_closed_with_bridge_appends_a_final_line_test`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, c) ] |> Subpath.setClosedWith Bridge true |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, c) ] |> Subpath.closeWith Bridge |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed); Assert.Equal(3, closed.Segments.Length); Assert.Equal(a, Subpath.finish closed)
 
 [<Fact>]
@@ -1216,7 +1217,7 @@ let ``set_closed_with_custom_reconciles_the_closing_gap_test`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c) ]
     let policy = Custom(fun last first _ -> [ Segment.withFinish (Segment.start first) last ])
-    let closed = Subpath.setClosedWith policy true source |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.closeWith policy source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed); Assert.Equal<Segment list>([ Line(a, b); Line(b, a) ], closed.Segments)
 
 [<Fact>]
@@ -1224,7 +1225,7 @@ let ``custom_policy_receives_closing_join_flag_test`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c) ]
     let policy = Custom(fun last first context -> if context.Closing then [ Segment.withFinish (Segment.start first) last ] else [ last; first ])
-    let closed = Subpath.setClosedWith policy true source |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.closeWith policy source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed); Assert.Equal(a, Subpath.finish closed)
 
 [<Fact>]
@@ -1232,7 +1233,7 @@ let ``set_closed_with_custom_runs_on_exact_closing_pair_test`` () =
     let a, b, c, elbow = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 5.0 5.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a) ]
     let policy = Custom(fun last _ context -> if context.Closing then [ Line(Segment.start last, elbow); Line(elbow, a) ] else [ last ])
-    let closed = Subpath.setClosedWith policy true source |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.closeWith policy source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed)
     Assert.Equal<Segment list>([ Line(a, b); Line(b, c); Line(c, elbow); Line(elbow, a) ], closed.Segments)
 
@@ -1241,37 +1242,37 @@ let ``set_closed_with_custom_rejects_invalid_results_test`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c) ]
     let policy = Custom(fun last first _ -> [ last; first ])
-    Assert.Equal(Error(Discontinuous(0, 1, c, a, 14.142135623730951<length>)), Subpath.setClosedWith policy true source)
+    Assert.Equal(Error(Discontinuous(0, 1, c, a, 14.142135623730951<length>)), Subpath.closeWith policy source)
 
 [<Fact>]
 let ``set_closed_with_custom_rejects_replacement_that_changes_subpath_start_test`` () =
     let a, b, changed = point 0.0 0.0, point 10.0 0.0, point 5.0 5.0
     let policy = Custom(fun _ _ _ -> [ Line(changed, changed) ])
-    Assert.Equal(Error(Discontinuous(-1, 0, a, changed, 7.0710678118654755<length>)), Subpath.ofSegment (Line(a, b)) |> Subpath.setClosedWith policy true)
+    Assert.Equal(Error(Discontinuous(-1, 0, a, changed, 7.0710678118654755<length>)), Subpath.ofSegment (Line(a, b)) |> Subpath.closeWith policy)
 
 [<Fact>]
 let ``set_closed_with_custom_empty_replacement_deletes_last_segment_test`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a); Line(a, c) ]
-    let closed = Subpath.setClosedWith (Custom(fun _ _ _ -> [])) true source |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.closeWith (Custom(fun _ _ _ -> [])) source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed); Assert.Equal<Segment list>([ Line(a, b); Line(b, c); Line(c, a) ], closed.Segments)
 
 [<Fact>]
 let ``set_closed_true_empty_subpath_closes_test`` () =
     let source = Subpath.empty (point 0.0 0.0)
-    Assert.Equal(Ok(Subpath.assertSetClosed true source), Subpath.setClosed true source)
+    Assert.Equal(Ok(Subpath.assertClose source), Subpath.close source)
 
 [<Fact>]
 let ``set_closed_true_discontinuous_error_reports_last_to_first_indices_test`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 0.0 10.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c) ]
-    Assert.Equal(Error(Discontinuous(1, 0, a, c, 10.0<length>)), Subpath.setClosed true source)
+    Assert.Equal(Error(Discontinuous(1, 0, a, c, 10.0<length>)), Subpath.close source)
 
 [<Fact>]
 let ``open_at_rotates_a_closed_subpath_to_start_at_parameter_test`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let ab, bc, cd, da = Line(a, b), Line(b, c), Line(c, d), Line(d, a)
-    let source = Subpath.assertCreate [ ab; bc; cd; da ] |> Subpath.assertSetClosed true
+    let source = Subpath.assertCreate [ ab; bc; cd; da ] |> Subpath.assertClose
     let opened = Subpath.openAt source { SegmentIndex = 1; T = 0.0<parameter> } |> Result.defaultWith (failwithf "%A")
     Assert.False(opened.Closed); Assert.Equal<Segment list>([ bc; cd; da; ab ], opened.Segments)
     Assert.Equal(b, Subpath.start opened); Assert.Equal(b, Subpath.finish opened)
@@ -1279,7 +1280,7 @@ let ``open_at_rotates_a_closed_subpath_to_start_at_parameter_test`` () =
 [<Fact>]
 let ``open_at_accepts_parameters_inside_segments_test`` () =
     let a, b, c, d, middle = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0, point 10.0 5.0
-    let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ] |> Subpath.assertSetClosed true
+    let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ] |> Subpath.assertClose
     let opened = Subpath.openAt source { SegmentIndex = 1; T = 0.5<parameter> } |> Result.defaultWith (failwithf "%A")
     Assert.False(opened.Closed); Assert.Equal(middle, Subpath.start opened); Assert.Equal(middle, Subpath.finish opened)
     Assert.Equal<Segment list>([ Line(middle, c); Line(c, d); Line(d, a); Line(a, b); Line(b, middle) ], opened.Segments)
@@ -1288,7 +1289,7 @@ let ``open_at_accepts_parameters_inside_segments_test`` () =
 let ``open at accepts last segment endpoint`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let segments = [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
-    let source = Subpath.assertCreate segments |> Subpath.assertSetClosed true
+    let source = Subpath.assertCreate segments |> Subpath.assertClose
     Assert.Equal<Segment list>(segments, (Subpath.openAt source { SegmentIndex = 3; T = 1.0<parameter> } |> Result.defaultWith (failwithf "%A")).Segments)
 
 [<Fact>]
@@ -1299,7 +1300,7 @@ let ``open at rejects open subpaths`` () =
 [<Fact>]
 let ``open at rejects invalid parameters`` () =
     let a, b, c = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a) ] |> Subpath.assertSetClosed true
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, a) ] |> Subpath.assertClose
     Assert.Equal(Error(InvalidSubpathParameter(3, 0.0<parameter>, 3)), Subpath.openAt closed { SegmentIndex = 3; T = 0.0<parameter> })
     Assert.Equal(Error(InvalidSubpathParameter(0, -0.1<parameter>, 3)), Subpath.openAt closed { SegmentIndex = 0; T = -0.1<parameter> })
 
@@ -1307,21 +1308,21 @@ let ``open at rejects invalid parameters`` () =
 let ``set closed with wiggle replaces nearby endpoints`` () =
     let a, b, nearA = point 0.0 0.0, point 10.0 0.0, point 0.0000000001 0.0
     let source = Subpath.assertCreate [ Line(a, b); Line(b, nearA) ]
-    let closed = Subpath.setClosedWith Wiggle true source |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.closeWith Wiggle source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed); Assert.Equal(Subpath.start closed, Subpath.finish closed)
 
 [<Fact>]
 let ``set closed with wiggle closes misaligned vertical lines`` () =
     let a, b, c, d = point 0.0 0.0, point 0.0 10.0, point 0.0000000001 0.0000000001, point 0.0000000001 0.00000000005
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, d) ]
-    let closed = Subpath.setClosedWith Wiggle true source |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.closeWith Wiggle source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed); Assert.Equal(4, closed.Segments.Length); Assert.Equal(a, Segment.finish closed.Segments[3])
 
 [<Fact>]
 let ``set closed with wiggle closes misaligned horizontal lines`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 0.0000000001 0.0000000001, point 0.00000000005 0.0000000001
     let source = Subpath.assertCreate [ Line(a, b); Line(b, c); Line(c, d) ]
-    let closed = Subpath.setClosedWith Wiggle true source |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.closeWith Wiggle source |> Result.defaultWith (failwithf "%A")
     Assert.True(closed.Closed); Assert.Equal(4, closed.Segments.Length); Assert.Equal(a, Segment.finish closed.Segments[3])
 
 [<Fact>]
@@ -1372,5 +1373,5 @@ let ``append_segment_with_line_bridges_a_gap_test`` () =
 [<Fact>]
 let ``assert_set_closed_true_closes_matching_endpoints_test`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
-    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertSetClosed true
+    let closed = Subpath.assertCreate [ Line(a, b); Line(b, a) ] |> Subpath.assertClose
     Assert.True(closed.Closed)

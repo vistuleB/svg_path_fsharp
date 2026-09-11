@@ -85,7 +85,7 @@ module Clip =
         // Containment includes fill closure, so encounters must include it too.
         Path.subpaths clipRegion
         |> List.fold (fun state subpath -> state |> Result.bind (fun boundaries ->
-            Subpath.setClosedWith Bridge true subpath |> Result.map (fun closed -> boundaries @ [closed]))) (Ok [])
+            Subpath.closeWith Bridge subpath |> Result.map (fun closed -> boundaries @ [closed]))) (Ok [])
         |> Result.bind (fun boundaries -> Encounters.pathWith (Path.singleton input) (Path.ofSubpaths boundaries) options.Intersection)
         |> Result.bind (fun found ->
             let intersections =

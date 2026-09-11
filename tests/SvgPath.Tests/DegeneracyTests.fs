@@ -199,7 +199,7 @@ let ``closed two-line backtracking is retained`` () =
             [ QuadraticBezier(point 0.0 0.0, point 5.0 0.0, point 0.0 0.0)
               Line(point 0.0 0.0, point 0.0 10.0)
               Line(point 0.0 10.0, point 0.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let normalized = Degeneracy.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(normalized.Closed)

@@ -47,7 +47,7 @@ let ``closing custom replacement cannot change original subpath start`` () =
     let source = Subpath.create [ Line(a, b) ] |> Result.defaultWith (failwithf "%A")
     let policy = Custom(fun _ _ _ -> [ Line(changedStart, changedStart) ])
 
-    match Subpath.setClosedWith policy true source with
+    match Subpath.closeWith policy source with
     | Error(Discontinuous(-1, 0, expected, actual, _)) ->
         Assert.Equal(a, expected)
         Assert.Equal(changedStart, actual)
@@ -58,7 +58,7 @@ let ``strict closure requires the final endpoint to equal the start`` () =
     let a, b = point 0.0 0.0, point 1.0 0.0
     let source = Subpath.create [ Line(a, b) ] |> Result.defaultWith (failwithf "%A")
 
-    match Subpath.setClosed true source with
+    match Subpath.close source with
     | Error(Discontinuous(0, 0, expected, actual, distance)) ->
         Assert.Equal(a, expected)
         Assert.Equal(b, actual)
@@ -221,4 +221,4 @@ let ``degenerate cubic preserves collinear backtracking`` () =
 [<Fact>]
 let ``setting an already closed subpath closed is idempotent`` () =
     let polygon = Subpath.polygon [ point 0.0 0.0; point 1.0 0.0; point 0.0 1.0 ] |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok polygon, Subpath.setClosed true polygon)
+    Assert.Equal(Ok polygon, Subpath.close polygon)

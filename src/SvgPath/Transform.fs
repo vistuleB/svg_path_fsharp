@@ -196,7 +196,7 @@ module Transform =
 
             rebuilt
             |> Result.bind (fun subpath ->
-                if Subpath.isClosed input then Subpath.setClosed true subpath
+                if Subpath.isClosed input then Subpath.close subpath
                 else Ok subpath)
             |> Result.mapError PathError)
 

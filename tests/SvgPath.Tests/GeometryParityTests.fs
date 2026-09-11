@@ -7,12 +7,6 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private line ax ay bx by = Line(point ax ay, point bx by)
 let private ratio value = Parameter.ratio value
 
-[<Fact>]
-let ``opening ignores an unused invalid endpoint policy`` () =
-    let closed = Subpath.polygon [point 0.0 0.0; point 1.0 0.0] |> Result.defaultWith (failwithf "%A")
-    let expected = Subpath.setClosed false closed
-    Assert.Equal(expected, Subpath.setClosedWith (WiggleWith -1.0<length>) false closed)
-
 // Gleam svg_path_geometry_test: segment_linearize_if_degenerate_rejects_negative_tolerance_test.
 [<Fact>]
 let ``segment conditional linearization rejects negative tolerance`` () =
@@ -531,7 +525,7 @@ let ``segment subdivide to max length rejects invalid max length`` () =
 let ``subpath subdivide to max length preserves boundaries and closed`` () =
     let source =
         Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 4.0; line 10.0 4.0 0.0 0.0 ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let subdivided = Subpath.subdivideToMaxLength source 4.0<length> |> Result.defaultWith (failwithf "%A")
     let segments = Subpath.segments subdivided
@@ -621,7 +615,7 @@ let ``subpaths between lengths splits open subpath`` () =
 let ``subpath between lengths wraps closed subpaths`` () =
     let source =
         Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 10.0; line 10.0 10.0 0.0 10.0; line 0.0 10.0 0.0 0.0 ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let piece = Subpath.betweenLengths source 25.0<length> 15.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(Subpath.segments piece = [ line 5.0 10.0 0.0 10.0; line 0.0 10.0 0.0 0.0; line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 5.0 ])
@@ -890,7 +884,7 @@ let ``clockwise svg circle has positive winding`` () =
         Subpath.create
             [ Arc ({ Start = point 1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point -1.0 0.0 }: Ellipse.EndpointArcData)
               Arc ({ Start = point -1.0 0.0; Radius = point 1.0 1.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 1.0 0.0 }: Ellipse.EndpointArcData) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(Ok(Winding 1), Path.winding (point 0.0 0.0) (Path.singleton source))
     Assert.Equal(Ok(Winding 0), Path.winding (point 2.0 0.0) (Path.singleton source))
@@ -1052,7 +1046,7 @@ let ``segment subpath intersections canonicalizes closed boundary aliases`` () =
     let a = point 5.0 0.0
     let source =
         Subpath.create [ Line(a, point 0.0 -5.0); line 0.0 -5.0 10.0 -5.0; Line(point 10.0 -5.0, a) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let foundPoint, segmentT, parameters = Intersections.segmentSubpath (line 0.0 0.0 10.0 0.0) source |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.True(Point.near 1.0e-6<length> foundPoint a)

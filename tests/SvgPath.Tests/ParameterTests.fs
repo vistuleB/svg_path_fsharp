@@ -110,7 +110,7 @@ let ``split subpath rejects closed empty boundary and outside parameters`` () =
     Assert.True(Subpath.split openSubpath (at 0 0.0) |> Result.isError)
     Assert.True(Subpath.split openSubpath (at 1 1.0) |> Result.isError)
     Assert.True(Subpath.split openSubpath (at 2 0.0) |> Result.isError)
-    let closed = Subpath.setClosed true openSubpath
+    let closed = Subpath.close openSubpath
     Assert.True(closed |> Result.bind (fun value -> Subpath.split value (at 0 0.5)) |> Result.isError)
 
 [<Fact>]
@@ -119,7 +119,7 @@ let ``from end parameter can address open at`` () =
     let ab, bc, cd, da = Line(a, b), Line(b, c), Line(c, d), Line(d, a)
     let closed =
         Subpath.create [ ab; bc; cd; da ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let opening = Subpath.parameterFromEnd closed 2 (t 1.0) |> Result.defaultWith (failwithf "%A")
     let opened = Subpath.openAt closed opening |> Result.defaultWith (failwithf "%A")
@@ -165,7 +165,7 @@ let ``subpath between wraps closed intervals`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let closed =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let wrapped = Subpath.between closed (at 2 0.5) (at 1 0.5) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(4, wrapped.Segments.Length)
@@ -195,7 +195,7 @@ let ``subpaths between closed accepts cyclic order`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let closed =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let pieces = Subpath.betweenMany closed [ at 2 0.5; at 3 0.5; at 1 0.5 ] |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, pieces.Length)
@@ -208,7 +208,7 @@ let ``subpaths between closed accepts single split point`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let closed =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let opened = Subpath.betweenMany closed [ at 1 0.5 ] |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.False(opened.Closed)
@@ -220,7 +220,7 @@ let ``subpaths between closed rejects duplicate and nonlinear order`` () =
     let a, b, c, d = point 0.0 0.0, point 10.0 0.0, point 10.0 10.0, point 0.0 10.0
     let closed =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(
         Error(InvalidSubpathInterval(at 0 0.0, at 0 0.0)),

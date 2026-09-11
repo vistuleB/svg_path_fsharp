@@ -109,7 +109,7 @@ module Svg =
               Line(bottomRight, bottomLeft)
               Line(bottomLeft, topLeft) ]
             |> Subpath.create
-            |> Result.bind (Subpath.setClosed true)
+            |> Result.bind (Subpath.close)
             |> Result.defaultWith (failwithf "%A")
         let diagonal startPoint endPoint =
             Subpath.create [ Line(startPoint, endPoint) ] |> Result.defaultWith (failwithf "%A")

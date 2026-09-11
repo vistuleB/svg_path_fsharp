@@ -298,5 +298,5 @@ module Degeneracy =
                 |> Result.bind (fun rebuilt ->
                     if not subpath.Closed then Ok rebuilt
                     else
-                        Subpath.setClosedWith Strict true rebuilt
+                        Subpath.closeWith Strict rebuilt
                         |> Result.mapError DegeneracyPathError))

@@ -12,7 +12,7 @@ module CsgAdditionalTests =
           Line(point (x + width) (y + height), point x (y + height))
           Line(point x (y + height), point x y) ]
         |> Subpath.create
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (fun error -> failwithf "%A" error)
         |> fun subpath -> Path.ofSubpaths [ subpath ]
 

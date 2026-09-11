@@ -414,7 +414,7 @@ let ``figure_eight_band_joins_reversed_outer_chunks_test`` () =
         Subpath.create
             [ CubicBezier(point 0.0 0.0, point -336.0 -234.0, point -336.0 234.0, point 0.0 0.0)
               CubicBezier(point 0.0 0.0, point 336.0 -234.0, point 336.0 234.0, point 0.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let result =
         Offset.subpathBandWith source 18.0<length> 34.0<length> Offset.Round Offset.Butt Offset.defaultOptions
@@ -428,7 +428,7 @@ let ``subpath_band_untrimmed_returns_two_raw_sides_test`` () =
         Subpath.create
             [ CubicBezier(point 0.0 0.0, point -336.0 -234.0, point -336.0 234.0, point 0.0 0.0)
               CubicBezier(point 0.0 0.0, point 336.0 -234.0, point 336.0 234.0, point 0.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let result =
         Offset.subpathBandUntrimmedWith

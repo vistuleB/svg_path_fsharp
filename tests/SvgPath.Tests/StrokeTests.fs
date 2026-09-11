@@ -175,7 +175,7 @@ let ``closed subpath stroke returns two closed contours`` () =
 let ``self meeting closed subpath stroke uses band sections`` () =
     let figureEight =
         Subpath.create [ CubicBezier(point 76.0 0.0, point -2.0 -62.0, point -2.0 62.0, point 76.0 0.0); CubicBezier(point 76.0 0.0, point 154.0 -62.0, point 154.0 62.0, point 76.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let path = Stroke.subpath figureEight 26.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, path.Subpaths.Length)
@@ -264,7 +264,7 @@ let ``zero dash square cap uses source direction`` () =
 [<Fact>]
 let ``zero visible dashes on closed source are points not full loops`` () =
     let source = lineSubpath [point 0. 0.;point 2. 0.;point 2. 2.;point 0. 2.;point 0. 0.]
-                 |> Subpath.setClosedWith Strict true |> Result.defaultWith (failwithf "%A")
+                 |> Subpath.closeWith Strict |> Result.defaultWith (failwithf "%A")
     let dashes = Stroke.subpathDashes source [0.0<length>;3.0<length>] 0.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, dashes.Length)
     for dash in dashes do

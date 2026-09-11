@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.0 - 2026-09-11
+
+- Aligned the public API changes with Gleam `svg_path` v0.48.0 (`fa075de`).
+- Breaking: replaced `Subpath.setClosed`, `setClosedWith`, and their assert
+  variants with `close`, `closeWith`, `assertClose`, `assertCloseWith`, and
+  the infallible opening function (`open` requires double backticks in F#
+  source). Opening changes only the closed flag; closing applies the endpoint
+  policy. No Boolean setter remains.
+- Breaking: ported Gleam's public naming cleanup: explicit taxicab diameter,
+  absolute-winding area, 90-degree rotations, arc-collapse transforms,
+  closest-pair queries, consistent curve splitting and parameter comparison,
+  and shorter convex-hull constructor names. Updated callers and examples;
+  removed obsolete left-padding aliases.
+- Breaking: moved conditional-linearization operations into `Degeneracy`
+  as `segmentLinearizeIfDegenerate` and `subpathLinearizeIfDegenerate`, with
+  `Degeneracy.Error` and corresponding negative-tolerance regressions.
+- Made `SmallestEnclosingCircle` and NumberFormat implementation helpers/types
+  internal. The three formatting option types used by public inspection and
+  serialization options remain public. Added assembly-export regression checks.
+- Clarified constructor, assertion, endpoint-policy, parametric fitting, and
+  arc-conversion contracts. Remaining documentation suggestions are recorded
+  separately in `FSharp_DOCSTRING_REVIEW.md`.
+- Release verification: `scripts/test-release` passed 1,843 fast tests and
+  26 slow convex-hull tests. `scripts/generate-readme-figures --check` and
+  `scripts/generate-gallery-figures --check` passed for all 13 README and 33
+  Gallery figures. README images are pinned to `assets-v0.8.0`.
+
 ## 0.7.0 - 2026-09-10
 
 - Aligned with Gleam `svg_path` v0.47.0 (`f543511`).

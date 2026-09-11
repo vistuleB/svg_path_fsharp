@@ -224,7 +224,7 @@ module EncountersTests =
     let ``subpath parameter complementarity uses short closed seam motion`` () =
         let left =
             Subpath.polyline [ point 0.0<length> 0.0<length>; point 10.0<length> 0.0<length>; point 10.0<length> 10.0<length>; point 0.0<length> 10.0<length>; point 0.0<length> 0.0<length> ]
-            |> Result.bind (Subpath.setClosed true)
+            |> Result.bind (Subpath.close)
             |> Result.defaultWith (failwithf "%A")
         let right = subpath [ line 0.0<length> 5.0<length> 0.0<length> 0.0<length> ]
         let overlaps = Overlaps.subpath left right |> Result.defaultWith (failwithf "%A")

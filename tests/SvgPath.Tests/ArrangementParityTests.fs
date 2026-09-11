@@ -11,7 +11,7 @@ let private line ax ay bx by = Line(point ax ay, point bx by)
 [<Fact>]
 let ``annotated drawing uses requested winding tolerance`` () =
     let source = Subpath.polyline [point 0. 0.;point 100. 0.;point 100. 100.;point 0. 100.;point 0. 0.]
-                 |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+                 |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     let path = Path.singleton source
     let build = Arrangement.build [path] 1e-12<length> 1e-8<length> |> Result.defaultWith (failwithf "%A")
     let things = ArrangementDrawing.annotatedDrawing build.Graph path 1e-12<length> |> Result.defaultWith (failwithf "%A")
@@ -135,7 +135,7 @@ let private arc start radius largeArc sweep finish =
 
 let private closedSubpath segments =
     Subpath.create segments
-    |> Result.bind (Subpath.setClosed true)
+    |> Result.bind (Subpath.close)
     |> Result.defaultWith (failwithf "%A")
 
 let private square x y size =

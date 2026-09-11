@@ -1,5 +1,18 @@
 # Gleam commit-by-commit synchronization
 
+## v0.48.0 release alignment (2026-09-11)
+
+- Gleam `fa075de`: incorporated the separate Subpath open/close API, removed
+  Boolean setters, and updated callers, tests, generated-code inspection, and
+  README examples. The preceding naming and documentation commits are mapped
+  individually below.
+- Gleam's five internal-module file moves do not require F# path changes:
+  Root, OverlapDetection, and WindingField were already internal modules.
+  F# `3c626bd` makes SmallestEnclosingCircle and NumberFormat implementation
+  details internal, retaining the formatting types used by public options.
+- F# v0.8.0 is the corresponding release. No geometry algorithm changes were
+  introduced by these API and visibility changes.
+
 ## v1 API and documentation review (2026-09-11)
 
 - Gleam `ba0bbed` → F# `39b3bc6`: public function renamings, removal of the

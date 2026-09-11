@@ -14,7 +14,7 @@ module ArrangementTests =
               line (x + width) (y + height) x (y + height)
               line x (y + height) x y ]
         Subpath.create segments
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (fun error -> failwithf "%A" error)
 
     let private graphWithEdges segments =

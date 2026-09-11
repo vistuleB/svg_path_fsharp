@@ -58,7 +58,7 @@ let ``subpath ignores closed field`` () =
             [ Line(point 0.0 0.0, point 10.0 0.0)
               Line(point 10.0 0.0, point 0.0 0.0) ]
         |> Result.defaultWith (failwithf "%A")
-    let closedSubpath = Subpath.setClosed true openSubpath |> Result.defaultWith (failwithf "%A")
+    let closedSubpath = Subpath.close openSubpath |> Result.defaultWith (failwithf "%A")
     Assert.True(Congruency.subpathWith openSubpath closedSubpath tolerance |> Result.isOk)
 
 [<Fact>]
@@ -66,7 +66,7 @@ let ``subpath maps move only subpaths`` () =
     let source = Subpath.empty (point 1.0 2.0)
     let target =
         Subpath.empty (point 6.0 8.0)
-        |> Subpath.setClosed true
+        |> Subpath.close
         |> Result.defaultWith (failwithf "%A")
     let transform = Congruency.subpath source target 1.0e-6<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> (Affine.point transform (point 1.0 2.0)) (point 6.0 8.0))
@@ -275,7 +275,7 @@ let ``fit subpath with affine uses semantic point cloud`` () =
 [<Fact>]
 let ``subpath maps move-only subpaths`` () =
     let source = Subpath.empty (point 1.0 2.0)
-    let target = Subpath.empty (point 6.0 8.0) |> Subpath.setClosed true |> Result.defaultWith (failwithf "%A")
+    let target = Subpath.empty (point 6.0 8.0) |> Subpath.close |> Result.defaultWith (failwithf "%A")
     let found = Congruency.subpath source target 1.0e-6<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> (Affine.point found source.Start) target.Start)
 
@@ -374,7 +374,7 @@ let ``path rejects individually congruent but globally inconsistent subpaths`` (
 [<Fact>]
 let ``path ignores subpath closed fields`` () =
     let openSubpath = Subpath.polyline [ point 0.0 0.0; point 10.0 0.0; point 0.0 0.0 ] |> Result.defaultWith (failwithf "%A")
-    let closed = Subpath.setClosed true openSubpath |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.close openSubpath |> Result.defaultWith (failwithf "%A")
     Assert.True(Congruency.path (Path.singleton openSubpath) (Path.singleton closed) 1.0e-6<length> |> Result.isOk)
 
 [<Fact>]

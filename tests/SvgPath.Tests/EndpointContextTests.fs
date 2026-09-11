@@ -39,18 +39,18 @@ let ``endpoint context coalescing keeps last flag`` () =
     Assert.Equal<Segment list>([line 0. 3.],path.Segments)
 [<Fact>]
 let ``set closed reapplies policy only at closing boundary`` () =
-    let closed = Subpath.create [line 0. 1.;line 1. 0.] |> get |> Subpath.setClosed true |> get
-    let reclosed = Subpath.setClosedWith (Custom(fun previous next actual ->
+    let closed = Subpath.create [line 0. 1.;line 1. 0.] |> get |> Subpath.close |> get
+    let reclosed = Subpath.closeWith (Custom(fun previous next actual ->
         Assert.Equal(context false false true,actual)
         Assert.Equal(line 1. 0.,previous)
         Assert.Equal(line 0. 1.,next)
-        [line 1. 0.5;line 0.5 0.])) true closed |> get
+        [line 1. 0.5;line 0.5 0.])) closed |> get
     Assert.True(reclosed.Closed)
     Assert.Equal<Segment list>([line 0. 1.;line 1. 0.5;line 0.5 0.],reclosed.Segments)
 [<Fact>]
 let ``closed singleton rebuild calls policy once`` () =
     let only = line 0. 0.
-    let closed = Subpath.create [only] |> get |> Subpath.setClosed true |> get
+    let closed = Subpath.create [only] |> get |> Subpath.close |> get
     let rebuilt = Subpath.rebuildWith (Custom(fun previous next actual ->
         Assert.Equal(only,previous)
         Assert.Equal(only,next)
@@ -62,8 +62,8 @@ let ``closed singleton rebuild calls policy once`` () =
 let ``empty closure and rebuild do not call policy`` () =
     let empty = Subpath.empty (Point.create 3.0<length> 4.0<length>)
     let policy = Custom(fun _ _ _ -> failwith "Empty subpath has no pair")
-    let closed = Subpath.setClosedWith policy true empty |> get
-    let reclosed = Subpath.setClosedWith policy true closed |> get
+    let closed = Subpath.closeWith policy empty |> get
+    let reclosed = Subpath.closeWith policy closed |> get
     let rebuilt = Subpath.rebuildWith policy closed |> get
     Assert.True(closed.Closed)
     Assert.True(List.isEmpty closed.Segments)
@@ -77,7 +77,7 @@ let ``open singleton rebuild does not call policy`` () =
     Assert.Equal(only,rebuilt)
 [<Fact>]
 let ``closed rebuild distinguishes last forward pair from closure`` () =
-    let closed = Subpath.create [line 0. 1.;line 1. 0.] |> get |> Subpath.setClosed true |> get
+    let closed = Subpath.create [line 0. 1.;line 1. 0.] |> get |> Subpath.close |> get
     let rebuilt = Subpath.rebuildWith (Custom(fun previous next actual ->
         if (Segment.start previous).X = 0.0<length> then
             Assert.Equal(context true true false,actual)

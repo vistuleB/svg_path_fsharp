@@ -164,7 +164,7 @@ module Csg =
                 cycle seed seed (Set.remove seedId remaining) [] (Set.count remaining + 1)
                 |> Result.bind (fun (segments, remaining) ->
                     Subpath.createWith (WiggleWith tolerance) segments
-                    |> Result.bind (Subpath.setClosedWith (WiggleWith tolerance) true)
+                    |> Result.bind (Subpath.closeWith (WiggleWith tolerance))
                     |> Result.mapError CsgPathError
                     |> Result.bind (fun subpath ->
                         let subpath = if reversePositiveLayers && seed.Layer > 0 then Subpath.reverse subpath else subpath

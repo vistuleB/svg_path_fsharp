@@ -19,8 +19,8 @@ let private bboxNear (box: BoundingBox) minPoint maxPoint =
 let private boundingBox minPoint maxPoint : BoundingBox =
     { Min = minPoint; Max = maxPoint }
 
-let private setClosed subpath =
-    Subpath.setClosed true subpath |> Result.defaultWith (failwithf "%A")
+let private closeSubpath subpath =
+    Subpath.close subpath |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
 let ``matrix_transforms_points_test`` () =
@@ -218,7 +218,7 @@ let ``quadratic_and_cubic_bezier_transform_test`` () =
 [<Fact>]
 let ``closed_subpath_transform_preserves_semantic_closure_test`` () =
     let matrix = Transform.matrix 1.0 0.0 0.0 1.0 10.0<length> 0.0<length>
-    let subpath = Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 0.0 0.0) ] |> Result.defaultWith (failwithf "%A") |> setClosed
+    let subpath = Subpath.create [ Line(point 0.0 0.0, point 10.0 0.0); Line(point 10.0 0.0, point 0.0 0.0) ] |> Result.defaultWith (failwithf "%A") |> closeSubpath
     let transformed = Transform.subpath subpath matrix |> Result.defaultWith (failwithf "%A")
     Assert.True(Subpath.isClosed transformed)
     Assert.Equal("M 10 0 H 20 Z", Serialize.subpath transformed)
@@ -320,7 +320,7 @@ let ``graceful_closed_subpath_transform_preserves_semantic_closure_test`` () =
         Subpath.create [
             Arc ({ Start = point 5.0 0.0; Radius = point 5.0 5.0; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = point -5.0 0.0 }: Ellipse.EndpointArcData)
             Line(point -5.0 0.0, point 5.0 0.0)
-        ] |> Result.defaultWith (failwithf "%A") |> setClosed
+        ] |> Result.defaultWith (failwithf "%A") |> closeSubpath
     let transformed = Transform.subpathWithArcCollapse subpath (Transform.matrix 1.0 0.0 0.0 0.0 0.0<length> 0.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.True(Subpath.isClosed transformed)
     Assert.Equal("M 5 0 H -5 Z", Serialize.subpath transformed)

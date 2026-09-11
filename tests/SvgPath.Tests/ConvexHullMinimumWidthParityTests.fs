@@ -44,7 +44,7 @@ let private circleSubpath radius =
     Subpath.create
         [ Arc ({ Start = right; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = left }: Ellipse.EndpointArcData)
           Arc ({ Start = left; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = right }: Ellipse.EndpointArcData) ]
-    |> Result.bind (Subpath.setClosed true)
+    |> Result.bind (Subpath.close)
     |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]

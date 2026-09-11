@@ -87,7 +87,7 @@ let ``source alignment preserves first handle edit at closed seam`` () =
     let a = Line(point 2. 2.,point -1. 0.)
     let b = Line(point -1. 0.,point 0. 0.)
     for segments in [[curve;a;b];[a;b;curve];[b;curve;a]] do
-        let source = Subpath.create segments |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+        let source = Subpath.create segments |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
         let normalized = Offset.normalizeSourceSubpath source Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
         let control1 = Subpath.segments normalized |> List.choose (function CubicBezier(_,c,_,_) -> Some c | _ -> None) |> List.exactlyOne
         Assert.Equal(0.0<length>,control1.Y)
@@ -97,7 +97,7 @@ let ``source alignment preserves first handle edit at closed seam`` () =
 [<Fact>]
 let ``source alignment keeps both edits for single closed cubic`` () =
     let source = Subpath.create [CubicBezier(point 0. 0.,point 100. 0.,point -100. 1.,point 0. 0.)]
-                 |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+                 |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     let normalized = Offset.normalizeSourceSubpath source Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
     let curve = Subpath.segments normalized |> List.exactlyOne
     let start = Segment.directions curve 0.0<parameter> |> Result.defaultWith (failwithf "%A")
@@ -109,7 +109,7 @@ let ``closed offset preserves corner at single portion seam`` () =
     let line = Line(point 0. 0.,point 1. 0.)
     let curve = CubicBezier(point 1. 0.,point 2. 0.,point 0. 1.,point 0. 0.)
     for segments in [[line;curve];[curve;line]] do
-        let source = Subpath.create segments |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+        let source = Subpath.create segments |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
         let actual = Offset.subpathUntrimmed source 0.1<length> Offset.Round |> Result.defaultWith (failwithf "%A")
         Assert.True(Subpath.isClosed actual)
         Assert.Equal(1,Subpath.segments actual |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
@@ -124,7 +124,7 @@ let ``open c offset preserves closed retraced line`` () =
 [<Fact>]
 let ``closed c and reversal offset preserves retraced line and outline`` () =
     let source = Subpath.polyline [point 2. 0.;point 0. 0.;point 0. 2.;point 2. 2.;point 0. 2.;point 0. 0.;point 2. 0.]
-                 |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+                 |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
     let actual = Offset.subpath source 1.0<length> Offset.Round Offset.Butt |> Result.defaultWith (failwithf "%A")
     let expected = Parse.path "M 2 1 H 1 H 2 A 1 1 0 0 1 2 3 H 0 A 1 1 0 0 1 -1 2 V 0 A 1 1 0 0 1 0 -1 H 2 A 1 1 0 0 1 2 1 Z" |> Result.defaultWith (failwithf "%A")
     Assert.True((actual=expected), sprintf "%A" actual)
@@ -160,7 +160,7 @@ let private twoCutCornerLoop () =
         Line(point 0.0 3.0, point 0.0 1.0)
         Line(point 0.0 1.0, point 1.0 0.0)
     ]
-    |> Subpath.setClosed true
+    |> Subpath.close
     |> Result.defaultWith (failwithf "%A")
 
 let private stalledArcTurnRadius = 40.0<length>

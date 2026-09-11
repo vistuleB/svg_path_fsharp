@@ -75,7 +75,7 @@ module CutTests =
         match subjectResult with
         | Error error -> failwithf "%A" error
         | Ok openSubject ->
-            match Subpath.setClosed true openSubject with
+            match Subpath.close openSubject with
             | Error error -> failwithf "%A" error
             | Ok subject ->
                 let cutter = Subpath.ofSegment (line 5.0<length> -5.0<length> 5.0<length> 0.0<length>)
@@ -94,7 +94,7 @@ module CutTests =
                   line 10.0<length> 0.0<length> 10.0<length> 10.0<length>
                   line 10.0<length> 10.0<length> 0.0<length> 10.0<length>
                   line 0.0<length> 10.0<length> 0.0<length> 0.0<length> ]
-            |> Result.bind (Subpath.setClosed true)
+            |> Result.bind (Subpath.close)
         match subject with
         | Error error -> failwithf "%A" error
         | Ok subject ->

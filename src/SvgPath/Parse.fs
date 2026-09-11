@@ -347,7 +347,7 @@ module Parse =
             if not state.Active then parseTokens tokens state
             else
                 let startPoint = Subpath.start state.Subpath
-                Subpath.setClosedWith Bridge true state.Subpath
+                Subpath.closeWith Bridge state.Subpath
                 |> Result.mapError (fun error -> ParsedPathError error, state.At)
                 |> Result.bind (fun subpath ->
                     parseTokens tokens

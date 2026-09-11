@@ -104,7 +104,7 @@ let ``side levels fall back from a midpoint cusp`` () =
     let cusp = CubicBezier(point -1.0 0.0, point 1.0 1.0, point -1.0 1.0, point 1.0 0.0)
     let source =
         Subpath.create [ cusp; Line(point 1.0 0.0, point -1.0 0.0) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(
         Ok(-1, 0),

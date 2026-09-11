@@ -12,7 +12,7 @@ module ClipTests =
         let p x y = point (Length.fromFloat x) (Length.fromFloat y)
         let polyline points = Subpath.polyline points |> Result.defaultWith (failwithf "%A")
         let triangle = polyline [p 0. 0.;p 10. 0.;p 0. 10.]
-        let closed = Subpath.setClosedWith Bridge true triangle |> Result.defaultWith (failwithf "%A")
+        let closed = Subpath.closeWith Bridge triangle |> Result.defaultWith (failwithf "%A")
         let input = polyline [p -2. 2.;p 4. 2.]
         let expected = polyline [p 0. 2.;p 4. 2.]
         for fillRule in [Nonzero;EvenOdd] do
@@ -25,7 +25,7 @@ module ClipTests =
               line 10.0<length> 0.0<length> 10.0<length> 10.0<length>
               line 10.0<length> 10.0<length> 0.0<length> 10.0<length>
               line 0.0<length> 10.0<length> 0.0<length> 0.0<length> ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
 
     let private rectangleAt minX minY maxX maxY =
         Subpath.polygon
@@ -67,7 +67,7 @@ module ClipTests =
                       line 4.0<length> 2.0<length> 4.0<length> 4.0<length>
                       line 4.0<length> 4.0<length> 2.0<length> 4.0<length>
                       line 2.0<length> 4.0<length> 2.0<length> 2.0<length> ]
-                |> Result.bind (Subpath.setClosed true)
+                |> Result.bind (Subpath.close)
             match inside with
             | Error error -> failwithf "%A" error
             | Ok inside ->
@@ -146,7 +146,7 @@ module ClipTests =
             Subpath.create
                 [ Arc ({ Start = point 10.0<length> 0.0<length>; Radius = point 10.0<length> 10.0<length>; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point -10.0<length> 0.0<length> }: Ellipse.EndpointArcData)
                   Arc ({ Start = point -10.0<length> 0.0<length>; Radius = point 10.0<length> 10.0<length>; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 10.0<length> 0.0<length> }: Ellipse.EndpointArcData) ]
-            |> Result.bind (Subpath.setClosed true)
+            |> Result.bind (Subpath.close)
             |> Result.defaultWith (failwithf "%A")
         let clipped =
             Clip.subpath input (rectanglePath -20.0<length> -5.0<length> 20.0<length> 5.0<length>) Nonzero

@@ -31,7 +31,7 @@ let ``length bounds sum subpaths without counting gaps`` () =
     let empty = Subpath.empty (p 100. 100.)
     let a,b = p 0. 0.,p 3. 4.
     let subpath = Subpath.create [Line(a,b);Line(b,a)] |> get
-    let closed = Subpath.setClosed true subpath |> get
+    let closed = Subpath.close subpath |> get
     Assert.Equal(Ok 0.0<length>,Subpath.lengthUpperBound empty)
     Assert.Equal(Ok 10.0<length>,Subpath.lengthUpperBound closed)
     Assert.Equal(Ok 0.0<length>,Path.lengthUpperBound (Path.ofSubpaths []))

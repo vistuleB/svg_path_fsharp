@@ -277,7 +277,7 @@ let ``subpath overlap exact lookup accepts internal endpoint aliases`` () =
 let ``subpath overlap exact lookup accepts closed seam alias`` () =
     let closed =
         Subpath.polyline [ point 0.0 0.0; point 1.0 0.0; point 1.0 1.0; point 0.0 1.0; point 0.0 0.0 ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let correspondence: Overlaps.SegmentOverlap =
         { LeftFrom = parameter 0.5

@@ -237,7 +237,7 @@ module ConvexHull =
         | [] -> Error InternalLoopUnionCollapsed
         | _ ->
             Subpath.createWith WiggleElseBridge pieces
-            |> Result.bind (Subpath.setClosedWith WiggleElseBridge true)
+            |> Result.bind (Subpath.closeWith WiggleElseBridge)
             |> Result.mapError InternalConstructionPathError
 
     let private supportCandidates segment direction =
@@ -503,7 +503,7 @@ module ConvexHull =
         |> Result.map List.rev
         |> Result.bind (fun segments ->
             Subpath.createWith WiggleElseBridge segments
-            |> Result.bind (Subpath.setClosedWith WiggleElseBridge true))
+            |> Result.bind (Subpath.closeWith WiggleElseBridge))
         |> Result.mapError InternalConstructionPathError)
 
     let private normalizeAngle (angle: float<degree>) =
@@ -1249,7 +1249,7 @@ module ConvexHull =
             let endPoint = kept.Segments |> List.last |> Segment.finish
             let segments = kept.Segments @ [ Line(endPoint, point); Line(point, startPoint) ]
             Subpath.createWith Strict segments
-            |> Result.bind (Subpath.setClosedWith Strict true)
+            |> Result.bind (Subpath.closeWith Strict)
             |> Result.mapError InternalConstructionPathError
             |> Result.map (fun subpath -> { loop with Segments = subpath.Segments }))
 
@@ -1372,7 +1372,7 @@ module ConvexHull =
 
     let private buildClosedSubpath segments =
         Subpath.createWith Wiggle segments
-        |> Result.bind (Subpath.setClosedWith Wiggle true)
+        |> Result.bind (Subpath.closeWith Wiggle)
         |> Result.mapError InternalConstructionPathError
         |> Result.mapError hullPieceDiscontinuity
 

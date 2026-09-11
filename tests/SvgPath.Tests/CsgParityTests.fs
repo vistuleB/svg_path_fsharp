@@ -63,7 +63,7 @@ let ``collapsed cubic endpoint direction reconstructs boundary`` () =
     let start = point 0.0 0.0
     let contour =
         Subpath.create [ CubicBezier(start, start, point 0.0 10.0, point 10.0 10.0); Line(point 10.0 10.0, point 10.0 0.0); Line(point 10.0 0.0, start) ]
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
     let union = Csg.union (Path.singleton contour) (Path.ofSubpaths []) Nonzero |> output
     Assert.Single(Path.subpaths union) |> ignore
@@ -88,7 +88,7 @@ let private circleSubpath radius =
     Subpath.create
         [ Arc ({ Start = right; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = left }: Ellipse.EndpointArcData)
           Arc ({ Start = left; Radius = point radius radius; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = right }: Ellipse.EndpointArcData) ]
-    |> Result.bind (Subpath.setClosed true)
+    |> Result.bind (Subpath.close)
     |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
@@ -141,7 +141,7 @@ let private quadraticLoop () =
     Subpath.create
         [ QuadraticBezier(left, point -10.0 -10.0, top); QuadraticBezier(top, point 10.0 -10.0, right)
           QuadraticBezier(right, point 10.0 10.0, bottom); QuadraticBezier(bottom, point -10.0 10.0, left) ]
-    |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
 let ``quadratic loop rectangle union preserves quadratics and lines`` () =
@@ -158,7 +158,7 @@ let private cubicLoop () =
     Subpath.create
         [ CubicBezier(left, point -r -h, point -h -r, top); CubicBezier(top, point h -r, point r -h, right)
           CubicBezier(right, point r h, point h r, bottom); CubicBezier(bottom, point -h r, point -r h, left) ]
-    |> Result.bind (Subpath.setClosed true) |> Result.defaultWith (failwithf "%A")
+    |> Result.bind (Subpath.close) |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
 let ``cubic loop rectangle union preserves cubics and lines`` () =

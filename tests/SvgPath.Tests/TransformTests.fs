@@ -20,7 +20,7 @@ let ``graceful arc subpaths preserve exact noncardinal endpoints`` () =
         let source = Subpath.create [Line(point 10. 4.,Segment.start arc);arc;Line(Segment.finish arc,point 10. 4.)] |> Result.defaultWith (failwithf "%A")
         let openResult = Transform.subpathWithArcCollapse source matrix |> Result.defaultWith (failwithf "%A")
         Assert.False(Subpath.isClosed openResult)
-        let closedSource = Subpath.setClosed true source |> Result.defaultWith (failwithf "%A")
+        let closedSource = Subpath.close source |> Result.defaultWith (failwithf "%A")
         let closed = Transform.subpathWithArcCollapse closedSource matrix |> Result.defaultWith (failwithf "%A")
         Assert.True(Subpath.isClosed closed)
         Assert.Equal(Subpath.start closed,Subpath.finish closed)
@@ -122,7 +122,7 @@ let ``subpath and path transforms preserve closure and ordering`` () =
     let first = Line(point 0.0 0.0, point 1.0 0.0)
     let second = Line(point 1.0 0.0, point 0.0 0.0)
     let openSubpath = Subpath.create [ first; second ] |> Result.defaultWith (failwithf "%A")
-    let closed = Subpath.setClosed true openSubpath |> Result.defaultWith (failwithf "%A")
+    let closed = Subpath.close openSubpath |> Result.defaultWith (failwithf "%A")
     let path = Path.ofSubpaths [ closed; openSubpath ]
     let transformed =
         Transform.translatePath path 4.0<length> 7.0<length>

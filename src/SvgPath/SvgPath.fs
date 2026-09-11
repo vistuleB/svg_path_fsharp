@@ -1733,20 +1733,19 @@ module Subpath =
                         (Segment.finish last)
                 ))
 
-    /// Set a subpath's semantic closed state with an endpoint policy.
-    ///
-    /// Setting `closed` to `false` always succeeds. Setting it to `true` uses the
-    /// given endpoint policy to reconcile a non-empty subpath's end point with its
-    /// start point, even if it is already closed. This invokes the policy exactly
+    /// Clear the semantic closed flag without changing segments, endpoints, or traversal.
+    /// Cannot fail. Empty and already-open subpaths are unchanged.
+    /// Use openAt to choose a new start along a closed traversal.
+    let ``open`` subpath = { subpath with isClosed = false }
+
+    /// Close a subpath using an endpoint reconciliation policy.
+    /// Reconciles its end with its start, even if already closed. Invokes the policy exactly
     /// once, for the closing pair only; interior pairs are not revisited. Repeated
     /// calls can change geometry if the policy is not idempotent. Empty subpaths
     /// may be closed and do not invoke the policy.
-    let setClosedWith policy closed subpath =
-        // Opening has no boundary to reconcile; unused policy options must not fail it.
-        if not closed then Ok { subpath with isClosed = false }
-        else
-            validatePolicy policy
-            |> Result.bind (fun _ ->
+    let closeWith policy subpath =
+        validatePolicy policy
+        |> Result.bind (fun _ ->
                 let reconcile = policyReconcile policy
                 match subpath.segmentList with
                 | [] -> Ok { subpath with isClosed = true }
@@ -1759,29 +1758,28 @@ module Subpath =
                     validateReplacement 0 last (reconcile last first { First = false; Last = false; Closing = true })
                     |> Result.bind (fun replacement -> validateClosed subpath.startPoint (first :: (middle @ replacement))))
 
-    /// Set a subpath's semantic closed state.
+    /// Close a subpath without changing its geometry.
     ///
-    /// Setting `closed` to `false` always succeeds. Setting it to `true` requires a
-    /// non-empty subpath's end point to exactly match its start point. Empty
-    /// subpaths may be closed.
-    let setClosed closed subpath = setClosedWith Strict closed subpath
+    /// A nonempty subpath's end must exactly match its start; otherwise returns
+    /// Discontinuous. Empty subpaths may be closed. Use closeWith to reconcile gaps.
+    let close subpath = closeWith Strict subpath
 
-    /// Set a subpath's semantic closed state with an endpoint policy.
+    /// Close a subpath with an endpoint policy; the exception-raising counterpart of closeWith.
     ///
     /// Throws `System.ArgumentException` if closing-boundary reconciliation returns an error, including a
-    /// custom-policy contract violation. Opening always succeeds; empty subpaths
-    /// may be closed without invoking the policy. See `Subpath.setClosedWith`
+    /// custom-policy contract violation. Empty subpaths
+    /// may be closed without invoking the policy. See `Subpath.closeWith`
     /// for the Result-returning version and policy invocation rules.
-    let assertSetClosedWith policy closed subpath =
-        match setClosedWith policy closed subpath with
+    let assertCloseWith policy subpath =
+        match closeWith policy subpath with
         | Ok result -> result
-        | Error _ -> invalidArg (nameof closed) "invalid closed subpath"
+        | Error _ -> invalidArg (nameof subpath) "closing endpoints could not be reconciled"
 
-    /// Set a subpath's semantic closed state, the exception-raising counterpart of `Subpath.setClosed`.
+    /// Close a subpath; the exception-raising counterpart of Subpath.close.
     ///
     /// Throws `System.ArgumentException` when closing a nonempty subpath whose end differs from its start.
-    /// Opening always succeeds, and empty subpaths may be closed.
-    let assertSetClosed closed subpath = assertSetClosedWith Strict closed subpath
+    /// Empty subpaths may be closed.
+    let assertClose subpath = assertCloseWith Strict subpath
 
     let rebuildWith policy subpath =
         match subpath.segmentList with
@@ -1789,7 +1787,7 @@ module Subpath =
         | segments ->
             createWith policy segments
             |> Result.bind (fun rebuilt ->
-                if subpath.isClosed then setClosedWith policy true rebuilt
+                if subpath.isClosed then closeWith policy rebuilt
                 else Ok rebuilt)
 
     /// Create an open subpath connecting the given points with line segments.
@@ -1806,14 +1804,14 @@ module Subpath =
     /// first point, no extra zero-length closing line is added.
     ///
     /// This is equivalent to constructing a `Subpath.polyline` from the same points
-    /// and closing it with `Subpath.setClosedWith(..., policy: Bridge)`.
+    /// and closing it with `Subpath.closeWith Bridge`.
     let polygon points =
         match points with
         | [] | [ _ ] -> Error EmptySubpath
         | first :: _ ->
             let closedPoints =
                 if List.last points = first then points else points @ [ first ]
-            polyline closedPoints |> Result.bind (setClosed true)
+            polyline closedPoints |> Result.bind (close)
 
     /// Create an open polyline subpath from at least two points.
     ///
@@ -1961,7 +1959,7 @@ module Subpath =
             | _ ->
                 createWith policy edited
                 |> Result.bind (fun rebuilt ->
-                    if subpath.isClosed then setClosedWith policy true rebuilt else Ok rebuilt)
+                    if subpath.isClosed then closeWith policy rebuilt else Ok rebuilt)
 
     /// Replace a range of segments in a subpath.
     ///

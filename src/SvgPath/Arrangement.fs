@@ -1542,7 +1542,7 @@ module Arrangement =
                 trace edge.Id edge.Id visited []
                 |> Result.bind (fun (segments, visited) ->
                     Subpath.createWith (WiggleWith tolerance) segments
-                    |> Result.bind (Subpath.setClosedWith (WiggleWith tolerance) true)
+                    |> Result.bind (Subpath.closeWith (WiggleWith tolerance))
                     |> Result.mapError InternalArrangementSegmentError
                     |> Result.bind (fun contour ->
                         let contour = if edge.Layer > 0 then Subpath.reverse contour else contour

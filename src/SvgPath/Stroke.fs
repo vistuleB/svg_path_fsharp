@@ -98,7 +98,7 @@ module Stroke =
               Arc { Start = left; Radius = radial; XAxisRotation = 0.0<degree>
                     LargeArc = false; Sweep = true; End = right } ]
         Subpath.create segments
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.map Path.singleton
 
     let private zeroLengthSquareStrokePath center radius direction =
@@ -110,7 +110,7 @@ module Stroke =
         let bottomLeft = Point.add (Point.subtract center along) across
         lineSegmentsBetween [ topLeft; topRight; bottomRight; bottomLeft; topLeft ]
         |> Subpath.create
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.map Path.singleton
 
     let private zeroLengthStrokePath subpath radius cap =

@@ -354,7 +354,7 @@ let ``subpath self intersections ignores closed endpoint join`` () =
               Line(point 10.0 0.0, point 10.0 10.0)
               Line(point 10.0 10.0, point 0.0 10.0)
               Line(point 0.0 10.0, point 0.0 0.0) ]
-        |> Subpath.assertSetClosed true
+        |> Subpath.assertClose
     Assert.Equal(Ok [], Intersections.subpathSelf closedValue)
 
 [<Fact>]
@@ -484,7 +484,7 @@ let private quarterArcCircle center radius startOnRight sweep =
                Sweep = sweep
                End = endPoint }: Ellipse.EndpointArcData))
     |> Subpath.create
-    |> Result.bind (Subpath.setClosed true)
+    |> Result.bind (Subpath.close)
     |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]

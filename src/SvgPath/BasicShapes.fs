@@ -19,7 +19,7 @@ module BasicShapes =
 
     let private closed segments =
         Subpath.create segments
-        |> Result.bind (Subpath.setClosed true)
+        |> Result.bind (Subpath.close)
         |> Result.mapError PathError
 
     let private radii

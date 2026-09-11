@@ -5,7 +5,7 @@ open Xunit
 
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private subpath segments = Subpath.create segments |> Result.defaultWith (failwithf "%A")
-let private closedSubpath segments = subpath segments |> Subpath.setClosedWith Bridge true |> Result.defaultWith (failwithf "%A")
+let private closedSubpath segments = subpath segments |> Subpath.closeWith Bridge |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
 let ``point inspects as comma separated coordinates`` () =
@@ -105,7 +105,7 @@ let ``subpath_code_inspects_as_copy_pasteable_gleam_test`` () =
 [<Fact>]
 let ``closed_subpath_code_inspects_as_copy_pasteable_gleam_test`` () =
     let value = closedSubpath [ Line(point 0.0 0.0, point 12.0 10.0) ]
-    Assert.Equal("Subpath.create [\n  Line(Point.create (0.0<length>) (0.0<length>), Point.create (12.0<length>) (10.0<length>));\n  Line(Point.create (12.0<length>) (10.0<length>), Point.create (0.0<length>) (0.0<length>))\n]\n|> Result.defaultWith (failwithf \"%A\")\n|> Subpath.setClosed true\n|> Result.defaultWith (failwithf \"%A\")", Inspect.subpathCode value)
+    Assert.Equal("Subpath.create [\n  Line(Point.create (0.0<length>) (0.0<length>), Point.create (12.0<length>) (10.0<length>));\n  Line(Point.create (12.0<length>) (10.0<length>), Point.create (0.0<length>) (0.0<length>))\n]\n|> Result.defaultWith (failwithf \"%A\")\n|> Subpath.close\n|> Result.defaultWith (failwithf \"%A\")", Inspect.subpathCode value)
 
 [<Fact>]
 let ``path_code_inspects_as_copy_pasteable_gleam_test`` () =

@@ -958,7 +958,7 @@ module Offset =
             let segments = if closed then colinearizeSourceSeam segments tolerance else segments
             // A closing Custom call owns only the tail; align the seam beforehand.
             Subpath.createWith (colinearizeSourceTangentPolicy tolerance) segments
-            |> Result.bind (Subpath.setClosedWith Strict closed)
+            |> Result.bind (fun subpath -> if closed then Subpath.close subpath else Ok(Subpath.``open`` subpath))
             |> Result.mapError InternalPathError
 
     let private segmentDiameter segment =
@@ -1022,7 +1022,9 @@ module Offset =
             | first :: rest ->
                 normalizeShortSourceRunsLoop rest tolerance [] 0.0<length> [first]
                 |> Result.bind (fun segments -> Subpath.create segments |> Result.mapError InternalPathError)
-                |> Result.bind (fun normalized -> Subpath.setClosed subpath.Closed normalized |> Result.mapError InternalPathError)
+                |> Result.bind (fun normalized ->
+                    (if subpath.Closed then Subpath.close normalized else Ok(Subpath.``open`` normalized))
+                    |> Result.mapError InternalPathError)
 
     let internal normalizeSourceSubpath subpath options =
         normalizeShortSourceRuns subpath 0.001<length>
@@ -2556,7 +2558,7 @@ module Offset =
             Subpath.create (List.rev segments)
             |> Result.mapError InternalPathError
             |> Result.bind (fun openSubpath ->
-                Subpath.setClosed closedValue openSubpath
+                (if closedValue then Subpath.close openSubpath else Ok(Subpath.``open`` openSubpath))
                 |> Result.mapError InternalPathError)
             |> Result.map (fun subpath ->
                 { Index = 0; Subpath = subpath; Closed = closedValue } :: portions)
@@ -3615,7 +3617,7 @@ module Offset =
             Subpath.createWith policy segments
             |> Result.mapError InternalPathError
             |> Result.bind (fun subpath ->
-                Subpath.setClosedWith policy closedValue subpath
+                (if closedValue then Subpath.closeWith policy subpath else Ok(Subpath.``open`` subpath))
                 |> Result.mapError InternalPathError)
 
     let private buildSynchronizedUntrimmed
@@ -4124,7 +4126,8 @@ module Offset =
             |> Result.mapError InternalPathError
             |> Result.mapError survivorChainDiscontinuity
             |> Result.bind (fun subpath ->
-                Subpath.setClosedWith (WiggleElseBridgeWith tolerance) first.Closed subpath
+                (if first.Closed then Subpath.closeWith (WiggleElseBridgeWith tolerance) subpath
+                 else Ok(Subpath.``open`` subpath))
                 |> Result.mapError InternalPathError)
             |> Result.bind (fun subpath ->
                 survivorChainsToSubpaths rest tolerance (subpath :: subpaths))
@@ -4132,7 +4135,7 @@ module Offset =
     let private closeSurvivorSubpath subpath tolerance =
         if Subpath.isClosed subpath then Ok subpath
         elif Point.distance (Subpath.start subpath) (Subpath.finish subpath) <= tolerance then
-            Subpath.setClosedWith (WiggleElseBridgeWith tolerance) true subpath
+            Subpath.closeWith (WiggleElseBridgeWith tolerance) subpath
             |> Result.mapError InternalPathError
         else Ok subpath
 
@@ -4395,7 +4398,7 @@ module Offset =
                 Subpath.createWith Wiggle segments
                 |> Result.mapError InternalPathError
                 |> Result.bind (fun outline ->
-                    Subpath.setClosedWith Wiggle true outline |> Result.mapError InternalPathError)))
+                    Subpath.closeWith Wiggle outline |> Result.mapError InternalPathError)))
 
     let private bandFromSides sideA innerOffset sideB outerOffset cap =
         let exterior, interior =
@@ -4965,7 +4968,7 @@ module Offset =
                                     | Some edge -> Ok(if reference.Left then edge.Segment else Segment.reverse edge.Segment))
                                 |> Result.bind (fun segments ->
                                     Subpath.createWith (WiggleWith (2.0 * arrangementTolerance)) segments
-                                    |> Result.bind (Subpath.setClosedWith (WiggleWith (2.0 * arrangementTolerance)) true)
+                                    |> Result.bind (Subpath.closeWith (WiggleWith (2.0 * arrangementTolerance)))
                                     |> Result.mapError InternalPathError))
                             |> Result.map Path.ofSubpaths))))
 

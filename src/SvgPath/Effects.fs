@@ -274,7 +274,7 @@ module Effects =
             Subpath.createWith Wiggle segments
             |> Result.mapError EffectsPathError
             |> Result.bind (fun rounded ->
-                if closed then Subpath.setClosedWith Wiggle true rounded |> Result.mapError EffectsPathError
+                if closed then Subpath.closeWith Wiggle rounded |> Result.mapError EffectsPathError
                 else Ok rounded))
 
     let roundSubpathCornersWith subpath radius options =

@@ -7,6 +7,12 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private line ax ay bx by = Line(point ax ay, point bx by)
 let private ratio value = Parameter.ratio value
 
+[<Fact>]
+let ``opening ignores an unused invalid endpoint policy`` () =
+    let closed = Subpath.polygon [point 0.0 0.0; point 1.0 0.0] |> Result.defaultWith (failwithf "%A")
+    let expected = Subpath.setClosed false closed
+    Assert.Equal(expected, Subpath.setClosedWith (WiggleWith -1.0<length>) false closed)
+
 // Gleam svg_path_geometry_test: segment_linearize_if_degenerate_rejects_negative_tolerance_test.
 [<Fact>]
 let ``segment conditional linearization rejects negative tolerance`` () =

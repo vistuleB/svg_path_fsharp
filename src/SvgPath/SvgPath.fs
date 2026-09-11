@@ -212,6 +212,8 @@ type MinimizeOptions =
 /// Options for approximating an arbitrary parametric curve with cubic Béziers.
 /// The parameter measure is caller-defined. If supplied, Tangent must carry
 /// length per unit of that same parameter.
+/// Tolerance must be finite and positive, SamplesPerPiece at least two,
+/// InitialPieceCount positive, and MaxDepth non-negative (zero disables refinement).
 type ParametricOptions<[<Measure>] 'Param> =
     { Tolerance: float<length>
       SamplesPerPiece: int
@@ -449,6 +451,12 @@ module Segment =
             Bezier.CubicBezierData(startPoint, control1, control2, endPoint)
         | Arc _ -> invalidArg (nameof segment) "arcs are not Bezier segments"
 
+    /// Return an elliptical arc segment as center-parameter arc data.
+    ///
+    /// Returns `DegenerateArc` for non-arc segments, coincident arc endpoints, or
+    /// either absolute radius at or below `1e-9`. Uses `Ellipse.endpointToCenter`:
+    /// negative radii are made positive, and radii too small to span the endpoints
+    /// are enlarged. This does not replace degenerate arcs with lines.
     let arcCenterData segment =
         match segment with
         | Arc endpoint -> Ellipse.endpointToCenter endpoint |> Result.mapError (fun _ -> DegenerateArc)
@@ -1175,10 +1183,15 @@ module Segment =
     let private derivativeScaleSquared segment =
         derivativeScale segment |> Result.map (fun scale -> scale * scale)
 
-    /// Cheap upper bound: chord for lines, control-polygon length for Beziers,
-    /// absolute angular travel times the larger corrected radius for arcs.
-    /// Uses ordinary floating-point arithmetic, not outward rounding; bounds
-    /// may substantially overestimate. Invalid arcs return DegenerateArc.
+    /// Return a cheap upper bound on a segment's length.
+    ///
+    /// Lines use their chord length. Beziers use the sum of their control-polygon
+    /// edge lengths. Arcs use absolute angular travel in radians times the larger
+    /// corrected ellipse radius. No numerical integration or subdivision is used.
+    /// These mathematical upper bounds are evaluated with ordinary floating-point
+    /// arithmetic, not outward-rounded interval arithmetic, and can substantially
+    /// overestimate length. Arcs rejected by `Segment.arcCenterData` return
+    /// `DegenerateArc`; see that function for endpoint and radius restrictions.
     let lengthUpperBound segment =
         match segment with
         | Line(a,b) -> Ok(Point.distance a b)
@@ -1244,11 +1257,16 @@ module Segment =
                         let after = List.skip before.Length hull
                         if List.isEmpty after then hull else after @ before))
 
-    /// Visually clockwise convex enclosure. Beziers use their control-point
-    /// hull; arcs use corrected-ellipse tangent triangles spanning at most 90°.
-    /// Start is first when a hull vertex, otherwise the lexicographic minimum.
-    /// The first vertex is not repeated; point/line degeneracies return 1/2
-    /// vertices. Invalid arcs return DegenerateArc.
+    /// Return a convex polygon enclosing the segment, in visual clockwise order.
+    ///
+    /// The first vertex is the segment start when it is a hull vertex; otherwise
+    /// it is the lexicographically smallest vertex (x, then y). The first vertex
+    /// is not repeated at the end. Point and line degeneracies return one or two
+    /// vertices. Beziers use their control-point hull; arcs use tangent triangles
+    /// spanning at most 90 degrees on the corrected ellipse, then their hull.
+    /// This is an ordinary floating-point bound, not outward-rounded arithmetic.
+    /// Arcs rejected by `Segment.arcCenterData` return `DegenerateArc`; see that function
+    /// for endpoint and radius restrictions.
     let boundingPolygon segment = boundingPolygonBetween segment 0.0<parameter> 1.0<parameter>
 
     let private tangentialErrorIsImproving segment previousT previousValue proposalT proposalValue =
@@ -1649,7 +1667,12 @@ module Subpath =
         | WiggleElseBridgeWith tolerance -> fun previous next context -> wiggleElseBridgeReconcile tolerance previous next context.Closing
         | Custom reconcile -> reconcile
 
-    /// Construct an open subpath while validating every endpoint-policy replacement.
+    /// Create an open subpath using the given endpoint reconciliation policy.
+    ///
+    /// Empty segment lists still return `EmptySubpath`.
+    /// Other construction rules are those of `Subpath.create`, except that `policy`
+    /// may repair endpoint gaps. Returns an error if the policy cannot reconcile
+    /// a boundary or a custom replacement violates the `EndpointPolicy` contract.
     let createWith policy segments =
         validatePolicy policy
         |> Result.bind (fun _ ->
@@ -1661,14 +1684,32 @@ module Subpath =
                     | [] -> Ok(empty (Segment.start first))
                     | reconciled -> validateFrom (Segment.start (List.head reconciled)) reconciled))
 
-    /// Construct a strictly continuous open subpath.
+    /// Create an open subpath from a non-empty continuous list of segments.
+    ///
+    /// Returns `EmptySubpath` if the segment list is empty. Use `Subpath.empty`
+    /// when you need to represent a move-only subpath.
+    ///
+    /// Returns `Discontinuous` if any segment starts somewhere other than the
+    /// previous segment's end point. The error includes the two segment indices
+    /// that failed to meet.
     let create segments = createWith Strict segments
 
+    /// Create an open subpath with an endpoint policy.
+    ///
+    /// Throws `System.ArgumentException` on any error from `Subpath.createWith`: an empty input list, an endpoint
+    /// gap the policy cannot reconcile, or a custom replacement that violates
+    /// the `EndpointPolicy` contract. Use `Subpath.createWith` to handle those errors.
     let assertWith policy segments =
         match createWith policy segments with
         | Ok subpath -> subpath
         | Error _ -> invalidArg (nameof segments) "invalid subpath segments"
 
+    /// Create an open subpath from a non-empty continuous list of segments.
+    ///
+    /// Throws `System.ArgumentException` if the list is empty or any consecutive endpoints differ exactly.
+    ///
+    /// This is useful for hand-authored paths where invalid continuity would be a
+    /// programmer error. Use `Subpath.create` when you want to handle construction errors.
     let assertCreate segments = assertWith Strict segments
     let ``assert`` segments = assertCreate segments
 
@@ -1692,14 +1733,20 @@ module Subpath =
                         (Segment.finish last)
                 ))
 
-    /// Apply the closing policy once even if already closed; never revisit
-    /// interior pairs. Empty subpaths have no call. Non-idempotent policies may
-    /// change geometry on repeated calls. Setting false opens without a call.
+    /// Set a subpath's semantic closed state with an endpoint policy.
+    ///
+    /// Setting `closed` to `false` always succeeds. Setting it to `true` uses the
+    /// given endpoint policy to reconcile a non-empty subpath's end point with its
+    /// start point, even if it is already closed. This invokes the policy exactly
+    /// once, for the closing pair only; interior pairs are not revisited. Repeated
+    /// calls can change geometry if the policy is not idempotent. Empty subpaths
+    /// may be closed and do not invoke the policy.
     let setClosedWith policy closed subpath =
-        validatePolicy policy
-        |> Result.bind (fun _ ->
-            if not closed then Ok { subpath with isClosed = false }
-            else
+        // Opening has no boundary to reconcile; unused policy options must not fail it.
+        if not closed then Ok { subpath with isClosed = false }
+        else
+            validatePolicy policy
+            |> Result.bind (fun _ ->
                 let reconcile = policyReconcile policy
                 match subpath.segmentList with
                 | [] -> Ok { subpath with isClosed = true }
@@ -1712,13 +1759,28 @@ module Subpath =
                     validateReplacement 0 last (reconcile last first { First = false; Last = false; Closing = true })
                     |> Result.bind (fun replacement -> validateClosed subpath.startPoint (first :: (middle @ replacement))))
 
+    /// Set a subpath's semantic closed state.
+    ///
+    /// Setting `closed` to `false` always succeeds. Setting it to `true` requires a
+    /// non-empty subpath's end point to exactly match its start point. Empty
+    /// subpaths may be closed.
     let setClosed closed subpath = setClosedWith Strict closed subpath
 
+    /// Set a subpath's semantic closed state with an endpoint policy.
+    ///
+    /// Throws `System.ArgumentException` if closing-boundary reconciliation returns an error, including a
+    /// custom-policy contract violation. Opening always succeeds; empty subpaths
+    /// may be closed without invoking the policy. See `Subpath.setClosedWith`
+    /// for the Result-returning version and policy invocation rules.
     let assertSetClosedWith policy closed subpath =
         match setClosedWith policy closed subpath with
         | Ok result -> result
         | Error _ -> invalidArg (nameof closed) "invalid closed subpath"
 
+    /// Set a subpath's semantic closed state, the exception-raising counterpart of `Subpath.setClosed`.
+    ///
+    /// Throws `System.ArgumentException` when closing a nonempty subpath whose end differs from its start.
+    /// Opening always succeeds, and empty subpaths may be closed.
     let assertSetClosed closed subpath = assertSetClosedWith Strict closed subpath
 
     let rebuildWith policy subpath =
@@ -1730,11 +1792,21 @@ module Subpath =
                 if subpath.isClosed then setClosedWith policy true rebuilt
                 else Ok rebuilt)
 
+    /// Create an open subpath connecting the given points with line segments.
+    ///
+    /// The input must contain at least two points.
     let polyline points =
         match points with
         | [] | [ _ ] -> Error EmptySubpath
         | _ -> points |> List.pairwise |> List.map Line |> create
 
+    /// Create a closed subpath connecting the given points with line segments.
+    ///
+    /// The input must contain at least two points. If the last point equals the
+    /// first point, no extra zero-length closing line is added.
+    ///
+    /// This is equivalent to constructing a `Subpath.polyline` from the same points
+    /// and closing it with `Subpath.setClosedWith(..., policy: Bridge)`.
     let polygon points =
         match points with
         | [] | [ _ ] -> Error EmptySubpath
@@ -1743,16 +1815,35 @@ module Subpath =
                 if List.last points = first then points else points @ [ first ]
             polyline closedPoints |> Result.bind (setClosed true)
 
+    /// Create an open polyline subpath from at least two points.
+    ///
+    /// Throws `System.ArgumentException` if fewer than two points are supplied. Points need not be distinct.
+    /// This is the the exception-raising counterpart of counterpart of `Subpath.polyline`, not a coordinate
+    /// validation function.
     let assertPolyline points =
         match polyline points with
         | Ok subpath -> subpath
         | Error _ -> invalidArg (nameof points) "invalid polyline points"
 
+    /// Create a closed polygon subpath from at least two points.
+    ///
+    /// Throws `System.ArgumentException` if fewer than two points are supplied. Points need not be distinct,
+    /// and the polygon need not be simple or have nonzero area. See
+    /// `Subpath.polygon` for closing-edge behavior and errors returned as a Result.
     let assertPolygon points =
         match polygon points with
         | Ok subpath -> subpath
         | Error _ -> invalidArg (nameof points) "invalid polygon points"
 
+    /// Approximate a parametric curve with a sequence of cubic Bezier segments
+    /// using explicit options.
+    ///
+    /// If `options.Tangent` is `Some tangentFunction`, each cubic is constrained
+    /// to match the endpoint tangent directions returned by that function. If it is
+    /// `None`, control points are fitted from samples while the endpoints are fixed.
+    /// The interval restrictions are the same as for `Subpath.fromParametric`.
+    /// Options must satisfy the constraints documented on `ParametricOptions`;
+    /// invalid options, failed fits, and exhausted refinement return errors.
     let fromParametricWith
         (startValue: float<'Param>)
         (endValue: float<'Param>)
@@ -1830,6 +1921,15 @@ module Subpath =
                     interval pieceStart pieceEnd options.MaxDepth |> Result.map (fun pieces -> segments @ pieces))) (Ok [])
             |> Result.bind create
 
+    /// Approximate a parametric curve with a sequence of cubic Bezier segments.
+    ///
+    /// The parameter interval is split uniformly into
+    /// `Subpath.defaultParametricOptions.InitialPieceCount` pieces. Each piece is
+    /// fitted with a cubic, then recursively bisected in parameter space until the
+    /// maximum sampled fitting error is within tolerance.
+    /// `startValue` and `endValue` must be finite and unequal; descending intervals are allowed.
+    /// Otherwise returns `InvalidParametricInterval`. Fitting and construction
+    /// errors propagate; this function does not guarantee a successful fit.
     let fromParametric startValue endValue pointFunction =
         fromParametricWith startValue endValue pointFunction defaultParametricOptions
 
@@ -1843,6 +1943,11 @@ module Subpath =
         | [], first :: _ -> { subpath with startPoint = Segment.start first; segmentList = [ first ] }
         | first :: _, _ -> { subpath with startPoint = Segment.start first; segmentList = cleaned }
 
+    /// Replace a range of segments in a subpath using the given endpoint policy.
+    ///
+    /// Index, deletion, start-point, and closure rules are those of `Subpath.splice`.
+    /// The policy reconciles resulting boundaries; errors from that reconciliation
+    /// propagate, including violations of the `EndpointPolicy` custom contract.
     let spliceWith policy startIndex deleteCount inserted subpath =
         let length = List.length subpath.segmentList
         if startIndex < 0 || deleteCount < 0 || startIndex > length then
@@ -1858,14 +1963,36 @@ module Subpath =
                 |> Result.bind (fun rebuilt ->
                     if subpath.isClosed then setClosedWith policy true rebuilt else Ok rebuilt)
 
+    /// Replace a range of segments in a subpath.
+    ///
+    /// `startIndex` is a zero-based segment index and `deleteCount` is the number of
+    /// segments to remove. If `startIndex + deleteCount` extends past the end of the subpath,
+    /// everything from `startIndex` onward is deleted. Negative `startIndex`, negative
+    /// `deleteCount`, and `startIndex` greater than the subpath length return
+    /// `InvalidSplice`.
+    ///
+    /// The edited subpath must remain continuous. Closed subpaths preserve their
+    /// closed state. If the splice result is nonempty, the subpath start is updated
+    /// to the first resulting segment's start point. If the splice result is empty,
+    /// the previous start point is preserved.
     let splice startIndex deleteCount inserted subpath =
         spliceWith Strict startIndex deleteCount inserted subpath
 
+    /// Replace a range of segments with an endpoint policy.
+    ///
+    /// Throws `System.ArgumentException` on any error from `Subpath.spliceWith`: invalid index/count as
+    /// described by `Subpath.splice`, or failure to reconcile the resulting
+    /// boundaries while preserving the subpath's closed state.
     let assertSpliceWith policy startIndex deleteCount inserted subpath =
         match spliceWith policy startIndex deleteCount inserted subpath with
         | Ok result -> result
         | Error _ -> invalidArg (nameof startIndex) "invalid subpath splice"
 
+    /// Replace a range of segments; the exception-raising counterpart of `Subpath.splice`.
+    ///
+    /// Throws `System.ArgumentException` for a negative `startIndex` or `deleteCount`, a `startIndex` beyond the segment
+    /// count, or a result with discontinuous endpoints (including closure).
+    /// Use `Subpath.splice` to receive errors as a Result.
     let assertSplice startIndex deleteCount inserted subpath =
         assertSpliceWith Strict startIndex deleteCount inserted subpath
 
@@ -1946,6 +2073,11 @@ module Subpath =
     let finish subpath = subpath.segmentList |> List.tryLast |> Option.map Segment.finish |> Option.defaultValue subpath.startPoint
     let ``end`` subpath = finish subpath
 
+    /// Append a segment to an open subpath using the given endpoint policy.
+    ///
+    /// Returns `AlreadyClosed` for a closed source. Otherwise follows
+    /// `Subpath.append`, allowing the policy to reconcile endpoint gaps.
+    /// Reconciliation errors propagate; the original subpath start is preserved.
     let appendWith policy segment subpath =
         if subpath.isClosed then Error AlreadyClosed
         else
@@ -1976,15 +2108,31 @@ module Subpath =
                 |> Result.bind (fun _ -> rebuilt)
                 |> Result.bind (validateFrom subpath.startPoint)
 
+    /// Append a segment to an open subpath.
+    ///
+    /// The new segment must start exactly at the current end point.
     let append segment subpath = appendWith Strict segment subpath
 
+    /// Append a segment with an endpoint policy.
+    ///
+    /// Throws `System.ArgumentException` if the source is closed or endpoint reconciliation returns an error.
+    /// See `Subpath.appendWith` for the Result-returning version.
     let assertAppendWith policy segment subpath =
         match appendWith policy segment subpath with
         | Ok result -> result
         | Error _ -> invalidArg (nameof segment) "invalid appended segment"
 
+    /// Append a segment, the exception-raising counterpart of `Subpath.append`.
+    ///
+    /// Throws `System.ArgumentException` if the source is closed or the new segment's start differs from the
+    /// current end. Use `Subpath.append` to receive errors as a Result.
     let assertAppend segment subpath = assertAppendWith Strict segment subpath
 
+    /// Join open subpaths using the given endpoint policy.
+    ///
+    /// Returns `EmptySubpath` for an empty input list and `AlreadyClosed` if any
+    /// input is closed. Follows `Subpath.join`, except the policy may repair gaps;
+    /// reconciliation errors propagate.
     let joinWith policy subpaths =
         if subpaths |> List.exists isClosed then Error AlreadyClosed
         else
@@ -2000,13 +2148,26 @@ module Subpath =
                             next.segmentList
                             |> List.fold (fun appended segment -> appended |> Result.bind (appendWith policy segment)) (Ok accumulated))) (Ok first))
 
+    /// Join open subpaths into one open subpath.
+    ///
+    /// Each subpath's end point must exactly match the next subpath's start point.
+    /// Empty open subpaths can act as identity values when their start points line
+    /// up with their neighbors.
     let join subpaths = joinWith Strict subpaths
 
+    /// Join open subpaths with an endpoint policy.
+    ///
+    /// Throws `System.ArgumentException` for an empty input list, a closed input subpath, or an error during
+    /// endpoint reconciliation. See `Subpath.joinWith` to receive errors as a Result.
     let assertJoinWith policy subpaths =
         match joinWith policy subpaths with
         | Ok result -> result
         | Error _ -> invalidArg (nameof subpaths) "invalid subpaths"
 
+    /// Join open subpaths, the exception-raising counterpart of `Subpath.join`.
+    ///
+    /// Throws `System.ArgumentException` for an empty input list, a closed input subpath, or endpoint gaps
+    /// that prevent continuous reconstruction. Use `Subpath.join` to handle errors.
     let assertJoin subpaths = assertJoinWith Strict subpaths
     let boundingBox subpath =
         match subpath.segmentList with

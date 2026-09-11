@@ -37,8 +37,15 @@ module BasicShapes =
         elif ry < 0.0<length> then Error(InvalidRectRadiusY ry)
         else Ok(min rx (width / 2.0), min ry (height / 2.0))
 
-    /// If either effective corner radius is zero, the rectangle is unrounded
-    /// and starts at (x,y), rather than (x+rx,y).
+    /// Convert an SVG `BasicShapes.rect` element to a subpath.
+    ///
+    /// The equivalent path starts at `(x + rx, y)` and proceeds clockwise. If only
+    /// one corner radius is present, the missing radius uses the same value. Radii
+    /// are clamped so they are no greater than half the rectangle extent. If either
+    /// effective radius is zero, the rectangle is unrounded and starts at `(x, y)`.
+    /// Negative dimensions or supplied corner radii return their corresponding
+    /// `InvalidRect*` error. Zero width or height returns `DisabledRendering`,
+    /// not an empty subpath.
     let rect
         (x: float<length>)
         (y: float<length>)
@@ -72,6 +79,12 @@ module BasicShapes =
                       Line(Point.create x y2, startPoint) ]
                     |> closed)
 
+    /// Convert an SVG `BasicShapes.ellipse` element to a subpath.
+    ///
+    /// The equivalent path starts at the 3 o'clock point and uses four quarter-arc
+    /// segments.
+    /// Negative radii return `InvalidEllipseRadiusX` or `InvalidEllipseRadiusY`.
+    /// Either radius being zero returns `DisabledRendering`, not an empty subpath.
     let ellipse cx cy rx ry =
         if rx < 0.0<length> then Error(InvalidEllipseRadiusX rx)
         elif ry < 0.0<length> then Error(InvalidEllipseRadiusY ry)
@@ -85,6 +98,12 @@ module BasicShapes =
               Arc { Start = Point.create cx (cy - ry); Radius = radius; XAxisRotation = degrees 0.0; LargeArc = false; Sweep = true; End = startPoint } ]
             |> closed
 
+    /// Convert an SVG `BasicShapes.circle` element to a subpath.
+    ///
+    /// The equivalent path starts at the 3 o'clock point and uses four quarter-arc
+    /// segments.
+    /// A negative radius returns `InvalidCircleRadius`; zero returns
+    /// `DisabledRendering`, not an empty subpath.
     let circle cx cy radius =
         if radius < 0.0<length> then Error(InvalidCircleRadius radius)
         elif InternalNumber.isZero radius then Error DisabledRendering

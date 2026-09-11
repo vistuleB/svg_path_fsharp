@@ -131,6 +131,12 @@ module Transform =
     let skewXSegment input degrees = segment input (skewX degrees)
     let skewYSegment input degrees = segment input (skewY degrees)
 
+    /// Transform a segment, allowing a collapsed arc to become one line segment.
+    ///
+    /// This returns a single segment. If a collapsed arc needs multiple line
+    /// segments to preserve its motion, use `Transform.segmentToSubpathWithArcCollapse`.
+    /// Such a multi-line collapse returns `DegenerateArcTransform` here. Errors
+    /// from matrix validation or source arc conversion are not suppressed.
     let segmentWithArcCollapse input transform =
         match segment input transform with
         | Ok transformed -> Ok transformed
@@ -148,6 +154,11 @@ module Transform =
     let private linesBetween points =
         points |> List.pairwise |> List.map Line
 
+    /// Transform a segment, representing collapsed arcs with line segments.
+    ///
+    /// This can represent collapsed arcs as multiple line segments when needed.
+    /// Matrix validation, source arc conversion, and subpath construction errors
+    /// still propagate.
     let segmentToSubpathWithArcCollapse input transform =
         match segment input transform with
         | Ok transformed ->
@@ -194,9 +205,13 @@ module Transform =
             (fun segmentValue transform -> segment segmentValue transform |> Result.map List.singleton)
             input transform
 
-    /// Collapsed arcs retain directly transformed endpoints for continuity.
-    /// Reconstruction uses strict matching; semantically closed subpaths
-    /// alone have a final closure wiggle fallback.
+    /// Transform a subpath, replacing collapsed arcs with line segments.
+    ///
+    /// Collapsed arcs retain their directly transformed endpoints so neighboring
+    /// segments remain continuous. Reconstruction uses strict endpoint matching;
+    /// only closing a semantically closed subpath has a final wiggle fallback.
+    /// Matrix validation, source arc conversion, and reconstruction errors still
+    /// propagate; allowing arc collapse does not guarantee success.
     let subpathWithArcCollapse input transform =
         transformSubpathWith
             (fun segmentValue transform ->
@@ -230,6 +245,9 @@ module Transform =
         |> Result.map (List.rev >> Path.ofSubpaths)
 
     let path input transform = transformPathWith subpath input transform
+    /// Transform every subpath in a path, replacing collapsed arcs with lines.
+    ///
+    /// This is the path-level counterpart of `Transform.subpathWithArcCollapse`.
     let pathWithArcCollapse input transform = transformPathWith subpathWithArcCollapse input transform
     let pathAboutPoint input transform center = path input (aboutPoint transform center)
 

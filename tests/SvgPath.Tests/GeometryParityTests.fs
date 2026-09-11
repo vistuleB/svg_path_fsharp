@@ -7,6 +7,20 @@ let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private line ax ay bx by = Line(point ax ay, point bx by)
 let private ratio value = Parameter.ratio value
 
+// Gleam svg_path_geometry_test: segment_linearize_if_degenerate_rejects_negative_tolerance_test.
+[<Fact>]
+let ``segment conditional linearization rejects negative tolerance`` () =
+    Assert.Equal(
+        Error(Degeneracy.DegeneracyInvalidTolerance -1.0<length>),
+        Degeneracy.segmentLinearizeIfDegenerate (line 0.0 0.0 1.0 0.0) -1.0<length>)
+
+// Gleam svg_path_geometry_test: subpath_linearize_if_degenerate_rejects_negative_tolerance_test.
+[<Fact>]
+let ``subpath conditional linearization rejects negative tolerance`` () =
+    Assert.Equal(
+        Error(Degeneracy.DegeneracyInvalidTolerance -1.0<length>),
+        Degeneracy.subpathLinearizeIfDegenerate (Subpath.empty (point 0.0 0.0)) -1.0<length>)
+
 [<Fact>]
 let ``segment segment projection reports crossing line pair`` () =
     let found = Intersections.segmentSegmentClosestPair (line 0.0 0.0 3.0 3.0) (line 1.0 0.0 1.0 3.0) |> Result.defaultWith (failwithf "%A")
@@ -73,35 +87,35 @@ let ``path path projection reports nearest subpaths`` () =
 
 [<Fact>]
 let ``segment degenerate lines preserves quadratic backtracking`` () =
-    let found = Segment.linearizeIfDegenerate (QuadraticBezier(point 0.0 0.0, point 10.0 0.0, point 0.0 0.0)) 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
+    let found = Degeneracy.segmentLinearizeIfDegenerate (QuadraticBezier(point 0.0 0.0, point 10.0 0.0, point 0.0 0.0)) 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
     Assert.Equal(2, found.Length)
     Assert.All(found, fun segment -> Assert.True(match segment with Line _ -> true | _ -> false))
 
 [<Fact>]
 let ``segment degenerate lines preserves cubic backtracking`` () =
-    let found = Segment.linearizeIfDegenerate (CubicBezier(point 0.0 0.0, point 10.0 0.0, point -10.0 0.0, point 0.0 0.0)) 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
+    let found = Degeneracy.segmentLinearizeIfDegenerate (CubicBezier(point 0.0 0.0, point 10.0 0.0, point -10.0 0.0, point 0.0 0.0)) 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
     Assert.Equal(3, found.Length)
 
 [<Fact>]
 let ``segment degenerate lines converts zero radius arc`` () =
     let arc = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
-    Assert.Equal(Some [ line 0.0 0.0 10.0 0.0 ], Segment.linearizeIfDegenerate arc 0.001<length> |> Result.defaultWith (failwithf "%A"))
+    Assert.Equal(Some [ line 0.0 0.0 10.0 0.0 ], Degeneracy.segmentLinearizeIfDegenerate arc 0.001<length> |> Result.defaultWith (failwithf "%A"))
 
 [<Fact>]
 let ``segment degenerate lines rejects wide curve`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 5.0 2.0, point 10.0 0.0)
-    Assert.Equal(Ok None, Segment.linearizeIfDegenerate curve 0.001<length>)
+    Assert.Equal(Ok None, Degeneracy.segmentLinearizeIfDegenerate curve 0.001<length>)
 
 [<Fact>]
 let ``subpath degenerate lines uses one strip for all segments`` () =
     let source = Subpath.create [ QuadraticBezier(point 0.0 0.0, point 10.0 0.0, point 0.0 0.0); line 0.0 0.0 -10.0 0.0 ] |> Result.defaultWith (failwithf "%A")
-    let found = Subpath.linearizeIfDegenerate source 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
+    let found = Degeneracy.subpathLinearizeIfDegenerate source 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
     Assert.Equal(3, found.Length)
 
 [<Fact>]
 let ``subpath degenerate lines rejects bent subpath`` () =
     let source = Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 10.0 ] |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok None, Subpath.linearizeIfDegenerate source 0.001<length>)
+    Assert.Equal(Ok None, Degeneracy.subpathLinearizeIfDegenerate source 0.001<length>)
 
 [<Fact>]
 let ``parametric subpath fits simple parabola`` () =

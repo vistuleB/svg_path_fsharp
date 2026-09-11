@@ -46,7 +46,7 @@ let ``negative zero length returns exact start parameter`` () =
 let ``negative zero radius degenerates to line`` () =
     let start,finish = p 1. 1.,p 2. 2.
     let arc = Arc ({ Start=start; Radius=p -0. 1.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }: Ellipse.EndpointArcData)
-    Assert.Equal(Ok(Some [Line(start,finish)]),Segment.linearizeIfDegenerate arc 0.0<length>)
+    Assert.Equal(Ok(Some [Line(start,finish)]),Degeneracy.segmentLinearizeIfDegenerate arc 0.0<length>)
 
 [<Fact>]
 let ``negative zero endpoint has forward offset unit tangent`` () =

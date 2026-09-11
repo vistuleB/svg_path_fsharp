@@ -512,6 +512,14 @@ axis-aligned bounds. Line, Bezier, and arc extrema are included. Measure a box
 with `BoundingBox.width`, `BoundingBox.height`, `BoundingBox.center`, and
 `BoundingBox.taxicabDiameter`; the diameter is width plus height.
 
+### Conditional Linearization
+
+For conditional line replacement, use
+`Degeneracy.segmentLinearizeIfDegenerate` or
+`Degeneracy.subpathLinearizeIfDegenerate`. They return `Ok None` when the
+geometry is not line-degenerate, or `Ok (Some lines)` for its line replacement,
+preserving backtracking. Errors use `Degeneracy.Error`.
+
 ### Optimization Over Segments
 
 Use `Segment.minimize` to find the segment parameter where a scalar function of

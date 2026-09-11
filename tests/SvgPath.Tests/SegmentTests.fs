@@ -210,7 +210,7 @@ let ``segment crossings and minimization match scalar sampling contracts`` () =
 [<Fact>]
 let ``degenerate cubic preserves collinear backtracking`` () =
     let segment = CubicBezier(point 0.0 0.0, point 3.0 0.0, point -2.0 0.0, point 1.0 0.0)
-    let replacement = Segment.linearizeIfDegenerate segment 1.0e-9<length> |> Result.defaultWith (failwithf "%A")
+    let replacement = Degeneracy.segmentLinearizeIfDegenerate segment 1.0e-9<length> |> Result.defaultWith (failwithf "%A")
     match replacement with
     | Some lines ->
         Assert.True(List.length lines >= 2)

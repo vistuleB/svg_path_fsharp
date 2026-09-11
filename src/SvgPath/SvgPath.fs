@@ -1498,78 +1498,6 @@ module Segment =
 
     let toLines segment = toLinesWith defaultLinearizeOptions segment
 
-    /// Replace a line-degenerate segment by its ordered line traversal.
-    /// The tolerance must be finite and non-negative; a tolerance of 0.0 collapses
-    /// the segment only when it lies exactly on a line strip of width zero.
-    let linearizeIfDegenerate segment tolerance =
-        let finiteNonNegative = tolerance >= 0.0<length> && System.Double.IsFinite(float tolerance)
-        let farthest points origin =
-            points |> List.fold (fun best point -> if Point.squaredDistance point origin > Point.squaredDistance best origin then point else best) origin
-        let axisFor points =
-            match points with
-            | [] -> None
-            | origin :: _ ->
-                let farthestPoint = farthest points origin
-                if Point.squaredDistance farthestPoint origin <= tolerance * tolerance then None
-                else Some(origin, Point.displacement origin farthestPoint)
-        let inStrip points origin axis =
-            let axisLength = Point.norm axis
-            points |> List.forall (fun point -> abs (Point.cross (Point.displacement origin point) axis) / axisLength <= tolerance)
-        let coordinate point origin axis =
-            let denominator = Point.squaredNorm axis
-            if denominator = 0.0<length^2> then 0.0
-            else float (Point.dot (Point.displacement origin point) axis / denominator)
-        let pieces at =
-            at
-            |> List.pairwise
-            |> List.fold (fun state (fromParameter, toParameter) ->
-                state
-                |> Result.bind (fun lines ->
-                    point segment (Parameter.fromFloat fromParameter)
-                    |> Result.bind (fun startPoint ->
-                        point segment (Parameter.fromFloat toParameter)
-                        |> Result.map (fun endPoint -> Line(startPoint, endPoint) :: lines)))) (Ok [])
-            |> Result.map (List.rev >> List.filter (fun line -> start line <> finish line))
-        let bezierResult definingPoints breaks =
-            match axisFor definingPoints with
-            | Some(origin, axis) when inStrip definingPoints origin axis -> pieces (0.0 :: breaks @ [ 1.0 ]) |> Result.map Some
-            | None -> Ok None
-            | _ -> Ok None
-        if not finiteNonNegative then Error(InvalidLinearizeTolerance tolerance)
-        else
-            match segment with
-            | Line _ -> Ok None
-            | QuadraticBezier(startPoint, control, endPoint) ->
-                let points = [ startPoint; control; endPoint ]
-                let origin = startPoint
-                let axis = Point.displacement origin (farthest points origin)
-                let s, c, e = coordinate startPoint origin axis, coordinate control origin axis, coordinate endPoint origin axis
-                let denominator = s - 2.0 * c + e
-                let breaks = if InternalNumber.isZero denominator then [] else [ (s - c) / denominator ] |> List.filter (fun t -> t > 0.0 && t < 1.0)
-                bezierResult points breaks
-            | CubicBezier(startPoint, control1, control2, endPoint) ->
-                let points = [ startPoint; control1; control2; endPoint ]
-                let origin = startPoint
-                let axis = Point.displacement origin (farthest points origin)
-                let s = coordinate startPoint origin axis
-                let c1 = coordinate control1 origin axis
-                let c2 = coordinate control2 origin axis
-                let e = coordinate endPoint origin axis
-                let a = -s + 3.0*c1 - 3.0*c2 + e
-                let b = 3.0*s - 6.0*c1 + 3.0*c2
-                let c = 3.0*c1 - 3.0*s
-                let breaks = Root.strictlyInside (Root.parameterQuadratic (3.0*a) (2.0*b) c) 0.0<parameter> 1.0<parameter> |> List.map Parameter.ratio
-                bezierResult points breaks
-            | Arc endpoint when InternalNumber.isZero endpoint.Radius.X || InternalNumber.isZero endpoint.Radius.Y ->
-                if endpoint.Start = endpoint.End then Ok(Some []) else Ok(Some [ Line(endpoint.Start, endpoint.End) ])
-            | Arc _ ->
-                toLinesWith { Tolerance = tolerance; MaxDepth = defaultLinearizeOptions.MaxDepth } segment
-                |> Result.map (fun lines ->
-                    let points = lines |> List.collect (fun line -> [ start line; finish line ])
-                    match axisFor points with
-                    | None -> Some []
-                    | Some(origin, axis) when inStrip points origin axis -> Some(List.filter (fun line -> start line <> finish line) lines)
-                    | _ -> None)
 
 [<RequireQualifiedAccess>]
 /// Construction, editing, measurement, and evaluation of continuous subpaths.
@@ -2012,42 +1940,6 @@ module Subpath =
 
     let toCubicBeziers subpath =
         { subpath with segmentList = subpath.segmentList |> List.collect Segment.toCubicBeziers }
-
-    /// Replace line-degenerate segments in a subpath with an ordered line traversal.
-    /// The tolerance must be finite and non-negative; a tolerance of 0.0 collapses
-    /// only exactly zero-width strips.
-    let linearizeIfDegenerate subpath tolerance =
-        if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
-            Error(InvalidLinearizeTolerance tolerance)
-        else
-            subpath.segmentList
-            |> List.fold (fun state segment ->
-                state
-                |> Result.bind (fun accumulated ->
-                    match accumulated with
-                    | None -> Ok None
-                    | Some accumulated ->
-                        Segment.linearizeIfDegenerate segment tolerance
-                        |> Result.map (fun replacement ->
-                            match segment, replacement with
-                            | Line _, None -> Some(accumulated @ [ segment ])
-                            | _, Some lines -> Some(accumulated @ lines)
-                            | _ -> None))) (Ok(Some []))
-            |> Result.map (fun replacements ->
-                match replacements with
-                | None -> None
-                | Some lines ->
-                    let points = lines |> List.collect (fun line -> [ Segment.start line; Segment.finish line ])
-                    match points with
-                    | [] -> Some []
-                    | origin :: _ ->
-                        let farthest = points |> List.maxBy (fun point -> Point.squaredDistance point origin)
-                        let axis = Point.displacement origin farthest
-                        let axisLength = Point.norm axis
-                        if axisLength = 0.0<length> then Some []
-                        elif points |> List.forall (fun point -> abs (Point.cross (Point.displacement origin point) axis) / axisLength <= tolerance) then
-                            Some(List.filter (fun line -> Segment.start line <> Segment.finish line) lines)
-                        else None)
 
     let segments subpath = subpath.segmentList
     let start subpath = subpath.startPoint

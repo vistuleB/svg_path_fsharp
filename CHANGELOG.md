@@ -113,7 +113,7 @@
   (`scripts/test-slow`), with `scripts/test-release` as the canonical
   pre-release verification (fast then slow profiles).
 - Document the release and asset-tag workflow (`RELEASING.md`,
-  `COMMIT_CYCLE.md`).
+  `WORKFLOW.md`).
 
 ## 0.1.0
 

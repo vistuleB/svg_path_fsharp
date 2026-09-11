@@ -1,11 +1,49 @@
-# Commit Cycle
+# Contributor Workflow
 
-This file describes the intended workflow for generated README figures and the
-release asset branch during normal feature work and release prep.
+This file describes coding conventions, verification, generated figures, and
+release preparation for contributors, whether working manually or with an agent.
+
+## Public Type Ownership
+
+- Follow Gleam's module qualification for operation-specific public types:
+  `Offset.Error`, `Stroke.Options`, `Arrangement.Error`, etc. Declare these
+  types inside their owning F# module, rather than as namespace-wide prefixed
+  types or generic root-level `Error` / `Options`.
+- Keep shared foundational geometry and core path types in the `SvgPath`
+  namespace. Do not add compatibility aliases for the removed operation names.
+
+## Error Payload Style
+
+- Name every error-union payload field, including single fields. Match the
+  corresponding Gleam payload meaning and preserve F# units of measure.
+- Labels describe the carried value: for example, `divergence`, not `depth`,
+  when reporting fitting error remaining at a recursion limit.
+
+## Test Profiles And Reporting
+
+- `scripts/test-fast`: all tests except the slow convex-hull suite.
+- `scripts/test-slow`: convex-hull stress tests only.
+- `scripts/test-all`: both profiles.
+- `scripts/test-release`: canonical pre-release verification, including both
+  profiles; fast tests alone do not verify a release.
+
+In review notes and reports, record the exact completed command and test count.
+Reserve claims that the full suite passes for a successful `scripts/test-all`
+or `scripts/test-release` run in the current worktree.
+
+## Figure Layout
+
+- Use `xml`, not `svg`, as the Markdown code-fence language for SVG examples.
+- When comparing opposite orientations, keep each direction arrow at the same
+  visual location and only reverse its direction.
+- Compute each panel's actual geometry bounds and recenter the geometry in its
+  panel rather than relying on hand-tuned translations when practical.
+
+## Relationship To The Gleam Project
 
 This `svg_path_fsharp` project is a port of the neighboring Gleam
 [`svg_path`](https://github.com/vistuleB/svg_path) package. The release and
-asset workflow here mirrors that project's `COMMIT_CYCLE.md`; where the master
+asset workflow here mirrors that project's `WORKFLOW.md`; where the master
 copies of scripts live in the Gleam project, this file notes them so the two
 projects can be kept in step as the workflow evolves.
 

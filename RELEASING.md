@@ -1,7 +1,7 @@
 # Releasing
 
 This checklist supplements the figure and asset-tag workflow in
-`COMMIT_CYCLE.md`.
+`WORKFLOW.md`.
 
 The master copy of this release sequence lives in the neighboring Gleam
 [`svg_path`](https://github.com/vistuleB/svg_path) project
@@ -32,10 +32,10 @@ here, `gleam` there).
    This should print nothing and exit zero.
 
 4. Confirm the `markdown-assets` worktree holds the final README-facing SVGs for
-   this release before tagging them (see `COMMIT_CYCLE.md`).
+   this release before tagging them (see `WORKFLOW.md`).
 
 5. Complete the README figure, changelog, version, asset-tag, release-tag, and
-   publication steps in `COMMIT_CYCLE.md`.
+   publication steps in `WORKFLOW.md`.
 
 ## Version and package metadata
 

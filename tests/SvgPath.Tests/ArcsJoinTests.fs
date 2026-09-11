@@ -63,7 +63,7 @@ let ``arcs_asymmetric_clipping_uses_auxiliary_arc_length_test`` () =
     let parts=pair (Some 10.0) (Some 5.0) 10.0
     Assert.Equal(2,parts.Length)
     let tip=Segment.finish parts[0]
-    let r=Point.dot tip tip/(2.0*Point.dot tip (Point.rotateCounterclockwise axis))
+    let r=Point.dot tip tip/(2.0*Point.dot tip (Point.rotate90Counterclockwise axis))
     let helper=Arc ({Start=p 0.0 0.0;Radius=Point.create (abs r) (abs r);XAxisRotation=0.0<degree>;LargeArc=false;Sweep=r<0.0<length>;End=tip}: Ellipse.EndpointArcData)
     let length=Segment.length helper |> ok
     let t=Parameter.fromFloat (1.2<length>/length)

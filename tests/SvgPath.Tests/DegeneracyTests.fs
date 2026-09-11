@@ -174,7 +174,7 @@ let ``longest thin prefix can be empty`` () =
 let ``incremental convex hull retains a degenerate curve`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 5.0 0.0, point 0.0 0.0)
     let vertical = Line(point 0.0 0.0, point 0.0 10.0)
-    let hull = ConvexHull.segmentHull curve |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.segment curve |> Result.defaultWith (failwithf "%A")
     let combined, _ =
         ConvexHull.internalConvexSubpathAddSegmentAndTestWidth hull vertical 0.001<length>
         |> Result.defaultWith (failwithf "%A")

@@ -79,7 +79,7 @@ let ``fill rules differ for a twice traced loop`` () =
     let traced = polyline (loop @ [ List.head loop ] @ loop)
     Assert.Equal(Ok 100.0<length^2>, Area.subpath traced Nonzero)
     Assert.Equal(Ok 0.0<length^2>, Area.subpath traced EvenOdd)
-    Assert.Equal(Ok 200.0<length^2>, Area.absoluteSubpath traced)
+    Assert.Equal(Ok 200.0<length^2>, Area.absoluteWindingSubpath traced)
     Assert.Equal(200.0<length^2>, Area.signedSubpath traced)
 
 [<Fact>]
@@ -88,7 +88,7 @@ let ``self intersecting bow tie has filled but no signed area`` () =
     Assert.Equal(0.0<length^2>, Area.signedSubpath bowTie)
     Assert.Equal(Ok 50.0<length^2>, Area.subpath bowTie Nonzero)
     Assert.Equal(Ok 50.0<length^2>, Area.subpath bowTie EvenOdd)
-    Assert.Equal(Ok 50.0<length^2>, Area.absoluteSubpath bowTie)
+    Assert.Equal(Ok 50.0<length^2>, Area.absoluteWindingSubpath bowTie)
 
 [<Fact>]
 let ``path fill area combines subpaths by fill rule`` () =
@@ -98,10 +98,10 @@ let ``path fill area combines subpaths by fill rule`` () =
     let opposite = Path.ofSubpaths [ outer; polyline (List.rev (square 5.0 5.0 10.0)) ]
     Assert.Equal(Ok 400.0<length^2>, Area.path same Nonzero)
     Assert.Equal(Ok 300.0<length^2>, Area.path same EvenOdd)
-    Assert.Equal(Ok 500.0<length^2>, Area.absolutePath same)
+    Assert.Equal(Ok 500.0<length^2>, Area.absoluteWindingPath same)
     Assert.Equal(Ok 300.0<length^2>, Area.path opposite Nonzero)
     Assert.Equal(Ok 300.0<length^2>, Area.path opposite EvenOdd)
-    Assert.Equal(Ok 300.0<length^2>, Area.absolutePath opposite)
+    Assert.Equal(Ok 300.0<length^2>, Area.absoluteWindingPath opposite)
 
 [<Fact>]
 let ``path fill area cancels overlapping opposite loops`` () =
@@ -111,7 +111,7 @@ let ``path fill area cancels overlapping opposite loops`` () =
     Assert.Equal(Ok 0.0<length^2>, Area.path path Nonzero)
     Assert.Equal(Ok 0.0<length^2>, Area.path path EvenOdd)
     Assert.Equal(0.0<length^2>, Area.signedPath path)
-    Assert.Equal(Ok 0.0<length^2>, Area.absolutePath path)
+    Assert.Equal(Ok 0.0<length^2>, Area.absoluteWindingPath path)
 
 [<Fact>]
 let ``absolute path counts overlapping winding magnitude`` () =
@@ -121,7 +121,7 @@ let ``absolute path counts overlapping winding magnitude`` () =
     Assert.Equal(Ok 400.0<length^2>, Area.path path Nonzero)
     Assert.Equal(Ok 300.0<length^2>, Area.path path EvenOdd)
     Assert.Equal(500.0<length^2>, Area.signedPath path)
-    Assert.Equal(Ok 500.0<length^2>, Area.absolutePath path)
+    Assert.Equal(Ok 500.0<length^2>, Area.absoluteWindingPath path)
 
 [<Fact>]
 let ``subpath clockwiseness reports area orientation`` () =
@@ -156,7 +156,7 @@ let ``move only paths have zero area`` () =
     Assert.Equal(0.0<length^2>, Area.signedPath path)
     Assert.Equal(Ok 0.0<length^2>, Area.path path Nonzero)
     Assert.Equal(Ok 0.0<length^2>, Area.path path EvenOdd)
-    Assert.Equal(Ok 0.0<length^2>, Area.absolutePath path)
+    Assert.Equal(Ok 0.0<length^2>, Area.absoluteWindingPath path)
 
 [<Fact>]
 let ``curved fill area uses linearization options`` () =
@@ -170,4 +170,4 @@ let ``fill area rejects invalid linearization options`` () =
     let subpath = polyline (square 0.0 0.0 10.0)
     let options = { Tolerance = 0.0<length>; MaxDepth = 20 }
     Assert.Equal(Error(InvalidLinearizeTolerance 0.0<length>), Area.subpathWith subpath Nonzero options)
-    Assert.Equal(Error(InvalidLinearizeTolerance 0.0<length>), Area.absoluteSubpathWith subpath options)
+    Assert.Equal(Error(InvalidLinearizeTolerance 0.0<length>), Area.absoluteWindingSubpathWith subpath options)

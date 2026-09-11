@@ -9,7 +9,7 @@ let private ratio value = Parameter.ratio value
 
 [<Fact>]
 let ``segment segment projection reports crossing line pair`` () =
-    let found = Intersections.segmentSegmentProjection (line 0.0 0.0 3.0 3.0) (line 1.0 0.0 1.0 3.0) |> Result.defaultWith (failwithf "%A")
+    let found = Intersections.segmentSegmentClosestPair (line 0.0 0.0 3.0 3.0) (line 1.0 0.0 1.0 3.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1.0 / 3.0, ratio found.LeftT, 6)
     Assert.Equal(1.0 / 3.0, ratio found.RightT, 6)
     Assert.True(found.Distance < 1.0e-6<length>)
@@ -18,7 +18,7 @@ let ``segment segment projection reports crossing line pair`` () =
 
 [<Fact>]
 let ``segment segment projection reports separated line pair`` () =
-    let found = Intersections.segmentSegmentProjection (line 0.0 0.0 1.0 0.0) (line 0.0 2.0 1.0 2.0) |> Result.defaultWith (failwithf "%A")
+    let found = Intersections.segmentSegmentClosestPair (line 0.0 0.0 1.0 0.0) (line 0.0 2.0 1.0 2.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
     Assert.Equal(Length.toFloat found.LeftPoint.X, Length.toFloat found.RightPoint.X, 6)
     Assert.Equal(0.0, Length.toFloat found.LeftPoint.Y, 6)
@@ -26,14 +26,14 @@ let ``segment segment projection reports separated line pair`` () =
 
 [<Fact>]
 let ``segment segment projection reports overlapping line pair`` () =
-    let found = Intersections.segmentSegmentProjection (line 0.0 0.0 3.0 0.0) (line 1.0 0.0 2.0 0.0) |> Result.defaultWith (failwithf "%A")
+    let found = Intersections.segmentSegmentClosestPair (line 0.0 0.0 3.0 0.0) (line 1.0 0.0 2.0 0.0) |> Result.defaultWith (failwithf "%A")
     Assert.True(found.Distance < 1.0e-6<length>)
     Assert.True(Point.distance found.LeftPoint found.RightPoint < 1.0e-6<length>)
 
 [<Fact>]
 let ``segment subpath projection reports nearest segment`` () =
     let right = Subpath.create [ line 0.0 3.0 1.0 3.0; line 1.0 3.0 1.0 2.0 ] |> Result.defaultWith (failwithf "%A")
-    let found = Intersections.segmentSubpathProjection (line 0.0 0.0 1.0 0.0) right |> Result.defaultWith (failwithf "%A")
+    let found = Intersections.segmentSubpathClosestPair (line 0.0 0.0 1.0 0.0) right |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, found.RightAt.SegmentIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
 
@@ -41,7 +41,7 @@ let ``segment subpath projection reports nearest segment`` () =
 let ``segment path projection reports nearest subpath`` () =
     let far = Subpath.ofSegment (line 0.0 5.0 1.0 5.0)
     let near = Subpath.ofSegment (line 0.0 2.0 1.0 2.0)
-    let found = Intersections.segmentPathProjection (line 0.0 0.0 1.0 0.0) (Path.ofSubpaths [ far; near ]) |> Result.defaultWith (failwithf "%A")
+    let found = Intersections.segmentPathClosestPair (line 0.0 0.0 1.0 0.0) (Path.ofSubpaths [ far; near ]) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, found.RightAt.SubpathIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
 
@@ -49,7 +49,7 @@ let ``segment path projection reports nearest subpath`` () =
 let ``subpath subpath projection reports nearest segments`` () =
     let left = Subpath.create [ line 0.0 0.0 1.0 0.0; line 1.0 0.0 2.0 0.0 ] |> Result.defaultWith (failwithf "%A")
     let right = Subpath.create [ line 0.0 4.0 1.0 4.0; line 1.0 4.0 1.0 2.0 ] |> Result.defaultWith (failwithf "%A")
-    let found = Intersections.subpathSubpathProjection left right |> Result.defaultWith (failwithf "%A")
+    let found = Intersections.subpathSubpathClosestPair left right |> Result.defaultWith (failwithf "%A")
     Assert.True(found.LeftAt.SegmentIndex = 0 || found.LeftAt.SegmentIndex = 1)
     Assert.Equal(1, found.RightAt.SegmentIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
@@ -59,7 +59,7 @@ let ``subpath path projection reports nearest subpath`` () =
     let left = Subpath.ofSegment (line 0.0 0.0 1.0 0.0)
     let far = Subpath.ofSegment (line 0.0 5.0 1.0 5.0)
     let near = Subpath.ofSegment (line 0.0 2.0 1.0 2.0)
-    let found = Intersections.subpathPathProjection left (Path.ofSubpaths [ far; near ]) |> Result.defaultWith (failwithf "%A")
+    let found = Intersections.subpathPathClosestPair left (Path.ofSubpaths [ far; near ]) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, found.RightAt.SubpathIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
 
@@ -67,45 +67,45 @@ let ``subpath path projection reports nearest subpath`` () =
 let ``path path projection reports nearest subpaths`` () =
     let left = Path.singleton (Subpath.ofSegment (line 0.0 0.0 1.0 0.0))
     let right = Path.ofSubpaths [ Subpath.ofSegment (line 0.0 5.0 1.0 5.0); Subpath.ofSegment (line 0.0 2.0 1.0 2.0) ]
-    let found = Intersections.pathPathProjection left right |> Result.defaultWith (failwithf "%A")
+    let found = Intersections.pathPathClosestPair left right |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, found.RightAt.SubpathIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
 
 [<Fact>]
 let ``segment degenerate lines preserves quadratic backtracking`` () =
-    let found = Segment.degenerateLines (QuadraticBezier(point 0.0 0.0, point 10.0 0.0, point 0.0 0.0)) 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
+    let found = Segment.linearizeIfDegenerate (QuadraticBezier(point 0.0 0.0, point 10.0 0.0, point 0.0 0.0)) 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
     Assert.Equal(2, found.Length)
     Assert.All(found, fun segment -> Assert.True(match segment with Line _ -> true | _ -> false))
 
 [<Fact>]
 let ``segment degenerate lines preserves cubic backtracking`` () =
-    let found = Segment.degenerateLines (CubicBezier(point 0.0 0.0, point 10.0 0.0, point -10.0 0.0, point 0.0 0.0)) 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
+    let found = Segment.linearizeIfDegenerate (CubicBezier(point 0.0 0.0, point 10.0 0.0, point -10.0 0.0, point 0.0 0.0)) 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
     Assert.Equal(3, found.Length)
 
 [<Fact>]
 let ``segment degenerate lines converts zero radius arc`` () =
     let arc = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
-    Assert.Equal(Some [ line 0.0 0.0 10.0 0.0 ], Segment.degenerateLines arc 0.001<length> |> Result.defaultWith (failwithf "%A"))
+    Assert.Equal(Some [ line 0.0 0.0 10.0 0.0 ], Segment.linearizeIfDegenerate arc 0.001<length> |> Result.defaultWith (failwithf "%A"))
 
 [<Fact>]
 let ``segment degenerate lines rejects wide curve`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 5.0 2.0, point 10.0 0.0)
-    Assert.Equal(Ok None, Segment.degenerateLines curve 0.001<length>)
+    Assert.Equal(Ok None, Segment.linearizeIfDegenerate curve 0.001<length>)
 
 [<Fact>]
 let ``subpath degenerate lines uses one strip for all segments`` () =
     let source = Subpath.create [ QuadraticBezier(point 0.0 0.0, point 10.0 0.0, point 0.0 0.0); line 0.0 0.0 -10.0 0.0 ] |> Result.defaultWith (failwithf "%A")
-    let found = Subpath.degenerateLines source 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
+    let found = Subpath.linearizeIfDegenerate source 0.001<length> |> Result.defaultWith (failwithf "%A") |> Option.get
     Assert.Equal(3, found.Length)
 
 [<Fact>]
 let ``subpath degenerate lines rejects bent subpath`` () =
     let source = Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 10.0 ] |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok None, Subpath.degenerateLines source 0.001<length>)
+    Assert.Equal(Ok None, Subpath.linearizeIfDegenerate source 0.001<length>)
 
 [<Fact>]
 let ``parametric subpath fits simple parabola`` () =
-    let source = Subpath.parametric 0.0 1.0 (fun t -> point t (t * t)) |> Result.defaultWith (failwithf "%A")
+    let source = Subpath.fromParametric 0.0 1.0 (fun t -> point t (t * t)) |> Result.defaultWith (failwithf "%A")
     let segment = Assert.Single(source.Segments)
     let sample = Segment.point segment 0.5<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> sample (point 0.5 0.25))
@@ -113,7 +113,7 @@ let ``parametric subpath fits simple parabola`` () =
 [<Fact>]
 let ``parametric subpath uses optional tangents`` () =
     let options = { Subpath.defaultParametricOptions with Tolerance = 1.0e-9<length>; Tangent = Some(fun _ -> point 1.0 1.0) }
-    let source = Subpath.parametricWith 2.0 6.0 (fun t -> point t t) options |> Result.defaultWith (failwithf "%A")
+    let source = Subpath.fromParametricWith 2.0 6.0 (fun t -> point t t) options |> Result.defaultWith (failwithf "%A")
     let segment = Assert.Single(source.Segments)
     let sample = Segment.point segment 0.25<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> sample (point 3.0 3.0))
@@ -128,7 +128,7 @@ let ``parametric subpath preserves caller parameter units`` () =
             Tolerance = 1.0e-9<length>
             Tangent = Some(fun _ -> Point.create 1.0<length / sourceParameter> 1.0<length / sourceParameter>) }
     let source =
-        Subpath.parametricWith
+        Subpath.fromParametricWith
             2.0<sourceParameter>
             6.0<sourceParameter>
             (fun t -> point (float t) (float t))
@@ -139,15 +139,15 @@ let ``parametric subpath preserves caller parameter units`` () =
 [<Fact>]
 let ``parametric subpath adaptively subdivides`` () =
     let options = { Subpath.defaultParametricOptions with Tolerance = 1.0e-5<length>; MaxDepth = 8 }
-    let source = Subpath.parametricWith -1.0 1.0 (fun t -> point t (t ** 4.0)) options |> Result.defaultWith (failwithf "%A")
+    let source = Subpath.fromParametricWith -1.0 1.0 (fun t -> point t (t ** 4.0)) options |> Result.defaultWith (failwithf "%A")
     Assert.True(source.Segments.Length > 1)
 
 [<Fact>]
 let ``parametric subpath rejects invalid options`` () =
     let invalid = { Subpath.defaultParametricOptions with SamplesPerPiece = 1 }
     let pointFunction t = point t t
-    Assert.Equal(Error(InvalidParametricSamplesPerPiece 1), Subpath.parametricWith 0.0 1.0 pointFunction invalid)
-    Assert.Equal(Error(InvalidParametricInterval(1.0, 1.0)), Subpath.parametric 1.0 1.0 pointFunction)
+    Assert.Equal(Error(InvalidParametricSamplesPerPiece 1), Subpath.fromParametricWith 0.0 1.0 pointFunction invalid)
+    Assert.Equal(Error(InvalidParametricInterval(1.0, 1.0)), Subpath.fromParametric 1.0 1.0 pointFunction)
 
 let private assertNear expected actual =
     Assert.InRange(float actual, expected - 1.0e-6, expected + 1.0e-6)

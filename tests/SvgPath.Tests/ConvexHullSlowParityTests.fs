@@ -55,7 +55,7 @@ let private nearValue result expected =
 
 let private segmentBoxDiameter segment =
     match Segment.boundingBox segment with
-    | Ok box -> Some(BoundingBox.diameter box)
+    | Ok box -> Some(BoundingBox.taxicabDiameter box)
     | Error _ -> None
 
 let private supportTolerance segment =
@@ -179,7 +179,7 @@ let private hullDerivativeAnglesAreNondecreasing (hull: Subpath) =
     |> nondecreasing 0.0<degree>
 
 let private hullFailureReason segment =
-    match ConvexHull.segmentHull segment with
+    match ConvexHull.segment segment with
     | Error error -> Error(sprintf "segment_hull returned %A" error)
     | Ok subpath ->
         if not subpath.Closed then Error "hull subpath is not closed"
@@ -202,7 +202,7 @@ let private subpathHullFailureReason segments =
     match Subpath.create segments with
     | Error error -> Error(sprintf "subpath constructor returned %A" error)
     | Ok subpath ->
-        match ConvexHull.subpathHull subpath with
+        match ConvexHull.subpath subpath with
         | Error error -> Error(sprintf "subpath_hull returned %A" error)
         | Ok hull ->
             if not hull.Closed then Error "hull subpath is not closed"
@@ -556,7 +556,7 @@ let private pointCloudHullIsValid points (hull: Subpath) =
            | _ -> false)
 
 let private publicPointCloudHullIsValid points =
-    match ConvexHull.pointsHull points with
+    match ConvexHull.points points with
     | Error _ -> false
     | Ok hull -> pointCloudHullIsValid points hull
 
@@ -708,8 +708,8 @@ let private representativeGeometryIsCovariantAtScale scale =
     let overlapsResult =
         Overlaps.segmentWith scaledOverlapLeft scaledOverlapRight (Length.fromFloat (1.0e-9 * scale))
         |> Result.defaultWith (failwithf "%A")
-    let referenceHull = ConvexHull.segmentHull cubic |> Result.defaultWith (failwithf "%A")
-    let scaledHull = ConvexHull.segmentHull scaledCubic |> Result.defaultWith (failwithf "%A")
+    let referenceHull = ConvexHull.segment cubic |> Result.defaultWith (failwithf "%A")
+    let scaledHull = ConvexHull.segment scaledCubic |> Result.defaultWith (failwithf "%A")
     let referenceHullBox =
         Subpath.boundingBox referenceHull |> Result.defaultWith (failwithf "%A")
     let scaledHullBox =
@@ -796,14 +796,14 @@ let ``path hull handles two sided 1 degree crescent points and chord`` () =
 let ``segment hull returns two segments for point cubic`` () =
     let segment =
         CubicBezier(point 0.0 0.0, point 0.0 0.0, point 0.0 0.0, point 0.0 0.0)
-    let subpath = ConvexHull.segmentHull segment |> Result.defaultWith (failwithf "%A")
+    let subpath = ConvexHull.segment segment |> Result.defaultWith (failwithf "%A")
     Assert.True subpath.Closed
     Assert.Equal(2, subpath.Segments.Length)
 
 [<Fact>]
 let ``segment hull handles near endpoint arc`` () =
     let subpath =
-        ConvexHull.segmentHull (nearEndpointArc true)
+        ConvexHull.segment (nearEndpointArc true)
         |> Result.defaultWith (failwithf "%A")
     Assert.True subpath.Closed
     Assert.Equal(2, subpath.Segments.Length)
@@ -815,7 +815,7 @@ let ``subpath hull handles curved subpath`` () =
     let tail = Line(point 100.0 20.0, point 135.0 70.0)
     let segments = [ curve; tail ]
     let subpath = Subpath.create segments |> Result.defaultWith (failwithf "%A")
-    let hull = ConvexHull.subpathHull subpath |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.subpath subpath |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     Assert.True(hull.Segments.Length >= 3)
     Assert.True (subpathSupportMatchesBool segments hull)
@@ -828,7 +828,7 @@ let ``path hull returns closed hull for multiple subpaths`` () =
         Path.ofSubpaths
             [ Subpath.ofSegment (List.head leftSegments)
               Subpath.ofSegment (List.head rightSegments) ]
-    let hull = ConvexHull.pathHull path |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.path path |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     Assert.True (subpathSupportMatchesBool (leftSegments @ rightSegments) hull)
 
@@ -848,7 +848,7 @@ let ``path hull handles customer line path`` () =
         + "M -79.02201 267.10191 L -70.36788 262.04612 "
         + "M -70.36788 -336.56919 L -70.36788 262.04612"
     let path = Parse.path source |> Result.defaultWith (failwithf "%A")
-    let hull = ConvexHull.pathHull path |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.path path |> Result.defaultWith (failwithf "%A")
     let originalSegments = path.Subpaths |> List.collect (fun subpath -> subpath.Segments)
     Assert.True hull.Closed
     Assert.True (subpathSupportMatchesBool originalSegments hull)
@@ -861,7 +861,7 @@ let ``path hull handles customer polyline path`` () =
         + "L 8.65413 294.25187 L -79.02201 267.10191 "
         + "L -70.36788 -336.56919 L -70.36788 262.04612"
     let path = Parse.path source |> Result.defaultWith (failwithf "%A")
-    let hull = ConvexHull.pathHull path |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.path path |> Result.defaultWith (failwithf "%A")
     let originalSegments = path.Subpaths |> List.collect (fun subpath -> subpath.Segments)
     Assert.True hull.Closed
     Assert.True (subpathSupportMatchesBool originalSegments hull)
@@ -871,7 +871,7 @@ let ``path hull treats path with only empty subpaths as points`` () =
     let left = point 0.0 0.0
     let right = point 10.0 0.0
     let hull =
-        ConvexHull.pathHull (Path.ofSubpaths [ Subpath.empty left; Subpath.empty right ])
+        ConvexHull.path (Path.ofSubpaths [ Subpath.empty left; Subpath.empty right ])
         |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     Assert.True (nearValue (hullSupportValue hull.Segments 0.0) 10.0<length>)
@@ -882,7 +882,7 @@ let ``specimen hulls survive strict subpath constructor`` () =
     let failures =
         specimens ()
         |> List.choose (fun (name, segment) ->
-            match ConvexHull.segmentHull segment with
+            match ConvexHull.segment segment with
             | Ok _ -> None
             | Error _ -> Some(name + ": segment hull failed"))
     Assert.Empty failures
@@ -892,7 +892,7 @@ let ``specimen hulls have at least two segments`` () =
     let failures =
         specimens ()
         |> List.choose (fun (name, segment) ->
-            match ConvexHull.segmentHull segment with
+            match ConvexHull.segment segment with
             | Ok hull when hull.Segments.Length >= 2 -> None
             | Ok hull -> Some(sprintf "%s: hull has %d segments" name hull.Segments.Length)
             | Error _ -> Some(name + ": segment hull failed"))
@@ -903,7 +903,7 @@ let ``specimen hull derivative angles are nondecreasing`` () =
     let failures =
         specimens ()
         |> List.choose (fun (name, segment) ->
-            match ConvexHull.segmentHull segment with
+            match ConvexHull.segment segment with
             | Ok hull when hullDerivativeAnglesAreNondecreasing hull -> None
             | Ok _ -> Some(name + ": derivative angles are not nondecreasing")
             | Error _ -> Some(name + ": segment hull failed"))
@@ -914,7 +914,7 @@ let ``specimen hull support matches original at 10 degree steps`` () =
     let failures =
         specimens ()
         |> List.collect (fun (name, segment) ->
-            match ConvexHull.segmentHull segment with
+            match ConvexHull.segment segment with
             | Error _ -> [ name + ": segment hull failed" ]
             | Ok hull ->
                 multiplesOfTenDegrees ()

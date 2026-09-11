@@ -80,8 +80,8 @@ let ``projection`` () =
 [<Fact>]
 let ``rotations and near`` () =
     let a = point 2.0 3.0
-    Assert.Equal(point -3.0 2.0, Point.rotateClockwise a)
-    Assert.Equal(point 3.0 -2.0, Point.rotateCounterclockwise a)
+    Assert.Equal(point -3.0 2.0, Point.rotate90Clockwise a)
+    Assert.Equal(point 3.0 -2.0, Point.rotate90Counterclockwise a)
     Assert.True(Point.near (Length.fromFloat 5.0) (point 0.0 0.0) (point 3.0 4.0))
     Assert.False(Point.near (Length.fromFloat 4.999) (point 0.0 0.0) (point 3.0 4.0))
     Assert.False(Point.near (Length.fromFloat -0.001) a a)

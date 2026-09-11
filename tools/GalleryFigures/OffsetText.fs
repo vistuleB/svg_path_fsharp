@@ -30,7 +30,7 @@ module OffsetText =
                     (radiusDerivative*Trig.cosDegrees angle-radius*Trig.sinDegrees angle*da+(if decaying then 0.0 else 16.0*da)))
                 (LanguagePrimitives.FloatWithMeasure<length/degree>
                     (radiusDerivative*Trig.sinDegrees angle+radius*Trig.cosDegrees angle*da))
-        Subpath.parametricWith 0.0<degree> (float turns*360.0<degree>) position
+        Subpath.fromParametricWith 0.0<degree> (float turns*360.0<degree>) position
             {Tolerance=0.001<length>;SamplesPerPiece=3;InitialPieceCount=turns*36;MaxDepth=0;Tangent=Some tangent}
         |> require "offset text source curve"
 

@@ -34,7 +34,7 @@ let ``opposite supports give width after one norm division`` () =
     Assert.Equal(6.0<length>, (upper + opposite) / 5.)
 [<Fact>]
 let ``collinear bezier width is not certified positive`` () =
-    let hull = ConvexHull.segmentHull (QuadraticBezier(p 0. 0., p -20. 0., p 0. 0.)) |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.segment (QuadraticBezier(p 0. 0., p -20. 0., p 0. 0.)) |> Result.defaultWith (failwithf "%A")
     match ConvexHull.internalConvexSubpathMinimumWidthDecision hull 0.0<length> |> Result.defaultWith (failwithf "%A") with
     | ConvexHull.MinimumWidthFits strip -> Assert.Equal(0.0<length>, strip.Width)
     | ConvexHull.MinimumWidthUnresolved(lower, _) -> Assert.Equal(0.0<length>, lower)

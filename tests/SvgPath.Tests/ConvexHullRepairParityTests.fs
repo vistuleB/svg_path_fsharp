@@ -113,7 +113,7 @@ let ``path hull handles scaled two arc probe`` () =
                Sweep = true
                End = point 999.84769516 17.45240644 }: Ellipse.EndpointArcData)
     let path = Path.ofSubpaths [ Subpath.ofSegment largeArc; Subpath.ofSegment (smallArc ()) ]
-    let hull = ConvexHull.pathHull path |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.path path |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
 
 [<Fact>]

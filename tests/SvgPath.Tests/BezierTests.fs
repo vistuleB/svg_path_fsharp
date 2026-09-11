@@ -309,14 +309,14 @@ let ``split many keeps boundary points when they are interior`` () =
 [<Fact>]
 let ``split inside many rejects any outside point`` () =
     let curve = Bezier.LinearBezierData(point 0.0 0.0, point 40.0 0.0)
-    Assert.Equal(Error Bezier.SplitOutsideBezier, Bezier.splitInsideMany curve [ parameter 0.25; parameter 1.01 ])
-    Assert.Equal(Error Bezier.SplitOutsideBezier, Bezier.splitInsideMany curve [ parameter -0.01; parameter 0.75 ])
+    Assert.Equal(Error Bezier.SplitOutsideBezier, Bezier.splitManyInside curve [ parameter 0.25; parameter 1.01 ])
+    Assert.Equal(Error Bezier.SplitOutsideBezier, Bezier.splitManyInside curve [ parameter -0.01; parameter 0.75 ])
 
 [<Fact>]
 let ``split inside many trims boundary points`` () =
     let curve = Bezier.LinearBezierData(point 0.0 0.0, point 40.0 0.0)
     let pieces =
-        Bezier.splitInsideMany curve [ parameter 1.0; parameter 0.0; parameter 0.5; parameter 0.5 ]
+        Bezier.splitManyInside curve [ parameter 1.0; parameter 0.0; parameter 0.5; parameter 0.5 ]
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, List.length pieces)
     Assert.Equal(point 0.0 0.0, Bezier.start pieces[0])

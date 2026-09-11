@@ -59,7 +59,7 @@ module Degeneracy =
                 | ConvexHull.MinimumWidthUnresolved _ ->
                     makeSubpath (List.rev (first :: accepted))
                     |> Result.bind (fun candidate ->
-                        ConvexHull.subpathHull candidate
+                        ConvexHull.subpath candidate
                         |> Result.mapError DegeneracyConvexHullError
                         |> Result.bind (fun rebuiltHull ->
                             sourceWidthDecision (first :: accepted) rebuiltHull tolerance
@@ -77,7 +77,7 @@ module Degeneracy =
         match subpath.Segments with
         | [] -> Ok { Segments = []; Remaining = []; Hull = None; Strip = None }
         | first :: rest ->
-            ConvexHull.segmentHull first
+            ConvexHull.segment first
             |> Result.mapError DegeneracyConvexHullError
             |> Result.bind (fun hull ->
                 sourceWidthDecision [first] hull tolerance
@@ -113,7 +113,7 @@ module Degeneracy =
             loop 1 (0, t, supportPoint, value) (List.tail segments))
 
     let private stripPointsInTraversalOrder segments (strip: ConvexHull.MinimumWidthStrip) tolerance =
-        let angle = strip.Normal |> Point.rotateClockwise |> Point.heading
+        let angle = strip.Normal |> Point.rotate90Clockwise |> Point.heading
         traversalSupport segments (angle + 180.0<degree>)
         |> Result.bind (fun (minIndex, minT, minPoint, _) ->
             traversalSupport segments angle
@@ -136,7 +136,7 @@ module Degeneracy =
         match segments with
         | [] -> Ok []
         | first :: rest ->
-            Segment.degenerateLines first tolerance
+            Segment.linearizeIfDegenerate first tolerance
             |> Result.mapError DegeneracyPathError
             |> Result.bind (fun replacement ->
                 degenerateTraversal tolerance rest
@@ -164,7 +164,7 @@ module Degeneracy =
                     |> Result.bind (fun lines ->
                         normalizeSegments tolerance prefix.Remaining (List.rev lines @ converted))
                 | _ ->
-                    Segment.degenerateLines first tolerance
+                    Segment.linearizeIfDegenerate first tolerance
                     |> Result.mapError DegeneracyPathError
                     |> Result.bind (fun replacement ->
                         normalizeSegments tolerance rest

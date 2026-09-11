@@ -4,7 +4,7 @@ namespace SvgPath
 // Corner-local coordinates; signed radii point along the visual left normal.
 module internal ArcsJoin =
     type Continuation = { Start: Point<length>; Tangent: Point<1>; Radius: float<length> option }
-    let private normal c = Point.rotateCounterclockwise c.Tangent
+    let private normal c = Point.rotate90Counterclockwise c.Tangent
     let private center c r = Point.add c.Start (Point.scale r (normal c))
     let private sign (x: float<length>) = if x < 0.0<length> then -1.0 else 1.0
     let private sqrtRoundoff (value: float<length^2>) (scale: float<length^2>) =
@@ -27,7 +27,7 @@ module internal ArcsJoin =
             | Some y ->
                 let axis = Point.scale (1.0/d) delta
                 let mid = Point.add a (Point.scale x axis)
-                let side = Point.scale y (Point.rotateCounterclockwise axis)
+                let side = Point.scale y (Point.rotate90Counterclockwise axis)
                 [Point.add mid side; Point.subtract mid side]
     let private intersections a b =
         match a.Radius,b.Radius with
@@ -84,7 +84,7 @@ module internal ArcsJoin =
     let private clipPoint c tip forward origin axis =
         let candidates =
             match c.Radius with
-            | Some r -> lineCircle origin (Point.rotateCounterclockwise axis) (center c r) r
+            | Some r -> lineCircle origin (Point.rotate90Counterclockwise axis) (center c r) r
             | None ->
                 let divisor = Point.dot c.Tangent axis
                 if divisor=0.0 then []
@@ -93,7 +93,7 @@ module internal ArcsJoin =
         candidates |> List.filter (fun q -> let t=progress c q forward in t>=0.0 && t<=stop+1e-9)
         |> List.sortBy (fun q -> progress c q forward) |> List.tryHead
     let private clipped a b tip axis limit =
-        let n = Point.rotateCounterclockwise axis
+        let n = Point.rotate90Counterclockwise axis
         let x,y = Point.dot tip axis,Point.dot tip n
         let extent,cut,tangent =
             if y=0.0<length> then Point.norm tip,Point.scale limit axis,axis

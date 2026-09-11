@@ -28,26 +28,26 @@ let private assertPolygon (hull: Subpath) expected =
 let private triangle = [p 0. 0.; p 3. 0.; p 2. 1.]
 [<Fact>]
 let ``vertex contribution does not expand into full loop`` () =
-    let hull = ConvexHull.subpathHull (polyline [p 0. 0.; p 1. 0.; p 2. 1.; p 3. 0.]) |> get
+    let hull = ConvexHull.subpath (polyline [p 0. 0.; p 1. 0.; p 2. 1.; p 3. 0.]) |> get
     Assert.Equal(3, hull.Segments.Length)
     assertPolygon hull triangle
 [<Fact>]
 let ``reversed input preserves triangle without extra circuit`` () =
-    ConvexHull.subpathHull (polyline [p 3. 0.; p 2. 1.; p 1. 0.; p 0. 0.]) |> get |> fun hull -> assertPolygon hull triangle
+    ConvexHull.subpath (polyline [p 3. 0.; p 2. 1.; p 1. 0.; p 0. 0.]) |> get |> fun hull -> assertPolygon hull triangle
 [<Fact>]
 let ``closure address aliases preserve triangle`` () =
     let vertices = [p 0. 0.; p 1. 0.; p 2. 1.; p 3. 0.]
     for index in [0;1;2;3] do
         let rotated = List.skip index vertices @ List.take index vertices
-        ConvexHull.subpathHull (polygon rotated) |> get |> fun hull -> assertPolygon hull triangle
+        ConvexHull.subpath (polygon rotated) |> get |> fun hull -> assertPolygon hull triangle
 [<Fact>]
 let ``full hull is retained in either union operand`` () =
     let vertices = [p 0. 0.; p 4. 0.; p 4. 4.; p 0. 4.]
     let square = polygon vertices
     let interior = polygon [p 1. 1.; p 2. 1.; p 1. 2.]
     for subpaths in [[square;interior]; [interior;square]; [square;square]] do
-        ConvexHull.pathHull (Path.ofSubpaths subpaths) |> get |> fun hull -> assertPolygon hull vertices
+        ConvexHull.path (Path.ofSubpaths subpaths) |> get |> fun hull -> assertPolygon hull vertices
 [<Fact>]
 let ``narrow triangle vertex contribution preserves extent`` () =
-    ConvexHull.subpathHull (polyline [p 0. 0.; p 1. 0.; p 2. 1e-9; p 3. 0.]) |> get
+    ConvexHull.subpath (polyline [p 0. 0.; p 1. 0.; p 2. 1e-9; p 3. 0.]) |> get
     |> fun hull -> assertPolygon hull [p 0. 0.; p 3. 0.; p 2. 1e-9]

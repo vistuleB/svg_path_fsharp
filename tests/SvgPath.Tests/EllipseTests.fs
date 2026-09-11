@@ -38,7 +38,7 @@ let ``arc point uses angular progress`` () =
     assertPointNear 1.0e-6<length> endpoint.Start (Ellipse.arcPoint arc (parameter 0.0))
     assertPointNear 1.0e-6<length> (point 10.0 -10.0) (Ellipse.arcPoint arc (parameter 0.5))
     assertPointNear 1.0e-6<length> endpoint.End (Ellipse.arcPoint arc (parameter 1.0))
-    Assert.True(abs (Ellipse.angleAt arc (parameter 0.5) - (arc.StartAngle + degrees 90.0)) <= degrees 1.0e-9)
+    Assert.True(abs (Ellipse.arcAngleAt arc (parameter 0.5) - (arc.StartAngle + degrees 90.0)) <= degrees 1.0e-9)
     Assert.True(abs (Ellipse.arcEndAngle arc - (arc.StartAngle + arc.DeltaAngle)) <= degrees 1.0e-9)
 
 [<Fact>]
@@ -124,7 +124,7 @@ let ``coincident endpoint arc is rejected`` () =
 
 [<Fact>]
 let ``split arc divides center data at t`` () =
-    let left, right = Ellipse.splitArc quarterEllipse (parameter 0.25)
+    let left, right = Ellipse.arcSplit quarterEllipse (parameter 0.25)
     Assert.Equal(degrees 22.5, left.DeltaAngle)
     Assert.Equal(degrees 22.5, right.StartAngle)
     Assert.Equal(degrees 67.5, right.DeltaAngle)
@@ -145,7 +145,7 @@ let ``projection extrema return nominal arc parameters`` () =
 [<Fact>]
 let ``a half-turn arc is approximated by two cubics`` () =
     let cubics =
-        Ellipse.arcToCubics (point 4.0 0.0) (point 4.0 2.0) (degrees 0.0) false true (point -4.0 0.0)
+        Ellipse.arcToCubicBeziers (point 4.0 0.0) (point 4.0 2.0) (degrees 0.0) false true (point -4.0 0.0)
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, List.length cubics)
     let first, second = List.item 0 cubics, List.item 1 cubics
@@ -250,8 +250,8 @@ let ``split arc allows endpoint splits`` () =
            StartAngle = degrees 1.0
            DeltaAngle = degrees 2.0 }: Ellipse.CenterArcData)
 
-    let zeroStart, wholeAfter = Ellipse.splitArc arc (parameter 0.0)
-    let wholeBefore, zeroEnd = Ellipse.splitArc arc (parameter 1.0)
+    let zeroStart, wholeAfter = Ellipse.arcSplit arc (parameter 0.0)
+    let wholeBefore, zeroEnd = Ellipse.arcSplit arc (parameter 1.0)
     Assert.Equal(degrees 0.0, zeroStart.DeltaAngle)
     Assert.Equal(arc.StartAngle, zeroStart.StartAngle)
     Assert.Equal(arc, wholeAfter)
@@ -267,8 +267,8 @@ let ``split arc extrapolates outside t`` () =
            XAxisRotation = degrees 0.0
            StartAngle = degrees 1.0
            DeltaAngle = degrees 2.0 }: Ellipse.CenterArcData)
-    let before, throughEnd = Ellipse.splitArc arc (parameter -0.25)
-    let throughPastEnd, backToEnd = Ellipse.splitArc arc (parameter 1.25)
+    let before, throughEnd = Ellipse.arcSplit arc (parameter -0.25)
+    let throughPastEnd, backToEnd = Ellipse.arcSplit arc (parameter 1.25)
     Assert.Equal(degrees -0.5, before.DeltaAngle)
     Assert.Equal(degrees 0.5, throughEnd.StartAngle)
     Assert.Equal(degrees 2.5, throughEnd.DeltaAngle)
@@ -284,10 +284,10 @@ let ``split arc inside rejects outside t`` () =
            XAxisRotation = degrees 0.0
            StartAngle = degrees 1.0
            DeltaAngle = degrees 2.0 }: Ellipse.CenterArcData)
-    Assert.Equal(Error Ellipse.SplitOutsideArc, Ellipse.splitArcInside arc (parameter -0.01))
-    Assert.Equal(Error Ellipse.SplitOutsideArc, Ellipse.splitArcInside arc (parameter 1.01))
-    Assert.True(Ellipse.splitArcInside arc (parameter 0.0) |> Result.isOk)
-    Assert.True(Ellipse.splitArcInside arc (parameter 1.0) |> Result.isOk)
+    Assert.Equal(Error Ellipse.SplitOutsideArc, Ellipse.arcSplitInside arc (parameter -0.01))
+    Assert.Equal(Error Ellipse.SplitOutsideArc, Ellipse.arcSplitInside arc (parameter 1.01))
+    Assert.True(Ellipse.arcSplitInside arc (parameter 0.0) |> Result.isOk)
+    Assert.True(Ellipse.arcSplitInside arc (parameter 1.0) |> Result.isOk)
 
 [<Fact>]
 let ``split arc many sorts and removes duplicate points`` () =
@@ -297,7 +297,7 @@ let ``split arc many sorts and removes duplicate points`` () =
            XAxisRotation = degrees 0.0
            StartAngle = degrees 1.0
            DeltaAngle = degrees 4.0 }: Ellipse.CenterArcData)
-    let pieces = Ellipse.splitArcMany arc [ parameter 0.75; parameter -0.25; parameter 0.25; parameter 0.25 ]
+    let pieces = Ellipse.arcSplitMany arc [ parameter 0.75; parameter -0.25; parameter 0.25; parameter 0.25 ]
     Assert.Equal(4, List.length pieces)
     let expected =
         [ degrees 1.0, degrees -1.0
@@ -308,13 +308,13 @@ let ``split arc many sorts and removes duplicate points`` () =
 
 [<Fact>]
 let ``split arc many without points returns original arc`` () =
-    Assert.Equal<Ellipse.CenterArcData list>([ quarterEllipse ], Ellipse.splitArcMany quarterEllipse [])
+    Assert.Equal<Ellipse.CenterArcData list>([ quarterEllipse ], Ellipse.arcSplitMany quarterEllipse [])
 
 [<Fact>]
 let ``split arc inside many rejects any outside point`` () =
     let arc = { quarterEllipse with DeltaAngle = degrees 180.0 }
-    Assert.Equal(Error Ellipse.SplitOutsideArc, Ellipse.splitArcInsideMany arc [ parameter 0.25; parameter 1.01 ])
-    Assert.Equal(Error Ellipse.SplitOutsideArc, Ellipse.splitArcInsideMany arc [ parameter -0.01; parameter 0.75 ])
+    Assert.Equal(Error Ellipse.SplitOutsideArc, Ellipse.arcSplitManyInside arc [ parameter 0.25; parameter 1.01 ])
+    Assert.Equal(Error Ellipse.SplitOutsideArc, Ellipse.arcSplitManyInside arc [ parameter -0.01; parameter 0.75 ])
 
 [<Fact>]
 let ``split arc inside many accepts endpoint points`` () =
@@ -325,7 +325,7 @@ let ``split arc inside many accepts endpoint points`` () =
            StartAngle = degrees 1.0
            DeltaAngle = degrees 4.0 }: Ellipse.CenterArcData)
     let pieces =
-        Ellipse.splitArcInsideMany arc [ parameter 1.0; parameter 0.0; parameter 0.5; parameter 0.5 ]
+        Ellipse.arcSplitManyInside arc [ parameter 1.0; parameter 0.0; parameter 0.5; parameter 0.5 ]
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, List.length pieces)
     Assert.Equal(degrees 1.0, pieces[0].StartAngle)
@@ -341,7 +341,7 @@ let ``split arc many keeps boundary points when they are interior`` () =
            XAxisRotation = degrees 0.0
            StartAngle = degrees 1.0
            DeltaAngle = degrees 4.0 }: Ellipse.CenterArcData)
-    let pieces = Ellipse.splitArcMany arc [ parameter 1.25; parameter 1.0; parameter 0.0; parameter -0.25 ]
+    let pieces = Ellipse.arcSplitMany arc [ parameter 1.25; parameter 1.0; parameter 0.0; parameter -0.25 ]
     let expected =
         [ degrees 1.0, degrees -1.0
           degrees 0.0, degrees 1.0

@@ -34,7 +34,7 @@ let ``serialization preserves scientific exponents`` () =
 
 [<Fact>]
 let ``serialized padding measures scientific significands`` () =
-    let options = Serialize.defaultOptions |> Serialize.withRightDecimals NumberFormat.System |> Serialize.withLeftPadding (NumberFormat.LeftPadding(4, NumberFormat.Zero))
+    let options = Serialize.defaultOptions |> Serialize.withRightDecimals NumberFormat.System |> Serialize.withLeftDecimals (NumberFormat.LeftPadding(4, NumberFormat.Zero))
     Assert.Equal("M 0001e20 0002", Serialize.subpathWith (Subpath.empty (point 1.0e20 2.0)) options)
 
 [<Fact>]
@@ -123,12 +123,12 @@ let ``fixed decimal options can use zero places`` () =
 
 [<Fact>]
 let ``left padding pads serialized numbers`` () =
-    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (NumberFormat.LeftPadding(3, NumberFormat.Zero))
+    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftDecimals (NumberFormat.LeftPadding(3, NumberFormat.Zero))
     Assert.Equal("M 000.0 -02.0 L 012.2 010.2", Serialize.segmentWith (Line(point 0.0 -2.0, point 12.2 10.2)) options)
 
 [<Fact>]
 let ``space left padding pads serialized numbers`` () =
-    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (NumberFormat.LeftPadding(3, NumberFormat.Space))
+    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftDecimals (NumberFormat.LeftPadding(3, NumberFormat.Space))
     Assert.Equal("M   0.0  -2.0 L  12.2  10.2", Serialize.segmentWith (Line(point 0.0 -2.0, point 12.2 10.2)) options)
 
 [<Fact>]
@@ -281,7 +281,7 @@ let ``commas preserve spaces between curve point pairs`` () =
               CubicBezier(b, point 260.0 30.0, point -320.0 45.0, c)
               CubicBezier(c, point 600.5 -70.25, point 720.0 80.0, d) ]
         |> Result.defaultWith (failwithf "%A")
-    let options = Serialize.fixedDecimalOptions 2 |> Serialize.withLeftPadding (NumberFormat.AutoLeftPadding NumberFormat.Space) |> Serialize.withCommas true |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments
+    let options = Serialize.fixedDecimalOptions 2 |> Serialize.withLeftDecimals (NumberFormat.AutoLeftPadding NumberFormat.Space) |> Serialize.withCommas true |> Serialize.repeatCommands false |> Serialize.withNewlines Serialize.AtSegments
     Assert.Equal("M\n  20.00, -30.00 C\n -15.00,  40.00   80.00, -90.00  140.00,  20.00\n 260.00,  30.00 -320.00,  45.00  480.00, -60.00\n 600.50, -70.25  720.00,  80.00  840.00, -90.00", Serialize.subpathWith subpath options)
 
 [<Fact>]
@@ -387,13 +387,13 @@ let ``parser tracked relative cubic uses similarity correction`` () =
 [<Fact>]
 let ``auto left padding aligns serialized path numbers`` () =
     let subpath = Subpath.polyline [ point 0.0 -5.0; point 120.0 10.0; point 2.0 -30.0 ] |> Result.defaultWith (failwithf "%A")
-    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftPadding (NumberFormat.AutoLeftPadding NumberFormat.Zero)
+    let options = Serialize.fixedDecimalOptions 1 |> Serialize.withLeftDecimals (NumberFormat.AutoLeftPadding NumberFormat.Zero)
     Assert.Equal("M 000.0 -05.0 L 120.0 010.0 L 002.0 -30.0", Serialize.subpathWith subpath options)
 
 [<Fact>]
 let ``parser tracked auto padding uses corrected numbers`` () =
     let subpath = Subpath.ofSegment (Line(point 0.14 0.0, point 10.06 0.0))
-    let options = Serialize.relativeDecimalOptions 1 |> Serialize.withLeftPadding (NumberFormat.AutoLeftPadding NumberFormat.Zero)
+    let options = Serialize.relativeDecimalOptions 1 |> Serialize.withLeftDecimals (NumberFormat.AutoLeftPadding NumberFormat.Zero)
     Assert.Equal("m 00.1 00 h 10", Serialize.pathWith (Path.ofSubpaths [ subpath ]) options)
 
 [<Fact>]

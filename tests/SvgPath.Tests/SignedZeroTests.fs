@@ -46,7 +46,7 @@ let ``negative zero length returns exact start parameter`` () =
 let ``negative zero radius degenerates to line`` () =
     let start,finish = p 1. 1.,p 2. 2.
     let arc = Arc ({ Start=start; Radius=p -0. 1.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish }: Ellipse.EndpointArcData)
-    Assert.Equal(Ok(Some [Line(start,finish)]),Segment.degenerateLines arc 0.0<length>)
+    Assert.Equal(Ok(Some [Line(start,finish)]),Segment.linearizeIfDegenerate arc 0.0<length>)
 
 [<Fact>]
 let ``negative zero endpoint has forward offset unit tangent`` () =
@@ -57,11 +57,11 @@ let private zeroTestArc =
 [<Fact>]
 let ``signed zero ellipse split parameters are canonical`` () =
     let arc = zeroTestArc
-    Assert.Equal<Ellipse.CenterArcData list>([arc],Ellipse.splitArcMany arc [-0.0<parameter>;0.0<parameter>])
-    Assert.Equal(Ok [arc],Ellipse.splitArcInsideMany arc [-0.0<parameter>;0.0<parameter>])
-    let expected = Ellipse.splitArcMany arc [-0.5<parameter>;0.0<parameter>;0.5<parameter>]
+    Assert.Equal<Ellipse.CenterArcData list>([arc],Ellipse.arcSplitMany arc [-0.0<parameter>;0.0<parameter>])
+    Assert.Equal(Ok [arc],Ellipse.arcSplitManyInside arc [-0.0<parameter>;0.0<parameter>])
+    let expected = Ellipse.arcSplitMany arc [-0.5<parameter>;0.0<parameter>;0.5<parameter>]
     Assert.Equal(4,List.length expected)
-    Assert.Equal<Ellipse.CenterArcData list>(expected,Ellipse.splitArcMany arc [-0.5<parameter>;-0.0<parameter>;0.0<parameter>;0.5<parameter>])
+    Assert.Equal<Ellipse.CenterArcData list>(expected,Ellipse.arcSplitMany arc [-0.5<parameter>;-0.0<parameter>;0.0<parameter>;0.5<parameter>])
 [<Fact>]
 let ``either zero direction has no ellipse projection extrema`` () =
     for x in [0.0;-0.0] do

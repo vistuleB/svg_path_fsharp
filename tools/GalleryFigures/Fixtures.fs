@@ -75,7 +75,7 @@ module Fixtures =
         panels 1000 450 ["Display correspondence blocks",(layer figureBand.Value "#f1f5f9" "none" 0.)::blocks@[layer figureBand.Value "none" "#0f172a" 1.5;sourceStyle figureEight]]
     let hulls () =
         ["Source hull",path figureEight;"Band hull",figureBand.Value;"Combined hull",combine[path figureEight;figureBand.Value]]
-        |> List.map(fun (title,p) -> let h=ConvexHull.pathHull p |> require "hull" in title,[(path h,"fill:#bfdbfe;fill-opacity:.35;stroke:#1d4ed8;stroke-width:3");layer p "none" "#be123c" 1.5]) |> panels 360 290
+        |> List.map(fun (title,p) -> let h=ConvexHull.path p |> require "hull" in title,[(path h,"fill:#bfdbfe;fill-opacity:.35;stroke:#1d4ed8;stroke-width:3");layer p "none" "#be123c" 1.5]) |> panels 360 290
     let trackSource = subpath "M0 32C82 -108 150 142 232 12C300 -92 414 118 532 -16"
     let family s offsets (palette: string array) =
         (offsets |> List.mapi(fun i d ->
@@ -107,7 +107,7 @@ module Fixtures =
             let fraction=0.1+0.82*float (((i*61+43)*(i*31+29)+17)%10000)/10000.
             {circle with X=chord+fraction*(circle.X-chord)})
         let cloud=Path.ofSubpaths (Subpath.ofSegment(Line(start,finish))::List.map Subpath.empty points)
-        let hull=ConvexHull.pathHull cloud |> require "crescent hull"
+        let hull=ConvexHull.path cloud |> require "crescent hull"
         let reference=Subpath.ofSegment(Arc ({Start=start; Radius=point 120. 120.; XAxisRotation=0.0<degree>; LargeArc=false; Sweep=true; End=finish}: Ellipse.EndpointArcData)) |> path
         let matrix=Transform.matrix 5.8 0. 0. 2. (-482.4<length>) 182.0<length>
         let display p=Transform.path p matrix |> require "crescent transform"

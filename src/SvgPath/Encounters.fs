@@ -397,7 +397,7 @@ module Encounters =
                 |> Result.map (fun keep -> if keep then parameterValue :: kept else kept))) (Ok [])
         |> Result.map List.rev
 
-    let filterFullyOverlapExplainedSubpathIntersectionParameters
+    let subpathFilterOverlapExplainedIntersections
         encounters
         leftSubpath
         rightSubpath

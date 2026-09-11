@@ -22,7 +22,7 @@ let private supportValuesMatch original (hull: Subpath) =
 [<Fact>]
 let ``segment hull returns closed subpath for line`` () =
     let segment = Line(point 0.0 0.0, point 10.0 0.0)
-    let hull = ConvexHull.segmentHull segment |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.segment segment |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     Assert.Equal(2, hull.Segments.Length)
     supportValuesMatch [ segment ] hull
@@ -30,7 +30,7 @@ let ``segment hull returns closed subpath for line`` () =
 [<Fact>]
 let ``segment hull returns closed hull for quadratic`` () =
     let segment = QuadraticBezier(point 0.0 0.0, point 5.0 10.0, point 10.0 0.0)
-    let hull = ConvexHull.segmentHull segment |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.segment segment |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     Assert.Equal(2, hull.Segments.Length)
     supportValuesMatch [ segment ] hull
@@ -41,7 +41,7 @@ let ``subpath hull returns closed hull for l shaped polyline`` () =
         [ Line(point 0.0 0.0, point 20.0 0.0)
           Line(point 20.0 0.0, point 20.0 15.0) ]
     let source = Subpath.create segments |> Result.defaultWith (failwithf "%A")
-    let hull = ConvexHull.subpathHull source |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.subpath source |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     Assert.True(hull.Segments.Length >= 3)
     supportValuesMatch segments hull
@@ -49,7 +49,7 @@ let ``subpath hull returns closed hull for l shaped polyline`` () =
 [<Fact>]
 let ``subpath hull treats empty subpath as single point`` () =
     let at = point 4.0 -3.0
-    let hull = ConvexHull.subpathHull (Subpath.empty at) |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.subpath (Subpath.empty at) |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     Assert.Equal<Segment list>([ Line(at, at); Line(at, at) ], hull.Segments)
 
@@ -57,10 +57,10 @@ let ``subpath hull treats empty subpath as single point`` () =
 let ``path hull includes empty subpath start points`` () =
     let a, b, far = point 0.0 0.0, point 2.0 0.0, point 10.0 0.0
     let source = Path.ofSubpaths [ Subpath.ofSegment (Line(a, b)); Subpath.empty far ]
-    let hull = ConvexHull.pathHull source |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.path source |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     Assert.True(abs (supportValue hull.Segments 0.0 - 10.0<length>) <= 1.0e-6<length>)
 
 [<Fact>]
 let ``path hull rejects empty path`` () =
-    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.pathHull Path.empty)
+    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.path Path.empty)

@@ -185,20 +185,20 @@ module Area =
                     if right <= left then 0.0<length^2>
                     else crossingGroups edges ((left + right) / 2.0) tolerance |> fun groups -> slabArea groups left right mode))
 
-    let absolutePathWith path options = arrangementArea path AbsoluteWindingArea options
-    let absolutePath path = absolutePathWith path Segment.defaultLinearizeOptions
+    let absoluteWindingPathWith path options = arrangementArea path AbsoluteWindingArea options
+    let absoluteWindingPath path = absoluteWindingPathWith path Segment.defaultLinearizeOptions
     let pathWith path fillRule options = arrangementArea path (FillRuleArea fillRule) options
     let path pathValue fillRule = pathWith pathValue fillRule Segment.defaultLinearizeOptions
 
     let private asPath subpath = Path.singleton subpath
-    let absoluteSubpathWith subpath options = absolutePathWith (asPath subpath) options
-    let absoluteSubpath subpath = absoluteSubpathWith subpath Segment.defaultLinearizeOptions
+    let absoluteWindingSubpathWith subpath options = absoluteWindingPathWith (asPath subpath) options
+    let absoluteWindingSubpath subpath = absoluteWindingSubpathWith subpath Segment.defaultLinearizeOptions
     let subpathWith subpath fillRule options = pathWith (asPath subpath) fillRule options
     let subpath subpathValue fillRule = subpathWith subpathValue fillRule Segment.defaultLinearizeOptions
 
     let subpathClockwisenessWith subpath options =
         let signed = signedSubpath subpath
-        absoluteSubpathWith subpath options
+        absoluteWindingSubpathWith subpath options
         |> Result.map (fun absolute ->
             if absolute <= 0.0<length^2> then 0.5
             else max 0.0 (min 1.0 (0.5 + signed / (2.0 * absolute))))

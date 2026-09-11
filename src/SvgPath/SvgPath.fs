@@ -253,7 +253,7 @@ module BoundingBox =
 
     let width box = box.Max.X - box.Min.X
     let height box = box.Max.Y - box.Min.Y
-    let diameter box = width box + height box
+    let taxicabDiameter box = width box + height box
 
     let unionMany boxes =
         match boxes with
@@ -409,7 +409,7 @@ module Segment =
     let arcsToCubicBeziers segment =
         match segment with
         | Arc endpoint ->
-            match Ellipse.arcToCubics
+            match Ellipse.arcToCubicBeziers
                 endpoint.Start endpoint.Radius endpoint.XAxisRotation
                 endpoint.LargeArc endpoint.Sweep endpoint.End with
             | Ok cubics ->
@@ -458,7 +458,7 @@ module Segment =
     let arcDerivative segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcDerivative arc t)
     let arcPointAtAngle segment angle = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcPointAtAngle arc angle)
     let arcDerivativeAtAngle segment angle = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcDerivativeAtAngle arc angle)
-    let arcAngleAt segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.angleAt arc t)
+    let arcAngleAt segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcAngleAt arc t)
     let arcEndAngle segment = arcCenterData segment |> Result.map Ellipse.arcEndAngle
 
     let point segment t =
@@ -485,7 +485,7 @@ module Segment =
                 if InternalNumber.isZero t then Line(endpoint.Start,endpoint.Start),segment
                 elif t=1.0<parameter> then segment,Line(endpoint.End,endpoint.End)
                 else
-                    let leftArc, rightArc = Ellipse.splitArc arc t
+                    let leftArc, rightArc = Ellipse.arcSplit arc t
                     let splitPoint = Ellipse.arcPoint arc t
                     let left = Arc(Ellipse.centerToEndpoint leftArc) |> withStart endpoint.Start |> withFinish splitPoint
                     let right = Arc(Ellipse.centerToEndpoint rightArc) |> withStart splitPoint |> withFinish endpoint.End
@@ -1288,7 +1288,7 @@ module Segment =
         betweenInside segment leftT rightT
         |> Result.bind boundingBox
         |> Result.bind (fun box ->
-            if BoundingBox.diameter box <= tolerance then
+            if BoundingBox.taxicabDiameter box <= tolerance then
                 bestDistanceParameter sample segment leftT rightT
                 |> Result.bind (fun estimate ->
                     distanceStationaryValue sample segment estimate
@@ -1470,7 +1470,7 @@ module Segment =
         if error <= options.Tolerance then Ok [ Line(startPoint, endPoint) ]
         elif depth >= options.MaxDepth then Error(LinearizeMaxDepthReached error)
         else
-            let left, right = Ellipse.splitArc arc (Parameter.fromFloat 0.5)
+            let left, right = Ellipse.arcSplit arc (Parameter.fromFloat 0.5)
             let middle = Ellipse.arcPoint arc (Parameter.fromFloat 0.5)
             match linearizeArc options (depth + 1) left startPoint middle,
                   linearizeArc options (depth + 1) right middle endPoint with
@@ -1501,7 +1501,7 @@ module Segment =
     /// Replace a line-degenerate segment by its ordered line traversal.
     /// The tolerance must be finite and non-negative; a tolerance of 0.0 collapses
     /// the segment only when it lies exactly on a line strip of width zero.
-    let degenerateLines segment tolerance =
+    let linearizeIfDegenerate segment tolerance =
         let finiteNonNegative = tolerance >= 0.0<length> && System.Double.IsFinite(float tolerance)
         let farthest points origin =
             points |> List.fold (fun best point -> if Point.squaredDistance point origin > Point.squaredDistance best origin then point else best) origin
@@ -1825,7 +1825,7 @@ module Subpath =
         | Ok subpath -> subpath
         | Error _ -> invalidArg (nameof points) "invalid polygon points"
 
-    let parametricWith
+    let fromParametricWith
         (startValue: float<'Param>)
         (endValue: float<'Param>)
         (pointFunction: float<'Param> -> Point<length>)
@@ -1902,8 +1902,8 @@ module Subpath =
                     interval pieceStart pieceEnd options.MaxDepth |> Result.map (fun pieces -> segments @ pieces))) (Ok [])
             |> Result.bind create
 
-    let parametric startValue endValue pointFunction =
-        parametricWith startValue endValue pointFunction defaultParametricOptions
+    let fromParametric startValue endValue pointFunction =
+        fromParametricWith startValue endValue pointFunction defaultParametricOptions
 
     let normalizeZeroLengthLines subpath =
         let isZeroLengthLine = function
@@ -2016,7 +2016,7 @@ module Subpath =
     /// Replace line-degenerate segments in a subpath with an ordered line traversal.
     /// The tolerance must be finite and non-negative; a tolerance of 0.0 collapses
     /// only exactly zero-width strips.
-    let degenerateLines subpath tolerance =
+    let linearizeIfDegenerate subpath tolerance =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
             Error(InvalidLinearizeTolerance tolerance)
         else
@@ -2027,7 +2027,7 @@ module Subpath =
                     match accumulated with
                     | None -> Ok None
                     | Some accumulated ->
-                        Segment.degenerateLines segment tolerance
+                        Segment.linearizeIfDegenerate segment tolerance
                         |> Result.map (fun replacement ->
                             match segment, replacement with
                             | Line _, None -> Some(accumulated @ [ segment ])
@@ -2141,7 +2141,7 @@ module Subpath =
             Ok { SegmentIndex = 0; T = 0.0<parameter> }
         else Ok parameter
 
-    let parametersCompare left right =
+    let parameterCompare left right =
         compare (left.SegmentIndex, left.T) (right.SegmentIndex, right.T)
 
     let parameterSnapToBoundary subpath parameter tolerance =
@@ -2214,8 +2214,8 @@ module Subpath =
 
     let private intervalSegments subpath fromParameter toParameter =
         let fromIndex, toIndex = fromParameter.SegmentIndex, toParameter.SegmentIndex
-        if parametersCompare fromParameter toParameter = 0 then Ok []
-        elif parametersCompare fromParameter toParameter > 0 then Error(InvalidSubpathInterval(fromParameter, toParameter))
+        if parameterCompare fromParameter toParameter = 0 then Ok []
+        elif parameterCompare fromParameter toParameter > 0 then Error(InvalidSubpathInterval(fromParameter, toParameter))
         elif fromIndex = toIndex then
             Segment.betweenInside subpath.segmentList[fromIndex] fromParameter.T toParameter.T |> Result.map List.singleton
         else
@@ -2234,7 +2234,7 @@ module Subpath =
         |> Result.bind (fun fromParameter ->
             parameterCanonicalize subpath toParameter
             |> Result.bind (fun toParameter ->
-                let order = parametersCompare fromParameter toParameter
+                let order = parameterCompare fromParameter toParameter
                 if order = 0 then Error(InvalidSubpathInterval(fromParameter, toParameter))
                 elif order < 0 then intervalSegments subpath fromParameter toParameter |> Result.bind create
                 elif not subpath.isClosed then Error(InvalidSubpathInterval(fromParameter, toParameter))
@@ -2285,25 +2285,25 @@ module Subpath =
             let startParameter = { SegmentIndex = 0; T = 0.0<parameter> }
             let endParameter = { SegmentIndex = length - 1; T = 1.0<parameter> }
             let isBoundary parameterValue =
-                parametersCompare parameterValue startParameter = 0
-                || parametersCompare parameterValue endParameter = 0
+                parameterCompare parameterValue startParameter = 0
+                || parameterCompare parameterValue endParameter = 0
             let invalidParameter parameterValue =
                 Error(InvalidSubpathParameter(parameterValue.SegmentIndex, parameterValue.T, length))
             let rec validateOpen previous = function
                 | [] -> Ok()
                 | point :: rest when isBoundary point -> invalidParameter point
-                | point :: rest when parametersCompare previous point < 0 -> validateOpen point rest
+                | point :: rest when parameterCompare previous point < 0 -> validateOpen point rest
                 | point :: _ -> Error(InvalidSubpathInterval(previous, point))
             let rec validateClosed first previous descents = function
                 | [] ->
-                    let order = parametersCompare previous first
+                    let order = parameterCompare previous first
                     if order = 0 then Error(InvalidSubpathInterval(previous, first))
                     else
                         let descents = if order > 0 then descents + 1 else descents
                         if descents = 1 then Ok()
                         else Error(InvalidSubpathInterval(previous, first))
                 | point :: rest ->
-                    let order = parametersCompare previous point
+                    let order = parameterCompare previous point
                     if order = 0 then Error(InvalidSubpathInterval(previous, point))
                     else
                         let descents = if order > 0 then descents + 1 else descents
@@ -2531,9 +2531,9 @@ module Path =
 
     let ``end`` path = finish path
 
-    let parametersCompare left right =
+    let parameterCompare left right =
         let subpathOrder = compare left.SubpathIndex right.SubpathIndex
-        if subpathOrder <> 0 then subpathOrder else Subpath.parametersCompare left.At right.At
+        if subpathOrder <> 0 then subpathOrder else Subpath.parameterCompare left.At right.At
 
     let point path parameterValue =
         if parameterValue.SubpathIndex < 0 || parameterValue.SubpathIndex >= List.length path.subpathList then

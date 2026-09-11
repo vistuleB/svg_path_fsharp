@@ -36,7 +36,7 @@ let ``split many trims both signed zero boundaries`` () =
     let curve = Bezier.LinearBezierData(p 1. 0.,p 0.1 0.2)
     Assert.Equal<Bezier.BezierData list>([curve],Bezier.splitMany curve [-0.0<parameter>])
     Assert.Equal<Bezier.BezierData list>([curve],Bezier.splitMany curve [0.0<parameter>;-0.0<parameter>;0.0<parameter>;1.0<parameter>])
-    Assert.Equal(Ok [curve],Bezier.splitInsideMany curve [-0.0<parameter>;0.0<parameter>;-0.0<parameter>;1.0<parameter>])
+    Assert.Equal(Ok [curve],Bezier.splitManyInside curve [-0.0<parameter>;0.0<parameter>;-0.0<parameter>;1.0<parameter>])
 
 [<Fact>]
 let ``split many deduplicates signed zero inside extrapolated range`` () =

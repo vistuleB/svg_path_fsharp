@@ -131,7 +131,7 @@ module Transform =
     let skewXSegment input degrees = segment input (skewX degrees)
     let skewYSegment input degrees = segment input (skewY degrees)
 
-    let segmentGracefully input transform =
+    let segmentWithArcCollapse input transform =
         match segment input transform with
         | Ok transformed -> Ok transformed
         | Error DegenerateArcTransform ->
@@ -148,7 +148,7 @@ module Transform =
     let private linesBetween points =
         points |> List.pairwise |> List.map Line
 
-    let segmentToSubpathGracefully input transform =
+    let segmentToSubpathWithArcCollapse input transform =
         match segment input transform with
         | Ok transformed ->
             Ok(Subpath.ofSegment transformed)
@@ -197,10 +197,10 @@ module Transform =
     /// Collapsed arcs retain directly transformed endpoints for continuity.
     /// Reconstruction uses strict matching; semantically closed subpaths
     /// alone have a final closure wiggle fallback.
-    let subpathGracefully input transform =
+    let subpathWithArcCollapse input transform =
         transformSubpathWith
             (fun segmentValue transform ->
-                segmentToSubpathGracefully segmentValue transform
+                segmentToSubpathWithArcCollapse segmentValue transform
                 |> Result.map Subpath.segments)
             input transform
 
@@ -230,7 +230,7 @@ module Transform =
         |> Result.map (List.rev >> Path.ofSubpaths)
 
     let path input transform = transformPathWith subpath input transform
-    let pathGracefully input transform = transformPathWith subpathGracefully input transform
+    let pathWithArcCollapse input transform = transformPathWith subpathWithArcCollapse input transform
     let pathAboutPoint input transform center = path input (aboutPoint transform center)
 
     let pathAboutAnchor input transform anchor =

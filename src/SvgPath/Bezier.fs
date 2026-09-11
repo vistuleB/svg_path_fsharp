@@ -216,7 +216,7 @@ module Bezier =
         let boundaries = parameter 0.0 :: (points @ [ parameter 1.0 ])
         boundaries |> List.pairwise |> List.map (fun (fromParameter, toParameter) -> between curve fromParameter toParameter)
 
-    let splitInsideMany curve points =
+    let splitManyInside curve points =
         let points = normalizedProgresses points
         if points |> List.exists (fun t -> t < parameter 0.0 || t > parameter 1.0) then
             Error SplitOutsideBezier

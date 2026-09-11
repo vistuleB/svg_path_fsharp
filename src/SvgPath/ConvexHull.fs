@@ -221,7 +221,7 @@ module ConvexHull =
     let private segmentIsPointLike segment =
         match Segment.boundingBox segment with
         | Error _ -> true
-        | Ok bounds -> BoundingBox.diameter bounds <= 1.0e-9<length>
+        | Ok bounds -> BoundingBox.taxicabDiameter bounds <= 1.0e-9<length>
 
     let private exactSimpleSegmentHull segment =
         let startPoint = Segment.start segment
@@ -299,7 +299,7 @@ module ConvexHull =
             let b = farthest a
             let c = farthest b
             // Preserve the unnormalized components during support search.
-            let raw = Point.displacement b c |> Point.rotateClockwise
+            let raw = Point.displacement b c |> Point.rotate90Clockwise
             let normal = Point.create (float raw.X) (float raw.Y)
             let norm = Point.norm normal
             if InternalNumber.isZero norm || not (System.Double.IsFinite norm) then Ok None
@@ -427,7 +427,7 @@ module ConvexHull =
                                             | Ok portion ->
                                                 match Segment.boundingBox portion with
                                                 | Error _ -> false
-                                                | Ok bounds -> BoundingBox.diameter bounds <= pointTolerance)
+                                                | Ok bounds -> BoundingBox.taxicabDiameter bounds <= pointTolerance)
                                     |> Result.map _.Estimate
                                     |> Result.mapError TangentRootFailure)
                         |> Option.defaultValue (Ok approximate)
@@ -949,7 +949,7 @@ module ConvexHull =
         | Ok portion ->
             match Segment.boundingBox portion with
             | Error _ -> false
-            | Ok bounds -> BoundingBox.diameter bounds <= pointTolerance
+            | Ok bounds -> BoundingBox.taxicabDiameter bounds <= pointTolerance
 
     let private refinePolynomialTangentIsolation coefficients segment isolation =
         if isolation.Lower = isolation.Upper then Ok isolation.Estimate
@@ -1410,15 +1410,15 @@ module ConvexHull =
         constructSegmentHullInternal segment |> Result.mapError publicError
 
     /// Compute a curve-preserving representation of a segment's convex hull.
-    let segmentHull segment = constructSegmentHull segment
+    let segment segment = constructSegmentHull segment
 
-    let subpathHull (subpath: Subpath) =
+    let subpath (subpath: Subpath) =
         let segments =
             if List.isEmpty subpath.Segments then [ Line(subpath.Start, subpath.Start) ]
             else subpath.Segments
         segmentsHullCore segments
 
-    let pathHull (path: Path) =
+    let path (path: Path) =
         match path.Subpaths with
         | [] -> Error(ConvexHullPathError EmptyPath)
         | subpaths ->
@@ -1440,7 +1440,7 @@ module ConvexHull =
 
     /// Compute a point collection's hull through the same curve-preserving
     /// loop-union and repair path used by segment, subpath, and path hulls.
-    let pointsHull points =
+    let points points =
         points
         |> List.map (fun point -> Line(point, point))
         |> function
@@ -1500,7 +1500,7 @@ module ConvexHull =
             edges
             |> List.choose (fun (a, b) ->
                 Point.displacement a b
-                |> Point.rotateCounterclockwise
+                |> Point.rotate90Counterclockwise
                 |> Point.normalize
                 |> Option.map (fun direction -> direction, extent vertices direction))
             |> List.minBy (fun (_, support) -> support.Width)

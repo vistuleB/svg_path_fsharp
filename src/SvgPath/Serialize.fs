@@ -71,7 +71,6 @@ module Serialize =
     let withNewlines newlines (options: Options) = { options with Newlines = newlines }
     let withLeftDecimals left (options: Options) = { options with LeftDecimals = left }
     let withRightDecimals right (options: Options) = { options with RightDecimals = right }
-    let withLeftPadding left options = withLeftDecimals left options
 
     let minifyingOptions decimalPlaces =
         relativeDecimalOptions decimalPlaces

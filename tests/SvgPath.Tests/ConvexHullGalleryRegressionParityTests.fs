@@ -35,14 +35,14 @@ let private supportMatches original hull =
 [<Fact>]
 let ``figure eight hull preserves source support`` () =
     let source = figureEight ()
-    let hull = ConvexHull.subpathHull source |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.subpath source |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     supportMatches source.Segments hull.Segments
 
 [<Fact>]
 let ``figure eight band hull preserves band support`` () =
     let band = figureEightBand ()
-    let hull = ConvexHull.pathHull band |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.path band |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     supportMatches (band.Subpaths |> List.collect _.Segments) hull.Segments
 
@@ -51,6 +51,6 @@ let ``figure eight and band hull preserves combined support`` () =
     let source = figureEight ()
     let band = figureEightBand ()
     let combined = Path.ofSubpaths (source :: band.Subpaths)
-    let hull = ConvexHull.pathHull combined |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.path combined |> Result.defaultWith (failwithf "%A")
     Assert.True hull.Closed
     supportMatches (combined.Subpaths |> List.collect _.Segments) hull.Segments

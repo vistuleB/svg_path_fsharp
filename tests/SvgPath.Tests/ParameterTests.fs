@@ -15,16 +15,16 @@ let private openLines count =
 
 [<Fact>]
 let ``compare subpath parameters orders by segment then t`` () =
-    Assert.True(Subpath.parametersCompare (at 0 0.75) (at 1 0.25) < 0)
-    Assert.Equal(0, Subpath.parametersCompare (at 1 0.25) (at 1 0.25))
-    Assert.True(Subpath.parametersCompare (at 2 0.0) (at 1 1.0) > 0)
+    Assert.True(Subpath.parameterCompare (at 0 0.75) (at 1 0.25) < 0)
+    Assert.Equal(0, Subpath.parameterCompare (at 1 0.25) (at 1 0.25))
+    Assert.True(Subpath.parameterCompare (at 2 0.0) (at 1 1.0) > 0)
 
 [<Fact>]
 let ``compare path parameters orders by subpath then subpath parameter`` () =
     let pathAt subpathIndex segmentIndex value = { SubpathIndex = subpathIndex; At = at segmentIndex value }
-    Assert.True(Path.parametersCompare (pathAt 0 3 0.75) (pathAt 1 0 0.25) < 0)
-    Assert.Equal(0, Path.parametersCompare (pathAt 1 0 0.25) (pathAt 1 0 0.25))
-    Assert.True(Path.parametersCompare (pathAt 1 2 0.0) (pathAt 1 1 1.0) > 0)
+    Assert.True(Path.parameterCompare (pathAt 0 3 0.75) (pathAt 1 0 0.25) < 0)
+    Assert.Equal(0, Path.parameterCompare (pathAt 1 0 0.25) (pathAt 1 0 0.25))
+    Assert.True(Path.parameterCompare (pathAt 1 2 0.0) (pathAt 1 1 1.0) > 0)
 
 [<Fact>]
 let ``from end parameter converts reversed address to original address`` () =

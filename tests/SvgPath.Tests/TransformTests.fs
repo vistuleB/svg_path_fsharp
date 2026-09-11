@@ -14,17 +14,17 @@ let ``graceful arc subpaths preserve exact noncardinal endpoints`` () =
     let matrix = Transform.scaleXY 1.0 0.0
     for largeArc in [false;true] do
         let arc = Arc ({Start=point 3. 4.;Radius=point 5. 5.;XAxisRotation=0.0<degree>;LargeArc=largeArc;Sweep=true;End=point -3. 4.}: Ellipse.EndpointArcData)
-        let part = Transform.segmentToSubpathGracefully arc matrix |> Result.defaultWith (failwithf "%A")
+        let part = Transform.segmentToSubpathWithArcCollapse arc matrix |> Result.defaultWith (failwithf "%A")
         Assert.Equal(Affine.point matrix (Segment.start arc),Subpath.start part)
         Assert.Equal(Affine.point matrix (Segment.finish arc),Subpath.finish part)
         let source = Subpath.create [Line(point 10. 4.,Segment.start arc);arc;Line(Segment.finish arc,point 10. 4.)] |> Result.defaultWith (failwithf "%A")
-        let openResult = Transform.subpathGracefully source matrix |> Result.defaultWith (failwithf "%A")
+        let openResult = Transform.subpathWithArcCollapse source matrix |> Result.defaultWith (failwithf "%A")
         Assert.False(Subpath.isClosed openResult)
         let closedSource = Subpath.setClosed true source |> Result.defaultWith (failwithf "%A")
-        let closed = Transform.subpathGracefully closedSource matrix |> Result.defaultWith (failwithf "%A")
+        let closed = Transform.subpathWithArcCollapse closedSource matrix |> Result.defaultWith (failwithf "%A")
         Assert.True(Subpath.isClosed closed)
         Assert.Equal(Subpath.start closed,Subpath.finish closed)
-        Transform.pathGracefully (Path.ofSubpaths [source]) matrix |> Result.defaultWith (failwithf "%A") |> ignore
+        Transform.pathWithArcCollapse (Path.ofSubpaths [source]) matrix |> Result.defaultWith (failwithf "%A") |> ignore
         if largeArc then
             let box = Subpath.boundingBox part |> Result.defaultWith (failwithf "%A")
             Assert.True(abs(box.Min.X + 5.0<length>)<1e-6<length>)
@@ -35,10 +35,10 @@ let ``singular oblique arc transform uses graceful collapse`` () =
     let arc = Arc ({Start=point 3. 4.;Radius=point 3. 2.;XAxisRotation=2.0<degree>;LargeArc=false;Sweep=true;End=point -3. 4.}: Ellipse.EndpointArcData)
     let matrix = Affine.fromTuple(1.,2.,0.,0.,0.0<length>,0.0<length>)
     Assert.Equal(Error Transform.DegenerateArcTransform,Transform.segment arc matrix)
-    match Transform.segmentGracefully arc matrix with
+    match Transform.segmentWithArcCollapse arc matrix with
     | Ok(Line _) -> ()
     | other -> failwithf "%A" other
-    let collapsed = Transform.segmentToSubpathGracefully arc matrix |> Result.defaultWith (failwithf "%A")
+    let collapsed = Transform.segmentToSubpathWithArcCollapse arc matrix |> Result.defaultWith (failwithf "%A")
     Assert.Equal(Affine.point matrix (Segment.start arc),Subpath.start collapsed)
     Assert.Equal(Affine.point matrix (Segment.finish arc),Subpath.finish collapsed)
     for segment in Subpath.segments collapsed do
@@ -110,7 +110,7 @@ let ``collapsed arc can be handled strictly or gracefully`` () =
                End = point 10.0 0.0 }: Ellipse.EndpointArcData)
     let collapse = Transform.scaleXY 1.0 0.0
     Assert.Equal(Error Transform.DegenerateArcTransform, Transform.segment arc collapse)
-    match Transform.segmentToSubpathGracefully arc collapse with
+    match Transform.segmentToSubpathWithArcCollapse arc collapse with
     | Ok subpath ->
         Assert.False(List.isEmpty subpath.Segments)
         Assert.Equal(point 0.0 0.0, subpath.Start)

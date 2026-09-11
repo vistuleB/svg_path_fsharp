@@ -16,7 +16,7 @@ let private width vertices =
 let private rectangleAtAngle center length width angle =
     let along = Point.direction (Degree.fromFloat angle) |> Point.scale (Length.fromFloat (length / 2.0))
     let across =
-        Point.rotateCounterclockwise along
+        Point.rotate90Counterclockwise along
         |> Point.normalize
         |> Option.defaultWith (fun () -> failwith "degenerate rectangle direction")
         |> Point.scale (Length.fromFloat (width / 2.0))
@@ -107,7 +107,7 @@ let ``five way decisions are translation and reversal invariant`` () =
 
 [<Fact>]
 let ``curved circle hull uses exact directional support`` () =
-    let hull = ConvexHull.subpathHull (circleSubpath 2.0) |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.subpath (circleSubpath 2.0) |> Result.defaultWith (failwithf "%A")
     match ConvexHull.internalConvexSubpathMinimumWidthDecision hull 4.001<length> with
     | Ok(ConvexHull.MinimumWidthFits strip) -> near 4.0<length> strip.Width
     | result -> Assert.Fail($"expected fit, got {result}")
@@ -118,7 +118,7 @@ let ``curved circle hull uses exact directional support`` () =
 [<Fact>]
 let ``curved hull search certifies an arbitrary line at graph tolerance`` () =
     let finish = Point.direction 31.7<degree> |> Point.scale 10.0<length>
-    let hull = ConvexHull.segmentHull (Line(point 0.0 0.0, finish)) |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.segment (Line(point 0.0 0.0, finish)) |> Result.defaultWith (failwithf "%A")
     match ConvexHull.internalConvexSubpathMinimumWidthDecision hull 1.0e-9<length> with
     | Ok(ConvexHull.MinimumWidthFits strip) -> Assert.True(strip.Width <= 1.0e-9<length>)
     | result -> Assert.Fail($"expected fit, got {result}")
@@ -126,7 +126,7 @@ let ``curved hull search certifies an arbitrary line at graph tolerance`` () =
 [<Fact>]
 let ``adding a segment returns the augmented hull and width decision`` () =
     let first, second, third = line 0.0 0.0 1.0 0.0, line 1.0 0.0 2.0 0.0, line 2.0 0.0 2.0 2.0
-    let firstHull = ConvexHull.segmentHull first |> Result.defaultWith (failwithf "%A")
+    let firstHull = ConvexHull.segment first |> Result.defaultWith (failwithf "%A")
     let secondHull, secondDecision = ConvexHull.internalConvexSubpathAddSegmentAndTestWidth firstHull second 0.01<length> |> Result.defaultWith (failwithf "%A")
     match secondDecision with ConvexHull.MinimumWidthFits strip -> Assert.True(strip.Width <= 0.01<length>) | result -> Assert.Fail($"expected fit, got {result}")
     let _, thirdDecision = ConvexHull.internalConvexSubpathAddSegmentAndTestWidth secondHull third 0.01<length> |> Result.defaultWith (failwithf "%A")

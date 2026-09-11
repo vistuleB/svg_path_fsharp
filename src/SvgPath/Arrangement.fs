@@ -512,7 +512,7 @@ module Arrangement =
             | _ ->
                 Segment.boundingBox segment
                 |> Result.mapError InternalArrangementSegmentError
-                |> Result.map BoundingBox.diameter
+                |> Result.map BoundingBox.taxicabDiameter
         let rec loop distinct = function
             | [] -> Ok(List.rev distinct)
             | first :: rest ->

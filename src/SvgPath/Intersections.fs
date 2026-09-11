@@ -557,8 +557,8 @@ module Intersections =
                         if boxDistanceSquared leftBox rightBox > best.DistanceSquared then
                             generations rest next best windows
                         elif window.RemainingDepth <= 0
-                             || (BoundingBox.diameter leftBox <= terminalSubdivisionTolerance
-                                 && BoundingBox.diameter rightBox <= terminalSubdivisionTolerance) then
+                             || (BoundingBox.taxicabDiameter leftBox <= terminalSubdivisionTolerance
+                                 && BoundingBox.taxicabDiameter rightBox <= terminalSubdivisionTolerance) then
                             let added = addTerminalWindowGrid window.Left window.Right windows
                             added
                             |> List.take 9
@@ -570,7 +570,7 @@ module Intersections =
                                     globalDistanceMinimumAt terminal.Left terminal.Right leftT rightT
                                     |> Result.map (closerMinimum best))) (Ok best)
                             |> Result.bind (fun best -> generations rest next best added)
-                        elif BoundingBox.diameter leftBox >= BoundingBox.diameter rightBox then
+                        elif BoundingBox.taxicabDiameter leftBox >= BoundingBox.taxicabDiameter rightBox then
                             let first, second = splitPiece window.Left
                             let children =
                                 [ { window with Left = second; RemainingDepth = window.RemainingDepth - 1 }
@@ -1092,7 +1092,7 @@ module Intersections =
                     projectionAt left right best.LeftT best.RightT)
         | _ -> failwith "expected two line segments"
 
-    let segmentSegmentProjectionWith left right options =
+    let segmentSegmentClosestPairWith left right options =
         validateOptions options
         |> Result.bind (fun () ->
             OverlapDetection.detect left right options.Tolerance
@@ -1108,8 +1108,8 @@ module Intersections =
 
     /// Separate distance-minimization search, including nonintersecting curves.
     /// Overlaps return a zero-distance pair; tied parameters need not be canonical.
-    let segmentSegmentProjection left right =
-        segmentSegmentProjectionWith left right defaultOptions
+    let segmentSegmentClosestPair left right =
+        segmentSegmentClosestPairWith left right defaultOptions
 
     let private indexedProjectionSegments segments =
         segments
@@ -1140,7 +1140,7 @@ module Intersections =
                             | None -> false
                         if skip then Ok best
                         else
-                            segmentSegmentProjectionWith leftSegment rightSegment options
+                            segmentSegmentClosestPairWith leftSegment rightSegment options
                             |> Result.map (fun projection ->
                                 match best with
                                 | None -> Some(leftIndex, rightIndex, projection)
@@ -1152,7 +1152,7 @@ module Intersections =
                     | None -> Error(InternalUncertifiedSegmentIntersection(
                         1.0e100<length>, 1.0e100<length>, options.Tolerance)))))
 
-    let segmentSubpathProjectionWith left (right: Subpath) options =
+    let segmentSubpathClosestPairWith left (right: Subpath) options =
         validateOptions options
         |> Result.bind (fun () ->
             if List.isEmpty right.Segments then Error EmptySubpath
@@ -1168,8 +1168,8 @@ module Intersections =
                           Distance = projection.Distance }
                     result))
 
-    let segmentSubpathProjection left right =
-        segmentSubpathProjectionWith left right defaultOptions
+    let segmentSubpathClosestPair left right =
+        segmentSubpathClosestPairWith left right defaultOptions
 
     let private pathProjectionSegments (path: Path) =
         if List.isEmpty path.Subpaths then Error EmptyPath
@@ -1189,7 +1189,7 @@ module Intersections =
     let private addressWithT (address: PathParameter) (t: float<parameter>) : PathParameter =
         { address with At = { address.At with T = t } }
 
-    let segmentPathProjectionWith left right options =
+    let segmentPathClosestPairWith left right options =
         validateOptions options
         |> Result.bind (fun () ->
             pathProjectionSegments right
@@ -1204,10 +1204,10 @@ module Intersections =
                           Distance = projection.Distance }
                     result)))
 
-    let segmentPathProjection left right =
-        segmentPathProjectionWith left right defaultOptions
+    let segmentPathClosestPair left right =
+        segmentPathClosestPairWith left right defaultOptions
 
-    let subpathSubpathProjectionWith (left: Subpath) (right: Subpath) options =
+    let subpathSubpathClosestPairWith (left: Subpath) (right: Subpath) options =
         validateOptions options
         |> Result.bind (fun () ->
             if List.isEmpty left.Segments || List.isEmpty right.Segments then Error EmptySubpath
@@ -1224,10 +1224,10 @@ module Intersections =
                           Distance = projection.Distance }
                     result))
 
-    let subpathSubpathProjection left right =
-        subpathSubpathProjectionWith left right defaultOptions
+    let subpathSubpathClosestPair left right =
+        subpathSubpathClosestPairWith left right defaultOptions
 
-    let subpathPathProjectionWith (left: Subpath) right options =
+    let subpathPathClosestPairWith (left: Subpath) right options =
         validateOptions options
         |> Result.bind (fun () ->
             if List.isEmpty left.Segments then Error EmptySubpath
@@ -1245,10 +1245,10 @@ module Intersections =
                               Distance = projection.Distance }
                         result)))
 
-    let subpathPathProjection left right =
-        subpathPathProjectionWith left right defaultOptions
+    let subpathPathClosestPair left right =
+        subpathPathClosestPairWith left right defaultOptions
 
-    let pathPathProjectionWith left right options =
+    let pathPathClosestPairWith left right options =
         validateOptions options
         |> Result.bind (fun () ->
             pathProjectionSegments left
@@ -1265,8 +1265,8 @@ module Intersections =
                               Distance = projection.Distance }
                         result))))
 
-    let pathPathProjection left right =
-        pathPathProjectionWith left right defaultOptions
+    let pathPathClosestPair left right =
+        pathPathClosestPairWith left right defaultOptions
 
     let private validateSelfIntersectionOptions options =
         if options.MinimumArcLengthSeparation <= 0.0<length>
@@ -1312,7 +1312,7 @@ module Intersections =
         segmentSelfWith segmentValue defaultSelfIntersectionOptions
 
     let private orderedSubpathPair (first: SubpathParameter) (second: SubpathParameter) =
-        if Subpath.parametersCompare first second <= 0 then first, second else second, first
+        if Subpath.parameterCompare first second <= 0 then first, second else second, first
 
     let private insertSubpathSelf
         (tolerance: float<length>)
@@ -1395,8 +1395,8 @@ module Intersections =
                 |> Result.map (List.sortWith (fun (left: SubpathSelfIntersection) (right: SubpathSelfIntersection) ->
                     let leftFirst, leftSecond = left.Parameters
                     let rightFirst, rightSecond = right.Parameters
-                    let firstOrder = Subpath.parametersCompare leftFirst rightFirst
-                    if firstOrder <> 0 then firstOrder else Subpath.parametersCompare leftSecond rightSecond))))
+                    let firstOrder = Subpath.parameterCompare leftFirst rightFirst
+                    if firstOrder <> 0 then firstOrder else Subpath.parameterCompare leftSecond rightSecond))))
 
     let subpathSelf subpathValue =
         subpathSelfWith subpathValue defaultSelfIntersectionOptions
@@ -1439,7 +1439,7 @@ module Intersections =
         let sorted =
             parameters
             |> List.map (canonicalSubpathParameterUnchecked subpath tolerance)
-            |> List.sortWith Subpath.parametersCompare
+            |> List.sortWith Subpath.parameterCompare
         let deduped =
             sorted
             |> List.fold (fun accumulated parameterValue ->
@@ -1588,8 +1588,8 @@ module Intersections =
                 intersections
                 |> List.map (fun intersection ->
                     { intersection with
-                        LeftParameters = intersection.LeftParameters |> List.distinct |> List.sortWith Path.parametersCompare
-                        RightParameters = intersection.RightParameters |> List.distinct |> List.sortWith Path.parametersCompare })
+                        LeftParameters = intersection.LeftParameters |> List.distinct |> List.sortWith Path.parameterCompare
+                        RightParameters = intersection.RightParameters |> List.distinct |> List.sortWith Path.parameterCompare })
                 |> List.sortBy (fun (intersection: PathIntersection) ->
                     intersection.LeftParameters
                     |> List.tryHead
@@ -1608,7 +1608,7 @@ module Intersections =
     let path left right = pathWith left right defaultOptions
 
     let private orderedPathPair first second =
-        if Path.parametersCompare first second <= 0 then first, second else second, first
+        if Path.parameterCompare first second <= 0 then first, second else second, first
 
     let private insertPathSelf tolerance point first second found =
         let first, second = orderedPathPair first second
@@ -1616,8 +1616,8 @@ module Intersections =
            |> List.exists (fun existing ->
                let existingFirst, existingSecond = existing.Parameters
                Point.distance existing.Point point <= tolerance
-               && Path.parametersCompare first existingFirst = 0
-               && Path.parametersCompare second existingSecond = 0) then found
+               && Path.parameterCompare first existingFirst = 0
+               && Path.parameterCompare second existingSecond = 0) then found
         else ({ Point = point; Parameters = first, second } : PathSelfIntersection) :: found
 
     let pathSelfWith (pathValue: Path) options =
@@ -1660,8 +1660,8 @@ module Intersections =
             |> Result.map (List.sortWith (fun left right ->
                 let leftFirst, leftSecond = left.Parameters
                 let rightFirst, rightSecond = right.Parameters
-                let firstOrder = Path.parametersCompare leftFirst rightFirst
-                if firstOrder <> 0 then firstOrder else Path.parametersCompare leftSecond rightSecond)))
+                let firstOrder = Path.parameterCompare leftFirst rightFirst
+                if firstOrder <> 0 then firstOrder else Path.parameterCompare leftSecond rightSecond)))
 
     let pathSelf pathValue = pathSelfWith pathValue defaultSelfIntersectionOptions
 

@@ -70,7 +70,7 @@ module Ellipse =
     let private angleAtRaw arc (t: float<parameter>) =
         arc.StartAngle + Parameter.ratio t * arc.DeltaAngle
 
-    let angleAt arc t = angleAtRaw arc t
+    let arcAngleAt arc t = angleAtRaw arc t
     let arcEndAngle arc = arc.StartAngle + arc.DeltaAngle
     let arcLargeArc arc = abs arc.DeltaAngle > halfTurn
     let arcSweep arc = arc.DeltaAngle >= 0.0<degree>
@@ -203,10 +203,10 @@ module Ellipse =
             StartAngle = angleAtRaw arc fromParameter
             DeltaAngle = Parameter.ratio (toParameter - fromParameter) * arc.DeltaAngle }
 
-    let splitArc arc t = arcBetween arc (parameter 0.0) t, arcBetween arc t (parameter 1.0)
+    let arcSplit arc t = arcBetween arc (parameter 0.0) t, arcBetween arc t (parameter 1.0)
 
-    let splitArcInside arc t =
-        if t < parameter 0.0 || t > parameter 1.0 then Error SplitOutsideArc else Ok(splitArc arc t)
+    let arcSplitInside arc t =
+        if t < parameter 0.0 || t > parameter 1.0 then Error SplitOutsideArc else Ok(arcSplit arc t)
 
     let private normalizedProgresses points =
         points
@@ -218,16 +218,16 @@ module Ellipse =
         |> List.skipWhile ((=) (parameter 1.0))
         |> List.rev
 
-    let splitArcMany arc points =
+    let arcSplitMany arc points =
         let boundaries = parameter 0.0 :: normalizedProgresses points @ [ parameter 1.0 ]
         boundaries |> List.pairwise |> List.map (fun (fromParameter, toParameter) -> arcBetween arc fromParameter toParameter)
 
-    let splitArcInsideMany arc points =
+    let arcSplitManyInside arc points =
         let points = normalizedProgresses points
         if points |> List.exists (fun t -> t < parameter 0.0 || t > parameter 1.0) then
             Error SplitOutsideArc
         else
-            Ok(splitArcMany arc points)
+            Ok(arcSplitMany arc points)
 
     let private boundingCandidateAngles arc =
         let xAlpha = arc.Radius.X * Trig.cosDegrees arc.XAxisRotation
@@ -295,10 +295,10 @@ module Ellipse =
           Control2 = Point.translate (Point.scale -alpha endTangent) endPoint
           End = endPoint }
 
-    let arcToCubics startPoint radius xAxisRotation largeArc sweep endPoint =
+    let arcToCubicBeziers startPoint radius xAxisRotation largeArc sweep endPoint =
         match doEndpointToCenter startPoint radius xAxisRotation largeArc sweep endPoint with
         | Error error -> Error error
-        | Ok arc -> splitArcInsideMany arc (cubicSplitProgresses arc) |> Result.map (List.map cubicForArc)
+        | Ok arc -> arcSplitManyInside arc (cubicSplitProgresses arc) |> Result.map (List.map cubicForArc)
 
     let private arcAxes radius xAxisRotation =
         let rx, ry = abs radius.X, abs radius.Y

@@ -128,7 +128,7 @@ let ``bounding box dimensions use extents`` () =
     Assert.Equal(10.0<length>, BoundingBox.width box)
     Assert.Equal(12.0<length>, BoundingBox.height box)
     Assert.Equal(point 3.0 9.0, BoundingBox.center box)
-    Assert.Equal(22.0<length>, BoundingBox.diameter box)
+    Assert.Equal(22.0<length>, BoundingBox.taxicabDiameter box)
 
 [<Fact>]
 let ``bounding box union covers both boxes`` () =

@@ -250,7 +250,7 @@ let ``near parallel line projection is scale invariant`` () =
             Transform.scaleSegment segmentValue scale
             |> Result.defaultWith (failwithf "%A")
         let projection =
-            Intersections.segmentSegmentProjectionWith (scaled left) (scaled right)
+            Intersections.segmentSegmentClosestPairWith (scaled left) (scaled right)
                 { Intersections.defaultOptions with Tolerance = 1.0e-12<length> * scale }
             |> Result.defaultWith (failwithf "%A")
         assertParameterNear 0.5<parameter> projection.LeftT 1.0e-6
@@ -261,18 +261,18 @@ let ``near parallel line projection is scale invariant`` () =
 let ``segment projection reports crossing separated and overlapping lines`` () =
     let horizontal = Line(point 0.0 0.0, point 10.0 0.0)
     let crossing = Line(point 5.0 -2.0, point 5.0 2.0)
-    let crossed = Intersections.segmentSegmentProjection horizontal crossing |> Result.defaultWith (failwithf "%A")
+    let crossed = Intersections.segmentSegmentClosestPair horizontal crossing |> Result.defaultWith (failwithf "%A")
     Assert.Equal(0.0<length>, crossed.Distance)
     assertParameterNear 0.5<parameter> crossed.LeftT 1.0e-9
     assertParameterNear 0.5<parameter> crossed.RightT 1.0e-9
 
     let separated = Line(point 2.0 3.0, point 8.0 3.0)
-    let nearest = Intersections.segmentSegmentProjection horizontal separated |> Result.defaultWith (failwithf "%A")
+    let nearest = Intersections.segmentSegmentClosestPair horizontal separated |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3.0<length>, nearest.Distance)
     Assert.Equal(nearest.LeftPoint.X, nearest.RightPoint.X)
 
     let overlapping = Line(point 3.0 0.0, point 7.0 0.0)
-    let overlap = Intersections.segmentSegmentProjection horizontal overlapping |> Result.defaultWith (failwithf "%A")
+    let overlap = Intersections.segmentSegmentClosestPair horizontal overlapping |> Result.defaultWith (failwithf "%A")
     Assert.Equal(0.0<length>, overlap.Distance)
 
 [<Fact>]

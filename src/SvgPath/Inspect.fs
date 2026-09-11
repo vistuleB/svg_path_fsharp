@@ -22,7 +22,6 @@ module Inspect =
 
     let withLeftDecimals leftDecimals (options: Options) = { options with LeftDecimals = leftDecimals }
     let withRightDecimals rightDecimals (options: Options) = { options with RightDecimals = rightDecimals }
-    let withLeftPadding leftPadding options = withLeftDecimals leftPadding options
 
     let private numberFormat options numbers =
         NumberFormat.prepare

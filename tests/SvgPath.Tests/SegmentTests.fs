@@ -181,7 +181,7 @@ let ``segment split and between extrapolate while inside variants reject`` () =
 [<Fact>]
 let ``parametric subpath fits a straight interval`` () =
     let curve t = point t (2.0 * t)
-    let subpath = Subpath.parametric 0.0 1.0 curve |> Result.defaultWith (failwithf "%A")
+    let subpath = Subpath.fromParametric 0.0 1.0 curve |> Result.defaultWith (failwithf "%A")
     Assert.False(Subpath.isClosed subpath)
     Assert.Equal(point 0.0 0.0, Subpath.start subpath)
     Assert.Equal(point 1.0 2.0, Subpath.finish subpath)
@@ -210,7 +210,7 @@ let ``segment crossings and minimization match scalar sampling contracts`` () =
 [<Fact>]
 let ``degenerate cubic preserves collinear backtracking`` () =
     let segment = CubicBezier(point 0.0 0.0, point 3.0 0.0, point -2.0 0.0, point 1.0 0.0)
-    let replacement = Segment.degenerateLines segment 1.0e-9<length> |> Result.defaultWith (failwithf "%A")
+    let replacement = Segment.linearizeIfDegenerate segment 1.0e-9<length> |> Result.defaultWith (failwithf "%A")
     match replacement with
     | Some lines ->
         Assert.True(List.length lines >= 2)

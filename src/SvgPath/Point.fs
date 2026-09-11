@@ -99,10 +99,10 @@ module Point =
             InternalNumber.checkedSum (point.X * unit.X) (point.Y * unit.Y) |> Result.toOption)
 
     /// Rotate by 90 degrees clockwise in displayed SVG coordinates.
-    let rotateClockwise (point: Point<'Unit>) : Point<'Unit> = create -point.Y point.X
+    let rotate90Clockwise (point: Point<'Unit>) : Point<'Unit> = create -point.Y point.X
 
     /// Rotate by 90 degrees counterclockwise in displayed SVG coordinates.
-    let rotateCounterclockwise (point: Point<'Unit>) : Point<'Unit> = create point.Y -point.X
+    let rotate90Counterclockwise (point: Point<'Unit>) : Point<'Unit> = create point.Y -point.X
 
     let displacement (fromPoint: Point<'Unit>) (toPoint: Point<'Unit>) : Point<'Unit> =
         subtract toPoint fromPoint

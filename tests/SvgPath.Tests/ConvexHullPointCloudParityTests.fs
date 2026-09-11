@@ -25,7 +25,7 @@ let private assertValidHull points (hull: Subpath) =
         Assert.True(abs (supportValueForPoints points angle - supportValueForSegments hull.Segments angle) <= 1.0e-6<length>)
 
 let private assertValidInAllModes points =
-    ConvexHull.pointsHull points
+    ConvexHull.points points
     |> Result.defaultWith (failwithf "%A")
     |> assertValidHull points
     let path = points |> List.map Subpath.empty |> Path.ofSubpaths
@@ -47,12 +47,12 @@ let ``point cloud hull handles 10 point cloud`` () =
 
 [<Fact>]
 let ``point cloud hull rejects empty point cloud`` () =
-    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.pointsHull [])
+    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.points [])
 
 [<Fact>]
 let ``point cloud hull handles points`` () =
     let points = [ point -2.0 1.0; point 5.0 1.0; point 0.0 4.0; point 1.0 2.0 ]
-    ConvexHull.pointsHull points
+    ConvexHull.points points
     |> Result.defaultWith (failwithf "%A")
     |> assertValidHull points
 

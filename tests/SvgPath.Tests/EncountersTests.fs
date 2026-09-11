@@ -60,7 +60,7 @@ module EncountersTests =
               LeftParameters = [ leftParameter ]
               RightParameters = [ rightParameter ] }
         let found = { Overlaps = overlaps; Intersections = [ intersection ] }
-        Encounters.filterFullyOverlapExplainedSubpathIntersectionParameters found left right tolerance
+        Encounters.subpathFilterOverlapExplainedIntersections found left right tolerance
         |> Result.map (fun filtered -> List.isEmpty filtered.Intersections)
 
     let private segmentSubpathOverlapIsValid segment (subpathValue: Subpath) (overlap: Overlaps.SegmentSubpathOverlap) tolerance =
@@ -279,7 +279,7 @@ module EncountersTests =
               RightParameters = [ at 0 0.5 ] }
         let found = { Overlaps = overlaps; Intersections = [ intersection ] }
         let filtered =
-            Encounters.filterFullyOverlapExplainedSubpathIntersectionParameters found left right 1.0e-9<length>
+            Encounters.subpathFilterOverlapExplainedIntersections found left right 1.0e-9<length>
             |> Result.defaultWith (failwithf "%A")
         Assert.True((overlaps = filtered.Overlaps))
         Assert.Empty filtered.Intersections
@@ -290,7 +290,7 @@ module EncountersTests =
         let found: Encounters<Overlaps.SubpathOverlap, Intersections.SubpathIntersection> = { Overlaps = []; Intersections = [] }
         Assert.Equal(
             Error(InvalidIntersectionTolerance 0.0<length>),
-            Encounters.filterFullyOverlapExplainedSubpathIntersectionParameters found value value 0.0<length>)
+            Encounters.subpathFilterOverlapExplainedIntersections found value value 0.0<length>)
 
     [<Fact>]
     let ``subpath intersection retains parameters with non overlap claim`` () =
@@ -307,7 +307,7 @@ module EncountersTests =
                     LeftParameters = [ complementaryLeft; nonComplementaryLeft ]
                     RightParameters = [ rightParameter ] } ] }
         let filtered =
-            Encounters.filterFullyOverlapExplainedSubpathIntersectionParameters found left right 1.0e-9<length>
+            Encounters.subpathFilterOverlapExplainedIntersections found left right 1.0e-9<length>
             |> Result.defaultWith (failwithf "%A")
         let intersection = filtered.Intersections |> List.exactlyOne
         Assert.True([ nonComplementaryLeft ] = intersection.LeftParameters)
@@ -402,7 +402,7 @@ module EncountersTests =
         let found = Encounters.subpath left right |> Result.defaultWith (failwithf "%A")
         Assert.Single found.Overlaps |> ignore
         Assert.Single found.Intersections |> ignore
-        let filtered = Encounters.filterFullyOverlapExplainedSubpathIntersectionParameters found left right 1.0e-6<length> |> Result.defaultWith (failwithf "%A")
+        let filtered = Encounters.subpathFilterOverlapExplainedIntersections found left right 1.0e-6<length> |> Result.defaultWith (failwithf "%A")
         Assert.Empty filtered.Intersections
 
     [<Fact>]
@@ -412,7 +412,7 @@ module EncountersTests =
         let found = Encounters.subpath left right |> Result.defaultWith (failwithf "%A")
         Assert.Single found.Overlaps |> ignore
         Assert.Equal(2, found.Intersections.Length)
-        let filtered = Encounters.filterFullyOverlapExplainedSubpathIntersectionParameters found left right 1.0e-6<length> |> Result.defaultWith (failwithf "%A")
+        let filtered = Encounters.subpathFilterOverlapExplainedIntersections found left right 1.0e-6<length> |> Result.defaultWith (failwithf "%A")
         let isolated = filtered.Intersections |> List.exactlyOne
         Assert.Equal(point 10.0<length> 5.0<length>, isolated.Point)
 

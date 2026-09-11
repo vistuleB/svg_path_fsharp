@@ -780,7 +780,7 @@ module Offset =
             else interiorUnitTangent t directions)
 
     let private unitNormal segment t =
-        unitTangent segment t |> Result.map Point.rotateCounterclockwise
+        unitTangent segment t |> Result.map Point.rotate90Counterclockwise
 
     let private hPreimageIsReversed preimage =
         match preimage.Source with
@@ -964,7 +964,7 @@ module Offset =
     let private segmentDiameter segment =
         Segment.boundingBox segment
         |> Result.mapError InternalPathError
-        |> Result.map BoundingBox.diameter
+        |> Result.map BoundingBox.taxicabDiameter
 
     let rec private splitShortRunNearHalf remaining target before beforeBound =
         match remaining with

@@ -510,7 +510,7 @@ this section maps the available families.
 Use `Segment.boundingBox`, `Subpath.boundingBox`, and `Path.boundingBox` for
 axis-aligned bounds. Line, Bezier, and arc extrema are included. Measure a box
 with `BoundingBox.width`, `BoundingBox.height`, `BoundingBox.center`, and
-`BoundingBox.diameter`; the diameter is width plus height.
+`BoundingBox.taxicabDiameter`; the diameter is width plus height.
 
 ### Optimization Over Segments
 
@@ -649,13 +649,13 @@ Use `Area` for signed area, SVG fill-rule area, and absolute winding area:
 ```fsharp
 let filledArea path = Area.path path Nonzero
 let signedArea path = Area.signedPath path
-let windingArea path = Area.absolutePath path
+let windingArea path = Area.absoluteWindingPath path
 ```
 
 There are three area notions here. `Area.signedSubpath` and `Area.signedPath`
 return algebraic area. `Area.subpath` and `Area.path` return unsigned filled
-area under `Nonzero` or `EvenOdd`. `Area.absoluteSubpath` and
-`Area.absolutePath` integrate `abs(windingNumber)`, so repeated same-direction
+area under `Nonzero` or `EvenOdd`. `Area.absoluteWindingSubpath` and
+`Area.absoluteWindingPath` integrate `abs(windingNumber)`, so repeated same-direction
 loops count with multiplicity. `ConvexHull` is a separate geometry operation; a
 hull area can be larger than the filled area of a concave or self-intersecting
 shape.
@@ -680,10 +680,10 @@ The difference matters for repeated or nested loops:
 | Same loop twice, same direction | `+2A` or `-2A` | `A` | `0` |
 | Same loop twice, opposite directions | `0` | `0` | `0` |
 
-For those three rows, `Area.absolutePath` returns `A`, `2A`, and `0`,
+For those three rows, `Area.absoluteWindingPath` returns `A`, `2A`, and `0`,
 respectively.
 
-`Area.subpath`, `Area.path`, `Area.absoluteSubpath`, and `Area.absolutePath`
+`Area.subpath`, `Area.path`, `Area.absoluteWindingSubpath`, and `Area.absoluteWindingPath`
 first linearize curves and then integrate slabs of the resulting line
 arrangement. The `With` variants accept `LinearizeOptions`; `Tolerance`
 controls curve-to-line approximation in coordinate units, not a direct bound on
@@ -785,7 +785,7 @@ Use `Encounters` when both continuous overlaps and isolated point intersections
 are required from one query. Its segment, segment-subpath, subpath, and path
 functions return both lists without changing the underlying payload types.
 Subpath encounters retain overlap-boundary intersections by default; the
-explicitly named `filterFullyOverlapExplainedSubpathIntersectionParameters`
+explicitly named `subpathFilterOverlapExplainedIntersections`
 helper derives a view with parameters fully explained by overlaps removed.
 
 ## Convex Hulls
@@ -794,7 +794,7 @@ The `ConvexHull` module computes closed convex hull subpaths for segments,
 subpaths, paths, and point lists.
 
 ```fsharp
-let hull segment = ConvexHull.segmentHull segment
+let hull segment = ConvexHull.segment segment
 ```
 
 Lines, quadratic Beziers, and ordinary arcs are handled semantically. Lines
@@ -802,8 +802,8 @@ produce a two-line closed hull, while quadratic Beziers and arcs produce the
 original primitive plus the chord joining its endpoints. Cubic Beziers use a
 cubic-specific numerical solver.
 
-Use `ConvexHull.subpathHull`, `ConvexHull.pathHull`, and
-`ConvexHull.pointsHull` for larger inputs. Move-only subpaths contribute their
+Use `ConvexHull.subpath`, `ConvexHull.path`, and
+`ConvexHull.points` for larger inputs. Move-only subpaths contribute their
 start points.
 
 `ConvexHull.segmentMinimumWidth`, `ConvexHull.subpathMinimumWidth`, and
@@ -989,8 +989,8 @@ y' = b*x + d*y + f
 
 The ordinary `segment`, `subpath`, and `path` transform functions preserve
 segment types and return `DegenerateArcTransform` when an affine transform
-collapses an arc into line geometry. Use `segmentGracefully`,
-`segmentToSubpathGracefully`, `subpathGracefully`, or `pathGracefully` when
+collapses an arc into line geometry. Use `segmentWithArcCollapse`,
+`segmentToSubpathWithArcCollapse`, `subpathWithArcCollapse`, or `pathWithArcCollapse` when
 collapsed arcs should instead become one or more line segments.
 
 Matrix values can be constructed and inspected as tuples:

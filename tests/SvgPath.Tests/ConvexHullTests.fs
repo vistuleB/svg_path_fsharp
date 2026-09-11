@@ -45,12 +45,12 @@ let private conflictingTangentLineLikeLoop () =
 
 [<Fact>]
 let ``point hull rejects an empty collection`` () =
-    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.pointsHull [])
+    Assert.Equal(Error(ConvexHull.ConvexHullPathError EmptyPath), ConvexHull.points [])
 
 [<Fact>]
 let ``point hull removes interior points`` () =
     let hull =
-        ConvexHull.pointsHull
+        ConvexHull.points
             [ point 0.0 0.0; point 4.0 0.0; point 4.0 2.0; point 0.0 2.0; point 2.0 1.0 ]
         |> Result.defaultWith (failwithf "%A")
     Assert.True(hull.Closed)
@@ -88,7 +88,7 @@ let ``directional support API keeps width units`` () =
 [<Fact>]
 let ``quadratic hull preserves the curve and closes with its chord`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 2.0 3.0, point 4.0 0.0)
-    let hull = ConvexHull.segmentHull curve |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.segment curve |> Result.defaultWith (failwithf "%A")
     Assert.Equal<Segment list>([ curve; Line(point 4.0 0.0, point 0.0 0.0) ], hull.Segments)
     Assert.True(hull.Closed)
 
@@ -102,14 +102,14 @@ let ``arc hull preserves the arc and closes with its chord`` () =
                LargeArc = false
                Sweep = true
                End = point 2.0 0.0 }: Ellipse.EndpointArcData)
-    let hull = ConvexHull.segmentHull arc |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.segment arc |> Result.defaultWith (failwithf "%A")
     Assert.Equal(arc, List.head hull.Segments)
     Assert.Equal(Line(point 2.0 0.0, point -2.0 0.0), List.last hull.Segments)
 
 [<Fact>]
 let ``cubic hull retains cubic boundary pieces`` () =
     let cubic = CubicBezier(point 0.0 0.0, point 0.0 4.0, point 4.0 4.0, point 4.0 0.0)
-    let hull = ConvexHull.segmentHull cubic |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.segment cubic |> Result.defaultWith (failwithf "%A")
     Assert.True(hull.Closed)
     Assert.Contains(hull.Segments, function CubicBezier _ -> true | _ -> false)
 
@@ -117,7 +117,7 @@ let ``cubic hull retains cubic boundary pieces`` () =
 let ``subpath hull preserves exposed source curves`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 2.0 3.0, point 4.0 0.0)
     let source = Subpath.ofSegment curve
-    let hull = ConvexHull.subpathHull source |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.subpath source |> Result.defaultWith (failwithf "%A")
     Assert.True(hull.Closed)
     Assert.Contains(hull.Segments, function QuadraticBezier _ -> true | _ -> false)
 
@@ -125,7 +125,7 @@ let ``subpath hull preserves exposed source curves`` () =
 let ``adaptive search converges on a rotated rectangle`` () =
     let angle = Degree.fromFloat 31.7
     let along = Point.direction angle
-    let across = Point.rotateClockwise along
+    let across = Point.rotate90Clockwise along
     let center = point 3.0 -2.0
     let corner alongSign acrossSign =
         center
@@ -150,7 +150,7 @@ let ``path hull refines transitions between distinct source curves`` () =
     let upper = QuadraticBezier(point -4.0 0.0, point -2.0 -3.0, point 0.0 0.0)
     let lower = QuadraticBezier(point 0.0 0.0, point 2.0 3.0, point 4.0 0.0)
     let source = Path.ofSubpaths [ Subpath.ofSegment upper; Subpath.ofSegment lower ]
-    let hull = ConvexHull.pathHull source |> Result.defaultWith (failwithf "%A")
+    let hull = ConvexHull.path source |> Result.defaultWith (failwithf "%A")
     Assert.True(hull.Closed)
     Assert.Contains(hull.Segments, function QuadraticBezier _ -> true | _ -> false)
     hull.Segments

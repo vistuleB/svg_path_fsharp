@@ -1,5 +1,24 @@
 # Gleam commit-by-commit synchronization
 
+## v1 API and documentation review (2026-09-11)
+
+- Gleam `ba0bbed` → F# `39b3bc6`: public function renamings, removal of the
+  left-padding aliases, and updates to callers and README. `scripts/test-fast`:
+  1840 passed.
+- Gleam `3f54520` → F# `1382f4f`: move conditional-linearization functions into
+  Degeneracy, preserve units and geometry algorithms, and port both negative
+  tolerance regressions. `scripts/test-fast`: 1842 passed.
+- Gleam `803c555` → F# `5a5f2f5`: construction, assertion, parametric fitting,
+  arc conversion, and basic-shape documentation. Also fixes an F# discrepancy:
+  opening with setClosedWith ignores the unused endpoint policy, matching
+  Gleam. An F# regression covers that previously failing case.
+  `scripts/test-fast`: 1843 passed.
+- A separate documentation audit is recorded in `FSharp_DOCSTRING_REVIEW.md`;
+  its remaining recommendations are not implemented.
+
+This batch ports the API/doc review commits, not the preceding Gleam-only
+historical-document and Gallery layout edits.
+
 ## v0.47.0 release alignment
 
 - Gleam `1f6f732` → F# `10bdd06`: detailed Transform correspondence errors,

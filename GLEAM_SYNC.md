@@ -1,5 +1,14 @@
 # Gleam commit-by-commit synchronization
 
+## v1.0.0 release alignment (2026-09-12)
+
+- Gleam `cc199907` establishes the stable v1.0.0 baseline; no library code
+  changed since the v0.48.0 baseline already ported for F# v0.8.0.
+- Gleam `26205535` / `c65a92f8`: ported the README figure adjustments to
+  the independent F# generator (1.6/1.8 square offsets, two successive 10%
+  legend increases and two successive 10% band-stroke reductions).
+- F# v1.0.0 retains the existing API and geometry implementation.
+
 ## v0.48.0 release alignment (2026-09-11)
 
 - Gleam `fa075de`: incorporated the separate Subpath open/close API, removed

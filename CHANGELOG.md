@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0 - 2026-09-12
+
+- Established the v0.8.0 public API as the stable baseline, aligned with Gleam
+  `svg_path` v1.0.0. No geometry algorithms or public signatures changed.
+- Future breaking public API changes require a major version increase.
+  Existing numerical tolerances and bounded intersection-search limitations
+  remain part of the documented contracts.
+- Updated the independently generated README band figures: square offsets
+  1.6/1.8, larger square legends, and thinner figure-eight band strokes.
+- Pinned README images to the immutable `assets-v1.0.0` tag.
+- Release verification: `scripts/test-release` passed 1,843 fast tests and
+  26 slow tests. `scripts/generate-readme-figures --check` and
+  `scripts/generate-gallery-figures --check` passed for 13 README and 33
+  Gallery figures.
+
 ## 0.8.0 - 2026-09-11
 
 - Aligned the public API changes with Gleam `svg_path` v0.48.0 (`fa075de`).

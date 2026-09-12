@@ -41,9 +41,10 @@ module Fixtures =
         [true,true,"inner_cusps: True · outer_cusps: True";false,true,"inner_cusps: False · outer_cusps: True";false,false,"inner_cusps: False · outer_cusps: False"]
         |> List.mapi(fun i (inner,outer,title) ->
             let options={Offset.defaultOptions with Offset.BandTrimming=({InnerCusps=inner;OuterCusps=outer;InBand=true}: Offset.BandTrimming)}
-            let answer=band options 1.7<length> 1.8<length> Offset.Round Offset.Butt concaveSquare
+            let answer=band options 1.6<length> 1.8<length> Offset.Round Offset.Butt concaveSquare
             let x=70+i*420
-            String.concat "\n" [label (x+140) 30 title;panelPath x 95 65.0 answer "fill:#fdba74;fill-opacity:.55;stroke:#c2410c;stroke-width:.025";panelPath x 95 65.0 (Path.ofSubpaths[concaveSquare]) sourceStyle])
+            let legend = (label (x+140) 30 title).Replace("font-size=\"18\"", "font-size=\"21.78\"")
+            String.concat "\n" [legend;panelPath x 95 65.0 answer "fill:#fdba74;fill-opacity:.55;stroke:#c2410c;stroke-width:.025";panelPath x 95 65.0 (Path.ofSubpaths[concaveSquare]) sourceStyle])
         |> String.concat "\n" |> document 1260 390
 
     let private figureEight = subpath "M0 0C-336 -234 -336 234 0 0C336 -234 336 234 0 0Z"
@@ -53,7 +54,7 @@ module Fixtures =
             let options={Offset.defaultOptions with Offset.BandTrimming=({InnerCusps=true;OuterCusps=true;InBand=inBand}: Offset.BandTrimming)}
             let answer=band options 18.0<length> 34.0<length> Offset.Round Offset.Butt figureEight
             let x=320+i*640
-            String.concat "\n" [label x 32 title;panelPath x 220 0.78 answer "fill:#bbf7d0;stroke:#14532d;stroke-width:2.2";panelPath x 220 0.78 (Path.ofSubpaths[figureEight]) "fill:none;stroke:#be123c;stroke-width:2;stroke-dasharray:7 6"])
+            String.concat "\n" [label x 32 title;panelPath x 220 0.78 answer "fill:#bbf7d0;stroke:#14532d;stroke-width:1.782";panelPath x 220 0.78 (Path.ofSubpaths[figureEight]) "fill:none;stroke:#be123c;stroke-width:2;stroke-dasharray:7 6"])
         |> String.concat "\n" |> document 1280 440
 
     let private arrangementFigure source =

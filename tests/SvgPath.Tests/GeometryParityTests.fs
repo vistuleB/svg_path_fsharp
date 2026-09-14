@@ -97,9 +97,9 @@ let ``segment degenerate lines preserves cubic backtracking`` () =
     Assert.Equal(3, found.Length)
 
 [<Fact>]
-let ``segment degenerate lines converts zero radius arc`` () =
+let ``segment degenerate lines rejects zero radius arc`` () =
     let arc = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false; End = point 10.0 0.0 }: Ellipse.EndpointArcData)
-    Assert.Equal(Some [ line 0.0 0.0 10.0 0.0 ], Degeneracy.segmentLinearizeIfDegenerate arc 0.001<length> |> Result.defaultWith (failwithf "%A"))
+    Assert.Equal(Error(Degeneracy.DegeneracyPathError DegenerateArc), Degeneracy.segmentLinearizeIfDegenerate arc 0.001<length>)
 
 [<Fact>]
 let ``segment degenerate lines rejects wide curve`` () =

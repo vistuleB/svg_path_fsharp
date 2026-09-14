@@ -408,23 +408,56 @@ module Segment =
         byPointPairSimilarity segment (start segment) (finish segment) newStart newEnd
         |> Result.map (withStart newStart >> withFinish newEnd)
 
-    let arcsToCubicBeziers segment =
+    /// Apply SVG's exact arc interpretation without a tolerance. Coincident
+    /// endpoints omit the arc before the zero-radius line rule; otherwise radii
+    /// become positive. Non-arcs are unchanged. Insufficient radii are not enlarged.
+    let normalizeSvgArc segment =
+        match segment with
+        | Arc endpoint ->
+            if InternalNumber.isZero (endpoint.Start.X - endpoint.End.X)
+               && InternalNumber.isZero (endpoint.Start.Y - endpoint.End.Y) then None
+            elif InternalNumber.isZero endpoint.Radius.X || InternalNumber.isZero endpoint.Radius.Y then
+                Some(Line(endpoint.Start, endpoint.End))
+            else Some(Arc { endpoint with Radius = Point.create (abs endpoint.Radius.X) (abs endpoint.Radius.Y) })
+        | _ -> Some segment
+
+    /// Approximate arcs with quarter-turn cubics, returning DegenerateArc on
+    /// conversion failure. Non-arcs are unchanged. Coincident endpoints and
+    /// absolute radii at or below 1e-9 are rejected; other radius corrections
+    /// follow Ellipse.endpointToCenter. Strictness concerns recovery, not accuracy.
+    let arcsToCubicBeziersStrict segment =
         match segment with
         | Arc endpoint ->
             match Ellipse.arcToCubicBeziers
                 endpoint.Start endpoint.Radius endpoint.XAxisRotation
                 endpoint.LargeArc endpoint.Sweep endpoint.End with
             | Ok cubics ->
+                // Match Gleam's endpoint reconciliation: center-form evaluation
+                // may round the boundary points away from the supplied endpoints.
+                let lastIndex = List.length cubics - 1
                 cubics
-                |> List.map (fun cubic -> CubicBezier(cubic.Start, cubic.Control1, cubic.Control2, cubic.End))
-            | Error _ ->
-                [ CubicBezier(
-                    endpoint.Start,
-                    Point.interpolate endpoint.Start endpoint.End (Parameter.fromFloat (1.0 / 3.0)),
-                    Point.interpolate endpoint.Start endpoint.End (Parameter.fromFloat (2.0 / 3.0)),
-                    endpoint.End
-                  ) ]
-        | _ -> [ segment ]
+                |> List.mapi (fun index cubic ->
+                    CubicBezier(
+                        (if index = 0 then endpoint.Start else cubic.Start),
+                        cubic.Control1, cubic.Control2,
+                        (if index = lastIndex then endpoint.End else cubic.End)))
+                |> Ok
+            | Error _ -> Error DegenerateArc
+        | _ -> Ok [ segment ]
+
+    /// Convert arcs to cubics, retaining the historical straight-cubic fallback
+    /// on ellipse conversion failure. Use arcsToCubicBeziersStrict to report it.
+    let arcsToCubicBeziers segment =
+        match arcsToCubicBeziersStrict segment with
+        | Ok cubics -> cubics
+        | Error _ ->
+            let endpointStart, endpointEnd = start segment, finish segment
+            [ CubicBezier(
+                endpointStart,
+                Point.interpolate endpointStart endpointEnd (Parameter.fromFloat (1.0 / 3.0)),
+                Point.interpolate endpointStart endpointEnd (Parameter.fromFloat (2.0 / 3.0)),
+                endpointEnd
+              ) ]
 
     let toCubicBeziers segment =
         match segment with
@@ -442,6 +475,13 @@ module Segment =
                 endPoint) ]
         | CubicBezier _ -> [ segment ]
         | Arc _ -> arcsToCubicBeziers segment
+
+    /// Convert to cubics without straight-cubic recovery for undefined arcs.
+    /// Non-arcs use exact conversion; arcs remain approximations.
+    let toCubicBeziersStrict segment =
+        match segment with
+        | Arc _ -> arcsToCubicBeziersStrict segment
+        | _ -> Ok(toCubicBeziers segment)
 
     let private asBezier segment =
         match segment with
@@ -1511,9 +1551,11 @@ module Segment =
             | CubicBezier _ -> linearizeBezier options 0 (asBezier segment)
             | Arc endpoint ->
                 match Ellipse.endpointToCenter endpoint with
-                | Error _ -> Ok [ Line(endpoint.Start, endpoint.End) ]
+                | Error _ -> Error DegenerateArc
                 | Ok arc -> linearizeArc options 0 arc endpoint.Start endpoint.End)
 
+    /// Approximate with lines. Undefined arcs return DegenerateArc; SVG-specific
+    /// line/omission replacements require explicit normalizeSvgArc(s) calls.
     let toLines segment = toLinesWith defaultLinearizeOptions segment
 
 
@@ -2059,6 +2101,21 @@ module Subpath =
                     | first :: rest -> first :: forceEnd rest
                 { mapped with startPoint = newStart; segmentList = mapped.segmentList |> List.mapi (fun i s -> if i = 0 then Segment.withStart newStart s else s) |> forceEnd })
 
+    /// Apply SVG arc interpretation, preserving start, closure, and empty subpaths.
+    /// Zero-length lines and all non-arc geometry remain unchanged.
+    let normalizeSvgArcs subpath =
+        { subpath with segmentList = List.choose Segment.normalizeSvgArc subpath.segmentList }
+
+    /// Convert to cubics, returning the first arc error without partial geometry.
+    /// Preserves the start and closed flag, including empty subpaths.
+    let toCubicBeziersStrict subpath =
+        subpath.segmentList
+        |> List.fold (fun state segment ->
+            state |> Result.bind (fun reversed ->
+                Segment.toCubicBeziersStrict segment
+                |> Result.map (fun pieces -> List.rev pieces @ reversed))) (Ok [])
+        |> Result.map (fun reversed -> { subpath with segmentList = List.rev reversed })
+
     let arcsToCubicBeziers subpath =
         { subpath with
             segmentList = subpath.segmentList |> List.collect Segment.arcsToCubicBeziers }
@@ -2563,6 +2620,19 @@ module Path =
                     Subpath.byPointPairSimilarity subpath sourceStart sourceEnd targetStart targetEnd
                     |> Result.map (fun next -> next :: mapped))) (Ok [])
             |> Result.map (fun reversed -> { subpathList = List.rev reversed }))
+
+    /// Apply SVG arc interpretation independently to each subpath.
+    let normalizeSvgArcs path =
+        { subpathList = List.map Subpath.normalizeSvgArcs path.subpathList }
+
+    /// Convert to cubics without fallback, stopping at the first arc error.
+    /// Preserves subpath order, starts, and closed flags.
+    let toCubicBeziersStrict path =
+        path.subpathList
+        |> List.fold (fun state subpath ->
+            state |> Result.bind (fun reversed ->
+                Subpath.toCubicBeziersStrict subpath |> Result.map (fun next -> next :: reversed))) (Ok [])
+        |> Result.map (fun reversed -> { subpathList = List.rev reversed })
 
     let arcsToCubicBeziers path =
         { subpathList = path.subpathList |> List.map Subpath.arcsToCubicBeziers }

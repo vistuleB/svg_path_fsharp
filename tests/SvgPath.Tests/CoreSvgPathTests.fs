@@ -994,10 +994,10 @@ let ``segment to lines approximates arcs within tolerance`` () =
         Assert.True(distance <= tolerance, $"sample {index} was {distance} from the line approximation")
 
 [<Fact>]
-let ``segment to lines degenerate arc falls back to line`` () =
+let ``segment to lines rejects degenerate arc`` () =
     let a, b = point 0.0 0.0, point 10.0 0.0
     let arc = Arc ({ Start = a; Radius = point 0.0 5.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = b }: Ellipse.EndpointArcData)
-    Assert.Equal(Ok [ Line(a, b) ], Segment.toLines arc)
+    Assert.Equal(Error DegenerateArc, Segment.toLines arc)
 
 [<Fact>]
 let ``segment to lines tighter tolerance does not use fewer lines`` () =

@@ -90,6 +90,7 @@
     <Compile Include="ParseParityTests.fs" />
     <Compile Include="ParseW3cParityTests.fs" />
     <Compile Include="SerializeTests.fs" />
+    <Compile Include="SvgArcNormalizationTests.fs" />
     <Compile Include="RoundtripTests.fs" />
     <Compile Include="SvgTests.fs" />
     <Compile Include="ArrangementTests.fs" />

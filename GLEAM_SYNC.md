@@ -1,5 +1,22 @@
 # Gleam commit-by-commit synchronization
 
+## v1.1.0 arc-policy alignment (2026-09-14)
+
+- Gleam `ac123ac8`: preserve raw parsed arc arguments and add explicit SVG
+  normalization. Applied the prototype together with its finalized location
+  from the next commit, without exposing the temporary Degeneracy helpers.
+- Gleam `8652335a`: place normalization in Segment/Subpath/Path, reject undefined
+  ellipse geometry in degeneracy and line conversion, and add the four strict
+  cubic converters while retaining forgiving defaults. README/docs updated.
+- Ported all 19 new tests one-to-one and updated the existing WPT, serialization,
+  zero-radius, and signed-zero expectations alongside their Gleam counterparts.
+- Also restored exact arc-to-cubic endpoints as Gleam already does in
+  `cubic_segments_from_ellipse`; this was absent in the previous F# converter.
+- Gleam `c4668aea` is the corresponding v1.1.0 release-preparation commit.
+- Verification: `scripts/test-release` passed 1,862 fast and 26 slow tests;
+  `scripts/generate-readme-figures --check` and
+  `scripts/generate-gallery-figures --check` passed for all 13/33 figures.
+
 ## v1.0.0 release alignment (2026-09-12)
 
 - Gleam `cc199907` establishes the stable v1.0.0 baseline; no library code

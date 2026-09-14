@@ -525,6 +525,28 @@ For conditional line replacement, use
 `Degeneracy.subpathLinearizeIfDegenerate`. They return `Ok None` when the
 geometry is not line-degenerate, or `Ok (Some lines)` for its line replacement,
 preserving backtracking. Errors use `Degeneracy.Error`.
+Arcs must determine ellipse geometry accepted by `Segment.arcCenterData`;
+undefined arcs return errors rather than SVG-specific replacement geometry.
+
+### Explicit SVG Arc Normalization
+
+Parsing preserves arc arguments, including signed radii, zero radii, and
+coincident endpoints. To request SVG's special interpretation rules, use
+`Segment.normalizeSvgArc`, `Subpath.normalizeSvgArcs`, or `Path.normalizeSvgArcs`.
+
+Coincident-endpoint arcs are omitted; otherwise zero-radius arcs become lines,
+and negative radii become positive. Subpath starts, boundaries, and closed flags
+are preserved, including when an entire subpath becomes empty. These operations
+use no tolerance, do not enlarge insufficient radii, and do not remove existing
+zero-length lines. They are never applied automatically by the parser.
+
+The existing cubic converters retain their straight-cubic recovery on arc
+conversion failure. Use `Segment.arcsToCubicBeziersStrict`,
+`Segment.toCubicBeziersStrict`, `Subpath.toCubicBeziersStrict`, or
+`Path.toCubicBeziersStrict` to return a `Result` instead: undefined arcs produce
+`Error DegenerateArc` without fallback geometry. Strictness concerns error
+recovery, not approximation accuracy; valid arcs use the same quarter-turn
+cubic approximation in both modes.
 
 ### Optimization Over Segments
 

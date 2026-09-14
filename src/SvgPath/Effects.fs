@@ -60,6 +60,8 @@ module Effects =
     /// Replace maximal thin windows through Degeneracy, preserving start/end
     /// and both longitudinal support extrema in source order. Intermediate
     /// local reversals need not survive.
+    /// Undefined ellipse geometry returns an error. SVG arc interpretation is
+    /// available separately through Path.normalizeSvgArcs.
     let normalizeDegenerateSegments subpath tolerance =
         Degeneracy.normalizeDegenerateSegments subpath tolerance
         |> Result.mapError degeneracyError

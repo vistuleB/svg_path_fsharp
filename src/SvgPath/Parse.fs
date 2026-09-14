@@ -1,6 +1,8 @@
 namespace SvgPath
 
 /// Parsing of SVG path-data strings.
+/// Arc arguments are preserved, including signed/zero radii and coincident
+/// endpoints. Request SVG interpretation separately with Path.normalizeSvgArcs.
 [<RequireQualifiedAccess>]
 module Parse =
 
@@ -322,20 +324,19 @@ module Parse =
                     takeArc current rest
                     |> Result.bind (fun (radiusX, radiusY, rotation, largeArc, sweep, endX, endY, tail) ->
                         let endpoint = targetPoint current (endX * 1.0<length>) (endY * 1.0<length>) relative
-                        let radiusX = abs radiusX * 1.0<length>
-                        let radiusY = abs radiusY * 1.0<length>
+                        let radiusX = radiusX * 1.0<length>
+                        let radiusY = radiusY * 1.0<length>
                         let next =
-                            if endpoint = current.Current then Ok(clearControls current)
-                            elif radiusX = 0.0<length> || radiusY = 0.0<length> then appendLine current endpoint
-                            else
-                                appendSegment current
-                                    (Arc
-                                        { Start = current.Current
-                                          Radius = Point.create radiusX radiusY
-                                          XAxisRotation = rotation * 1.0<degree>
-                                          LargeArc = largeArc
-                                          Sweep = sweep
-                                          End = endpoint }) endpoint
+                            // Preserve arc data; SVG interpretation is explicitly requested
+                            // through Path.normalizeSvgArcs, not performed by parsing.
+                            appendSegment current
+                                (Arc
+                                    { Start = current.Current
+                                      Radius = Point.create radiusX radiusY
+                                      XAxisRotation = rotation * 1.0<degree>
+                                      LargeArc = largeArc
+                                      Sweep = sweep
+                                      End = endpoint }) endpoint
                         next |> Result.bind (fun value -> loop value tail true))
                 | _ when parsed -> parseTokens rest current
                 | _ -> Error(expectedNumber current rest)

@@ -408,7 +408,8 @@ let ``parser tracked relative coincident arc does not invent geometry`` () =
     let serialized = Serialize.segmentWith arc (Serialize.relativeDecimalOptions 1)
     Assert.Equal("m 0.3 0 a 10 10 0 0 1 0 0",serialized)
     let parsed = Parse.path serialized |> Result.defaultWith (failwithf "%A")
-    Assert.Equal<Subpath list>([Subpath.empty(point 0.3 0.0)],Path.subpaths parsed)
+    Assert.Equal(1, (Path.subpaths parsed |> List.exactlyOne).Segments.Length)
+    Assert.Equal<Subpath list>([Subpath.empty(point 0.3 0.0)],Path.subpaths (Path.normalizeSvgArcs parsed))
 
 [<Fact>]
 let ``relative coincident zero radius arc terminates`` () =
@@ -419,7 +420,8 @@ let ``relative coincident zero radius arc terminates`` () =
         let encoded = Serialize.pathWith source Serialize.relativeOptions
         let parsed = Parse.path encoded |> Result.defaultWith (failwithf "%A")
         Assert.Equal(Ok parsed,Parse.path(Serialize.path source))
-        Assert.Equal(Path.singleton(Subpath.empty anchor),parsed)
+        Assert.Equal(source, parsed)
+        Assert.Equal(Path.singleton(Subpath.empty anchor),Path.normalizeSvgArcs parsed)
         Assert.Equal(1,encoded |> Seq.filter ((=) 'a') |> Seq.length)
 
 [<Fact>]

@@ -1,6 +1,8 @@
 namespace SvgPath
 
 /// Detection and normalization of geometrically degenerate path segments.
+/// Undefined ellipse geometry returns errors. SVG-specific arc interpretation
+/// is available separately through Path.normalizeSvgArcs.
 [<RequireQualifiedAccess>]
 module Degeneracy =
 
@@ -72,10 +74,10 @@ module Degeneracy =
                 let c = 3.0*c1 - 3.0*s
                 let breaks = Root.strictlyInside (Root.parameterQuadratic (3.0*a) (2.0*b) c) 0.0<parameter> 1.0<parameter> |> List.map Parameter.ratio
                 bezierResult points breaks
-            | Arc endpoint when InternalNumber.isZero endpoint.Radius.X || InternalNumber.isZero endpoint.Radius.Y ->
-                if endpoint.Start = endpoint.End then Ok(Some []) else Ok(Some [ Line(endpoint.Start, endpoint.End) ])
             | Arc _ ->
-                Segment.toLinesWith { Tolerance = tolerance; MaxDepth = Segment.defaultLinearizeOptions.MaxDepth } segment
+                Segment.arcCenterData segment
+                |> Result.bind (fun _ ->
+                    Segment.toLinesWith { Tolerance = tolerance; MaxDepth = Segment.defaultLinearizeOptions.MaxDepth } segment)
                 |> Result.mapError DegeneracyPathError
                 |> Result.map (fun lines ->
                     let points = lines |> List.collect (fun line -> [ Segment.start line; Segment.finish line ])
@@ -278,6 +280,16 @@ module Degeneracy =
                         normalizeSegments tolerance rest
                             (List.rev (Option.defaultValue [ first ] replacement) @ converted)))
 
+    // Validate before hull construction can replace undefined arcs by chords.
+    let rec private validateArcGeometry segments =
+        match segments with
+        | [] -> Ok ()
+        | (Arc _ as arc) :: rest ->
+            Segment.arcCenterData arc
+            |> Result.mapError DegeneracyPathError
+            |> Result.bind (fun _ -> validateArcGeometry rest)
+        | _ :: rest -> validateArcGeometry rest
+
     /// Replace maximal contiguous line-degenerate windows with ordered line traversals.
     /// Preserve endpoints and both longitudinal support extrema in source order;
     /// intermediate local reversals need not be retained.
@@ -286,7 +298,8 @@ module Degeneracy =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
             Error(DegeneracyInvalidTolerance tolerance)
         else
-            normalizeSegments tolerance subpath.Segments []
+            validateArcGeometry subpath.Segments
+            |> Result.bind (fun () -> normalizeSegments tolerance subpath.Segments [])
             |> Result.bind (fun segments ->
                 let openResult =
                     match segments with

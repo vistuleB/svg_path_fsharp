@@ -203,15 +203,21 @@ let ``wpt_repeated_arc_arguments_test`` () =
 
 [<Fact>]
 let ``wpt_negative_arc_radius_uses_absolute_value_test`` () =
-    Assert.Equal("M 200 300 A 50 50 0 0 1 300 300", canonical "M 200,300 A -50,50 0 0,1 300,300")
+    let path = Parse.path "M 200,300 A -50,50 0 0,1 300,300" |> Result.defaultWith (failwithf "%A")
+    Assert.Equal("M 200 300 A -50 50 0 0 1 300 300", Serialize.path path)
+    Assert.Equal("M 200 300 A 50 50 0 0 1 300 300", Serialize.path (Path.normalizeSvgArcs path))
 
 [<Fact>]
 let ``wpt_zero_arc_radius_becomes_line_test`` () =
-    Assert.Equal("M 200 250 H 300", canonical "M 200,250 A 0,0 0 0,1 300,250")
+    let path = Parse.path "M 200,250 A 0,0 0 0,1 300,250" |> Result.defaultWith (failwithf "%A")
+    Assert.Equal("M 200 250 A 0 0 0 0 1 300 250", Serialize.path path)
+    Assert.Equal("M 200 250 H 300", Serialize.path (Path.normalizeSvgArcs path))
 
 [<Fact>]
 let ``svg_same_endpoint_arc_is_omitted_test`` () =
-    Assert.Equal("M 20 30", canonical "M 20,30 A 10,10 0 1,1 20,30")
+    let path = Parse.path "M 20,30 A 10,10 0 1,1 20,30" |> Result.defaultWith (failwithf "%A")
+    Assert.Equal("M 20 30 A 10 10 0 1 1 20 30", Serialize.path path)
+    Assert.Equal("M 20 30", Serialize.path (Path.normalizeSvgArcs path))
 
 [<Fact>]
 let ``wpt_consecutive_signed_number_cases_test`` () =

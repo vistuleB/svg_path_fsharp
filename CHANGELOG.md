@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.1.0 - 2026-09-14
+
+- Aligned with Gleam `svg_path` v1.1.0. Parsing now preserves signed/zero arc
+  radii and coincident endpoints instead of applying SVG interpretation rules.
+  Existing function signatures remain unchanged.
+- Added `Segment.normalizeSvgArc`, `Subpath.normalizeSvgArcs`, and
+  `Path.normalizeSvgArcs` for explicit SVG arc omission, zero-radius line
+  replacement, and absolute-radius normalization, without a tolerance.
+- Degeneracy normalization and line conversion now report undefined ellipse
+  geometry through their existing error types rather than substituting chords.
+- Added `Segment.arcsToCubicBeziersStrict`, `Segment.toCubicBeziersStrict`,
+  `Subpath.toCubicBeziersStrict`, and `Path.toCubicBeziersStrict`. These return
+  `Result` without straight-cubic recovery. Existing forgiving converters remain
+  available, using the same approximation for valid arcs.
+- Corrected arc-to-cubic endpoint reconciliation to match Gleam: the first and
+  last cubic retain the exact supplied arc endpoints.
+- Ported all 19 new Gleam arc regressions and updated related existing tests.
+- Documented explicit SVG normalization separately from geometric simplification
+  and pinned README figures to `assets-v1.1.0`.
+- Release verification: `scripts/test-release` passed 1,862 fast and 26 slow
+  tests; README and Gallery generator checks passed for all 13 and 33 figures.
+
 ## 1.0.0 - 2026-09-12
 
 - Established the v0.8.0 public API as the stable baseline, aligned with Gleam

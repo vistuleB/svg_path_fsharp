@@ -440,7 +440,7 @@ deterministic: each arc chunk spans no more than 90 degrees. This is the common
 practical SVG arc-to-cubic approximation and is usually more than adequate for
 rendering and interchange.
 
-If you want every segment represented as cubic Bezier curves, use the stricter
+If you want every segment represented as cubic Bezier curves, use the all-cubic
 helpers instead. Lines and quadratic Beziers are converted exactly.
 
 ```fsharp
@@ -448,6 +448,12 @@ Segment.toCubicBeziers segment
 Subpath.toCubicBeziers subpath
 Path.toCubicBeziers path
 ```
+
+These forgiving converters retain the straight-cubic recovery for undefined
+arc geometry. Use `Segment.arcsToCubicBeziersStrict`,
+`Segment.toCubicBeziersStrict`, `Subpath.toCubicBeziersStrict`, or
+`Path.toCubicBeziersStrict` for a `Result` that reports the conversion error
+instead. Valid arcs use the same approximation in either mode.
 
 Use the `toLines` family to approximate every segment with straight lines:
 
@@ -460,8 +466,10 @@ Path.toLines path
 The `With` variants accept `LinearizeOptions`. The default tolerance is
 `0.01<length>` and the default recursion limit is 20. Beziers are adaptively
 subdivided using their control points' distance from each chord. Arcs use a
-conservative bound based on their radius and angular span. Degenerate arcs
-become lines between their endpoints.
+conservative bound based on their radius and angular span. Undefined ellipse
+geometry returns an error. If you want SVG rendering interpretation first,
+explicitly apply `Segment.normalizeSvgArc`, `Subpath.normalizeSvgArcs`, or
+`Path.normalizeSvgArcs` before line conversion.
 
 ## Arcs and the Ellipse Module
 

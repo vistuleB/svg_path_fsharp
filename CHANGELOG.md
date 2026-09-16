@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — Gleam v2.0.0 API alignment
+
+- Breaking: made degree-specific Bezier projection-extrema helpers private;
+  use `Bezier.projectionExtrema`.
+- Removed `Effects.normalizeDegenerateSegments` and its dedicated error cases;
+  use `Degeneracy.normalizeDegenerateSegments`.
+- Removed `Area.subpathClockwiseness` and its `With` variant.
+- Internalized the four uncapped band diagnostics and
+  `ArrangementDrawing.edgeAnnotationPose`.
+- Simplified `Curvature`: derivative bundles are private; removed radius-margin
+  and raw cusp-residual queries and `InvalidCurvatureMargin`.
+  `segmentInflectionParameters` now takes only a segment and returns a list,
+  without options or a `Result` wrapper.
+- Internalized callback-based convex-hull diameter/minimum-width searches and
+  `DirectionalExtent`; removed the unused F# `DirectionalSupport` alias.
+  Segment/subpath/path queries remain public.
+- Removed the six `Segment.arcPoint`/derivative/angle wrappers. Use
+  `Segment.point`/`derivative`, or `Segment.arcCenterData` with `Ellipse` helpers.
+- Renamed `Encounters.subpathFilterOverlapExplainedIntersections` to
+  `subpathRemoveRedundantIntersections` and specified the overlap-matching
+  contract. Its behavior is unchanged.
+- Moved the six direction-arrow helpers from `ArrangementDrawing` to `Svg`.
+- Updated callers, tests, and documentation without changing geometry algorithms.
+
 ## 1.1.0 - 2026-09-14
 
 - Aligned with Gleam `svg_path` v1.1.0. Parsing now preserves signed/zero arc

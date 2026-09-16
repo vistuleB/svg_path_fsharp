@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased — Gleam v2.0.0 API alignment
+## 2.0.0 - 2026-09-16
+
+- Aligned with Gleam `svg_path` v2.0.0. This major release reduces the public
+  API; the geometry algorithms are unchanged.
 
 - Breaking: made degree-specific Bezier projection-extrema helpers private;
   use `Bezier.projectionExtrema`.
@@ -23,6 +26,10 @@
   contract. Its behavior is unchanged.
 - Moved the six direction-arrow helpers from `ArrangementDrawing` to `Svg`.
 - Updated callers, tests, and documentation without changing geometry algorithms.
+- Pinned README images to `assets-v2.0.0` (unchanged artwork).
+- Release verification: `scripts/test-release` passed 1,855 fast and 26 slow
+  tests; all 13 README figures matched. The preceding API-port verification
+  also confirmed all 33 Gallery figures and the compiled public API surface.
 
 ## 1.1.0 - 2026-09-14
 

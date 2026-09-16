@@ -3,8 +3,9 @@
 ## v2.0.0 API alignment (2026-09-16)
 
 The code/API changes through Gleam `458b4e85` are ported below. Gleam's
-`cad5f804` is release preparation only. F# package version, release tags, and
-asset tags are deliberately left for a separate F# release-preparation step.
+`cad5f804` is release preparation only. F# v2.0.0 is the corresponding release;
+its preparation re-ran both test profiles and the README figure check and pins
+the unchanged artwork to `assets-v2.0.0`.
 
 | Gleam | F# | Change |
 | --- | --- | --- |

@@ -1,5 +1,41 @@
 # Gleam commit-by-commit synchronization
 
+## v2.0.0 API alignment (2026-09-16)
+
+The code/API changes through Gleam `458b4e85` are ported below. Gleam's
+`cad5f804` is release preparation only. F# package version, release tags, and
+asset tags are deliberately left for a separate F# release-preparation step.
+
+| Gleam | F# | Change |
+| --- | --- | --- |
+| `b0f4cf57` | `d2d863a` | Private degree-specific Bezier extrema helpers |
+| `99521fea` | `2b47527` | Remove duplicate Effects normalization entry point |
+| `e38ae659` | `76c824f` | Remove area clockwiseness score |
+| `a5dc5dee` | `a977635` | Internal uncapped band diagnostics |
+| `5acee63a` | `c61f767` | Internal edge annotation pose helper |
+| `cdb7e667` | `4886794` | Curvature API reduction and plain-list inflections |
+| `cab548c9` | `8d02a43` | Internal callback-based hull searches |
+| `cecd5d25` | `ebc773d` | Remove redundant root arc-evaluation wrappers |
+| `ffbd80a5` | `00655d5` | Rename/document redundant-intersection filtering |
+| `e8293053` | `c62b215` | Move direction-arrow helpers into Svg |
+| `458b4e85` | `a3c4e3f` | README corrections and API migration changelog |
+
+No geometry algorithm was replaced. The unused F# `DirectionalSupport` alias
+was removed along with internalizing its underlying `DirectionalExtent` type.
+Two F#-specific curvature checks now use the retained Segment derivative and
+Curvature radius queries. The seven removed tests match the obsolete Gleam
+tests: four area, two curvature, and one arc-wrapper test. Both arrow tests
+were moved, not duplicated or deleted.
+
+Verification:
+
+- `scripts/test-release`: 1,855 fast and 26 slow tests passed.
+- `scripts/generate-readme-figures --check`: all 13 figures matched.
+- `scripts/generate-gallery-figures --check`: all 33 figures matched.
+- External-consumer compiled-assembly checks confirmed the removed/internal
+  public methods are unavailable, the six Svg arrow methods and renamed
+  encounter query are public, and inflection discovery returns a plain list.
+
 ## v1.1.0 arc-policy alignment (2026-09-14)
 
 - Gleam `ac123ac8`: preserve raw parsed arc arguments and add explicit SVG

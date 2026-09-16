@@ -5,8 +5,6 @@ namespace SvgPath
 module Effects =
 
     type Error =
-        /// The degeneracy tolerance must be finite and non-negative.
-        | InvalidDegeneracyTolerance of tolerance: float<length>
         | EffectsPathError of error: SegmentError
         | InvalidRadius of radius: float<length>
         /// The distance tolerance must be finite and non-negative.
@@ -14,7 +12,6 @@ module Effects =
         | InvalidAngularTolerance of tolerance: float<degree>
         | CannotRoundCorner of index: int
         | CornerTrimsOverlap of segmentIndex: int
-        | EffectsConvexHullError of error: ConvexHull.Error
 
     type FailureMode =
         | ErrorOnFailure
@@ -51,20 +48,6 @@ module Effects =
           LengthOptions = Segment.defaultLengthOptions
           DistanceTolerance = 1.0e-6<length>
           AngularTolerance = 1.0e-6<degree> }
-
-    let private degeneracyError = function
-        | Degeneracy.DegeneracyInvalidTolerance tolerance -> InvalidDegeneracyTolerance tolerance
-        | Degeneracy.DegeneracyPathError error -> EffectsPathError error
-        | Degeneracy.DegeneracyConvexHullError error -> EffectsConvexHullError error
-
-    /// Replace maximal thin windows through Degeneracy, preserving start/end
-    /// and both longitudinal support extrema in source order. Intermediate
-    /// local reversals need not survive.
-    /// Undefined ellipse geometry returns an error. SVG arc interpretation is
-    /// available separately through Path.normalizeSvgArcs.
-    let normalizeDegenerateSegments subpath tolerance =
-        Degeneracy.normalizeDegenerateSegments subpath tolerance
-        |> Result.mapError degeneracyError
 
     let private remapEndpoints segment newStart newFinish =
         match segment with

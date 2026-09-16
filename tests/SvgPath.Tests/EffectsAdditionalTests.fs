@@ -14,5 +14,5 @@ let ``invalid round-corner angular tolerance is rejected`` () =
 [<Fact>]
 let ``degeneracy effect converts a nearly linear quadratic`` () =
     let source = Subpath.ofSegment (QuadraticBezier(point 0.0 0.0, point 1.0 0.001, point 2.0 0.0))
-    let normalized = Effects.normalizeDegenerateSegments source 0.01<length> |> Result.defaultWith (failwithf "%A")
+    let normalized = Degeneracy.normalizeDegenerateSegments source 0.01<length> |> Result.defaultWith (failwithf "%A")
     Assert.All(normalized.Segments, fun segment -> Assert.True(match segment with Line _ -> true | _ -> false))

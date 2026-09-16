@@ -58,16 +58,16 @@ let ``round corners rounds closed square`` () =
 let ``normalize degenerate segments returns direct tolerance error`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     Assert.Equal(
-        Error(Effects.InvalidDegeneracyTolerance -0.000001<length>),
-        Effects.normalizeDegenerateSegments source -0.000001<length>)
+        Error(Degeneracy.DegeneracyInvalidTolerance -0.000001<length>),
+        Degeneracy.normalizeDegenerateSegments source -0.000001<length>)
 
 [<Fact>]
 let ``normalize degenerate segments rejects nonfinite tolerance`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 1.0 0.0))
     let infinity = Length.fromFloat System.Double.PositiveInfinity
-    Assert.Equal(Error(Effects.InvalidDegeneracyTolerance infinity), Effects.normalizeDegenerateSegments source infinity)
-    match Effects.normalizeDegenerateSegments source (Length.fromFloat System.Double.NaN) with
-    | Error(Effects.InvalidDegeneracyTolerance tolerance) -> Assert.True(System.Double.IsNaN(float tolerance))
+    Assert.Equal(Error(Degeneracy.DegeneracyInvalidTolerance infinity), Degeneracy.normalizeDegenerateSegments source infinity)
+    match Degeneracy.normalizeDegenerateSegments source (Length.fromFloat System.Double.NaN) with
+    | Error(Degeneracy.DegeneracyInvalidTolerance tolerance) -> Assert.True(System.Double.IsNaN(float tolerance))
     | result -> failwithf "expected a direct invalid-tolerance error, got %A" result
 
 [<Fact>]
@@ -162,7 +162,7 @@ let ``round corners can adapt radius to fit short segments`` () =
 [<Fact>]
 let ``normalize degenerate segments replaces degenerate segments`` () =
     let source = Subpath.ofSegment (QuadraticBezier(point 0.0 0.0, point 10.0 0.0, point 0.0 0.0))
-    let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
+    let cleaned = Degeneracy.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, cleaned.Segments.Length)
 
 [<Fact>]
@@ -174,7 +174,7 @@ let ``normalize degenerate segments preserves closed one line replacement`` () =
               Line(point 0.0 10.0, point 0.0 0.0) ]
         |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
-    let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
+    let cleaned = Degeneracy.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.True cleaned.Closed
     Assert.Equal(3, cleaned.Segments.Length)
     Assert.Contains(Line(point 0.0 0.0, point 10.0 0.0), cleaned.Segments)
@@ -184,7 +184,7 @@ let ``normalize degenerate segments coalesces thin line window`` () =
     let source =
         Subpath.polyline [ point 0.0 0.0; point 1.0 0.0; point 2.0 0.0; point 3.0 0.0; point 4.0 0.0 ]
         |> Result.defaultWith (failwithf "%A")
-    let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
+    let cleaned = Degeneracy.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal<Segment list>([ Line(point 0.0 0.0, point 4.0 0.0) ], cleaned.Segments)
 
 [<Fact>]
@@ -196,7 +196,7 @@ let ``normalize degenerate segments preserves closed two line backtracking`` () 
               Line(point 0.0 10.0, point 0.0 0.0) ]
         |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
-    let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
+    let cleaned = Degeneracy.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.True cleaned.Closed
     Assert.Equal(4, cleaned.Segments.Length)
     Assert.Contains(Line(point 0.0 0.0, point 2.5 0.0), cleaned.Segments)
@@ -212,7 +212,7 @@ let ``normalize degenerate segments keeps closed three line traversal`` () =
               Line(point 0.0 10.0, point 0.0 0.0) ]
         |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
-    let cleaned = Effects.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
+    let cleaned = Degeneracy.normalizeDegenerateSegments source 0.001<length> |> Result.defaultWith (failwithf "%A")
     Assert.True cleaned.Closed
     Assert.Equal(4, cleaned.Segments.Length)
 

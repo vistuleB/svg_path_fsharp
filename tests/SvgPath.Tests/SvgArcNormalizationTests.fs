@@ -141,7 +141,6 @@ let ``geometric degeneracy rejects undefined arcs`` () =
         eq (Error(Degeneracy.DegeneracyPathError DegenerateArc)) (Degeneracy.segmentLinearizeIfDegenerate segment 0.001<length>)
         eq (Error(Degeneracy.DegeneracyPathError DegenerateArc)) (Degeneracy.subpathLinearizeIfDegenerate subpath 0.001<length>)
         eq (Error(Degeneracy.DegeneracyPathError DegenerateArc)) (Degeneracy.normalizeDegenerateSegments subpath 0.001<length>)
-        eq (Error(Effects.EffectsPathError DegenerateArc)) (Effects.normalizeDegenerateSegments subpath 0.001<length>)
 
 [<Fact>]
 let ``undefined arc in thin run cannot be hidden by hull`` () =

@@ -107,7 +107,7 @@ module Bezier =
             Point.add (Point.scale (1.0 - ratio t) first) (Point.scale (ratio t) second)
             |> Point.scale (3.0 * perParameter)
 
-    let lineProjectionExtrema (_start: BezierPoint) (_end: BezierPoint) (_direction: Point<1>) = []
+    let private lineProjectionExtrema (_start: BezierPoint) (_end: BezierPoint) (_direction: Point<1>) = []
 
     let private tolerantQuadraticRoots a b c =
         Root.parameterQuadraticWith
@@ -117,7 +117,7 @@ module Bezier =
             b
             c
 
-    let quadraticProjectionExtrema
+    let private quadraticProjectionExtrema
         (startPoint: BezierPoint)
         (control: BezierPoint)
         (endPoint: BezierPoint)
@@ -130,7 +130,7 @@ module Bezier =
         tolerantQuadraticRoots 0.0<_> (2.0 * a) b
         |> List.filter (fun t -> t >= parameter 0.0 && t <= parameter 1.0)
 
-    let cubicProjectionExtrema
+    let private cubicProjectionExtrema
         (startPoint: BezierPoint)
         (control1: BezierPoint)
         (control2: BezierPoint)

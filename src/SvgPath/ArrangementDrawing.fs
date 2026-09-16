@@ -69,7 +69,7 @@ module ArrangementDrawing =
     let pathDirectionArrows path color =
         pathDirectionArrowsWith path color 1.0 1.0 0.0<length> 1.0
 
-    let edgeAnnotationPose (edge: Arrangement.ArrangementEdge) =
+    let internal edgeAnnotationPose (edge: Arrangement.ArrangementEdge) =
         Segment.point edge.Segment 0.5<parameter>
         |> Result.bind (fun midpoint ->
             Segment.directions edge.Segment 0.5<parameter>

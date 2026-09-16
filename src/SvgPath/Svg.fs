@@ -18,6 +18,51 @@ module Svg =
 
     type ThingsToDraw = ThingToDraw list
 
+    /// Draw an endpoint arrowhead with independently scaled length and width.
+    let segmentDirectionArrowWith segment color lengthScale widthScale arrivalOffset opacity =
+        Segment.point segment 1.0<parameter>
+        |> Result.mapError (fun _ -> ())
+        |> Result.bind (fun endpoint ->
+            Segment.directions segment 1.0<parameter>
+            |> Result.mapError (fun _ -> ())
+            |> Result.bind (fun directions ->
+                match directions.Incoming with
+                | None -> Error()
+                | Some direction ->
+                    let perpendicular = Point.create -direction.Y direction.X
+                    let tip = Point.subtract endpoint (Point.scale arrivalOffset direction)
+                    let behind = Point.subtract tip (Point.scale (9.0<length> * lengthScale) direction)
+                    let left = Point.add behind (Point.scale (3.5<length> * widthScale) perpendicular)
+                    let right = Point.subtract behind (Point.scale (3.5<length> * widthScale) perpendicular)
+                    Subpath.polygon [ tip; left; right ]
+                    |> Result.mapError (fun _ -> ())
+                    |> Result.map (fun arrow ->
+                        StyledPath(Path.ofSubpaths [ arrow ], $"fill: {color}; fill-opacity: {opacity}; stroke: none"))))
+
+    /// Draw one arrowhead whose tip is the end of a segment.
+    let segmentDirectionArrow segment color =
+        segmentDirectionArrowWith segment color 1.0 1.0 0.0<length> 1.0
+
+    /// Draw independently scaled endpoint arrowheads for every segment of a subpath.
+    let subpathDirectionArrowsWith (subpath: Subpath) color lengthScale widthScale arrivalOffset opacity =
+        subpath.Segments
+        |> List.choose (fun segment ->
+            segmentDirectionArrowWith segment color lengthScale widthScale arrivalOffset opacity |> Result.toOption)
+
+    /// Draw endpoint arrowheads for every segment of a subpath.
+    let subpathDirectionArrows subpath color =
+        subpathDirectionArrowsWith subpath color 1.0 1.0 0.0<length> 1.0
+
+    /// Draw independently scaled endpoint arrowheads for every segment of a path.
+    let pathDirectionArrowsWith (path: Path) color lengthScale widthScale arrivalOffset opacity =
+        path.Subpaths
+        |> List.collect (fun subpath ->
+            subpathDirectionArrowsWith subpath color lengthScale widthScale arrivalOffset opacity)
+
+    /// Draw endpoint arrowheads for every segment of a path.
+    let pathDirectionArrows path color =
+        pathDirectionArrowsWith path color 1.0 1.0 0.0<length> 1.0
+
     let private numberFormat numbers =
         NumberFormat.prepare
             { LeftDecimals = NumberFormat.Succinct

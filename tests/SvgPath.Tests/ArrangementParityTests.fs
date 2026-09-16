@@ -739,12 +739,3 @@ let ``drawing_contains_edges_vertices_and_multiplicity_labels_test`` () =
         Arrangement.insertAtomicSegment Arrangement.empty (line 0.0 0.0 10.0 0.0) tolerance minimumChord
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(7, ArrangementDrawing.drawing graph |> List.length)
-
-[<Fact>]
-let ``subpath_direction_arrows_draws_one_arrow_per_segment_test`` () =
-    let subpath =
-        Subpath.assertCreate [
-            line 0.0 0.0 10.0 0.0
-            line 10.0 0.0 10.0 10.0
-        ]
-    Assert.Equal(2, ArrangementDrawing.subpathDirectionArrows subpath "red" |> List.length)

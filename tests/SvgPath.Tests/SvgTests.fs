@@ -8,6 +8,21 @@ let private length value = Length.fromFloat value
 let private box minX minY maxX maxY : BoundingBox = { Min = point minX minY; Max = point maxX maxY }
 
 [<Fact>]
+let ``segment_direction_arrow_recovers_collapsed_cubic_endpoint_test`` () =
+    let finish = point 10.0 10.0
+    let segment = CubicBezier(point 0.0 0.0, point 0.0 10.0, finish, finish)
+    Assert.True(Svg.segmentDirectionArrow segment "red" |> Result.isOk)
+
+[<Fact>]
+let ``subpath_direction_arrows_draws_one_arrow_per_segment_test`` () =
+    let subpath =
+        Subpath.assertCreate [
+            Line(point 0.0 0.0, point 10.0 0.0)
+            Line(point 10.0 0.0, point 10.0 10.0)
+        ]
+    Assert.Equal(2, Svg.subpathDirectionArrows subpath "red" |> List.length)
+
+[<Fact>]
 let ``document renders a complete svg document`` () =
     let path = Path.ofSubpaths [ Subpath.ofSegment (Line(point 1.0 2.0, point 11.0 2.0)) ]
     let actual =

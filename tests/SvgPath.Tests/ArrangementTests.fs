@@ -203,9 +203,3 @@ module ArrangementTests =
     let ``edge_annotation_pose_rejects_directionless_segment_test`` () =
         let p = point 1.0 2.0
         Assert.Equal(Error IndeterminateDirection, ArrangementDrawing.edgeAnnotationPose (drawingEdge (Line(p, p))))
-
-    [<Fact>]
-    let ``segment_direction_arrow_recovers_collapsed_cubic_endpoint_test`` () =
-        let finish = point 10.0 10.0
-        let segment = CubicBezier(point 0.0 0.0, point 0.0 10.0, finish, finish)
-        Assert.True(ArrangementDrawing.segmentDirectionArrow segment "red" |> Result.isOk)

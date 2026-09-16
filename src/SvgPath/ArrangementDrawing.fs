@@ -30,45 +30,6 @@ module ArrangementDrawing =
             |> List.collect (fun vertex -> Svg.labeledPoint $"v{vertex.Id}" "#dc2626" vertex.Point 8.0<length>)
         edgeThings @ vertexThings
 
-    let segmentDirectionArrowWith segment color lengthScale widthScale arrivalOffset opacity =
-        Segment.point segment 1.0<parameter>
-        |> Result.mapError (fun _ -> ())
-        |> Result.bind (fun endpoint ->
-            Segment.directions segment 1.0<parameter>
-            |> Result.mapError (fun _ -> ())
-            |> Result.bind (fun directions ->
-                match directions.Incoming with
-                | None -> Error()
-                | Some direction ->
-                    let perpendicular = Point.create -direction.Y direction.X
-                    let tip = Point.subtract endpoint (Point.scale arrivalOffset direction)
-                    let behind = Point.subtract tip (Point.scale (9.0<length> * lengthScale) direction)
-                    let left = Point.add behind (Point.scale (3.5<length> * widthScale) perpendicular)
-                    let right = Point.subtract behind (Point.scale (3.5<length> * widthScale) perpendicular)
-                    Subpath.polygon [ tip; left; right ]
-                    |> Result.mapError (fun _ -> ())
-                    |> Result.map (fun arrow ->
-                        Svg.StyledPath(Path.ofSubpaths [ arrow ], $"fill: {color}; fill-opacity: {opacity}; stroke: none"))))
-
-    let segmentDirectionArrow segment color =
-        segmentDirectionArrowWith segment color 1.0 1.0 0.0<length> 1.0
-
-    let subpathDirectionArrowsWith (subpath: Subpath) color lengthScale widthScale arrivalOffset opacity =
-        subpath.Segments
-        |> List.choose (fun segment ->
-            segmentDirectionArrowWith segment color lengthScale widthScale arrivalOffset opacity |> Result.toOption)
-
-    let subpathDirectionArrows subpath color =
-        subpathDirectionArrowsWith subpath color 1.0 1.0 0.0<length> 1.0
-
-    let pathDirectionArrowsWith (path: Path) color lengthScale widthScale arrivalOffset opacity =
-        path.Subpaths
-        |> List.collect (fun subpath ->
-            subpathDirectionArrowsWith subpath color lengthScale widthScale arrivalOffset opacity)
-
-    let pathDirectionArrows path color =
-        pathDirectionArrowsWith path color 1.0 1.0 0.0<length> 1.0
-
     let internal edgeAnnotationPose (edge: Arrangement.ArrangementEdge) =
         Segment.point edge.Segment 0.5<parameter>
         |> Result.bind (fun midpoint ->
@@ -102,7 +63,7 @@ module ArrangementDrawing =
                     |> Result.mapError Arrangement.ArrangementSegmentError
                     |> Result.bind (fun pose ->
                         let arrow =
-                            segmentDirectionArrowWith edge.Segment "#dc2626"
+                            Svg.segmentDirectionArrowWith edge.Segment "#dc2626"
                                 (2.0 * float nodeRadius / 9.0) (1.6 * float nodeRadius / 3.5) nodeRadius 1.0
                             |> Result.defaultValue (Svg.StyledPath(Path.ofSubpaths [], ""))
                         let chord = Point.distance (Segment.start edge.Segment) (Segment.finish edge.Segment)

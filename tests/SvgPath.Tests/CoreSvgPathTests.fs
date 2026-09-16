@@ -183,29 +183,20 @@ let ``arc center data rejects non arc segments`` () =
     Assert.Equal(Error DegenerateArc, Segment.arcCenterData (Line(point 0.0 0.0, point 1.0 0.0)))
 
 [<Fact>]
-let ``arc wrappers use root points`` () =
-    let sample = Segment.arcPoint semicircle 0.5<parameter> |> Result.defaultWith (failwithf "%A")
-    let derivative = Segment.arcDerivative semicircle 0.5<parameter> |> Result.defaultWith (failwithf "%A")
-    let anglePoint = Segment.arcPointAtAngle semicircle 270.0<degree> |> Result.defaultWith (failwithf "%A")
-    let angleDerivative = Segment.arcDerivativeAtAngle semicircle 270.0<degree> |> Result.defaultWith (failwithf "%A")
+let ``arc center data supports angle evaluation`` () =
+    let sample = Segment.point semicircle 0.5<parameter> |> Result.defaultWith (failwithf "%A")
+    let derivative = Segment.derivative semicircle 0.5<parameter> |> Result.defaultWith (failwithf "%A")
+    let arc = Segment.arcCenterData semicircle |> Result.defaultWith (failwithf "%A")
+    let anglePoint = Ellipse.arcPointAtAngle arc 270.0<degree>
+    let angleDerivative = Ellipse.arcDerivativeAtAngle arc 270.0<degree>
     assertPointNear (point 10.0 -10.0) sample
     Assert.True(derivative.X > 0.0<length / parameter>)
     Assert.True(abs derivative.Y < 1.0e-6<length / parameter>)
     assertPointNear (point 10.0 -10.0) anglePoint
     Assert.True(angleDerivative.X > 0.0<length / degree>)
     Assert.True(abs angleDerivative.Y < 1.0e-6<length / degree>)
-    Assert.Equal(270.0<degree>, Segment.arcAngleAt semicircle 0.5<parameter> |> Result.defaultWith (failwithf "%A"))
-    Assert.Equal(360.0<degree>, Segment.arcEndAngle semicircle |> Result.defaultWith (failwithf "%A"))
-
-[<Fact>]
-let ``arc wrappers reject non arc segments`` () =
-    let line = Line(point 0.0 0.0, point 1.0 0.0)
-    Assert.Equal(Error DegenerateArc, Segment.arcPoint line 0.5<parameter>)
-    Assert.Equal(Error DegenerateArc, Segment.arcDerivative line 0.5<parameter>)
-    Assert.Equal(Error DegenerateArc, Segment.arcPointAtAngle line 0.0<degree>)
-    Assert.Equal(Error DegenerateArc, Segment.arcDerivativeAtAngle line 0.0<degree>)
-    Assert.Equal(Error DegenerateArc, Segment.arcAngleAt line 0.5<parameter>)
-    Assert.Equal(Error DegenerateArc, Segment.arcEndAngle line)
+    Assert.Equal(270.0<degree>, Ellipse.arcAngleAt arc 0.5<parameter>)
+    Assert.Equal(360.0<degree>, Ellipse.arcEndAngle arc)
 
 let private mapPoint (value: Point<length>) = point (float value.X + 1.0) (float value.Y * 2.0)
 

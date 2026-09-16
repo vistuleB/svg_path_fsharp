@@ -1,6 +1,9 @@
 namespace SvgPath
 
 /// SVG elliptical-arc conversion, evaluation, and geometric queries.
+/// Use Segment.point and Segment.derivative for parameter-based segment queries.
+/// For ellipse-angle evaluation, convert with Segment.arcCenterData and use
+/// this module's CenterArcData helpers.
 [<RequireQualifiedAccess>]
 module Ellipse =
 

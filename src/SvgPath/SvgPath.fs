@@ -502,13 +502,6 @@ module Segment =
         | Arc endpoint -> Ellipse.endpointToCenter endpoint |> Result.mapError (fun _ -> DegenerateArc)
         | _ -> Error DegenerateArc
 
-    let arcPoint segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcPoint arc t)
-    let arcDerivative segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcDerivative arc t)
-    let arcPointAtAngle segment angle = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcPointAtAngle arc angle)
-    let arcDerivativeAtAngle segment angle = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcDerivativeAtAngle arc angle)
-    let arcAngleAt segment t = arcCenterData segment |> Result.map (fun arc -> Ellipse.arcAngleAt arc t)
-    let arcEndAngle segment = arcCenterData segment |> Result.map Ellipse.arcEndAngle
-
     let point segment t =
         let t = InternalNumber.normalizeZero t
         if t = 0.0<parameter> then Ok(start segment)

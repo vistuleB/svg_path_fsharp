@@ -502,8 +502,10 @@ is signed, and determines the sweep direction.
 
 Use `Segment.arcCenterData` to convert a root `Arc` segment to
 `CenterArcData`, and `Segment.arcFromCenterData` to come back to an `Arc`. For
-common evaluation tasks, use `Segment.arcPoint`, `Segment.arcDerivative`, and
-`Segment.arcPointAtAngle`; these keep the ordinary `SegmentError` type.
+parameter-based evaluation, use `Segment.point` and `Segment.derivative`;
+these keep the ordinary `SegmentError` type. For ellipse-angle evaluation,
+pass the converted center data to `Ellipse.arcPointAtAngle` or
+`Ellipse.arcDerivativeAtAngle`.
 
 ## Geometry Helpers
 

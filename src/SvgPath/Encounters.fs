@@ -397,7 +397,24 @@ module Encounters =
                 |> Result.map (fun keep -> if keep then parameterValue :: kept else kept))) (Ok [])
         |> Result.map List.rev
 
-    let subpathFilterOverlapExplainedIntersections
+    /// Remove point-intersection parameters fully accounted for by continuous
+    /// overlaps in an existing encounter result; leave overlaps unchanged.
+    /// Remove a left parameter only if every right parameter is paired with it
+    /// by some reported overlap (different pairs may use different overlaps).
+    /// Test right parameters symmetrically against the original left list.
+    /// Drop an intersection record only when both parameter lists become empty.
+    ///
+    /// Each overlap's piecewise-affine correspondence must match in both
+    /// directions. An input address may clamp onto the overlap within tolerance;
+    /// mapping that clamped address must land within tolerance of the original
+    /// opposite address. Distances are measured along each subpath, not in
+    /// Euclidean space or local parameter units; closed paths use the shorter
+    /// traversal distance. Tolerance must be finite and positive. Geometry
+    /// failures propagate through the encounter error.
+    ///
+    /// For left parameters A,B and right C, if only A/C is overlap-covered,
+    /// remove A but retain B and C.
+    let subpathRemoveRedundantIntersections
         encounters
         leftSubpath
         rightSubpath

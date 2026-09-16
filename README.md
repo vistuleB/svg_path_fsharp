@@ -823,7 +823,7 @@ Use `Encounters` when both continuous overlaps and isolated point intersections
 are required from one query. Its segment, segment-subpath, subpath, and path
 functions return both lists without changing the underlying payload types.
 Subpath encounters retain overlap-boundary intersections by default; the
-explicitly named `subpathFilterOverlapExplainedIntersections`
+explicitly named `subpathRemoveRedundantIntersections`
 helper derives a view with parameters fully explained by overlaps removed.
 
 ## Convex Hulls

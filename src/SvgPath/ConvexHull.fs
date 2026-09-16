@@ -30,7 +30,7 @@ module ConvexHull =
     type internal RepairMode = PointRepair | LoopRepair | NoRepair
 
     [<Struct>]
-    type DirectionalExtent =
+    type internal DirectionalExtent =
         { LowerPoint: Point<length>
           UpperPoint: Point<length>
           Width: float<length> }
@@ -65,8 +65,6 @@ module ConvexHull =
         | MinimumWidthFits of MinimumWidthStrip
         | MinimumWidthExceeds of lowerBound: float<length>
         | MinimumWidthUnresolved of lowerBound: float<length> * bestWidth: float<length>
-
-    type DirectionalSupport = DirectionalExtent
 
     type private SupportSample =
         { T: float<parameter>
@@ -1733,16 +1731,16 @@ module ConvexHull =
         if findMinimum then adaptiveMinimum support (abs diameterUpperBound) accuracy maxDepth samples
         else adaptiveMaximum support (abs diameterUpperBound) accuracy maxDepth samples
 
-    let minimumWidthWith support diameterUpperBound options =
+    let internal minimumWidthWith support diameterUpperBound options =
         adaptiveDirectionalExtremum true support diameterUpperBound options
 
-    let minimumWidth support diameterUpperBound =
+    let internal minimumWidth support diameterUpperBound =
         minimumWidthWith support diameterUpperBound defaultWidthSearchOptions
 
-    let diameterWith support diameterUpperBound options =
+    let internal diameterWith support diameterUpperBound options =
         adaptiveDirectionalExtremum false support diameterUpperBound options
 
-    let diameter support diameterUpperBound =
+    let internal diameter support diameterUpperBound =
         diameterWith support diameterUpperBound defaultWidthSearchOptions
 
     let private sourceExtremum findMinimum segments options =

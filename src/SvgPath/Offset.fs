@@ -3880,7 +3880,7 @@ module Offset =
     /// Constructs synchronized untrimmed inner and outer offsets.
     /// Returns separate uncapped sides, without side-local or final trimming.
     /// Use subpathBandWith with trimming disabled for a capped band.
-    let subpathBandUntrimmedWith subpath innerOffset outerOffset join options =
+    let internal subpathBandUntrimmedWith subpath innerOffset outerOffset join options =
         validateOptions options
         |> Result.mapError publicError
         |> Result.bind (fun _ ->
@@ -3894,7 +3894,7 @@ module Offset =
 
     /// Constructs synchronized untrimmed inner and outer offsets with default options.
     /// These sides remain separate and uncapped.
-    let subpathBandUntrimmed subpath innerOffset outerOffset join =
+    let internal subpathBandUntrimmed subpath innerOffset outerOffset join =
         subpathBandUntrimmedWith subpath innerOffset outerOffset join defaultOptions
 
     let rec private untrimmedOffsetPathSubpaths subpaths offset join options converted =
@@ -3940,7 +3940,7 @@ module Offset =
                     (List.rev (Path.subpaths band) @ converted))
 
     /// Constructs synchronized untrimmed bands independently for every subpath.
-    let pathBandUntrimmedWith path innerOffset outerOffset join options =
+    let internal pathBandUntrimmedWith path innerOffset outerOffset join options =
         validateOptions options
         |> Result.mapError publicError
         |> Result.bind (fun _ ->
@@ -3952,7 +3952,7 @@ module Offset =
 
     /// Constructs untrimmed bands for a path with default options.
     /// Each subpath's synchronized pair is returned separately and uncapped.
-    let pathBandUntrimmed path innerOffset outerOffset join =
+    let internal pathBandUntrimmed path innerOffset outerOffset join =
         pathBandUntrimmedWith path innerOffset outerOffset join defaultOptions
 
     let private arrangementEdgeCapacities

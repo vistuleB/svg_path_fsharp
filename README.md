@@ -1337,11 +1337,6 @@ inspection and for specialized callers that want to preserve intermediate
 geometry, but the result can retain reversal folds, self-intersections, or
 disconnected loops that the default pipeline removes.
 
-`Offset.subpathBandUntrimmed`, `Offset.pathBandUntrimmed`, and their `With`
-variants return the two synchronized offset sides without side-local or joint
-trimming. They preserve inner-then-outer ordering and add no caps or bridges.
-They take a join argument but no cap.
-
 ## Stroke Outlines and Dashes
 
 `Stroke` is a small public wrapper over symmetric offset bands. It

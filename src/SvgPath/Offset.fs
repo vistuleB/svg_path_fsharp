@@ -1192,9 +1192,9 @@ module Offset =
                 Curvature.segmentLeftNormalCuspParameters segment offset Curvature.defaultOptions
                 |> Result.mapError (fun _ -> InternalNonFinite)
 
-        match reversalParameters innerStatus inner, reversalParameters outerStatus outer,
-              Curvature.segmentInflectionParameters segment Curvature.defaultOptions with
-        | Ok innerReversals, Ok outerReversals, Ok inflections ->
+        match reversalParameters innerStatus inner, reversalParameters outerStatus outer with
+        | Ok innerReversals, Ok outerReversals ->
+            let inflections = Curvature.segmentInflectionParameters segment
             let interior values =
                 values
                 |> List.filter (fun t -> t > pointParameterTolerance && t < 1.0<parameter> - pointParameterTolerance)

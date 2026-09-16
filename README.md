@@ -1372,12 +1372,13 @@ offset is normalized around the total pattern length.
 
 ## Curvature Errors
 
-Curvature helpers return `CurvatureError`, distinguishing invalid tolerance,
-sample count, maximum depth, and margin (with their offending values) from
-`DegenerateCurvatureDerivative` and `InfiniteRadiusOfCurvature`.
+Curvature queries return `Curvature.Error`, distinguishing invalid tolerance
+and maximum depth (with their offending values) from undefined derivatives,
+infinite radius, underlying path errors, and failed root refinement.
 `Curvature.Options.Tolerance` accepts zero for exact-only parameter comparisons;
-negative and non-finite tolerances remain invalid. `Curvature.segmentDerivatives`
-continues to return `SegmentError` for underlying path errors.
+negative and non-finite tolerances remain invalid.
+`Curvature.segmentInflectionParameters` is algebraic: it takes only a segment
+and returns a list directly, without options or a Result wrapper.
 
 ## Arrangement Graphs
 

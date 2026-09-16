@@ -2,7 +2,7 @@ namespace SvgPath
 
 /// Signed curvature, radius, inflection points, and offset-cusp diagnostics.
 /// Signs refer to the visual left normal in SVG coordinates (positive y down).
-/// Curvature has inverse-length units; radius, offsets, and margins have length
+/// Curvature has inverse-length units; radius and offsets have length
 /// units. Parameters refer to the segment's 0..1 interval.
 /// Pointwise queries evaluate derivatives directly. Cusp discovery partitions at
 /// curvature extrema before bisection. Individual contracts describe limitations.
@@ -14,14 +14,13 @@ module Curvature =
         | CurvaturePathError of error: SegmentError
         | InvalidCurvatureTolerance of tolerance: float<parameter>
         | InvalidCurvatureMaxDepth of maxDepth: int
-        | InvalidCurvatureMargin of margin: float<length>
         | DegenerateCurvatureDerivative
         | InfiniteRadiusOfCurvature
         | CurvatureRootIsolationFailed
         | CurvatureMaxDepthReached of lower: float<parameter> * upper: float<parameter>
 
-    /// Cusp discovery options. Every field is validated; algebraic inflection
-    /// discovery uses none of the fields after validation.
+    /// Cusp discovery options. Every field is validated by cusp discovery.
+    /// Algebraic inflection discovery does not accept options.
     [<Struct>]
     type Options =
         { Tolerance: float<parameter>
@@ -29,7 +28,7 @@ module Curvature =
 
     /// First and second parameter derivatives at a segment parameter.
     [<Struct>]
-    type Derivatives =
+    type private Derivatives =
         { First: Point<length / parameter>
           Second: Point<length / parameter^2> }
 
@@ -49,7 +48,7 @@ module Curvature =
 
     /// Return first and second parameter derivatives. Lines have zero second
     /// derivative; arcs use exact ellipse derivatives.
-    let segmentDerivatives segment t =
+    let private segmentDerivatives segment t =
         match Segment.derivative segment t, Segment.secondDerivative segment t with
         | Ok first, Ok second -> Ok { First = first; Second = second }
         | Error error, _
@@ -77,42 +76,6 @@ module Curvature =
     let segmentLeftNormalRadius segment t : Result<float<length>, Error> =
         segmentLeftNormalCurvature segment t
         |> Result.bind (fun curvature -> if InternalNumber.isZero curvature then Error InfiniteRadiusOfCurvature else Ok(1.0 / curvature))
-
-    let private cuspResidualFromDerivatives data (offset: float<length>) =
-        let speedSquared = Point.dot data.First data.First
-        if speedSquared <= 0.0<length^2 / parameter^2>
-           || not (System.Double.IsFinite(float speedSquared)) then Error DegenerateCurvatureDerivative
-        else
-            let speed = sqrt (float speedSquared) * 1.0<length / parameter>
-            Ok(speedSquared * speed + offset * Point.cross data.First data.Second)
-
-    /// Return |p'|^3 + offset * cross(p', p''). Zero means the signed visual-left
-    /// radius equals offset, assuming finite nonzero curvature. Its magnitude
-    /// depends on parameter speed and is not a geometric distance error.
-    /// Units are length^3 / parameter^3. Lines return |p'|^3; zero-speed
-    /// parameters return DegenerateCurvatureDerivative.
-    let segmentLeftNormalCuspResidual segment offset t =
-        segmentDerivatives segment t
-        |> Result.mapError CurvaturePathError
-        |> Result.bind (fun data -> cuspResidualFromDerivatives data offset)
-
-    /// Test abs(R_left(t) - offset) < margin without dividing by curvature.
-    /// For finite nonzero curvature, this is equivalent to
-    /// abs(|p'|^3 + offset * cross(p', p'')) < margin * abs(cross(p', p'')).
-    let segmentLeftNormalRadiusCloseTo segment offset margin t =
-        if margin < 0.0<length> || not (System.Double.IsFinite(float margin)) then Error(InvalidCurvatureMargin margin)
-        else
-            segmentDerivatives segment t
-            |> Result.mapError CurvaturePathError
-            |> Result.bind (fun data ->
-                let speedSquared = Point.dot data.First data.First
-                let cross = Point.cross data.First data.Second
-                if speedSquared <= 0.0<length^2 / parameter^2>
-                   || not (System.Double.IsFinite(float speedSquared)) then Error DegenerateCurvatureDerivative
-                elif InternalNumber.isZero cross then Error InfiniteRadiusOfCurvature
-                else
-                    let speed = sqrt (float speedSquared) * 1.0<length / parameter>
-                    Ok(abs (speedSquared * speed + offset * cross) < margin * abs cross))
 
     let inline private signChange a b = (a < 0.0<_> && b > 0.0<_>) || (a > 0.0<_> && b < 0.0<_>)
 
@@ -249,16 +212,12 @@ module Curvature =
     /// Return algebraically computed interior roots of cross(p', p'') = 0.
     /// Cubics use the Bezier inflection solver; lines, quadratics, arcs, and
     /// identically flat pieces return an empty list. Endpoint roots are excluded.
-    /// Options are validated but do not affect the algebraic solve.
-    let segmentInflectionParameters segment options =
-        match validateOptions options with
-        | Error error -> Error error
-        | Ok _ ->
-            match segment with
-            | Line _
-            | QuadraticBezier _
-            | Arc _ -> Ok []
-            | CubicBezier(startPoint, control1, control2, endPoint) ->
-                Bezier.CubicBezierData(startPoint, control1, control2, endPoint)
-                |> Bezier.cubicInflectionParameters
-                |> Ok
+    /// No numerical search options are required.
+    let segmentInflectionParameters segment =
+        match segment with
+        | Line _
+        | QuadraticBezier _
+        | Arc _ -> []
+        | CubicBezier(startPoint, control1, control2, endPoint) ->
+            Bezier.CubicBezierData(startPoint, control1, control2, endPoint)
+            |> Bezier.cubicInflectionParameters

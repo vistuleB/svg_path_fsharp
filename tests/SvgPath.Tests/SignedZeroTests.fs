@@ -25,8 +25,8 @@ let ``signed zero matrix entries do not add operations`` () =
 let ``reversed line still has infinite radius`` () =
     let line = Line(p 1. 0.,p 0. 0.)
     Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadius line 0.5<parameter>)
-    Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadiusCloseTo line 1.0<length> 0.1<length> 0.5<parameter>)
-    Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadiusCloseTo (Segment.reverse line) 1.0<length> 0.1<length> 0.5<parameter>)
+    Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadius line 0.5<parameter>)
+    Assert.Equal(Error Curvature.InfiniteRadiusOfCurvature,Curvature.segmentLeftNormalRadius (Segment.reverse line) 0.5<parameter>)
 
 [<Fact>]
 let ``negative zero sizes disable rendering`` () =

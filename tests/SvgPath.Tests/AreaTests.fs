@@ -124,31 +124,6 @@ let ``absolute path counts overlapping winding magnitude`` () =
     Assert.Equal(Ok 500.0<length^2>, Area.absoluteWindingPath path)
 
 [<Fact>]
-let ``subpath clockwiseness reports area orientation`` () =
-    let clockwise = polygon (square 0.0 0.0 10.0)
-    let counterclockwise = polygon (List.rev (square 0.0 0.0 10.0))
-    Assert.Equal(Ok 1.0, Area.subpathClockwiseness clockwise)
-    Assert.Equal(Ok 0.0, Area.subpathClockwiseness counterclockwise)
-
-[<Fact>]
-let ``subpath clockwiseness uses implicit closing chord`` () =
-    let openSquare = polyline (square 0.0 0.0 10.0)
-    let line = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    Assert.Equal(Ok 1.0, Area.subpathClockwiseness openSquare)
-    Assert.Equal(Ok 0.5, Area.subpathClockwiseness line)
-
-[<Fact>]
-let ``subpath clockwiseness can be intermediate`` () =
-    let bowTie = polyline [ point 0.0 0.0; point 10.0 10.0; point 0.0 10.0; point 10.0 0.0 ]
-    Assert.Equal(Ok 0.5, Area.subpathClockwiseness bowTie)
-
-[<Fact>]
-let ``subpath clockwiseness rejects invalid linearization options`` () =
-    let subpath = polygon (square 0.0 0.0 10.0)
-    let options = { Tolerance = 0.0<length>; MaxDepth = 20 }
-    Assert.Equal(Error(InvalidLinearizeTolerance 0.0<length>), Area.subpathClockwisenessWith subpath options)
-
-[<Fact>]
 let ``move only paths have zero area`` () =
     let moveOnly = Subpath.empty (point 3.0 4.0)
     let path = Path.ofSubpaths [ moveOnly ]

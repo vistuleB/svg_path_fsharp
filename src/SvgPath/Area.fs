@@ -195,12 +195,3 @@ module Area =
     let absoluteWindingSubpath subpath = absoluteWindingSubpathWith subpath Segment.defaultLinearizeOptions
     let subpathWith subpath fillRule options = pathWith (asPath subpath) fillRule options
     let subpath subpathValue fillRule = subpathWith subpathValue fillRule Segment.defaultLinearizeOptions
-
-    let subpathClockwisenessWith subpath options =
-        let signed = signedSubpath subpath
-        absoluteWindingSubpathWith subpath options
-        |> Result.map (fun absolute ->
-            if absolute <= 0.0<length^2> then 0.5
-            else max 0.0 (min 1.0 (0.5 + signed / (2.0 * absolute))))
-
-    let subpathClockwiseness subpath = subpathClockwisenessWith subpath Segment.defaultLinearizeOptions

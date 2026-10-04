@@ -39,20 +39,20 @@ module Fixtures =
             title,[layer result fill color 2.2;sourceStyle dashSource]) |> panels 330 300
     let recursiveDashes () =
         let s = subpath "M0 34C88 -112 180 146 270 10C344 -98 418 138 520 22"
-        let s = Transform.translateSubpath s 92.0<length> 154.0<length> |> require "place recursive source"
+        let s = Transform.subpath s (Transform.translate 92.0<length> 154.0<length>) |> require "place recursive source"
         // Same source truncation: end at the last on-interval of [112,48], phase 10.
-        let length = Subpath.length s |> require "dash source length" |> float
+        let length = Measure.subpathLength s |> require "dash source length" |> float
         let rec lastOn pos remaining on last =
             if pos >= length then last
             else
                 let finish = min length (pos+remaining)
                 lastOn finish (if on then 48. else 112.) (not on) (if on then finish else last)
         let ending = lastOn 0. 102. true 0.
-        let s = Subpath.betweenLengths s 0.0<length> (ending*1.0<length>) |> require "truncate dash source"
+        let s = Measure.subpathBetweenLengths s 0.0<length> (ending*1.0<length>) |> require "truncate dash source"
         let first = Stroke.subpathDashed s 58.0<length> [112.0<length>;48.0<length>] 10.0<length> Offset.Round Offset.RoundCap |> require "first dash stroke"
         let second = first.Subpaths |> List.collect(fun outline ->
             Stroke.subpathDashes outline [17.0<length>;9.0<length>] 3.0<length> |> require "second dashes"
-            |> List.filter(fun dash -> (Subpath.length dash |> require "dash length") > 0.1<length>)
+            |> List.filter(fun dash -> (Measure.subpathLength dash |> require "dash length") > 0.1<length>)
             |> List.map(fun dash -> Stroke.subpath dash 6.0<length> Offset.Round Offset.RoundCap |> require "second dash stroke")) |> combine
         panels 1000 450 ["Recursive dashes",[(first,"fill:#fed7aa;stroke:#9a3412;stroke-width:1.4;opacity:.42");layer second "#fee2e2" "#7f1d1d" 1.7;sourceStyle s]]
     let figureEightBand () = panels 900 420 ["Offsets +18 / +34",[green figureBand.Value;sourceStyle figureEight]]
@@ -128,10 +128,10 @@ module Fixtures =
         let snake=Subpath.createWith Strict segments |> require "radiator"
         let cut=Cut.path (path snake) cutter |> require "cut"
         let kept=cut.Subpaths |> List.filter(fun p ->
-            let length=Subpath.length p |> require "piece length"
+            let length=Measure.subpathLength p |> require "piece length"
             if length<=1e-6<length> then false
             else
-                let sample=Subpath.pointAtLength p (length/2.) |> require "piece midpoint"
+                let sample=Measure.subpathPointAtLength p (length/2.) |> require "piece midpoint"
                 (Path.containment sample cutter Nonzero |> require "containment") <> Inside) |> Path.ofSubpaths
         panels 650 650 ["Cut radiator",[layer kept "none" "#0f172a" 0.035]]
     let csgCases () =

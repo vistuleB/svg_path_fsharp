@@ -23,7 +23,7 @@ let ``subpath conditional linearization rejects negative tolerance`` () =
 
 [<Fact>]
 let ``segment segment projection reports crossing line pair`` () =
-    let found = Intersections.segmentSegmentClosestPair (line 0.0 0.0 3.0 3.0) (line 1.0 0.0 1.0 3.0) |> Result.defaultWith (failwithf "%A")
+    let found = Distance.segmentSegmentClosestPair (line 0.0 0.0 3.0 3.0) (line 1.0 0.0 1.0 3.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1.0 / 3.0, ratio found.LeftT, 6)
     Assert.Equal(1.0 / 3.0, ratio found.RightT, 6)
     Assert.True(found.Distance < 1.0e-6<length>)
@@ -32,7 +32,7 @@ let ``segment segment projection reports crossing line pair`` () =
 
 [<Fact>]
 let ``segment segment projection reports separated line pair`` () =
-    let found = Intersections.segmentSegmentClosestPair (line 0.0 0.0 1.0 0.0) (line 0.0 2.0 1.0 2.0) |> Result.defaultWith (failwithf "%A")
+    let found = Distance.segmentSegmentClosestPair (line 0.0 0.0 1.0 0.0) (line 0.0 2.0 1.0 2.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
     Assert.Equal(Length.toFloat found.LeftPoint.X, Length.toFloat found.RightPoint.X, 6)
     Assert.Equal(0.0, Length.toFloat found.LeftPoint.Y, 6)
@@ -40,14 +40,14 @@ let ``segment segment projection reports separated line pair`` () =
 
 [<Fact>]
 let ``segment segment projection reports overlapping line pair`` () =
-    let found = Intersections.segmentSegmentClosestPair (line 0.0 0.0 3.0 0.0) (line 1.0 0.0 2.0 0.0) |> Result.defaultWith (failwithf "%A")
+    let found = Distance.segmentSegmentClosestPair (line 0.0 0.0 3.0 0.0) (line 1.0 0.0 2.0 0.0) |> Result.defaultWith (failwithf "%A")
     Assert.True(found.Distance < 1.0e-6<length>)
     Assert.True(Point.distance found.LeftPoint found.RightPoint < 1.0e-6<length>)
 
 [<Fact>]
 let ``segment subpath projection reports nearest segment`` () =
     let right = Subpath.create [ line 0.0 3.0 1.0 3.0; line 1.0 3.0 1.0 2.0 ] |> Result.defaultWith (failwithf "%A")
-    let found = Intersections.segmentSubpathClosestPair (line 0.0 0.0 1.0 0.0) right |> Result.defaultWith (failwithf "%A")
+    let found = Distance.segmentSubpathClosestPair (line 0.0 0.0 1.0 0.0) right |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, found.RightAt.SegmentIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
 
@@ -55,7 +55,7 @@ let ``segment subpath projection reports nearest segment`` () =
 let ``segment path projection reports nearest subpath`` () =
     let far = Subpath.ofSegment (line 0.0 5.0 1.0 5.0)
     let near = Subpath.ofSegment (line 0.0 2.0 1.0 2.0)
-    let found = Intersections.segmentPathClosestPair (line 0.0 0.0 1.0 0.0) (Path.ofSubpaths [ far; near ]) |> Result.defaultWith (failwithf "%A")
+    let found = Distance.segmentPathClosestPair (line 0.0 0.0 1.0 0.0) (Path.ofSubpaths [ far; near ]) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, found.RightAt.SubpathIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
 
@@ -63,7 +63,7 @@ let ``segment path projection reports nearest subpath`` () =
 let ``subpath subpath projection reports nearest segments`` () =
     let left = Subpath.create [ line 0.0 0.0 1.0 0.0; line 1.0 0.0 2.0 0.0 ] |> Result.defaultWith (failwithf "%A")
     let right = Subpath.create [ line 0.0 4.0 1.0 4.0; line 1.0 4.0 1.0 2.0 ] |> Result.defaultWith (failwithf "%A")
-    let found = Intersections.subpathSubpathClosestPair left right |> Result.defaultWith (failwithf "%A")
+    let found = Distance.subpathSubpathClosestPair left right |> Result.defaultWith (failwithf "%A")
     Assert.True(found.LeftAt.SegmentIndex = 0 || found.LeftAt.SegmentIndex = 1)
     Assert.Equal(1, found.RightAt.SegmentIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
@@ -73,7 +73,7 @@ let ``subpath path projection reports nearest subpath`` () =
     let left = Subpath.ofSegment (line 0.0 0.0 1.0 0.0)
     let far = Subpath.ofSegment (line 0.0 5.0 1.0 5.0)
     let near = Subpath.ofSegment (line 0.0 2.0 1.0 2.0)
-    let found = Intersections.subpathPathClosestPair left (Path.ofSubpaths [ far; near ]) |> Result.defaultWith (failwithf "%A")
+    let found = Distance.subpathPathClosestPair left (Path.ofSubpaths [ far; near ]) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, found.RightAt.SubpathIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
 
@@ -81,7 +81,7 @@ let ``subpath path projection reports nearest subpath`` () =
 let ``path path projection reports nearest subpaths`` () =
     let left = Path.singleton (Subpath.ofSegment (line 0.0 0.0 1.0 0.0))
     let right = Path.ofSubpaths [ Subpath.ofSegment (line 0.0 5.0 1.0 5.0); Subpath.ofSegment (line 0.0 2.0 1.0 2.0) ]
-    let found = Intersections.pathPathClosestPair left right |> Result.defaultWith (failwithf "%A")
+    let found = Distance.pathPathClosestPair left right |> Result.defaultWith (failwithf "%A")
     Assert.Equal(1, found.RightAt.SubpathIndex)
     Assert.Equal(2.0, Length.toFloat found.Distance, 6)
 
@@ -119,15 +119,15 @@ let ``subpath degenerate lines rejects bent subpath`` () =
 
 [<Fact>]
 let ``parametric subpath fits simple parabola`` () =
-    let source = Subpath.fromParametric 0.0 1.0 (fun t -> point t (t * t)) |> Result.defaultWith (failwithf "%A")
+    let source = Fit.subpathFromParametric 0.0 1.0 (fun t -> point t (t * t)) |> Result.defaultWith (failwithf "%A")
     let segment = Assert.Single(source.Segments)
     let sample = Segment.point segment 0.5<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> sample (point 0.5 0.25))
 
 [<Fact>]
 let ``parametric subpath uses optional tangents`` () =
-    let options = { Subpath.defaultParametricOptions with Tolerance = 1.0e-9<length>; Tangent = Some(fun _ -> point 1.0 1.0) }
-    let source = Subpath.fromParametricWith 2.0 6.0 (fun t -> point t t) options |> Result.defaultWith (failwithf "%A")
+    let options = { Fit.defaultParametricOptions with Tolerance = 1.0e-9<length>; Tangent = Some(fun _ -> point 1.0 1.0) }
+    let source = Fit.subpathFromParametricWith 2.0 6.0 (fun t -> point t t) options |> Result.defaultWith (failwithf "%A")
     let segment = Assert.Single(source.Segments)
     let sample = Segment.point segment 0.25<parameter> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> sample (point 3.0 3.0))
@@ -138,11 +138,11 @@ type private sourceParameter
 [<Fact>]
 let ``parametric subpath preserves caller parameter units`` () =
     let options: ParametricOptions<sourceParameter> =
-        { Subpath.defaultParametricOptions with
+        { Fit.defaultParametricOptions with
             Tolerance = 1.0e-9<length>
             Tangent = Some(fun _ -> Point.create 1.0<length / sourceParameter> 1.0<length / sourceParameter>) }
     let source =
-        Subpath.fromParametricWith
+        Fit.subpathFromParametricWith
             2.0<sourceParameter>
             6.0<sourceParameter>
             (fun t -> point (float t) (float t))
@@ -152,16 +152,16 @@ let ``parametric subpath preserves caller parameter units`` () =
 
 [<Fact>]
 let ``parametric subpath adaptively subdivides`` () =
-    let options = { Subpath.defaultParametricOptions with Tolerance = 1.0e-5<length>; MaxDepth = 8 }
-    let source = Subpath.fromParametricWith -1.0 1.0 (fun t -> point t (t ** 4.0)) options |> Result.defaultWith (failwithf "%A")
+    let options = { Fit.defaultParametricOptions with Tolerance = 1.0e-5<length>; MaxDepth = 8 }
+    let source = Fit.subpathFromParametricWith -1.0 1.0 (fun t -> point t (t ** 4.0)) options |> Result.defaultWith (failwithf "%A")
     Assert.True(source.Segments.Length > 1)
 
 [<Fact>]
 let ``parametric subpath rejects invalid options`` () =
-    let invalid = { Subpath.defaultParametricOptions with SamplesPerPiece = 1 }
+    let invalid = { Fit.defaultParametricOptions with SamplesPerPiece = 1 }
     let pointFunction t = point t t
-    Assert.Equal(Error(InvalidParametricSamplesPerPiece 1), Subpath.fromParametricWith 0.0 1.0 pointFunction invalid)
-    Assert.Equal(Error(InvalidParametricInterval(1.0, 1.0)), Subpath.fromParametric 1.0 1.0 pointFunction)
+    Assert.Equal(Error(InvalidParametricSamplesPerPiece 1), Fit.subpathFromParametricWith 0.0 1.0 pointFunction invalid)
+    Assert.Equal(Error(InvalidParametricInterval(1.0, 1.0)), Fit.subpathFromParametric 1.0 1.0 pointFunction)
 
 let private assertNear expected actual =
     Assert.InRange(float actual, expected - 1.0e-6, expected + 1.0e-6)
@@ -181,7 +181,7 @@ let private semicircle () =
 [<Fact>]
 let ``segment crossings finds line crossing`` () =
     let crossing =
-        Segment.crossings (line 0.0 0.0 10.0 0.0) (fun sample -> sample.X - 5.0<length>)
+        Containment.segmentCrossings (line 0.0 0.0 10.0 0.0) (fun sample -> sample.X - 5.0<length>)
         |> Result.defaultWith (failwithf "%A")
         |> List.exactlyOne
     assertNear 0.5 crossing
@@ -190,7 +190,7 @@ let ``segment crossings finds line crossing`` () =
 let ``segment crossings finds multiple quadratic crossings`` () =
     let options = { Samples = 20; SignedLineDistanceTolerance = 1.0e-9<length>; MaxIterations = 100 }
     let crossings =
-        Segment.crossingsWith
+        Containment.segmentCrossingsWith
             (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0))
             (fun sample -> sample.Y - 5.0<length>)
             options
@@ -202,7 +202,7 @@ let ``segment crossings finds multiple quadratic crossings`` () =
 [<Fact>]
 let ``segment crossings finds arc crossing`` () =
     let crossing =
-        Segment.crossings (semicircle ()) (fun sample -> sample.X - 10.0<length>)
+        Containment.segmentCrossings (semicircle ()) (fun sample -> sample.X - 10.0<length>)
         |> Result.defaultWith (failwithf "%A")
         |> List.exactlyOne
     assertNear 0.5 crossing
@@ -213,11 +213,11 @@ let ``segment_ray_crossings_defaults_match_explicit_options_test`` () =
     let origin = point 5.0 0.0
     let direction = Point.create 1.0 0.0
     let crossings =
-        Segment.rayCrossings source origin direction
+        Containment.segmentRayCrossings source origin direction
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(
         Ok crossings,
-        Segment.rayCrossingsWith source origin direction Segment.defaultCrossingOptions)
+        Containment.segmentRayCrossingsWith source origin direction Containment.defaultCrossingOptions)
     let crossing, rayT = List.exactlyOne crossings
     assertNear 0.5 crossing
     assertLengthNear 5.0 rayT
@@ -225,7 +225,7 @@ let ``segment_ray_crossings_defaults_match_explicit_options_test`` () =
 [<Fact>]
 let ``segment ray crossings finds line crossing`` () =
     let crossing, rayT =
-        Segment.rayCrossingsWith (line 10.0 -5.0 10.0 5.0) (point 5.0 0.0) (Point.create 1.0 0.0) Segment.defaultCrossingOptions
+        Containment.segmentRayCrossingsWith (line 10.0 -5.0 10.0 5.0) (point 5.0 0.0) (Point.create 1.0 0.0) Containment.defaultCrossingOptions
         |> Result.defaultWith (failwithf "%A")
         |> List.exactlyOne
     assertNear 0.5 crossing
@@ -234,11 +234,11 @@ let ``segment ray crossings finds line crossing`` () =
 [<Fact>]
 let ``segment ray crossings finds quadratic tangent contact`` () =
     let crossing, rayT =
-        Segment.rayCrossingsWith
+        Containment.segmentRayCrossingsWith
             (QuadraticBezier(point 0.0 0.0, point 10.0 10.0, point 20.0 0.0))
             (point 0.0 5.0)
             (Point.create 1.0 0.0)
-            Segment.defaultCrossingOptions
+            Containment.defaultCrossingOptions
         |> Result.defaultWith (failwithf "%A")
         |> List.exactlyOne
     assertNear 0.5 crossing
@@ -247,11 +247,11 @@ let ``segment ray crossings finds quadratic tangent contact`` () =
 [<Fact>]
 let ``segment ray crossings finds cubic line crossing`` () =
     let crossing, rayT =
-        Segment.rayCrossingsWith
+        Containment.segmentRayCrossingsWith
             (CubicBezier(point 0.0 0.0, point 0.1 0.1, point 2.5 2.5, point 3.0 3.0))
             (point 1.0 0.0)
             (Point.create 0.0 1.0)
-            Segment.defaultCrossingOptions
+            Containment.defaultCrossingOptions
         |> Result.defaultWith (failwithf "%A")
         |> List.filter (fun (_, rayT) -> rayT > 0.0<length>)
         |> List.exactlyOne
@@ -261,7 +261,7 @@ let ``segment ray crossings finds cubic line crossing`` () =
 [<Fact>]
 let ``segment ray crossings finds arc line crossing`` () =
     let crossing, rayT =
-        Segment.rayCrossingsWith (semicircle ()) (point 10.0 -15.0) (Point.create 0.0 1.0) Segment.defaultCrossingOptions
+        Containment.segmentRayCrossingsWith (semicircle ()) (point 10.0 -15.0) (Point.create 0.0 1.0) Containment.defaultCrossingOptions
         |> Result.defaultWith (failwithf "%A")
         |> List.filter (fun (_, rayT) -> rayT > 0.0<length>)
         |> List.exactlyOne
@@ -271,7 +271,7 @@ let ``segment ray crossings finds arc line crossing`` () =
 [<Fact>]
 let ``segment ray crossings includes wrong side crossing`` () =
     let crossing, rayT =
-        Segment.rayCrossingsWith (line 10.0 -5.0 10.0 5.0) (point 5.0 0.0) (Point.create -1.0 0.0) Segment.defaultCrossingOptions
+        Containment.segmentRayCrossingsWith (line 10.0 -5.0 10.0 5.0) (point 5.0 0.0) (Point.create -1.0 0.0) Containment.defaultCrossingOptions
         |> Result.defaultWith (failwithf "%A")
         |> List.exactlyOne
     assertNear 0.5 crossing
@@ -281,32 +281,32 @@ let ``segment ray crossings includes wrong side crossing`` () =
 let ``segment ray crossings rejects zero direction`` () =
     Assert.Equal(
         Error IndeterminateDirection,
-        Segment.rayCrossingsWith (line 0.0 0.0 10.0 0.0) (point 5.0 0.0) (Point.create 0.0 0.0) Segment.defaultCrossingOptions)
+        Containment.segmentRayCrossingsWith (line 0.0 0.0 10.0 0.0) (point 5.0 0.0) (Point.create 0.0 0.0) Containment.defaultCrossingOptions)
 
 [<Fact>]
 let ``segment crossings rejects invalid options`` () =
     let segment = line 0.0 0.0 10.0 0.0
     let measure sample = sample.X - 5.0<length>
-    Assert.Equal(Error(InvalidCrossingSamples 0), Segment.crossingsWith segment measure { Segment.defaultCrossingOptions with Samples = 0 })
-    Assert.Equal(Error(InvalidCrossingTolerance 0.0<length>), Segment.crossingsWith segment measure { Segment.defaultCrossingOptions with SignedLineDistanceTolerance = 0.0<length> })
-    Assert.Equal(Error(InvalidCrossingMaxIterations 0), Segment.crossingsWith segment measure { Segment.defaultCrossingOptions with MaxIterations = 0 })
+    Assert.Equal(Error(InvalidCrossingSamples 0), Containment.segmentCrossingsWith segment measure { Containment.defaultCrossingOptions with Samples = 0 })
+    Assert.Equal(Error(InvalidCrossingTolerance 0.0<length>), Containment.segmentCrossingsWith segment measure { Containment.defaultCrossingOptions with SignedLineDistanceTolerance = 0.0<length> })
+    Assert.Equal(Error(InvalidCrossingMaxIterations 0), Containment.segmentCrossingsWith segment measure { Containment.defaultCrossingOptions with MaxIterations = 0 })
 
 [<Fact>]
 let ``segment crossings returns degenerate arc errors`` () =
     let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
-    Assert.Equal(Error DegenerateArc, Segment.crossings segment (fun sample -> sample.X))
+    Assert.Equal(Error DegenerateArc, Containment.segmentCrossings segment (fun sample -> sample.X))
 
 [<Fact>]
 let ``segment minimize finds line minimum`` () =
     let found =
-        Segment.minimize (line 0.0 0.0 10.0 0.0) (fun sample -> (float sample.X - 7.0) ** 2.0)
+        Fit.segmentMinimize (line 0.0 0.0 10.0 0.0) (fun sample -> (float sample.X - 7.0) ** 2.0)
         |> Result.defaultWith (failwithf "%A")
     assertNear 0.7 found
 
 [<Fact>]
 let ``segment minimize finds quadratic minimum`` () =
     let found =
-        Segment.minimize
+        Fit.segmentMinimize
             (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0))
             (fun sample -> (float sample.X - 10.0) ** 2.0 + (float sample.Y - 10.0) ** 2.0)
         |> Result.defaultWith (failwithf "%A")
@@ -315,7 +315,7 @@ let ``segment minimize finds quadratic minimum`` () =
 [<Fact>]
 let ``segment minimize finds arc minimum`` () =
     let found =
-        Segment.minimize (semicircle ()) (fun sample -> (float sample.X - 10.0) ** 2.0)
+        Fit.segmentMinimize (semicircle ()) (fun sample -> (float sample.X - 10.0) ** 2.0)
         |> Result.defaultWith (failwithf "%A")
     assertNear 0.5 found
 
@@ -323,29 +323,29 @@ let ``segment minimize finds arc minimum`` () =
 let ``segment minimize with rejects invalid options`` () =
     let segment = line 0.0 0.0 10.0 0.0
     let measure sample = float sample.X
-    Assert.Equal(Error(InvalidMinimizeSamples 0), Segment.minimizeWith segment measure { Segment.defaultMinimizeOptions with Samples = 0 })
-    Assert.Equal(Error(InvalidMinimizeTolerance 0.0<parameter>), Segment.minimizeWith segment measure { Segment.defaultMinimizeOptions with ParameterTolerance = 0.0<parameter> })
-    Assert.Equal(Error(InvalidMinimizeMaxIterations 0), Segment.minimizeWith segment measure { Segment.defaultMinimizeOptions with MaxIterations = 0 })
+    Assert.Equal(Error(InvalidMinimizeSamples 0), Fit.segmentMinimizeWith segment measure { Fit.defaultMinimizeOptions with Samples = 0 })
+    Assert.Equal(Error(InvalidMinimizeTolerance 0.0<parameter>), Fit.segmentMinimizeWith segment measure { Fit.defaultMinimizeOptions with ParameterTolerance = 0.0<parameter> })
+    Assert.Equal(Error(InvalidMinimizeMaxIterations 0), Fit.segmentMinimizeWith segment measure { Fit.defaultMinimizeOptions with MaxIterations = 0 })
 
 [<Fact>]
 let ``segment minimize returns degenerate arc errors`` () =
     let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
-    Assert.Equal(Error DegenerateArc, Segment.minimize segment (fun sample -> float sample.X))
+    Assert.Equal(Error DegenerateArc, Fit.segmentMinimize segment (fun sample -> float sample.X))
 
 [<Fact>]
 let ``segment distance measures line projection`` () =
-    let found = Segment.distance (line 0.0 0.0 10.0 0.0) (point 5.0 4.0) |> Result.defaultWith (failwithf "%A")
+    let found = Distance.segmentDistance (line 0.0 0.0 10.0 0.0) (point 5.0 4.0) |> Result.defaultWith (failwithf "%A")
     assertLengthNear 4.0 found
 
 [<Fact>]
 let ``segment distance measures line endpoint`` () =
-    let found = Segment.distance (line 0.0 0.0 10.0 0.0) (point 13.0 4.0) |> Result.defaultWith (failwithf "%A")
+    let found = Distance.segmentDistance (line 0.0 0.0 10.0 0.0) (point 13.0 4.0) |> Result.defaultWith (failwithf "%A")
     assertLengthNear 5.0 found
 
 [<Fact>]
 let ``segment distance measures quadratic curve`` () =
     let found =
-        Segment.distance
+        Distance.segmentDistance
             (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0))
             (point 10.0 15.0)
         |> Result.defaultWith (failwithf "%A")
@@ -354,7 +354,7 @@ let ``segment distance measures quadratic curve`` () =
 [<Fact>]
 let ``segment distance measures cubic curve`` () =
     let found =
-        Segment.distance
+        Distance.segmentDistance
             (CubicBezier(point 0.0 0.0, point 0.0 10.0, point 10.0 10.0, point 10.0 0.0))
             (point 5.0 7.5)
         |> Result.defaultWith (failwithf "%A")
@@ -362,41 +362,41 @@ let ``segment distance measures cubic curve`` () =
 
 [<Fact>]
 let ``segment distance measures arc`` () =
-    let found = Segment.distance (semicircle ()) (point 10.0 -15.0) |> Result.defaultWith (failwithf "%A")
+    let found = Distance.segmentDistance (semicircle ()) (point 10.0 -15.0) |> Result.defaultWith (failwithf "%A")
     assertLengthNear 5.0 found
 
 [<Fact>]
 let ``segment distance with rejects invalid options`` () =
     let segment = line 0.0 0.0 10.0 0.0
     let sample = point 5.0 4.0
-    Assert.Equal(Error(InvalidDistanceSamples 0), Segment.distanceWith segment sample { Segment.defaultDistanceOptions with Samples = 0 })
-    Assert.Equal(Error(InvalidDistanceTolerance 0.0<length>), Segment.distanceWith segment sample { Segment.defaultDistanceOptions with Tolerance = 0.0<length> })
-    Assert.Equal(Error(InvalidDistanceMaxIterations 0), Segment.distanceWith segment sample { Segment.defaultDistanceOptions with MaxIterations = 0 })
+    Assert.Equal(Error(InvalidDistanceSamples 0), Distance.segmentDistanceWith segment sample { Distance.defaultDistanceOptions with Samples = 0 })
+    Assert.Equal(Error(InvalidDistanceTolerance 0.0<length>), Distance.segmentDistanceWith segment sample { Distance.defaultDistanceOptions with Tolerance = 0.0<length> })
+    Assert.Equal(Error(InvalidDistanceMaxIterations 0), Distance.segmentDistanceWith segment sample { Distance.defaultDistanceOptions with MaxIterations = 0 })
 
 [<Fact>]
 let ``segment distance returns degenerate arc errors`` () =
     let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
-    Assert.Equal(Error DegenerateArc, Segment.distance segment (point 10.0 0.0))
+    Assert.Equal(Error DegenerateArc, Distance.segmentDistance segment (point 10.0 0.0))
 
 [<Fact>]
 let ``segment length measures line exactly`` () =
-    Segment.length (line 0.0 0.0 3.0 4.0)
+    Measure.segmentLength (line 0.0 0.0 3.0 4.0)
     |> Result.defaultWith (failwithf "%A")
     |> assertLengthNear 5.0
 
 [<Fact>]
 let ``segment length avoids intermediate overflow`` () =
-    Assert.Equal(Ok 1.0e200<length>, Segment.length (line 0.0 0.0 1.0e200 0.0))
+    Assert.Equal(Ok 1.0e200<length>, Measure.segmentLength (line 0.0 0.0 1.0e200 0.0))
 
 [<Fact>]
 let ``segment length approximates quadratic curve`` () =
-    let found = Segment.length (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)) |> Result.defaultWith (failwithf "%A")
+    let found = Measure.segmentLength (QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)) |> Result.defaultWith (failwithf "%A")
     Assert.InRange(found, 20.0<length>, 40.0<length>)
 
 [<Fact>]
 let ``segment length matches sampled curve reference`` () =
     let curve = CubicBezier(point 0.0 0.0, point 0.0 30.0, point 40.0 -10.0, point 40.0 20.0)
-    let found = Segment.length curve |> Result.defaultWith (failwithf "%A")
+    let found = Measure.segmentLength curve |> Result.defaultWith (failwithf "%A")
     let samples =
         [ 0 .. 1000 ]
         |> List.map (fun index -> Segment.point curve (Parameter.fromFloat (float index / 1000.0)) |> Result.defaultWith (failwithf "%A"))
@@ -405,19 +405,19 @@ let ``segment length matches sampled curve reference`` () =
 
 [<Fact>]
 let ``segment length approximates arc`` () =
-    let found = Segment.length (semicircle ()) |> Result.defaultWith (failwithf "%A")
+    let found = Measure.segmentLength (semicircle ()) |> Result.defaultWith (failwithf "%A")
     Assert.True(abs (found - 31.41592653589793<length>) < 0.01<length>)
 
 [<Fact>]
 let ``segment length with rejects invalid options`` () =
     let segment = line 0.0 0.0 10.0 0.0
-    Assert.Equal(Error(InvalidLengthTolerance 0.0<length>), Segment.lengthWith segment { Tolerance = 0.0<length>; MaxDepth = 20 })
-    Assert.Equal(Error(InvalidLengthMaxDepth 0), Segment.lengthWith segment { Tolerance = 1.0e-9<length>; MaxDepth = 0 })
+    Assert.Equal(Error(InvalidLengthTolerance 0.0<length>), Measure.segmentLengthWith segment { Tolerance = 0.0<length>; MaxDepth = 20 })
+    Assert.Equal(Error(InvalidLengthMaxDepth 0), Measure.segmentLengthWith segment { Tolerance = 1.0e-9<length>; MaxDepth = 0 })
 
 [<Fact>]
 let ``segment length with reports exhausted refinement depth`` () =
     let curve = CubicBezier(point 0.0 0.0, point 0.0 100.0, point 100.0 -100.0, point 100.0 0.0)
-    match Segment.lengthWith curve { Tolerance = 1.0e-30<length>; MaxDepth = 1 } with
+    match Measure.segmentLengthWith curve { Tolerance = 1.0e-30<length>; MaxDepth = 1 } with
     | Error(LengthMaxDepthReached(estimate, error)) ->
         Assert.True(estimate > 0.0<length>)
         Assert.True(error > 0.0<length>)
@@ -426,33 +426,33 @@ let ``segment length with reports exhausted refinement depth`` () =
 [<Fact>]
 let ``subpath length sums segment lengths`` () =
     let subpath = Subpath.create [ line 0.0 0.0 3.0 4.0; line 3.0 4.0 8.0 16.0 ] |> Result.defaultWith (failwithf "%A")
-    Subpath.length subpath |> Result.defaultWith (failwithf "%A") |> assertLengthNear 18.0
+    Measure.subpathLength subpath |> Result.defaultWith (failwithf "%A") |> assertLengthNear 18.0
 
 [<Fact>]
 let ``subpath length returns zero for empty subpath`` () =
-    Assert.Equal(Ok 0.0<length>, Subpath.length (Subpath.empty (point 0.0 0.0)))
+    Assert.Equal(Ok 0.0<length>, Measure.subpathLength (Subpath.empty (point 0.0 0.0)))
 
 [<Fact>]
 let ``segment parameter at length measures line exactly`` () =
-    Assert.Equal(Ok 0.4<parameter>, Segment.parameterAtLength (line 0.0 0.0 10.0 0.0) 4.0<length>)
+    Assert.Equal(Ok 0.4<parameter>, Measure.segmentParameterAtLength (line 0.0 0.0 10.0 0.0) 4.0<length>)
 
 [<Fact>]
 let ``segment point at length evaluates line`` () =
-    let found = Segment.pointAtLength (line 0.0 0.0 10.0 0.0) 4.0<length> |> Result.defaultWith (failwithf "%A")
+    let found = Measure.segmentPointAtLength (line 0.0 0.0 10.0 0.0) 4.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> found (point 4.0 0.0))
 
 [<Fact>]
 let ``segment parameter at length inverts symmetric curve`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
-    let length = Segment.length curve |> Result.defaultWith (failwithf "%A")
-    Segment.parameterAtLength curve (length / 2.0) |> Result.defaultWith (failwithf "%A") |> assertNear 0.5
+    let length = Measure.segmentLength curve |> Result.defaultWith (failwithf "%A")
+    Measure.segmentParameterAtLength curve (length / 2.0) |> Result.defaultWith (failwithf "%A") |> assertNear 0.5
 
 [<Fact>]
 let ``segment point at length evaluates arc`` () =
     let arc = semicircle ()
-    let length = Segment.length arc |> Result.defaultWith (failwithf "%A")
-    let found = Segment.pointAtLength arc (length / 2.0) |> Result.defaultWith (failwithf "%A")
-    let derivative = Segment.derivativeAtLength arc (length / 2.0) |> Result.defaultWith (failwithf "%A")
+    let length = Measure.segmentLength arc |> Result.defaultWith (failwithf "%A")
+    let found = Measure.segmentPointAtLength arc (length / 2.0) |> Result.defaultWith (failwithf "%A")
+    let derivative = Measure.segmentDerivativeAtLength arc (length / 2.0) |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> found (point 10.0 -10.0))
     Assert.True(derivative.X > 0.0<length / parameter>)
     Assert.True(abs derivative.Y < 1.0e-6<length / parameter>)
@@ -460,14 +460,14 @@ let ``segment point at length evaluates arc`` () =
 [<Fact>]
 let ``segment parameter at length rejects invalid distances`` () =
     let segment = line 0.0 0.0 10.0 0.0
-    Assert.Equal(Error(InvalidLengthDistance(-1.0<length>, 10.0<length>)), Segment.parameterAtLength segment -1.0<length>)
-    Assert.Equal(Error(InvalidLengthDistance(11.0<length>, 10.0<length>)), Segment.parameterAtLength segment 11.0<length>)
+    Assert.Equal(Error(InvalidLengthDistance(-1.0<length>, 10.0<length>)), Measure.segmentParameterAtLength segment -1.0<length>)
+    Assert.Equal(Error(InvalidLengthDistance(11.0<length>, 10.0<length>)), Measure.segmentParameterAtLength segment 11.0<length>)
 
 [<Fact>]
 let ``segment between lengths uses traveled distances`` () =
     let segment = line 0.0 0.0 10.0 0.0
-    let forward = Segment.betweenLengths segment 2.0<length> 7.0<length> |> Result.defaultWith (failwithf "%A")
-    let reverse = Segment.betweenLengths segment 7.0<length> 2.0<length> |> Result.defaultWith (failwithf "%A")
+    let forward = Measure.segmentBetweenLengths segment 2.0<length> 7.0<length> |> Result.defaultWith (failwithf "%A")
+    let reverse = Measure.segmentBetweenLengths segment 7.0<length> 2.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal(point 2.0 0.0, Segment.start forward)
     Assert.Equal(point 7.0 0.0, Segment.finish forward)
     Assert.Equal(point 7.0 0.0, Segment.start reverse)
@@ -476,7 +476,7 @@ let ``segment between lengths uses traveled distances`` () =
 [<Fact>]
 let ``segments between lengths uses adjacent distances`` () =
     let pieces =
-        Segment.betweenLengthsMany (line 0.0 0.0 10.0 0.0) [ 2.0<length>; 7.0<length>; 4.0<length> ]
+        Measure.segmentBetweenLengthsMany (line 0.0 0.0 10.0 0.0) [ 2.0<length>; 7.0<length>; 4.0<length> ]
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, pieces.Length)
     Assert.Equal(point 2.0 0.0, Segment.start pieces[0])
@@ -487,14 +487,14 @@ let ``segments between lengths uses adjacent distances`` () =
 [<Fact>]
 let ``segment between lengths rejects invalid input`` () =
     let segment = line 0.0 0.0 10.0 0.0
-    Assert.Equal(Error(InvalidLengthDistance(11.0<length>, 10.0<length>)), Segment.betweenLengths segment 0.0<length> 11.0<length>)
+    Assert.Equal(Error(InvalidLengthDistance(11.0<length>, 10.0<length>)), Measure.segmentBetweenLengths segment 0.0<length> 11.0<length>)
     Assert.Equal(
         Error(InvalidLengthTolerance 0.0<length>),
-        Segment.betweenLengthsWith segment 2.0<length> 7.0<length> { Tolerance = 0.0<length>; MaxDepth = 20 })
+        Measure.segmentBetweenLengthsWith segment 2.0<length> 7.0<length> { Tolerance = 0.0<length>; MaxDepth = 20 })
 
 [<Fact>]
 let ``segment subdivide to max length splits line by arc length`` () =
-    let pieces = Segment.subdivideToMaxLength (line 0.0 0.0 10.0 0.0) 3.0<length> |> Result.defaultWith (failwithf "%A")
+    let pieces = Measure.segmentSubdivideToMaxLength (line 0.0 0.0 10.0 0.0) 3.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal(4, pieces.Length)
     Assert.Equal(point 0.0 0.0, Segment.start pieces[0])
     Assert.Equal(point 2.5 0.0, Segment.start pieces[1])
@@ -505,21 +505,21 @@ let ``segment subdivide to max length splits line by arc length`` () =
 [<Fact>]
 let ``segment subdivide to max length splits curve by arc length`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 30.0 0.0, point 30.0 30.0)
-    let length = Segment.length curve |> Result.defaultWith (failwithf "%A")
-    let pieces = Segment.subdivideToMaxLength curve (length / 2.0) |> Result.defaultWith (failwithf "%A")
+    let length = Measure.segmentLength curve |> Result.defaultWith (failwithf "%A")
+    let pieces = Measure.segmentSubdivideToMaxLength curve (length / 2.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, pieces.Length)
-    Segment.length pieces[0] |> Result.defaultWith (failwithf "%A") |> assertLengthNear (float length / 2.0)
-    Segment.length pieces[1] |> Result.defaultWith (failwithf "%A") |> assertLengthNear (float length / 2.0)
+    Measure.segmentLength pieces[0] |> Result.defaultWith (failwithf "%A") |> assertLengthNear (float length / 2.0)
+    Measure.segmentLength pieces[1] |> Result.defaultWith (failwithf "%A") |> assertLengthNear (float length / 2.0)
     Assert.True(Point.near 1.0e-6<length> (Segment.finish pieces[0]) (Segment.start pieces[1]))
 
 [<Fact>]
 let ``segment subdivide to max length keeps zero length segment`` () =
     let segment = line 1.0 2.0 1.0 2.0
-    Assert.Equal(Ok [ segment ], Segment.subdivideToMaxLength segment 1.0<length>)
+    Assert.Equal(Ok [ segment ], Measure.segmentSubdivideToMaxLength segment 1.0<length>)
 
 [<Fact>]
 let ``segment subdivide to max length rejects invalid max length`` () =
-    Assert.Equal(Error(InvalidSubdivisionMaxLength 0.0<length>), Segment.subdivideToMaxLength (line 0.0 0.0 10.0 0.0) 0.0<length>)
+    Assert.Equal(Error(InvalidSubdivisionMaxLength 0.0<length>), Measure.segmentSubdivideToMaxLength (line 0.0 0.0 10.0 0.0) 0.0<length>)
 
 [<Fact>]
 let ``subpath subdivide to max length preserves boundaries and closed`` () =
@@ -527,7 +527,7 @@ let ``subpath subdivide to max length preserves boundaries and closed`` () =
         Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 4.0; line 10.0 4.0 0.0 0.0 ]
         |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
-    let subdivided = Subpath.subdivideToMaxLength source 4.0<length> |> Result.defaultWith (failwithf "%A")
+    let subdivided = Measure.subpathSubdivideToMaxLength source 4.0<length> |> Result.defaultWith (failwithf "%A")
     let segments = Subpath.segments subdivided
     Assert.True(Subpath.isClosed subdivided)
     Assert.Equal(7, segments.Length)
@@ -537,7 +537,7 @@ let ``subpath subdivide to max length preserves boundaries and closed`` () =
 [<Fact>]
 let ``path subdivide to max length preserves subpaths`` () =
     let source = Path.ofSubpaths [ Subpath.ofSegment (line 0.0 0.0 10.0 0.0); Subpath.ofSegment (line 20.0 0.0 20.0 8.0) ]
-    let subdivided = Path.subdivideToMaxLength source 4.0<length> |> Result.defaultWith (failwithf "%A") |> Path.subpaths
+    let subdivided = Measure.pathSubdivideToMaxLength source 4.0<length> |> Result.defaultWith (failwithf "%A") |> Path.subpaths
     Assert.Equal(2, subdivided.Length)
     Assert.Equal(3, Subpath.segments subdivided[0] |> List.length)
     Assert.Equal(2, Subpath.segments subdivided[1] |> List.length)
@@ -545,36 +545,36 @@ let ``path subdivide to max length preserves subpaths`` () =
 [<Fact>]
 let ``subpath parameter at length returns public parameter`` () =
     let source = Subpath.create [ line 0.0 0.0 3.0 4.0; line 3.0 4.0 3.0 16.0 ] |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok { SegmentIndex = 1; T = 0.5<parameter> }, Subpath.parameterAtLength source 11.0<length>)
-    Assert.Equal(Ok { SegmentIndex = 1; T = 1.0<parameter> }, Subpath.parameterAtLength source 17.0<length>)
+    Assert.Equal(Ok { SegmentIndex = 1; T = 0.5<parameter> }, Measure.subpathParameterAtLength source 11.0<length>)
+    Assert.Equal(Ok { SegmentIndex = 1; T = 1.0<parameter> }, Measure.subpathParameterAtLength source 17.0<length>)
 
 [<Fact>]
 let ``subpath point and derivative at length evaluate parameter`` () =
     let source = Subpath.create [ line 0.0 0.0 3.0 4.0; line 3.0 4.0 3.0 16.0 ] |> Result.defaultWith (failwithf "%A")
-    let found = Subpath.pointAtLength source 11.0<length> |> Result.defaultWith (failwithf "%A")
-    let derivative = Subpath.derivativeAtLength source 11.0<length> |> Result.defaultWith (failwithf "%A")
+    let found = Measure.subpathPointAtLength source 11.0<length> |> Result.defaultWith (failwithf "%A")
+    let derivative = Measure.subpathDerivativeAtLength source 11.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> found (point 3.0 10.0))
     Assert.Equal(Point.create 0.0<length / parameter> 12.0<length / parameter>, derivative)
 
 [<Fact>]
 let ``subpath parameter at length rejects empty subpaths`` () =
-    Assert.Equal(Error EmptySubpath, Subpath.parameterAtLength (Subpath.empty (point 0.0 0.0)) 0.0<length>)
+    Assert.Equal(Error EmptySubpath, Measure.subpathParameterAtLength (Subpath.empty (point 0.0 0.0)) 0.0<length>)
 
 [<Fact>]
 let ``path parameter at length rejects empty paths and empty subpaths`` () =
-    Assert.Equal(Error EmptyPath, Path.parameterAtLength Path.empty 0.0<length>)
+    Assert.Equal(Error EmptyPath, Measure.pathParameterAtLength Path.empty 0.0<length>)
     let moveOnly = Subpath.empty (point 0.0 0.0)
-    Assert.Equal(Error EmptySubpaths, Path.parameterAtLength (Path.singleton moveOnly) 0.0<length>)
+    Assert.Equal(Error EmptySubpaths, Measure.pathParameterAtLength (Path.singleton moveOnly) 0.0<length>)
 
 [<Fact>]
 let ``empty aggregate lengths still validate options`` () =
     let invalid: LengthOptions = { Tolerance = 0.0<length>; MaxDepth = 20 }
     Assert.Equal(
         Error(InvalidLengthTolerance 0.0<length>),
-        Subpath.lengthWith (Subpath.empty (point 0.0 0.0)) invalid)
+        Measure.subpathLengthWith (Subpath.empty (point 0.0 0.0)) invalid)
     Assert.Equal(
         Error(InvalidLengthTolerance 0.0<length>),
-        Path.lengthWith Path.empty invalid)
+        Measure.pathLengthWith Path.empty invalid)
 
 [<Fact>]
 let ``empty aggregate linearization still validates options`` () =
@@ -599,13 +599,13 @@ let ``subpath directions validate options before the parameter`` () =
 [<Fact>]
 let ``subpath between lengths crosses segments`` () =
     let source = Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 20.0 0.0; line 20.0 0.0 30.0 0.0 ] |> Result.defaultWith (failwithf "%A")
-    let piece = Subpath.betweenLengths source 5.0<length> 25.0<length> |> Result.defaultWith (failwithf "%A")
+    let piece = Measure.subpathBetweenLengths source 5.0<length> 25.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(Subpath.segments piece = [ line 5.0 0.0 10.0 0.0; line 10.0 0.0 20.0 0.0; line 20.0 0.0 25.0 0.0 ])
 
 [<Fact>]
 let ``subpaths between lengths splits open subpath`` () =
     let source = Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 20.0 0.0; line 20.0 0.0 30.0 0.0 ] |> Result.defaultWith (failwithf "%A")
-    let pieces = Subpath.betweenLengthsMany source [ 5.0<length>; 25.0<length> ] |> Result.defaultWith (failwithf "%A")
+    let pieces = Measure.subpathBetweenLengthsMany source [ 5.0<length>; 25.0<length> ] |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, pieces.Length)
     Assert.True(Subpath.segments pieces[0] = [ line 0.0 0.0 5.0 0.0 ])
     Assert.True(Subpath.segments pieces[1] = [ line 5.0 0.0 10.0 0.0; line 10.0 0.0 20.0 0.0; line 20.0 0.0 25.0 0.0 ])
@@ -617,7 +617,7 @@ let ``subpath between lengths wraps closed subpaths`` () =
         Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 10.0; line 10.0 10.0 0.0 10.0; line 0.0 10.0 0.0 0.0 ]
         |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
-    let piece = Subpath.betweenLengths source 25.0<length> 15.0<length> |> Result.defaultWith (failwithf "%A")
+    let piece = Measure.subpathBetweenLengths source 25.0<length> 15.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(Subpath.segments piece = [ line 5.0 10.0 0.0 10.0; line 0.0 10.0 0.0 0.0; line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 5.0 ])
 
 let private lengthPath () =
@@ -628,31 +628,31 @@ let private lengthPath () =
 
 [<Fact>]
 let ``path length sums subpath lengths`` () =
-    Path.length (lengthPath ()) |> Result.defaultWith (failwithf "%A") |> assertLengthNear 17.0
+    Measure.pathLength (lengthPath ()) |> Result.defaultWith (failwithf "%A") |> assertLengthNear 17.0
 
 [<Fact>]
 let ``path length returns zero for empty path`` () =
-    Assert.Equal(Ok 0.0<length>, Path.length Path.empty)
+    Assert.Equal(Ok 0.0<length>, Measure.pathLength Path.empty)
 
 [<Fact>]
 let ``path parameter at length returns public parameter`` () =
     let source = lengthPath ()
-    Assert.Equal(Ok { SubpathIndex = 2; At = { SegmentIndex = 0; T = 0.5<parameter> } }, Path.parameterAtLength source 11.0<length>)
-    Assert.Equal(Ok { SubpathIndex = 2; At = { SegmentIndex = 0; T = 1.0<parameter> } }, Path.parameterAtLength source 17.0<length>)
+    Assert.Equal(Ok { SubpathIndex = 2; At = { SegmentIndex = 0; T = 0.5<parameter> } }, Measure.pathParameterAtLength source 11.0<length>)
+    Assert.Equal(Ok { SubpathIndex = 2; At = { SegmentIndex = 0; T = 1.0<parameter> } }, Measure.pathParameterAtLength source 17.0<length>)
 
 [<Fact>]
 let ``path point and derivative at length evaluate parameter`` () =
     let source = Path.ofSubpaths [ Subpath.ofSegment (line 0.0 0.0 3.0 4.0); Subpath.ofSegment (line 10.0 10.0 10.0 22.0) ]
-    let found = Path.pointAtLength source 11.0<length> |> Result.defaultWith (failwithf "%A")
-    let derivative = Path.derivativeAtLength source 11.0<length> |> Result.defaultWith (failwithf "%A")
+    let found = Measure.pathPointAtLength source 11.0<length> |> Result.defaultWith (failwithf "%A")
+    let derivative = Measure.pathDerivativeAtLength source 11.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.True(Point.near 1.0e-6<length> found (point 10.0 16.0))
     Assert.Equal(Point.create 0.0<length / parameter> 12.0<length / parameter>, derivative)
 
 [<Fact>]
 let ``path parameter at length rejects invalid distances`` () =
     let source = Path.singleton (Subpath.ofSegment (line 0.0 0.0 10.0 0.0))
-    Assert.Equal(Error(InvalidLengthDistance(-1.0<length>, 10.0<length>)), Path.parameterAtLength source -1.0<length>)
-    Assert.Equal(Error(InvalidLengthDistance(11.0<length>, 10.0<length>)), Path.parameterAtLength source 11.0<length>)
+    Assert.Equal(Error(InvalidLengthDistance(-1.0<length>, 10.0<length>)), Measure.pathParameterAtLength source -1.0<length>)
+    Assert.Equal(Error(InvalidLengthDistance(11.0<length>, 10.0<length>)), Measure.pathParameterAtLength source 11.0<length>)
 
 [<Fact>]
 let ``path point rejects invalid path parameters`` () =
@@ -662,14 +662,14 @@ let ``path point rejects invalid path parameters`` () =
 
 [<Fact>]
 let ``segment projection returns line parameter point and distance`` () =
-    let t, found, distance = Segment.projection (line 0.0 0.0 10.0 0.0) (point 4.0 3.0) |> Result.defaultWith (failwithf "%A")
+    let t, found, distance = Distance.segmentProjection (line 0.0 0.0 10.0 0.0) (point 4.0 3.0) |> Result.defaultWith (failwithf "%A")
     assertNear 0.4 t
     Assert.True(Point.near 1.0e-6<length> found (point 4.0 0.0))
     assertLengthNear 3.0 distance
 
 [<Fact>]
 let ``segment projection clamps to line endpoint`` () =
-    let t, found, distance = Segment.projection (line 0.0 0.0 10.0 0.0) (point 13.0 4.0) |> Result.defaultWith (failwithf "%A")
+    let t, found, distance = Distance.segmentProjection (line 0.0 0.0 10.0 0.0) (point 13.0 4.0) |> Result.defaultWith (failwithf "%A")
     assertNear 1.0 t
     Assert.True(Point.near 1.0e-6<length> found (point 10.0 0.0))
     assertLengthNear 5.0 distance
@@ -677,7 +677,7 @@ let ``segment projection clamps to line endpoint`` () =
 [<Fact>]
 let ``segment projection returns curve parameter point and distance`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
-    let t, found, distance = Segment.projection curve (point 10.0 15.0) |> Result.defaultWith (failwithf "%A")
+    let t, found, distance = Distance.segmentProjection curve (point 10.0 15.0) |> Result.defaultWith (failwithf "%A")
     assertNear 0.5 t
     Assert.True(Point.near 1.0e-6<length> found (point 10.0 10.0))
     assertLengthNear 5.0 distance
@@ -685,7 +685,7 @@ let ``segment projection returns curve parameter point and distance`` () =
 [<Fact>]
 let ``projection returns quadratic parameter point and distance`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
-    let t, found, distance = Segment.projection curve (point 10.0 15.0) |> Result.defaultWith (failwithf "%A")
+    let t, found, distance = Distance.segmentProjection curve (point 10.0 15.0) |> Result.defaultWith (failwithf "%A")
     assertNear 0.5 t
     Assert.True(Point.near 1.0e-6<length> found (point 10.0 10.0))
     assertLengthNear 5.0 distance
@@ -709,14 +709,14 @@ let ``polished bezier projections have small tangential error`` () =
         for x in projectionComparisonCoordinates do
             for y in projectionComparisonCoordinates do
                 let query = point x y
-                let t, _, _ = Segment.projection segment query |> Result.defaultWith (failwithf "%A")
+                let t, _, _ = Distance.segmentProjection segment query |> Result.defaultWith (failwithf "%A")
                 if t > 0.0<parameter> && t < 1.0<parameter> then
                     Assert.True(projectionTangentialError query segment t < 1.0e-7<length>)
 
 [<Fact>]
 let ``projection handles unreliable near cusp tangent`` () =
     let segment = QuadraticBezier(point 0.0 0.0, point 1.0 1.0, point 0.00000001 0.0)
-    let t, _, distance = Segment.projection segment (point 0.5 0.6) |> Result.defaultWith (failwithf "%A")
+    let t, _, distance = Distance.segmentProjection segment (point 0.5 0.6) |> Result.defaultWith (failwithf "%A")
     Assert.InRange(t, 0.0<parameter>, 1.0<parameter>)
     Assert.True(distance >= 0.0<length>)
 
@@ -729,7 +729,7 @@ let ``projection of bezier points respects tolerance`` () =
     for segment in segments do
         for t in parameters do
             let sample = Segment.point segment t |> Result.defaultWith (failwithf "%A")
-            let _, _, distance = Segment.projection segment sample |> Result.defaultWith (failwithf "%A")
+            let _, _, distance = Distance.segmentProjection segment sample |> Result.defaultWith (failwithf "%A")
             Assert.True(distance <= 1.0e-9<length>)
 
 [<Fact>]
@@ -743,29 +743,29 @@ let ``projection of curve points respects geometric tolerance`` () =
     for segment in segments do
         for t in parameters do
             let sample = Segment.point segment t |> Result.defaultWith (failwithf "%A")
-            let _, _, distance = Segment.projectionWith segment sample options |> Result.defaultWith (failwithf "%A")
+            let _, _, distance = Distance.segmentProjectionWith segment sample options |> Result.defaultWith (failwithf "%A")
             Assert.True(distance <= 1.0e-9<length>)
 
 [<Fact>]
 let ``segment projection with rejects invalid options`` () =
     Assert.Equal(
         Error(InvalidDistanceSamples 0),
-        Segment.projectionWith
+        Distance.segmentProjectionWith
             (line 0.0 0.0 10.0 0.0)
             (point 5.0 4.0)
-            { Segment.defaultDistanceOptions with Samples = 0 })
+            { Distance.defaultDistanceOptions with Samples = 0 })
 
 [<Fact>]
 let ``subpath projection returns subpath parameter point and distance`` () =
     let source = Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 10.0 20.0 ] |> Result.defaultWith (failwithf "%A")
-    let projection = Subpath.projection source (point 14.0 8.0) |> Result.defaultWith (failwithf "%A")
+    let projection = Distance.subpathProjection source (point 14.0 8.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal({ SegmentIndex = 1; T = 0.4<parameter> }, projection.At)
     Assert.True(Point.near 1.0e-6<length> projection.Point (point 10.0 8.0))
     assertLengthNear 4.0 projection.Distance
 
 [<Fact>]
 let ``subpath projection rejects empty subpaths`` () =
-    Assert.Equal(Error EmptySubpath, Subpath.projection (Subpath.empty (point 0.0 0.0)) (point 1.0 1.0))
+    Assert.Equal(Error EmptySubpath, Distance.subpathProjection (Subpath.empty (point 0.0 0.0)) (point 1.0 1.0))
 
 [<Fact>]
 let ``path projection returns path parameter point and distance`` () =
@@ -774,7 +774,7 @@ let ``path projection returns path parameter point and distance`` () =
             [ Subpath.empty (point -10.0 -10.0)
               Subpath.ofSegment (line 0.0 0.0 10.0 0.0)
               Subpath.ofSegment (line 20.0 0.0 20.0 10.0) ]
-    let projection = Path.projection source (point 17.0 6.0) |> Result.defaultWith (failwithf "%A")
+    let projection = Distance.pathProjection source (point 17.0 6.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal({ SubpathIndex = 2; At = { SegmentIndex = 0; T = 0.6<parameter> } }, projection.At)
     Assert.True(Point.near 1.0e-6<length> projection.Point (point 20.0 6.0))
     assertLengthNear 3.0 projection.Distance
@@ -782,24 +782,24 @@ let ``path projection returns path parameter point and distance`` () =
 [<Fact>]
 let ``path distance returns projection distance`` () =
     let source = Path.singleton (Subpath.ofSegment (line 0.0 0.0 10.0 0.0))
-    Path.distance source (point 4.0 3.0) |> Result.defaultWith (failwithf "%A") |> assertLengthNear 3.0
+    Distance.pathDistance source (point 4.0 3.0) |> Result.defaultWith (failwithf "%A") |> assertLengthNear 3.0
 
 [<Fact>]
 let ``subpath distance returns projection distance`` () =
     let source = Subpath.ofSegment (line 0.0 0.0 10.0 0.0)
-    Subpath.distance source (point 4.0 3.0) |> Result.defaultWith (failwithf "%A") |> assertLengthNear 3.0
+    Distance.subpathDistance source (point 4.0 3.0) |> Result.defaultWith (failwithf "%A") |> assertLengthNear 3.0
 
 [<Fact>]
 let ``path projection rejects empty paths and empty subpaths`` () =
-    Assert.Equal(Error EmptyPath, Path.projection Path.empty (point 1.0 1.0))
-    Assert.Equal(Error EmptySubpaths, Path.projection (Path.singleton (Subpath.empty (point 0.0 0.0))) (point 1.0 1.0))
+    Assert.Equal(Error EmptyPath, Distance.pathProjection Path.empty (point 1.0 1.0))
+    Assert.Equal(Error EmptySubpaths, Distance.pathProjection (Path.singleton (Subpath.empty (point 0.0 0.0))) (point 1.0 1.0))
 
 [<Fact>]
 let ``path projection with rejects invalid options`` () =
     let source = Path.singleton (Subpath.ofSegment (line 0.0 0.0 10.0 0.0))
     Assert.Equal(
         Error(InvalidDistanceSamples 0),
-        Path.projectionWith source (point 4.0 3.0) { Segment.defaultDistanceOptions with Samples = 0 })
+        Distance.pathProjectionWith source (point 4.0 3.0) { Distance.defaultDistanceOptions with Samples = 0 })
 
 let private polygon coordinates =
     coordinates |> List.map (fun (x, y) -> point x y) |> Subpath.polygon |> Result.defaultWith (failwithf "%A")

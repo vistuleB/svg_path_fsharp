@@ -30,7 +30,6 @@ let ``matrix_transforms_points_test`` () =
 [<Fact>]
 let ``translate_matrix_transforms_points_test`` () =
     Assert.Equal(point 7.0 -4.0, Transform.point (Transform.translate 5.0<length> -7.0<length>) (point 2.0 3.0))
-    Assert.Equal(point 7.0 -4.0, Transform.translatePoint (point 2.0 3.0) 5.0<length> -7.0<length>)
 
 [<Fact>]
 let ``matrix_transforms_bounding_boxes_test`` () =
@@ -48,12 +47,10 @@ let ``rotated_matrix_transforms_bounding_box_corners_test`` () =
 [<Fact>]
 let ``scale_matrix_transforms_points_test`` () =
     Assert.Equal(point 8.0 12.0, Transform.point (Transform.scale 4.0) (point 2.0 3.0))
-    Assert.Equal(point 8.0 12.0, Transform.scalePoint (point 2.0 3.0) 4.0)
 
 [<Fact>]
 let ``scale_xy_matrix_transforms_points_test`` () =
     Assert.Equal(point 8.0 -6.0, Transform.point (Transform.scaleXY 4.0 -2.0) (point 2.0 3.0))
-    Assert.Equal(point 8.0 -6.0, Transform.scaleXYPoint (point 2.0 3.0) 4.0 -2.0)
 
 [<Fact>]
 let ``about_point_matrix_transforms_points_about_point_test`` () =
@@ -134,7 +131,7 @@ let ``point_triple_map_rejects_negative_tolerance_test`` () =
 [<Fact>]
 let ``rotate_matrix_uses_degrees_test`` () =
     let line = Line(point 1.0 0.0, point 1.0 2.0)
-    let segment = Transform.rotateSegment line (degrees 90.0) |> Result.defaultWith (failwithf "%A")
+    let segment = Transform.segment line (Transform.rotate (degrees 90.0)) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 0 1 H -2", Serialize.segment segment)
 
 [<Fact>]
@@ -168,7 +165,7 @@ let ``path_about_anchor_transforms_path_about_anchor_test`` () =
 [<Fact>]
 let ``skew_matrices_use_degrees_test`` () =
     Assert.Equal(point 5.0 3.0, Transform.point (Transform.skewX (degrees 45.0)) (point 2.0 3.0))
-    Assert.Equal(point 2.0 5.0, Transform.skewYPoint (point 2.0 3.0) (degrees 45.0))
+    Assert.Equal(point 2.0 5.0, Transform.point (Transform.skewY (degrees 45.0)) (point 2.0 3.0))
 
 [<Fact>]
 let ``chain_applies_first_then_second_test`` () =
@@ -183,11 +180,11 @@ let ``multiply_uses_algebraic_left_times_right_order_test`` () =
     Assert.Equal(point 22.0 42.0, Transform.point (Transform.multiply scale translate) (point 1.0 1.0))
 
 [<Fact>]
-let ``direct_subpath_and_path_helpers_delegate_to_matrices_test`` () =
+let ``matrices_transform_subpaths_and_paths_test`` () =
     let subpath = Subpath.create [ Line(point 0.0 0.0, point 5.0 0.0) ] |> Result.defaultWith (failwithf "%A")
     let path = Subpath.asPath subpath
-    let translatedSubpath = Transform.translateSubpath subpath 10.0<length> 20.0<length> |> Result.defaultWith (failwithf "%A")
-    let scaledPath = Transform.scalePath path 2.0 |> Result.defaultWith (failwithf "%A")
+    let translatedSubpath = Transform.subpath subpath (Transform.translate 10.0<length> 20.0<length>) |> Result.defaultWith (failwithf "%A")
+    let scaledPath = Transform.path path (Transform.scale 2.0) |> Result.defaultWith (failwithf "%A")
     Assert.Equal("M 10 20 H 15", Serialize.subpath translatedSubpath)
     Assert.Equal("M 0 0 H 10", Serialize.path scaledPath)
 

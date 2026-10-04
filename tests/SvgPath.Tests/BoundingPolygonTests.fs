@@ -7,7 +7,7 @@ let private p x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private unwrap result = Result.defaultWith (failwithf "%A") result
 let private cross (a: Point<length>) b q = (b.X-a.X)*(q.Y-a.Y)-(b.Y-a.Y)*(q.X-a.X)
 let private check segment fromT toT =
-    let points = Segment.boundingPolygonBetween segment fromT toT |> unwrap
+    let points = Bounds.segmentBoundingPolygonBetween segment fromT toT |> unwrap
     Assert.True(points.Length>=3)
     Assert.Equal(points.Length, List.distinct points |> List.length)
     for a,b in List.zip points (List.tail points @ [List.head points]) do
@@ -20,18 +20,18 @@ let private check segment fromT toT =
 [<Fact>]
 let ``bounding_polygon_line_and_point_test`` () =
     let a,b = p 4.0 2.0,p -1.0 3.0
-    Assert.True(Segment.boundingPolygon (Line(a,b)) = Ok [a;b])
-    Assert.True(Segment.boundingPolygon (Line(a,a)) = Ok [a])
-    Assert.True(Segment.boundingPolygonBetween (Line(a,b)) 1.0<parameter> 0.0<parameter> = Ok [b;a])
+    Assert.True(Bounds.segmentBoundingPolygon (Line(a,b)) = Ok [a;b])
+    Assert.True(Bounds.segmentBoundingPolygon (Line(a,a)) = Ok [a])
+    Assert.True(Bounds.segmentBoundingPolygonBetween (Line(a,b)) 1.0<parameter> 0.0<parameter> = Ok [b;a])
 
 [<Fact>]
 let ``bounding_polygon_bezier_order_and_interior_start_test`` () =
     let a = p 0.0 0.0
     let q = QuadraticBezier(a,p 2.0 -3.0,p 4.0 0.0)
-    Assert.Equal(a, Segment.boundingPolygon q |> unwrap |> List.head)
+    Assert.Equal(a, Bounds.segmentBoundingPolygon q |> unwrap |> List.head)
     check q 0.0<parameter> 1.0<parameter>
     let c = CubicBezier(a,p -3.0 -2.0,p 3.0 -2.0,p 0.0 4.0)
-    Assert.True(Segment.boundingPolygon c = Ok [p -3.0 -2.0;p 3.0 -2.0;p 0.0 4.0])
+    Assert.True(Bounds.segmentBoundingPolygon c = Ok [p -3.0 -2.0;p 3.0 -2.0;p 0.0 4.0])
     check c 0.0<parameter> 1.0<parameter>
     check c 0.8<parameter> 0.2<parameter>
 
@@ -39,8 +39,8 @@ let ``bounding_polygon_bezier_order_and_interior_start_test`` () =
 let ``bounding_polygon_collinear_controls_test`` () =
     let a = p 0.0 0.0
     let c = CubicBezier(a,p -3.0 0.0,p 5.0 0.0,a)
-    Assert.True(Segment.boundingPolygon c = Ok [p -3.0 0.0;p 5.0 0.0])
-    Assert.True(Segment.boundingPolygonBetween c 0.0<parameter> 0.0<parameter> = Ok [a])
+    Assert.True(Bounds.segmentBoundingPolygon c = Ok [p -3.0 0.0;p 5.0 0.0])
+    Assert.True(Bounds.segmentBoundingPolygonBetween c 0.0<parameter> 0.0<parameter> = Ok [a])
 
 [<Fact>]
 let ``bounding_polygon_arcs_test`` () =
@@ -56,6 +56,6 @@ let ``bounding_polygon_arcs_test`` () =
 [<Fact>]
 let ``bounding_polygon_invalid_interval_and_arc_test`` () =
     let a = p 0.0 0.0
-    Assert.True(Segment.boundingPolygonBetween (Line(a,a)) -0.1<parameter> 1.0<parameter> = Error SplitOutsideSegment)
+    Assert.True(Bounds.segmentBoundingPolygonBetween (Line(a,a)) -0.1<parameter> 1.0<parameter> = Error SplitOutsideSegment)
     let arc = Arc ({Start=a;Radius=p 1.0 1.0;XAxisRotation=0.0<degree>;LargeArc=false;Sweep=true;End=a}: Ellipse.EndpointArcData)
-    Assert.True(Segment.boundingPolygon arc = Error DegenerateArc)
+    Assert.True(Bounds.segmentBoundingPolygon arc = Error DegenerateArc)

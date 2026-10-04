@@ -14,12 +14,13 @@ module Stroke =
         | InvalidDashPatternLength
 
     [<Struct>]
-    /// Stroke width and technical offset settings; join and cap are operation arguments.
-    /// Stroke overrides trimming: side cusp trimming is disabled, final in-band
-    /// trimming enabled. Single-offset trimming options do not apply.
+    /// Fitting, healing, and inner-join controls used by stroke construction.
+    /// Width and styles are operation arguments; the stroke trimming policy is fixed.
     type Options =
-        { Width: float<length>
-          Offset: Offset.Options }
+        { Fitting: Offset.FittingOptions
+          StalledOffsetDiameter: float<length>
+          TangentHealAngleDegrees: float<degree>
+          InnerJoin: Offset.InnerJoin option }
 
     [<Struct>]
     type DashOptions =
@@ -31,20 +32,30 @@ module Stroke =
     type Cap = Offset.Cap
 
     let defaultOptions =
-        { Width = 1.0<length>
-          Offset = Offset.defaultOptions }
+        { Fitting = Offset.defaultOptions.Fitting
+          StalledOffsetDiameter = Offset.defaultOptions.StalledOffsetDiameter
+          TangentHealAngleDegrees = Offset.defaultOptions.TangentHealAngleDegrees
+          InnerJoin = Offset.defaultOptions.InnerJoin }
+
+    let private offsetOptions (options: Options) =
+        { Offset.defaultOptions with
+            Fitting = options.Fitting
+            StalledOffsetDiameter = options.StalledOffsetDiameter
+            TangentHealAngleDegrees = options.TangentHealAngleDegrees
+            InnerJoin = options.InnerJoin
+            BandTrimming = { InnerCusps = false; OuterCusps = false; InBand = true } }
 
     let defaultDashOptions pattern offset =
         { Pattern = pattern
           Offset = offset
           LengthOptions = Segment.defaultLengthOptions }
 
-    let private validateOptions options join =
-        if options.Width <= 0.0<length> || not (System.Double.IsFinite(float options.Width)) then
-            Error(InvalidStrokeOutlineWidth options.Width)
+    let private validateOptions width options join =
+        if width <= 0.0<length> || not (System.Double.IsFinite(float width)) then
+            Error(InvalidStrokeOutlineWidth width)
         else
             // Validate even when the path or generated dash list is empty.
-            Offset.validateOptions options.Offset
+            Offset.validateOptions (offsetOptions options)
             |> Result.bind (fun () -> Offset.validateJoin join)
             |> Result.mapError (Offset.publicError >> StrokeOffsetError)
 
@@ -122,8 +133,8 @@ module Stroke =
 
     // Entry points validate even empty geometry. Internal traversal reuses that
     // validation for each subpath/dash rather than repeating it.
-    let private strokeValidatedSubpath subpath join cap (options: Options) =
-            let radius = options.Width / 2.0
+    let private strokeValidatedSubpath subpath (width: float<length>) join cap (options: Options) =
+            let radius = width / 2.0
             match Subpath.segments subpath with
                 | [] -> Ok Path.empty
                 | _ ->
@@ -134,40 +145,39 @@ module Stroke =
                             zeroLengthStrokePath subpath radius cap |> Result.mapError (Offset.PathError >> StrokeOffsetError)
                         else
                             Offset.subpathBandWith subpath -radius radius join cap
-                                {options.Offset with Offset.BandTrimming={InnerCusps=false;OuterCusps=false;InBand=true}}
+                                (offsetOptions options)
                             |> Result.mapError StrokeOffsetError)
 
-    /// Delegate nonzero strokes to symmetric bands. For compatibility strokes
-    /// disable side cusp trimming and enable final trimming regardless of the
-    /// supplied band trimming settings; band construction owns caps and topology.
-    let subpathWith subpath join cap (options: Options) =
-        validateOptions options join
-        |> Result.bind (fun () -> strokeValidatedSubpath subpath join cap options)
+    /// Delegate nonzero strokes to symmetric bands with side cusp trimming
+    /// disabled and final trimming enabled. Band construction owns caps and topology.
+    let subpathWith subpath width join cap (options: Options) =
+        validateOptions width options join
+        |> Result.bind (fun () -> strokeValidatedSubpath subpath width join cap options)
 
-    let rec private strokeSubpaths subpaths join cap options reversedStroked =
+    let rec private strokeSubpaths subpaths width join cap options reversedStroked =
         match subpaths with
         | [] -> Ok(List.rev reversedStroked)
         | first :: rest ->
-            strokeValidatedSubpath first join cap options
+            strokeValidatedSubpath first width join cap options
             |> Result.bind (fun path ->
-                strokeSubpaths rest join cap options (List.rev path.Subpaths @ reversedStroked))
+                strokeSubpaths rest width join cap options (List.rev path.Subpaths @ reversedStroked))
 
-    let subpath subpath width join cap = subpathWith subpath join cap { defaultOptions with Width = width }
+    let subpath subpath width join cap = subpathWith subpath width join cap defaultOptions
 
-    let segmentWith segment join cap options =
-        validateOptions options join
+    let segmentWith segment width join cap options =
+        validateOptions width options join
         |> Result.bind (fun () ->
             Subpath.create [ segment ]
             |> Result.mapError StrokePathError
-            |> Result.bind (fun subpath -> strokeValidatedSubpath subpath join cap options))
+            |> Result.bind (fun subpath -> strokeValidatedSubpath subpath width join cap options))
 
-    let segment segment width join cap = segmentWith segment join cap { defaultOptions with Width = width }
+    let segment segment width join cap = segmentWith segment width join cap defaultOptions
 
-    let pathWith (path: Path) join cap options =
-        validateOptions options join
-        |> Result.bind (fun () -> strokeSubpaths path.Subpaths join cap options [] |> Result.map Path.ofSubpaths)
+    let pathWith (path: Path) width join cap options =
+        validateOptions width options join
+        |> Result.bind (fun () -> strokeSubpaths path.Subpaths width join cap options [] |> Result.map Path.ofSubpaths)
 
-    let path path width join cap = pathWith path join cap { defaultOptions with Width = width }
+    let path path width join cap = pathWith path width join cap defaultOptions
 
     let private positiveRemainder (value: float<length>) (modulus: float<length>) =
         let turns = floor (value / modulus)
@@ -286,8 +296,8 @@ module Stroke =
 
     let pathDashes path pattern offset = pathDashesWith path (defaultDashOptions pattern offset)
 
-    let subpathDashedWith subpath join cap options dashOptions =
-        validateOptions options join
+    let subpathDashedWith subpath width join cap options dashOptions =
+        validateOptions width options join
         |> Result.bind (fun () -> locatedDashPieces subpath dashOptions)
         |> Result.bind (fun dashes ->
             dashes |> List.fold (fun state (piece, at) ->
@@ -303,24 +313,24 @@ module Stroke =
                                     match directions.Outgoing, directions.Incoming with
                                     | Some direction, _ | None, Some direction -> direction
                                     | None, None -> Point.create 1.0 0.0
-                                zeroLengthSquareStrokePath (Subpath.start piece) (options.Width / 2.0) direction
+                                zeroLengthSquareStrokePath (Subpath.start piece) (width / 2.0) direction
                                 |> Result.mapError (Offset.PathError >> StrokeOffsetError))
-                        else strokeValidatedSubpath piece join cap options
+                        else strokeValidatedSubpath piece width join cap options
                     stroked |> Result.map (fun path -> path :: paths))) (Ok [])
             |> Result.map (List.rev >> List.collect Path.subpaths >> Path.ofSubpaths))
 
     let subpathDashed subpath width pattern offset join cap =
-        subpathDashedWith subpath join cap { defaultOptions with Width = width } (defaultDashOptions pattern offset)
+        subpathDashedWith subpath width join cap defaultOptions (defaultDashOptions pattern offset)
 
-    let pathDashedWith path join cap options dashOptions =
-        validateOptions options join
+    let pathDashedWith path width join cap options dashOptions =
+        validateOptions width options join
         |> Result.bind (fun () -> validateDashOptions dashOptions)
         |> Result.bind (fun () ->
             Path.subpaths path |> List.fold (fun state subpath ->
                 state |> Result.bind (fun paths ->
-                    subpathDashedWith subpath join cap options dashOptions
+                    subpathDashedWith subpath width join cap options dashOptions
                     |> Result.map (fun path -> path :: paths))) (Ok [])
             |> Result.map (List.rev >> List.collect Path.subpaths >> Path.ofSubpaths))
 
     let pathDashed path width pattern offset join cap =
-        pathDashedWith path join cap { defaultOptions with Width = width } (defaultDashOptions pattern offset)
+        pathDashedWith path width join cap defaultOptions (defaultDashOptions pattern offset)

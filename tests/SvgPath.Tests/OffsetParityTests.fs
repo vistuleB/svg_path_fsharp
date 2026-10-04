@@ -25,7 +25,7 @@ let ``zero offset preserves closed square without source capacity`` () =
         let result = Offset.subpath source 0.0<length> Offset.Round Offset.Butt |> Result.defaultWith (failwithf "%A")
         let loop = result |> Path.subpaths |> List.exactlyOne
         Assert.True(Subpath.isClosed loop)
-        let length = Subpath.length loop |> Result.defaultWith (failwithf "%A")
+        let length = Measure.subpathLength loop |> Result.defaultWith (failwithf "%A")
         Assert.True(abs(length - 40.0<length>) < 0.000001<length>)
 
 [<Fact>]
@@ -41,7 +41,7 @@ let ``zero offset preserves open line endpoint demands`` () =
 let ``zero offset preserves repeated eligible traversals`` () =
     let source = Parse.path "M 0 0 H 10 V 10 H 0 Z M 0 0 H 10 V 10 H 0 Z" |> Result.defaultWith (failwithf "%A")
     let result = Offset.path source 0.0<length> Offset.Round Offset.Butt |> Result.defaultWith (failwithf "%A")
-    let length = Path.length result |> Result.defaultWith (failwithf "%A")
+    let length = Measure.pathLength result |> Result.defaultWith (failwithf "%A")
     Assert.True(abs(length - 80.0<length>) < 0.000001<length>)
     Assert.True(result |> Path.subpaths |> List.forall Subpath.isClosed)
 
@@ -421,7 +421,7 @@ let ``endpoint_near_reversal_is_absorbed_into_stalled_piece_test`` () =
             Fitting = ({ Tolerance = 0.01<length>; Samples = 5; MaxDepth = 12 }: Offset.FittingOptions) }
     match Subject.internalOffsetSourceTrace source 1.04<length> options with
     | Ok [ { Pieces = Offset.OffsetSourceTraceStalled(_, stalled) :: Offset.OffsetSourceTraceDRefined(_, _, sourceFrom, _, _, _, _, _, _) :: _ } ] ->
-        Assert.True(Segment.chordLength stalled < 0.001<length>)
+        Assert.True(Measure.segmentChordLength stalled < 0.001<length>)
         Assert.True(abs (float sourceFrom - 0.00019493877887725834) < 0.000000001)
     | other -> failwithf "unexpected result: %A" other
 
@@ -886,11 +886,7 @@ let ``single_offset_band_candidate_keeps_closed_source_as_two_sides_test`` () =
 let ``untrimmed_stroke_band_closes_open_source_test`` () =
     let openSubpath = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let result =
-        Stroke.subpathWith
-            openSubpath
-            (Offset.Miter Offset.defaultMiterLimit)
-            Offset.Butt
-            { Stroke.defaultOptions with Width = 4.0<length>; Offset = Subject.defaultOptions }
+        Stroke.subpathWith openSubpath 4.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt Stroke.defaultOptions
         |> Result.defaultWith (failwithf "%A")
     Assert.Single(result.Subpaths) |> ignore
     Assert.True(result.Subpaths.Head.Closed)
@@ -912,9 +908,7 @@ let ``closed rectangular band matches Gleam contour topology`` () =
 let ``open line round stroke matches Gleam contour topology`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let result =
-        Stroke.subpathWith
-            source Offset.Round Offset.RoundCap
-            { Stroke.defaultOptions with Width = 2.0<length>; Offset = Subject.defaultOptions }
+        Stroke.subpathWith source 2.0<length> Offset.Round Offset.RoundCap Stroke.defaultOptions
         |> Result.defaultWith (failwithf "%A")
     let contours = Path.subpaths result
     Assert.Single(contours) |> ignore

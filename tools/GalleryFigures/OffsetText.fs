@@ -30,15 +30,15 @@ module OffsetText =
                     (radiusDerivative*Trig.cosDegrees angle-radius*Trig.sinDegrees angle*da+(if decaying then 0.0 else 16.0*da)))
                 (LanguagePrimitives.FloatWithMeasure<length/degree>
                     (radiusDerivative*Trig.sinDegrees angle+radius*Trig.cosDegrees angle*da))
-        Subpath.fromParametricWith 0.0<degree> (float turns*360.0<degree>) position
+        Fit.subpathFromParametricWith 0.0<degree> (float turns*360.0<degree>) position
             {Tolerance=0.001<length>;SamplesPerPiece=3;InitialPieceCount=turns*36;MaxDepth=0;Tangent=Some tangent}
         |> require "offset text source curve"
 
     let generate decaying () =
         let text = source ()
-        let textBox = Path.boundingBox text |> require "text bounds"
+        let textBox = Bounds.pathBoundingBox text |> require "text bounds"
         let baseline = curve decaying
-        let total = Subpath.length baseline |> require "baseline length"
+        let total = Measure.subpathLength baseline |> require "baseline length"
         let map = Offset.subpathOffsetMap baseline |> require "offset map"
         let rate = -(5.0*log 0.8 / float total)
         let maximum = float total - 1e-6
@@ -50,9 +50,9 @@ module OffsetText =
                 let distance = max 0.0 (min maximum slowed)
                 let decay = Math.Pow(0.8,distance/float total*5.0)
                 map (point distance (float p.Y*decay))
-        let text = if decaying then Path.subdivideToMaxLength text 1.0<length> |> require "subdivide offset text" else text
-        let width = float (BoundingBox.width textBox)
-        let height = float (BoundingBox.height textBox)
+        let text = if decaying then Measure.pathSubdivideToMaxLength text 1.0<length> |> require "subdivide offset text" else text
+        let width = float (Bounds.boundingBoxWidth textBox)
+        let height = float (Bounds.boundingBoxHeight textBox)
         let xScale = height/15.0
         let textLength = width*xScale
         let pitch = textLength+15.0
@@ -72,11 +72,11 @@ module OffsetText =
                          if available>0.0 then copies @ [copy full available] else copies
                      else copies
         let mapped = combine copies
-        let box = Path.boundingBox mapped |> require "mapped text bounds"
+        let box = Bounds.pathBoundingBox mapped |> require "mapped text bounds"
         let view: BoundingBox =
             {Min=point (float box.Min.X-30.0) (float box.Min.Y-30.0)
              Max=point (float box.Max.X+30.0) (float box.Max.Y+45.0)}
         let style = if decaying then "fill: #581c87; fill-opacity: 0.78; stroke: #2e1065; stroke-width: 0.2"
                     else "fill: #0f766e; fill-opacity: 0.78; stroke: #064e3b; stroke-width: 0.25"
-        Svg.document [Svg.ThingToDraw.Rectangle(view.Min,BoundingBox.width view,BoundingBox.height view,"fill: #ffffff; stroke: none")
+        Svg.document [Svg.ThingToDraw.Rectangle(view.Min,Bounds.boundingBoxWidth view,Bounds.boundingBoxHeight view,"fill: #ffffff; stroke: none")
                       Svg.StyledPath(mapped,style)] view

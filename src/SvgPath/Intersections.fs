@@ -1092,7 +1092,7 @@ module Intersections =
                     projectionAt left right best.LeftT best.RightT)
         | _ -> failwith "expected two line segments"
 
-    let segmentSegmentClosestPairWith left right options =
+    let internal segmentSegmentClosestPairWith left right options =
         validateOptions options
         |> Result.bind (fun () ->
             OverlapDetection.detect left right options.Tolerance
@@ -1108,7 +1108,7 @@ module Intersections =
 
     /// Separate distance-minimization search, including nonintersecting curves.
     /// Overlaps return a zero-distance pair; tied parameters need not be canonical.
-    let segmentSegmentClosestPair left right =
+    let internal segmentSegmentClosestPair left right =
         segmentSegmentClosestPairWith left right defaultOptions
 
     let private indexedProjectionSegments segments =
@@ -1152,7 +1152,7 @@ module Intersections =
                     | None -> Error(InternalUncertifiedSegmentIntersection(
                         1.0e100<length>, 1.0e100<length>, options.Tolerance)))))
 
-    let segmentSubpathClosestPairWith left (right: Subpath) options =
+    let internal segmentSubpathClosestPairWith left (right: Subpath) options =
         validateOptions options
         |> Result.bind (fun () ->
             if List.isEmpty right.Segments then Error EmptySubpath
@@ -1168,7 +1168,7 @@ module Intersections =
                           Distance = projection.Distance }
                     result))
 
-    let segmentSubpathClosestPair left right =
+    let internal segmentSubpathClosestPair left right =
         segmentSubpathClosestPairWith left right defaultOptions
 
     let private pathProjectionSegments (path: Path) =
@@ -1189,7 +1189,7 @@ module Intersections =
     let private addressWithT (address: PathParameter) (t: float<parameter>) : PathParameter =
         { address with At = { address.At with T = t } }
 
-    let segmentPathClosestPairWith left right options =
+    let internal segmentPathClosestPairWith left right options =
         validateOptions options
         |> Result.bind (fun () ->
             pathProjectionSegments right
@@ -1204,10 +1204,10 @@ module Intersections =
                           Distance = projection.Distance }
                     result)))
 
-    let segmentPathClosestPair left right =
+    let internal segmentPathClosestPair left right =
         segmentPathClosestPairWith left right defaultOptions
 
-    let subpathSubpathClosestPairWith (left: Subpath) (right: Subpath) options =
+    let internal subpathSubpathClosestPairWith (left: Subpath) (right: Subpath) options =
         validateOptions options
         |> Result.bind (fun () ->
             if List.isEmpty left.Segments || List.isEmpty right.Segments then Error EmptySubpath
@@ -1224,10 +1224,10 @@ module Intersections =
                           Distance = projection.Distance }
                     result))
 
-    let subpathSubpathClosestPair left right =
+    let internal subpathSubpathClosestPair left right =
         subpathSubpathClosestPairWith left right defaultOptions
 
-    let subpathPathClosestPairWith (left: Subpath) right options =
+    let internal subpathPathClosestPairWith (left: Subpath) right options =
         validateOptions options
         |> Result.bind (fun () ->
             if List.isEmpty left.Segments then Error EmptySubpath
@@ -1245,10 +1245,10 @@ module Intersections =
                               Distance = projection.Distance }
                         result)))
 
-    let subpathPathClosestPair left right =
+    let internal subpathPathClosestPair left right =
         subpathPathClosestPairWith left right defaultOptions
 
-    let pathPathClosestPairWith left right options =
+    let internal pathPathClosestPairWith left right options =
         validateOptions options
         |> Result.bind (fun () ->
             pathProjectionSegments left
@@ -1265,7 +1265,7 @@ module Intersections =
                               Distance = projection.Distance }
                         result))))
 
-    let pathPathClosestPair left right =
+    let internal pathPathClosestPair left right =
         pathPathClosestPairWith left right defaultOptions
 
     let private validateSelfIntersectionOptions options =

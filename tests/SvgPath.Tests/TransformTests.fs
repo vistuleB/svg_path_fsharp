@@ -26,7 +26,7 @@ let ``graceful arc subpaths preserve exact noncardinal endpoints`` () =
         Assert.Equal(Subpath.start closed,Subpath.finish closed)
         Transform.pathWithArcCollapse (Path.ofSubpaths [source]) matrix |> Result.defaultWith (failwithf "%A") |> ignore
         if largeArc then
-            let box = Subpath.boundingBox part |> Result.defaultWith (failwithf "%A")
+            let box = Bounds.subpathBoundingBox part |> Result.defaultWith (failwithf "%A")
             Assert.True(abs(box.Min.X + 5.0<length>)<1e-6<length>)
             Assert.True(abs(box.Max.X - 5.0<length>)<1e-6<length>)
 
@@ -54,10 +54,10 @@ let ``matrix coefficients transform points with measured translations`` () =
     Assert.Equal(point 30.0 40.0, Transform.point transform (point 2.0 3.0))
 
 [<Fact>]
-let ``point convenience transforms retain scalar roles`` () =
-    Assert.Equal(point 7.0 -4.0, Transform.translatePoint (point 2.0 3.0) 5.0<length> -7.0<length>)
-    Assert.Equal(point 8.0 12.0, Transform.scalePoint (point 2.0 3.0) 4.0)
-    Assert.Equal(point 4.0 -6.0, Transform.scaleXYPoint (point 2.0 3.0) 2.0 -2.0)
+let ``point matrix transforms retain scalar roles`` () =
+    Assert.Equal(point 7.0 -4.0, Transform.point (Transform.translate 5.0<length> -7.0<length>) (point 2.0 3.0))
+    Assert.Equal(point 8.0 12.0, Transform.point (Transform.scale 4.0) (point 2.0 3.0))
+    Assert.Equal(point 4.0 -6.0, Transform.point (Transform.scaleXY 2.0 -2.0) (point 2.0 3.0))
 
 [<Fact>]
 let ``bounding box uses all transformed corners`` () =
@@ -125,7 +125,7 @@ let ``subpath and path transforms preserve closure and ordering`` () =
     let closed = Subpath.close openSubpath |> Result.defaultWith (failwithf "%A")
     let path = Path.ofSubpaths [ closed; openSubpath ]
     let transformed =
-        Transform.translatePath path 4.0<length> 7.0<length>
+        Transform.path path (Transform.translate 4.0<length> 7.0<length>)
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, List.length transformed.Subpaths)
     Assert.True(transformed.Subpaths.Head.Closed)

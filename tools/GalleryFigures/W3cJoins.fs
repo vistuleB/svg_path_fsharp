@@ -29,7 +29,7 @@ module W3cJoins =
         let sub=source "M25,60 L175,90 L25,120"
         let m=Stroke.subpath sub 35.0<length> (Offset.Miter 3.0) Offset.Butt |> ok
         let c=Stroke.subpath sub 35.0<length> (Offset.MiterClip 3.0) Offset.Butt |> ok
-        if abs((Path.boundingBox c |> ok).Max.X-227.5<length>)>=1e-9<length> then failwith "Miter clip plane mismatch"
+        if abs((Bounds.pathBoundingBox c |> ok).Max.X-227.5<length>)>=1e-9<length> then failwith "Miter clip plane mismatch"
         doc 1000 690 ("<text x=\"20\" y=\"25\" font-family=\"sans-serif\" font-size=\"18\">Miter limit 3 — W3C reference (top), F# blue overlay (bottom)</text>"+reference raw "top" 600 180 20 40 960 288 1.0+reference raw "bottom" 600 180 20 360 960 288 0.45+"<svg x=\"20\" y=\"360\" width=\"960\" height=\"288\" viewBox=\"0 0 600 180\">"+draw m ""+draw c "translate(300 0)"+"</svg>")
     let all =
         ["w3c-miter-limit.svg",miter

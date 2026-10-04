@@ -13,7 +13,7 @@ let private checkFill input output =
     for x in [-1..7] do
         for y in [-1..7] do
             let point = p(float x + 0.37,float y + 0.19)
-            match WindingField.pathWinding point input |> unwrap, WindingField.pathWinding point output |> unwrap with
+            match Containment.pathWinding point input |> unwrap, Containment.pathWinding point output |> unwrap with
             | Winding a, Winding b ->
                 Assert.Equal(a % 2 <> 0,b <> 0)
                 Assert.True(b = 0 || b = 1)

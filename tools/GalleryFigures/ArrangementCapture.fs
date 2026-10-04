@@ -39,7 +39,7 @@ module ArrangementCapture =
             layer (Path.singleton (Subpath.ofSegment e.Segment))
                 ("fill: none; stroke: "+color+"; stroke-width: "+width+"; stroke-linecap: round; stroke-linejoin: round"+opacity)+"</g>"
         let label (e:Arrangement.ArrangementEdge) =
-            let box = Segment.boundingBox e.Segment |> require "edge bounds"
+            let box = Bounds.segmentBoundingBox e.Segment |> require "edge bounds"
             "<text x=\""+number(float((box.Min.X+box.Max.X)/2.0))+"\" y=\""+number(float((box.Min.Y+box.Max.Y)/2.0))+
             "\" font-size=\"0.3\" style=\"fill: #1e3a8a; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-anchor: middle; dominant-baseline: central\">"+string e.Id+"</text>"
         let dot (p:Point<length>) = "<circle cx=\""+number(float p.X)+"\" cy=\""+number(float p.Y)+"\" r=\"0.035\" style=\"fill: #111827; stroke: none; opacity: 0.8\"/>"

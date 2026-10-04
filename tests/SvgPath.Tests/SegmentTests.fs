@@ -91,17 +91,17 @@ let ``custom wiggle tolerance must be finite and nonnegative`` () =
 [<Fact>]
 let ``segment length and inversion use path-coordinate units`` () =
     let segment = Line(point 0.0 0.0, point 3.0 4.0)
-    Assert.Equal(Ok 5.0<length>, Segment.length segment)
-    Assert.Equal(Ok 0.4<parameter>, Segment.parameterAtLength segment 2.0<length>)
-    let sample = Segment.pointAtLength segment 2.0<length> |> Result.defaultWith (fun error -> failwithf "%A" error)
+    Assert.Equal(Ok 5.0<length>, Measure.segmentLength segment)
+    Assert.Equal(Ok 0.4<parameter>, Measure.segmentParameterAtLength segment 2.0<length>)
+    let sample = Measure.segmentPointAtLength segment 2.0<length> |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.True(Point.distance sample (point 1.2 1.6) < 1.0e-12<length>)
 
 [<Fact>]
 let ``curved segment length inversion returns the requested prefix length`` () =
     let segment = QuadraticBezier(point 0.0 0.0, point 1.0 2.0, point 2.0 0.0)
-    let options = { Segment.defaultLengthOptions with Tolerance = 1.0e-8<length> }
-    let total = Segment.lengthWith segment options |> Result.defaultWith (fun error -> failwithf "%A" error)
-    let t = Segment.parameterAtLengthWith segment (total / 2.0) options |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let options = { Measure.defaultLengthOptions with Tolerance = 1.0e-8<length> }
+    let total = Measure.segmentLengthWith segment options |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let t = Measure.segmentParameterAtLengthWith segment (total / 2.0) options |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.InRange(float t, 0.499999, 0.500001)
 
 [<Fact>]
@@ -109,16 +109,16 @@ let ``subpath parameter at length crosses segment boundaries`` () =
     let subpath =
         Subpath.create [ Line(point 0.0 0.0, point 2.0 0.0); Line(point 2.0 0.0, point 2.0 3.0) ]
         |> Result.defaultWith (fun error -> failwithf "%A" error)
-    Assert.Equal(Ok 5.0<length>, Subpath.length subpath)
+    Assert.Equal(Ok 5.0<length>, Measure.subpathLength subpath)
     Assert.Equal(
         Ok { SegmentIndex = 1; T = Parameter.fromFloat (1.0 / 3.0) },
-        Subpath.parameterAtLength subpath 3.0<length>)
+        Measure.subpathParameterAtLength subpath 3.0<length>)
 
 [<Fact>]
 let ``segment ray crossings find line quadratic cubic and arc roots`` () =
     let direction x y = Point.create x y
     let crossing segment origin ray =
-        Segment.rayCrossingsWith segment origin ray Segment.defaultCrossingOptions
+        Containment.segmentRayCrossingsWith segment origin ray Containment.defaultCrossingOptions
         |> Result.defaultWith (failwithf "%A")
 
     let line = Line(point 10.0 -5.0, point 10.0 5.0)
@@ -158,13 +158,13 @@ let ``segment ray crossings find line quadratic cubic and arc roots`` () =
 let ``segment ray crossings retain negative ray parameters and reject zero direction`` () =
     let line = Line(point 10.0 -5.0, point 10.0 5.0)
     let crossings =
-        Segment.rayCrossingsWith line (point 5.0 0.0) (Point.create -1.0 0.0) Segment.defaultCrossingOptions
+        Containment.segmentRayCrossingsWith line (point 5.0 0.0) (Point.create -1.0 0.0) Containment.defaultCrossingOptions
         |> Result.defaultWith (failwithf "%A")
     let _, rayT = List.exactlyOne crossings
     Assert.InRange(float rayT, -5.000000001, -4.999999999)
     Assert.Equal(
         Error IndeterminateDirection,
-        Segment.rayCrossingsWith line (point 5.0 0.0) (Point.create 0.0 0.0) Segment.defaultCrossingOptions)
+        Containment.segmentRayCrossingsWith line (point 5.0 0.0) (Point.create 0.0 0.0) Containment.defaultCrossingOptions)
 
 [<Fact>]
 let ``segment split and between extrapolate while inside variants reject`` () =
@@ -181,7 +181,7 @@ let ``segment split and between extrapolate while inside variants reject`` () =
 [<Fact>]
 let ``parametric subpath fits a straight interval`` () =
     let curve t = point t (2.0 * t)
-    let subpath = Subpath.fromParametric 0.0 1.0 curve |> Result.defaultWith (failwithf "%A")
+    let subpath = Fit.subpathFromParametric 0.0 1.0 curve |> Result.defaultWith (failwithf "%A")
     Assert.False(Subpath.isClosed subpath)
     Assert.Equal(point 0.0 0.0, Subpath.start subpath)
     Assert.Equal(point 1.0 2.0, Subpath.finish subpath)
@@ -193,7 +193,7 @@ let ``parametric subpath fits a straight interval`` () =
 [<Fact>]
 let ``maximum-length subdivision preserves exact endpoints`` () =
     let segment = Line(point 0.0 0.0, point 5.0 0.0)
-    let pieces = Segment.subdivideToMaxLength segment 2.0<length> |> Result.defaultWith (failwithf "%A")
+    let pieces = Measure.segmentSubdivideToMaxLength segment 2.0<length> |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, List.length pieces)
     Assert.Equal(Segment.start segment, Segment.start (List.head pieces))
     Assert.Equal(Segment.finish segment, Segment.finish (List.last pieces))
@@ -201,10 +201,10 @@ let ``maximum-length subdivision preserves exact endpoints`` () =
 [<Fact>]
 let ``segment crossings and minimization match scalar sampling contracts`` () =
     let segment = Line(point 0.0 0.0, point 10.0 0.0)
-    let crossings = Segment.crossings segment (fun sample -> sample.X - 4.0<length>) |> Result.defaultWith (failwithf "%A")
+    let crossings = Containment.segmentCrossings segment (fun sample -> sample.X - 4.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Single(crossings) |> ignore
     Assert.InRange(float crossings.Head, 0.399999999, 0.400000001)
-    let minimum = Segment.minimize segment (fun sample -> (float sample.X - 7.0) ** 2.0) |> Result.defaultWith (failwithf "%A")
+    let minimum = Fit.segmentMinimize segment (fun sample -> (float sample.X - 7.0) ** 2.0) |> Result.defaultWith (failwithf "%A")
     Assert.InRange(float minimum, 0.699999999, 0.700000001)
 
 [<Fact>]

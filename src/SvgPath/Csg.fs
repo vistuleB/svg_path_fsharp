@@ -204,3 +204,37 @@ module Csg =
             |> Result.map (fun contours -> { Path = Path.ofSubpaths contours; Build = build }))
 
     let nestedContours path = nestedContoursWith path defaultOptions
+
+    /// Return only the reconstructed path. Use union for arrangement/source data.
+    let unionPathWith left right fillRule options =
+        unionWith left right fillRule options |> Result.map (fun output -> output.Path)
+
+    /// Return only the reconstructed path using default numerical options.
+    let unionPath left right fillRule = unionPathWith left right fillRule defaultOptions
+
+    /// Return only the reconstructed path. Use intersection for arrangement/source data.
+    let intersectionPathWith left right fillRule options =
+        intersectionWith left right fillRule options |> Result.map (fun output -> output.Path)
+
+    /// Return only the reconstructed path using default numerical options.
+    let intersectionPath left right fillRule = intersectionPathWith left right fillRule defaultOptions
+
+    /// Return only the reconstructed path. Use difference for arrangement/source data.
+    let differencePathWith left right fillRule options =
+        differenceWith left right fillRule options |> Result.map (fun output -> output.Path)
+
+    /// Return only the reconstructed path using default numerical options.
+    let differencePath left right fillRule = differencePathWith left right fillRule defaultOptions
+
+    /// Return only the reconstructed path. Use symmetricDifference for arrangement/source data.
+    let symmetricDifferencePathWith left right fillRule options =
+        symmetricDifferenceWith left right fillRule options |> Result.map (fun output -> output.Path)
+
+    /// Return only the reconstructed path using default numerical options.
+    let symmetricDifferencePath left right fillRule = symmetricDifferencePathWith left right fillRule defaultOptions
+
+    /// Preserve signed winding levels without retaining the arrangement build.
+    let nestedContoursPathWith path options =
+        nestedContoursWith path options |> Result.map (fun output -> output.Path)
+
+    let nestedContoursPath path = nestedContoursPathWith path defaultOptions

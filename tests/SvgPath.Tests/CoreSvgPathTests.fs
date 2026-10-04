@@ -114,7 +114,7 @@ let ``segment second derivative evaluates arc analytically`` () =
 [<Fact>]
 let ``segment bounding box handles lines beziers and arcs`` () =
     let check segment expectedMin expectedMax =
-        let box = Segment.boundingBox segment |> Result.defaultWith (failwithf "%A")
+        let box = Bounds.segmentBoundingBox segment |> Result.defaultWith (failwithf "%A")
         assertPointNear expectedMin box.Min
         assertPointNear expectedMax box.Max
     check (Line(point 1.0 2.0, point 5.0 -3.0)) (point 1.0 -3.0) (point 5.0 2.0)
@@ -125,17 +125,17 @@ let ``segment bounding box handles lines beziers and arcs`` () =
 [<Fact>]
 let ``bounding box dimensions use extents`` () =
     let box: BoundingBox = { Min = point -2.0 3.0; Max = point 8.0 15.0 }
-    Assert.Equal(10.0<length>, BoundingBox.width box)
-    Assert.Equal(12.0<length>, BoundingBox.height box)
-    Assert.Equal(point 3.0 9.0, BoundingBox.center box)
-    Assert.Equal(22.0<length>, BoundingBox.taxicabDiameter box)
+    Assert.Equal(10.0<length>, Bounds.boundingBoxWidth box)
+    Assert.Equal(12.0<length>, Bounds.boundingBoxHeight box)
+    Assert.Equal(point 3.0 9.0, Bounds.boundingBoxCenter box)
+    Assert.Equal(22.0<length>, Bounds.boundingBoxTaxicabDiameter box)
 
 [<Fact>]
 let ``bounding box union covers both boxes`` () =
     let first: BoundingBox = { Min = point 2.0 -3.0; Max = point 5.0 4.0 }
     let second: BoundingBox = { Min = point -7.0 6.0; Max = point -2.0 9.0 }
     let expected: BoundingBox = { Min = point -7.0 -3.0; Max = point 5.0 9.0 }
-    Assert.Equal(expected, BoundingBox.union first second)
+    Assert.Equal(expected, Bounds.boundingBoxUnion first second)
 
 [<Fact>]
 let ``bounding box union many covers every box`` () =
@@ -144,27 +144,27 @@ let ``bounding box union many covers every box`` () =
           { Min = point -7.0 6.0; Max = point -2.0 9.0 }
           { Min = point 3.0 -8.0; Max = point 4.0 -6.0 } ]
     let expected: BoundingBox = { Min = point -7.0 -8.0; Max = point 5.0 9.0 }
-    Assert.Equal(Some expected, BoundingBox.unionMany boxes)
+    Assert.Equal(Some expected, Bounds.boundingBoxUnionMany boxes)
 
 [<Fact>]
 let ``bounding_box_union_many_returns_error_for_empty_lists_test`` () =
-    Assert.Equal(None, BoundingBox.unionMany [])
+    Assert.Equal(None, Bounds.boundingBoxUnionMany [])
 
 [<Fact>]
 let ``points bounding box covers every point`` () =
     let expected: BoundingBox = { Min = point -7.0 -8.0; Max = point 4.0 6.0 }
     Assert.Equal(
         Some expected,
-        BoundingBox.ofPoints [ point 2.0 -3.0; point -7.0 6.0; point 4.0 -8.0 ])
+        Bounds.pointsBoundingBox [ point 2.0 -3.0; point -7.0 6.0; point 4.0 -8.0 ])
 
 [<Fact>]
 let ``points_bounding_box_returns_error_for_empty_lists_test`` () =
-    Assert.Equal(None, BoundingBox.ofPoints [])
+    Assert.Equal(None, Bounds.pointsBoundingBox [])
 
 [<Fact>]
 let ``segment bounding box returns degenerate arc errors`` () =
     let segment = Arc ({ Start = point 0.0 0.0; Radius = point 0.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
-    Assert.Equal(Error DegenerateArc, Segment.boundingBox segment)
+    Assert.Equal(Error DegenerateArc, Bounds.segmentBoundingBox segment)
 
 let private semicircle =
     Arc ({ Start = point 0.0 0.0; Radius = point 10.0 10.0; XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = point 20.0 0.0 }: Ellipse.EndpointArcData)
@@ -441,7 +441,7 @@ let ``path start and end use first and last subpaths`` () =
 [<Fact>]
 let ``subpath bounding box combines segment boxes`` () =
     let source = Subpath.create [ Line(point 1.0 2.0, point 5.0 -3.0); QuadraticBezier(point 5.0 -3.0, point 10.0 10.0, point 20.0 0.0) ] |> Result.defaultWith (failwithf "%A")
-    let box = Subpath.boundingBox source |> Result.defaultWith (failwithf "%A")
+    let box = Bounds.subpathBoundingBox source |> Result.defaultWith (failwithf "%A")
     assertPointNear (point 1.0 -3.0) box.Min
     assertPointNear (point 20.0 4.347826086956522) box.Max
 
@@ -449,7 +449,7 @@ let ``subpath bounding box combines segment boxes`` () =
 let ``path bounding box uses nonempty subpaths`` () =
     let first = Subpath.ofSegment (Line(point 1.0 2.0, point 5.0 -3.0))
     let path = Path.ofSubpaths [ Subpath.empty (point 0.0 0.0); first; Subpath.empty (point 0.0 0.0); Subpath.ofSegment semicircle ]
-    let box = Path.boundingBox path |> Result.defaultWith (failwithf "%A")
+    let box = Bounds.pathBoundingBox path |> Result.defaultWith (failwithf "%A")
     assertPointNear (point 0.0 -10.0) box.Min
     assertPointNear (point 20.0 2.0) box.Max
 
@@ -457,7 +457,7 @@ let ``path bounding box uses nonempty subpaths`` () =
 let ``empty path has no start or end`` () =
     Assert.Equal(Error EmptyPath, Path.start Path.empty)
     Assert.Equal(Error EmptyPath, Path.finish Path.empty)
-    Assert.Equal(Error EmptyPath, Path.boundingBox Path.empty)
+    Assert.Equal(Error EmptyPath, Bounds.pathBoundingBox Path.empty)
 
 [<Fact>]
 let ``path with only empty subpaths has start and end`` () =
@@ -465,7 +465,7 @@ let ``path with only empty subpaths has start and end`` () =
     let path = Path.ofSubpaths [ Subpath.empty a; Subpath.empty b ]
     Assert.Equal(Ok a, Path.start path)
     Assert.Equal(Ok b, Path.finish path)
-    Assert.Equal(Error EmptySubpaths, Path.boundingBox path)
+    Assert.Equal(Error EmptySubpaths, Bounds.pathBoundingBox path)
 
 [<Fact>]
 let ``as subpath rejects empty path`` () =
@@ -544,7 +544,7 @@ let ``empty subpath has start and end`` () =
     let empty = Subpath.empty at
     Assert.Equal(at, Subpath.start empty)
     Assert.Equal(at, Subpath.finish empty)
-    Assert.Equal(Error EmptySubpath, Subpath.boundingBox empty)
+    Assert.Equal(Error EmptySubpath, Bounds.subpathBoundingBox empty)
 
 [<Fact>]
 let ``subpath rejects disconnected segments`` () =
@@ -724,22 +724,22 @@ let ``clean subpath preserves closed state`` () =
 [<Fact>]
 let ``segment is zero length detects exact zero lines`` () =
     let a = point 0.0 0.0
-    Assert.Equal(Ok true, Segment.isZeroLength (Line(a, a)) 0.0<length>)
-    Assert.Equal(Ok false, Segment.isZeroLength (Line(a, point 1.0 0.0)) 0.0<length>)
+    Assert.Equal(Ok true, Measure.segmentIsZeroLength (Line(a, a)) 0.0<length>)
+    Assert.Equal(Ok false, Measure.segmentIsZeroLength (Line(a, point 1.0 0.0)) 0.0<length>)
 
 [<Fact>]
 let ``segment is zero length uses tolerance`` () =
     let short = Line(point 0.0 0.0, point 0.001 0.0)
-    Assert.Equal(Ok false, Segment.isZeroLength short 0.0009<length>); Assert.Equal(Ok true, Segment.isZeroLength short 0.0011<length>)
+    Assert.Equal(Ok false, Measure.segmentIsZeroLength short 0.0009<length>); Assert.Equal(Ok true, Measure.segmentIsZeroLength short 0.0011<length>)
 
 [<Fact>]
 let ``segment is zero length detects collapsed cubic`` () =
     let a = point 2.0 3.0
-    Assert.Equal(Ok true, Segment.isZeroLength (CubicBezier(a, a, a, a)) 0.0<length>)
+    Assert.Equal(Ok true, Measure.segmentIsZeroLength (CubicBezier(a, a, a, a)) 0.0<length>)
 
 [<Fact>]
 let ``subpath is zero length requires non empty subpath`` () =
-    Assert.Equal(Ok false, Subpath.isZeroLength (Subpath.empty (point 0.0 0.0)) 0.0<length>)
+    Assert.Equal(Ok false, Measure.subpathIsZeroLength (Subpath.empty (point 0.0 0.0)) 0.0<length>)
 
 [<Fact>]
 let ``subpath is empty distinguishes no segments from zero length`` () =
@@ -753,15 +753,15 @@ let ``subpath is empty distinguishes no segments from zero length`` () =
 let ``subpath is zero length checks every segment`` () =
     let a, b = point 0.0 0.0, point 1.0 0.0
     let zero, nonzero = Line(a, a), Line(a, b)
-    Assert.Equal(Ok true, Subpath.isZeroLength (Subpath.assertCreate [ zero ]) 0.0<length>)
-    Assert.Equal(Ok true, Subpath.isZeroLength (Subpath.assertCreate [ zero; zero ]) 0.0<length>)
+    Assert.Equal(Ok true, Measure.subpathIsZeroLength (Subpath.assertCreate [ zero ]) 0.0<length>)
+    Assert.Equal(Ok true, Measure.subpathIsZeroLength (Subpath.assertCreate [ zero; zero ]) 0.0<length>)
     let mixed = Subpath.createWith Wiggle [ zero; nonzero ] |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(Ok false, Subpath.isZeroLength mixed 0.0<length>)
+    Assert.Equal(Ok false, Measure.subpathIsZeroLength mixed 0.0<length>)
 
 [<Fact>]
 let ``zero length predicates reject negative tolerance`` () =
     let a = point 0.0 0.0
-    Assert.Equal(Error(InvalidZeroLengthTolerance -0.1<length>), Segment.isZeroLength (Line(a, a)) -0.1<length>)
+    Assert.Equal(Error(InvalidZeroLengthTolerance -0.1<length>), Measure.segmentIsZeroLength (Line(a, a)) -0.1<length>)
 
 [<Fact>]
 let ``path map subpaths maps each subpath`` () =
@@ -961,7 +961,7 @@ let ``segment to lines approximates beziers within tolerance`` () =
         Assert.True(lines |> List.pairwise |> List.forall (fun (left, right) -> Segment.finish left = Segment.start right))
         for index in 0 .. 500 do
             let sample = Segment.point curve (Parameter.fromFloat (float index / 500.0)) |> Result.defaultWith (failwithf "%A")
-            let distance = lines |> List.map (fun line -> Segment.distance line sample |> Result.defaultWith (failwithf "%A")) |> List.min
+            let distance = lines |> List.map (fun line -> Distance.segmentDistance line sample |> Result.defaultWith (failwithf "%A")) |> List.min
             Assert.True(distance <= options.Tolerance, $"sample {index} was {distance} from the line approximation")
 
 [<Fact>]
@@ -981,7 +981,7 @@ let ``segment to lines approximates arcs within tolerance`` () =
     Assert.Equal(Segment.finish arc, Segment.finish lines[lines.Length - 1])
     for index in 0 .. 500 do
         let sample = Segment.point arc (Parameter.fromFloat (float index / 500.0)) |> Result.defaultWith (failwithf "%A")
-        let distance = lines |> List.map (fun line -> Segment.distance line sample |> Result.defaultWith (failwithf "%A")) |> List.min
+        let distance = lines |> List.map (fun line -> Distance.segmentDistance line sample |> Result.defaultWith (failwithf "%A")) |> List.min
         Assert.True(distance <= tolerance, $"sample {index} was {distance} from the line approximation")
 
 [<Fact>]

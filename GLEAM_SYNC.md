@@ -1,5 +1,24 @@
 # Gleam commit-by-commit synchronization
 
+## v3.0.0 API alignment (unreleased)
+
+- `24546fa`: explicit stroke widths and applicable stroke options.
+- `372c73c`: operation modules and path-only CSG results.
+- `8b42250`: remove 24 transform shortcuts and migrate callers.
+
+F# retains existing argument order and units of measure. Numerical implementations
+remain internal in the core compilation units; the new operation modules expose
+them without public aliases at the former locations. README artwork is unchanged
+and remains pinned to the immutable `assets-v2.0.0` tag.
+
+Verification:
+
+- `scripts/test-all`: 1,857 fast and 26 slow tests passed.
+- `scripts/generate-readme-figures --check`: passed with unchanged artwork.
+- Both figure generators build; Gallery uses `-p:GalleryDiagnostics=true`.
+- Compiled-assembly inspection verified all 101 relocated entries are public
+  in their new modules and unavailable at their former public locations.
+
 ## v2.0.0 API alignment (2026-09-16)
 
 The code/API changes through Gleam `458b4e85` are ported below. Gleam's

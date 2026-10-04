@@ -9,34 +9,34 @@ let ``stroke delegates to symmetric band for open and closed sources`` () =
     let openSource = Subpath.polyline [p 0. 0.;p 10. 0.;p 10. 10.] |> Result.defaultWith (failwithf "%A")
     let closed = Subpath.polygon [p 0. 0.;p 10. 0.;p 10. 10.;p 0. 10.] |> Result.defaultWith (failwithf "%A")
     let bandOptions = {Offset.defaultOptions with Offset.BandTrimming=({InnerCusps=false;OuterCusps=false;InBand=true}: Offset.BandTrimming)}
-    let strokeOptions: Stroke.Options = {Width=2.0<length>;Offset={Offset.defaultOptions with Offset.BandTrimming=({InnerCusps=true;OuterCusps=true;InBand=false}: Offset.BandTrimming)}}
+    let strokeOptions = Stroke.defaultOptions
     for source in [openSource;closed] do
         for cap in [Offset.Butt;Offset.RoundCap;Offset.Square] do
             let expected = Offset.subpathBandWith source -1.0<length> 1.0<length> Offset.Round cap bandOptions |> Result.defaultWith (failwithf "%A")
-            Assert.Equal(Ok expected,Stroke.subpathWith source Offset.Round cap strokeOptions)
+            Assert.Equal(Ok expected,Stroke.subpathWith source 2.0<length> Offset.Round cap strokeOptions)
 
 [<Fact>]
 let ``empty_path_stroke_validates_join_test`` () =
-    Assert.Equal(Error(Stroke.StrokeOffsetError(Offset.InvalidMiterLimit 0.0)), Stroke.pathWith Path.empty (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions)
+    Assert.Equal(Error(Stroke.StrokeOffsetError(Offset.InvalidMiterLimit 0.0)), Stroke.pathWith Path.empty 1.0<length> (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions)
     Assert.Equal(Error(Stroke.InvalidStrokeOutlineWidth 0.0<length>),
-        Stroke.pathWith Path.empty (Offset.Miter 0.0) Offset.Butt {Stroke.defaultOptions with Width=0.0<length>})
+        Stroke.pathWith Path.empty 0.0<length> (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions)
     let source = Subpath.ofSegment(Line(Point.create 0.0<length> 0.0<length>, Point.create 10.0<length> 0.0<length>))
     Assert.Equal(Error(Stroke.StrokeOffsetError(Offset.InvalidMiterLimit 0.0)),
-        Stroke.pathWith (Path.ofSubpaths[source]) (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions)
+        Stroke.pathWith (Path.ofSubpaths[source]) 1.0<length> (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions)
 
 [<Fact>]
 let ``empty_dashed_path_stroke_validates_join_test`` () =
     let source = Subpath.ofSegment(Line(Point.create 0.0<length> 0.0<length>, Point.create 10.0<length> 0.0<length>))
     let dashes = Stroke.defaultDashOptions [0.0<length>;20.0<length>] 0.0<length>
     Assert.Equal(Error(Stroke.StrokeOffsetError(Offset.InvalidMiterLimit 0.0)),
-        Stroke.pathDashedWith (Path.ofSubpaths[source]) (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions dashes)
+        Stroke.pathDashedWith (Path.ofSubpaths[source]) 1.0<length> (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions dashes)
 
 [<Fact>]
 let ``empty_path_stroke_validates_fitting_options_test`` () =
     let defaults = Stroke.defaultOptions
-    let options = { defaults with Offset = { defaults.Offset with Fitting = { defaults.Offset.Fitting with Samples = 0 } } }
+    let options = { defaults with Fitting = { defaults.Fitting with Samples = 0 } }
     Assert.Equal(Error(Stroke.StrokeOffsetError(Offset.InvalidSamples 0)),
-        Stroke.pathWith Path.empty Offset.Round Offset.Butt options)
+        Stroke.pathWith Path.empty 1.0<length> Offset.Round Offset.Butt options)
 
 [<Fact>]
 let ``stroke preserves gallery hairpin dash`` () =
@@ -56,7 +56,7 @@ let ``stroke preserves gallery hairpin dash`` () =
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private simpleLineSubpath a b = Subpath.polyline [ a; b ] |> Result.defaultWith (failwithf "%A")
 let private rightAngle () = Subpath.polyline [ point 0.0 0.0; point 10.0 0.0; point 10.0 10.0 ] |> Result.defaultWith (failwithf "%A")
-let private stroked subpath join cap options = Stroke.subpathWith subpath join cap options |> Result.defaultWith (failwithf "%A")
+let private stroked subpath width join cap options = Stroke.subpathWith subpath width join cap options |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]
 let ``segment stroke with butt caps returns closed outline`` () =
@@ -67,13 +67,13 @@ let ``segment stroke with butt caps returns closed outline`` () =
 
 [<Fact>]
 let ``subpath stroke with round caps adds two cap arcs`` () =
-    let path = stroked (simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)) (Offset.Miter Offset.defaultMiterLimit) Offset.RoundCap { Stroke.defaultOptions with Width = 2.0<length> }
+    let path = stroked (simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)) 2.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.RoundCap Stroke.defaultOptions
     let outline = List.exactlyOne path.Subpaths
     Assert.Equal(2, outline.Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
 
 [<Fact>]
 let ``subpath stroke with round cap serializes semicircles`` () =
-    let path = stroked (simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)) (Offset.Miter Offset.defaultMiterLimit) Offset.RoundCap { Stroke.defaultOptions with Width = 2.0<length> }
+    let path = stroked (simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)) 2.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.RoundCap Stroke.defaultOptions
     ClosedPathAssertions.equivalent path "M 0 -1 H 10 A 1 1 0 0 1 10 1 H 0 A 1 1 0 0 1 0 -1 Z"
 
 [<Fact>]
@@ -86,10 +86,9 @@ let ``round caps use normalized source endpoint directions`` () =
                 point 120.60455242265807 120.1171740145196,
                 point 121.21463749128954 119.84268982753466))
     let options =
-        { Stroke.defaultOptions with
-            Width = 6.0<length> }
+        Stroke.defaultOptions
 
-    let path = stroked subpath Offset.Round Offset.RoundCap options
+    let path = stroked subpath 6.0<length> Offset.Round Offset.RoundCap options
     let outline = List.exactlyOne path.Subpaths
 
     Assert.True outline.Closed
@@ -128,40 +127,40 @@ let ``zero length subpath stroke with butt cap returns empty path`` () =
 [<Fact>]
 let ``zero length subpath stroke with round cap returns circle`` () =
     let p = point 3.0 4.0
-    let path = stroked (Subpath.ofSegment (Line(p, p))) (Offset.Miter Offset.defaultMiterLimit) Offset.RoundCap { Stroke.defaultOptions with Width = 2.0<length> }
+    let path = stroked (Subpath.ofSegment (Line(p, p))) 2.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.RoundCap Stroke.defaultOptions
     Assert.Equal("M 4 4 A 1 1 0 0 1 2 4 A 1 1 0 0 1 4 4 Z", Serialize.subpath (List.exactlyOne path.Subpaths))
 
 [<Fact>]
 let ``subpath stroke with square caps extends by half width`` () =
-    let path = stroked (simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)) (Offset.Miter Offset.defaultMiterLimit) Offset.Square { Stroke.defaultOptions with Width = 2.0<length> }
+    let path = stroked (simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)) 2.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Square Stroke.defaultOptions
     ClosedPathAssertions.equivalent path "M 0 -1 H 10 H 11 V 1 H 10 H 0 H -1 V -1 Z"
 
 [<Fact>]
 let ``subpath stroke with bevel join keeps corner cut`` () =
-    let options = { Stroke.defaultOptions with Width = 2.0<length> }
-    ClosedPathAssertions.equivalent (stroked (rightAngle ()) Offset.Bevel Offset.Butt options) "M 0 -1 H 10 L 11 0 V 10 H 9 V 1 H 0 Z"
+    let options = Stroke.defaultOptions
+    ClosedPathAssertions.equivalent (stroked (rightAngle ()) 2.0<length> Offset.Bevel Offset.Butt options) "M 0 -1 H 10 L 11 0 V 10 H 9 V 1 H 0 Z"
 
 [<Fact>]
 let ``subpath stroke with round join adds join arcs`` () =
-    let options = { Stroke.defaultOptions with Width = 2.0<length> }
-    let outline = stroked (rightAngle ()) Offset.Round Offset.Butt options |> _.Subpaths |> List.exactlyOne
+    let options = Stroke.defaultOptions
+    let outline = stroked (rightAngle ()) 2.0<length> Offset.Round Offset.Butt options |> _.Subpaths |> List.exactlyOne
     Assert.Equal(1, outline.Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
     ClosedPathAssertions.equivalent (Path.ofSubpaths [outline]) "M 0 -1 H 10 A 1 1 0 0 1 11 0 V 10 H 9 V 1 H 0 Z"
 
 [<Fact>]
 let ``subpath stroke with miter join extends to apex`` () =
-    let options = { Stroke.defaultOptions with Width = 2.0<length> }
-    ClosedPathAssertions.equivalent (stroked (rightAngle ()) (Offset.Miter 4.0) Offset.Butt options) "M 0 -1 H 10 H 11 V 0 V 10 H 9 V 1 H 0 Z"
+    let options = Stroke.defaultOptions
+    ClosedPathAssertions.equivalent (stroked (rightAngle ()) 2.0<length> (Offset.Miter 4.0) Offset.Butt options) "M 0 -1 H 10 H 11 V 0 V 10 H 9 V 1 H 0 Z"
 
 [<Fact>]
 let ``subpath stroke with low miter limit falls back to bevel`` () =
-    let withJoin join = stroked (rightAngle ()) join Offset.Butt { Stroke.defaultOptions with Width = 2.0<length> } |> Serialize.path
+    let withJoin join = stroked (rightAngle ()) 2.0<length> join Offset.Butt Stroke.defaultOptions |> Serialize.path
     Assert.Equal(withJoin Offset.Bevel, withJoin (Offset.Miter 1.0))
 
 [<Fact>]
 let ``zero length subpath stroke with square cap returns square`` () =
     let p = point 3.0 4.0
-    let path = stroked (Subpath.ofSegment (Line(p, p))) (Offset.Miter Offset.defaultMiterLimit) Offset.Square { Stroke.defaultOptions with Width = 2.0<length> }
+    let path = stroked (Subpath.ofSegment (Line(p, p))) 2.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Square Stroke.defaultOptions
     Assert.Equal("M 2 3 H 4 V 5 H 2 Z", Serialize.subpath (List.exactlyOne path.Subpaths))
 
 [<Fact>]
@@ -269,7 +268,7 @@ let ``zero visible dashes on closed source are points not full loops`` () =
     Assert.Equal(3, dashes.Length)
     for dash in dashes do
         Assert.False(Subpath.isClosed dash)
-        Assert.Equal(Ok 0.0<length>, Subpath.length dash)
+        Assert.Equal(Ok 0.0<length>, Measure.subpathLength dash)
     let result = Stroke.subpathDashed source 0.5<length> [0.0<length>;3.0<length>] 0.0<length> Offset.Bevel Offset.RoundCap |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, (Path.subpaths result).Length)
 
@@ -359,15 +358,15 @@ let ``stroke rejects non positive width`` () =
 let ``stroke converts explicit miter errors and preserves technical options`` () =
     let source = rightAngle ()
     Assert.Equal(Error(Stroke.StrokeOffsetError(Offset.InvalidMiterLimit 0.0)),
-        Stroke.subpathWith source (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions)
+        Stroke.subpathWith source 1.0<length> (Offset.Miter 0.0) Offset.Butt Stroke.defaultOptions)
     let options =
         { Stroke.defaultOptions with
-            Offset = { Offset.defaultOptions with Fitting = { Offset.defaultFittingOptions with Tolerance = 0.0<length> } } }
+            Fitting = { Offset.defaultFittingOptions with Tolerance = 0.0<length> } }
     Assert.Equal(Error(Stroke.StrokeOffsetError(Offset.InvalidTolerance 0.0<length>)),
-        Stroke.subpathWith source Offset.Round Offset.RoundCap options)
+        Stroke.subpathWith source 1.0<length> Offset.Round Offset.RoundCap options)
 
 [<Fact>]
 let ``stroke exposes Offset.Join and Offset.Cap type aliases`` () =
     let source = simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)
-    let path = Stroke.subpathWith source Stroke.Join.Round Stroke.Cap.RoundCap Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let path = Stroke.subpathWith source 1.0<length> Stroke.Join.Round Stroke.Cap.RoundCap Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
     Assert.Single(path.Subpaths) |> ignore

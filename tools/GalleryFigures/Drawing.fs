@@ -20,7 +20,7 @@ module Drawing =
         geometry, sprintf "fill:%s;stroke:%s;stroke-width:%s;stroke-linejoin:round" fill stroke (number width)
     let element (geometry, style) = sprintf "<path d=\"%s\" style=\"%s\"/>" (Serialize.path geometry) style
     let bounds layers =
-        layers |> List.map fst |> combine |> Path.boundingBox |> require "figure bounds"
+        layers |> List.map fst |> combine |> Bounds.pathBoundingBox |> require "figure bounds"
     /// Each panel is centered using the bounds of its actual rendered paths.
     let panel x width height title layers =
         let box = bounds layers

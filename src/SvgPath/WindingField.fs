@@ -25,7 +25,7 @@ type private ContainmentCalculation =
 
 [<RequireQualifiedAccess>]
 module internal WindingField =
-    let defaultOptions =
+    let internal defaultOptions =
         { Tolerance = 1.0e-9<length>
           Samples = 100
           MaxIterations = 100
@@ -243,16 +243,16 @@ module internal WindingField =
         | CalculatedBoundary -> Boundary
         | CalculatedWinding(winding, crossings) -> containmentFromWinding winding crossings fillRule
 
-    let subpathContainmentWith point subpath fillRule options =
+    let internal subpathContainmentWith point subpath fillRule options =
         validateOptions options
         |> Result.bind (fun () ->
             subpathContainmentCalculation point subpath options
             |> Result.map (fun calculation -> containmentFromCalculation calculation fillRule))
 
-    let subpathContainment point subpath fillRule =
+    let internal subpathContainment point subpath fillRule =
         subpathContainmentWith point subpath fillRule defaultOptions
 
-    let pathWindingWith (point: Point<length>) (path: Path) (options: ContainmentOptions) =
+    let internal pathWindingWith (point: Point<length>) (path: Path) (options: ContainmentOptions) =
         validateOptions options
         |> Result.bind (fun () ->
             Path.subpaths path
@@ -267,9 +267,9 @@ module internal WindingField =
                             | CalculatedWinding(next, _) -> Winding(winding + next)))) (Ok(Winding 0)))
 
     /// Visually clockwise loops contribute +1; counterclockwise loops contribute -1.
-    let pathWinding point path = pathWindingWith point path defaultOptions
+    let internal pathWinding point path = pathWindingWith point path defaultOptions
 
-    let pathContainmentWith
+    let internal pathContainmentWith
         (point: Point<length>)
         (path: Path)
         (fillRule: FillRule)
@@ -290,7 +290,7 @@ module internal WindingField =
                 (Ok(CalculatedWinding(0, 0)))
             |> Result.map (fun calculation -> containmentFromCalculation calculation fillRule))
 
-    let pathContainment point path fillRule = pathContainmentWith point path fillRule defaultOptions
+    let internal pathContainment point path fillRule = pathContainmentWith point path fillRule defaultOptions
 
     let nonzeroLevelAt point path options =
         pathWindingWith point path options

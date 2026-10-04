@@ -252,7 +252,7 @@ let ``exchanging_band_offsets_reverses_result_orientation_test`` () =
 let ``subpath_can_use_round_join_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let options = Offset.defaultOptions
-    let result = Stroke.subpathWith source Offset.Round Offset.RoundCap { Stroke.defaultOptions with Width = 2.0<length>; Offset = options } |> Result.defaultWith (fun error -> failwithf "%A" error)
+    let result = Stroke.subpathWith source 2.0<length> Offset.Round Offset.RoundCap Stroke.defaultOptions |> Result.defaultWith (fun error -> failwithf "%A" error)
     Assert.Single(result.Subpaths) |> ignore
     Assert.True(result.Subpaths[0].Closed)
     Assert.Equal(2, result.Subpaths[0].Segments |> List.filter (function Arc _ -> true | _ -> false) |> List.length)
@@ -440,9 +440,9 @@ let ``subpath_band_untrimmed_returns_two_raw_sides_test`` () =
 [<Fact>]
 let ``zero-length stroke follows cap semantics`` () =
     let source = Subpath.ofSegment (Line(point 2.0 3.0, point 2.0 3.0))
-    let butt = Stroke.subpathWith source (Offset.Miter Offset.defaultMiterLimit) Offset.Butt Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
-    let round = Stroke.subpathWith source (Offset.Miter Offset.defaultMiterLimit) Offset.RoundCap Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
-    let square = Stroke.subpathWith source (Offset.Miter Offset.defaultMiterLimit) Offset.Square Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let butt = Stroke.subpathWith source 1.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let round = Stroke.subpathWith source 1.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.RoundCap Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let square = Stroke.subpathWith source 1.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Square Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
     Assert.Empty(butt.Subpaths)
     Assert.Equal(2, round.Subpaths[0].Segments.Length)
     Assert.Equal(4, square.Subpaths[0].Segments.Length)
@@ -451,7 +451,7 @@ let ``zero-length stroke follows cap semantics`` () =
 let ``subpath_stroke_open_line_with_square_cap_extends_ends_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
     let render cap =
-        Stroke.subpathWith source (Offset.Miter Offset.defaultMiterLimit) cap { Stroke.defaultOptions with Width = 2.0<length> }
+        Stroke.subpathWith source 2.0<length> (Offset.Miter Offset.defaultMiterLimit) cap Stroke.defaultOptions
         |> Result.defaultWith (failwithf "%A")
     ClosedPathAssertions.equivalent (render Offset.Butt) "M 0 -1 H 10 V 1 H 0 Z"
     ClosedPathAssertions.equivalent (render Offset.Square) "M 0 -1 H 10 H 11 V 1 H 10 H 0 H -1 V -1 Z"
@@ -459,7 +459,7 @@ let ``subpath_stroke_open_line_with_square_cap_extends_ends_test`` () =
 [<Fact>]
 let ``subpath_stroke_open_line_with_butt_cap_returns_closed_outline_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    let result = Stroke.subpathWith source (Offset.Miter Offset.defaultMiterLimit) Offset.Butt { Stroke.defaultOptions with Width = 2.0<length> } |> Result.defaultWith (failwithf "%A")
+    let result = Stroke.subpathWith source 2.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
     Assert.Single(result.Subpaths) |> ignore
     Assert.True(result.Subpaths[0].Closed)
     ClosedPathAssertions.equivalent result "M 0 -1 H 10 V 1 H 0 Z"
@@ -467,8 +467,8 @@ let ``subpath_stroke_open_line_with_butt_cap_returns_closed_outline_test`` () =
 [<Fact>]
 let ``subpath_stroke_rejects_invalid_width_test`` () =
     let source = Subpath.ofSegment (Line(point 0.0 0.0, point 10.0 0.0))
-    Assert.Equal(Error(Stroke.InvalidStrokeOutlineWidth 0.0<length>), Stroke.subpathWith source (Offset.Miter Offset.defaultMiterLimit) Offset.Butt { Stroke.defaultOptions with Width = 0.0<length> })
-    Assert.Equal(Error(Stroke.InvalidStrokeOutlineWidth -1.0<length>), Stroke.subpathWith source (Offset.Miter Offset.defaultMiterLimit) Offset.Butt { Stroke.defaultOptions with Width = -1.0<length> })
+    Assert.Equal(Error(Stroke.InvalidStrokeOutlineWidth 0.0<length>), Stroke.subpathWith source 0.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt Stroke.defaultOptions)
+    Assert.Equal(Error(Stroke.InvalidStrokeOutlineWidth -1.0<length>), Stroke.subpathWith source -1.0<length> (Offset.Miter Offset.defaultMiterLimit) Offset.Butt Stroke.defaultOptions)
 
 [<Fact>]
 let ``path_band_untrimmed_returns_two_raw_sides_per_subpath_test`` () =

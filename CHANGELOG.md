@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0.0 - Unreleased
+
+- Group measurement, bounds, containment, distance/projection, and fitting APIs
+  into `Measure`, `Bounds`, `Containment`, `Distance`, and `Fit`. Relocated
+  entry points are no longer public in their former modules.
+- Make stroke width explicit in all `With` outline operations and flatten
+  `Stroke.Options` to its four applicable technical controls. Remove ignored
+  offset trimming settings from stroke configuration.
+- Add path-only Boolean operations alongside the existing detailed results.
+- Remove 24 transform shortcuts; construct a matrix and apply it to geometry.
+- Update tests, figure generators, README examples, and migration guidance.
+  Geometry algorithms and units of measure are retained.
+
 ## 2.0.0 - 2026-09-16
 
 - Aligned with Gleam `svg_path` v2.0.0. This major release reduces the public

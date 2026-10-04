@@ -18,7 +18,7 @@ let ``balanced short run has no greedy remainder`` () =
     Assert.Equal(List.head source.Segments,List.head segments)
     Assert.Equal(List.last source.Segments,List.last segments)
     for chunk in segments |> List.skip 1 |> List.take 3 do
-        let bound = Segment.lengthUpperBound chunk |> get
+        let bound = Measure.segmentLengthUpperBound chunk |> get
         Assert.True(bound > 0.001<length> && bound <= 0.003<length>)
 [<Fact>]
 let ``long short run preserves large backtracking extent`` () =
@@ -26,8 +26,8 @@ let ``long short run preserves large backtracking extent`` () =
     let inward = List.rev outward |> List.skip 1
     let source = Subpath.polyline (p -1. :: (outward @ inward @ [p -1.])) |> get
     let normalized = normalize source
-    Assert.Equal(Subpath.boundingBox source |> get,Subpath.boundingBox normalized |> get)
-    let length,original = Subpath.length normalized |> get,Subpath.length source |> get
+    Assert.Equal(Bounds.subpathBoundingBox source |> get,Bounds.subpathBoundingBox normalized |> get)
+    let length,original = Measure.subpathLength normalized |> get,Measure.subpathLength source |> get
     Assert.True(abs(length - original) < 1e-12<length>)
 [<Fact>]
 let ``short run preserves neighbors instead of moving them`` () =
@@ -56,7 +56,7 @@ let ``short run preserves closed empty and singleton subpaths`` () =
 [<Fact>]
 let ``zero length run is handled without division by zero`` () =
     let source = Subpath.create [Line(p -1.,p 0.);Line(p 0.,p 0.);Line(p 0.,p 0.);Line(p 0.,p 1.)] |> get
-    Assert.Equal(2.0<length>,Subpath.length (normalize source) |> get)
+    Assert.Equal(2.0<length>,Measure.subpathLength (normalize source) |> get)
 [<Fact>]
 let ``short run rejects invalid tolerance`` () =
     Assert.Equal(Error(Offset.InternalInvalidTolerance 0.0<length>),Offset.normalizeShortSourceRuns (Subpath.empty (p 0.)) 0.0<length>)

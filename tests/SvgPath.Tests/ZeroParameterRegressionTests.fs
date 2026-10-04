@@ -15,9 +15,9 @@ let ``endpoint arc splits return usable empty lines`` () =
             let empty,retained,endpoint = if t=1.0<parameter> then right,left,Segment.finish arc else left,right,Segment.start arc
             Assert.Equal(Line(endpoint,endpoint),empty)
             Assert.Equal(arc,retained)
-            Assert.Equal(Ok 0.0<length>,Segment.length empty)
+            Assert.Equal(Ok 0.0<length>,Measure.segmentLength empty)
             Assert.Equal(Ok endpoint,Segment.point empty 0.5<parameter>)
-            Assert.Equal(Segment.length arc,Segment.length retained)
+            Assert.Equal(Measure.segmentLength arc,Measure.segmentLength retained)
 
 [<Fact>]
 let ``subpath canonicalization normalizes negative zero`` () =

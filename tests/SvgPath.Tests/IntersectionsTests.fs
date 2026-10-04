@@ -62,8 +62,8 @@ let ``ray crossing rejects unmatched clamped endpoint root`` () =
                             point -330.65275800451764 -215.61911559176272,
                             point -330.65275800435217 215.61911559210864,
                             point -16.041725986446977 10.810480774202006)
-    let options = { Segment.defaultCrossingOptions with Samples=100; SignedLineDistanceTolerance=2.5e-10<length>; MaxIterations=100 }
-    let t, _ = Segment.rayCrossingsWith curve (point 0.0 -10.810480773800316) (Point.create 1.0 0.0) options
+    let options = { Containment.defaultCrossingOptions with Samples=100; SignedLineDistanceTolerance=2.5e-10<length>; MaxIterations=100 }
+    let t, _ = Containment.segmentRayCrossingsWith curve (point 0.0 -10.810480773800316) (Point.create 1.0 0.0) options
                |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.True(t > 0.46<parameter> && t < 0.48<parameter>)
 
@@ -247,10 +247,10 @@ let ``near parallel line projection is scale invariant`` () =
     let right = Line(point -1.0 1.0e-8, point 1.0 -1.0e-8)
     for scale in [ 1.0e-6; 1.0; 1.0e6 ] do
         let scaled segmentValue =
-            Transform.scaleSegment segmentValue scale
+            Transform.segment segmentValue (Transform.scale scale)
             |> Result.defaultWith (failwithf "%A")
         let projection =
-            Intersections.segmentSegmentClosestPairWith (scaled left) (scaled right)
+            Distance.segmentSegmentClosestPairWith (scaled left) (scaled right)
                 { Intersections.defaultOptions with Tolerance = 1.0e-12<length> * scale }
             |> Result.defaultWith (failwithf "%A")
         assertParameterNear 0.5<parameter> projection.LeftT 1.0e-6
@@ -261,18 +261,18 @@ let ``near parallel line projection is scale invariant`` () =
 let ``segment projection reports crossing separated and overlapping lines`` () =
     let horizontal = Line(point 0.0 0.0, point 10.0 0.0)
     let crossing = Line(point 5.0 -2.0, point 5.0 2.0)
-    let crossed = Intersections.segmentSegmentClosestPair horizontal crossing |> Result.defaultWith (failwithf "%A")
+    let crossed = Distance.segmentSegmentClosestPair horizontal crossing |> Result.defaultWith (failwithf "%A")
     Assert.Equal(0.0<length>, crossed.Distance)
     assertParameterNear 0.5<parameter> crossed.LeftT 1.0e-9
     assertParameterNear 0.5<parameter> crossed.RightT 1.0e-9
 
     let separated = Line(point 2.0 3.0, point 8.0 3.0)
-    let nearest = Intersections.segmentSegmentClosestPair horizontal separated |> Result.defaultWith (failwithf "%A")
+    let nearest = Distance.segmentSegmentClosestPair horizontal separated |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3.0<length>, nearest.Distance)
     Assert.Equal(nearest.LeftPoint.X, nearest.RightPoint.X)
 
     let overlapping = Line(point 3.0 0.0, point 7.0 0.0)
-    let overlap = Intersections.segmentSegmentClosestPair horizontal overlapping |> Result.defaultWith (failwithf "%A")
+    let overlap = Distance.segmentSegmentClosestPair horizontal overlapping |> Result.defaultWith (failwithf "%A")
     Assert.Equal(0.0<length>, overlap.Distance)
 
 [<Fact>]

@@ -246,23 +246,23 @@ type BoundingBox =
 module BoundingBox =
     let fromPoint point = { Min = point; Max = point }
 
-    let union left right =
+    let internal union left right =
         { Min = Point.create (min left.Min.X right.Min.X) (min left.Min.Y right.Min.Y)
           Max = Point.create (max left.Max.X right.Max.X) (max left.Max.Y right.Max.Y) }
 
-    let center box =
+    let internal center box =
         Point.create ((box.Min.X + box.Max.X) / 2.0) ((box.Min.Y + box.Max.Y) / 2.0)
 
-    let width box = box.Max.X - box.Min.X
-    let height box = box.Max.Y - box.Min.Y
-    let taxicabDiameter box = width box + height box
+    let internal width box = box.Max.X - box.Min.X
+    let internal height box = box.Max.Y - box.Min.Y
+    let internal taxicabDiameter box = width box + height box
 
-    let unionMany boxes =
+    let internal unionMany boxes =
         match boxes with
         | [] -> None
         | first :: rest -> Some(List.fold union first rest)
 
-    let ofPoints points =
+    let internal ofPoints points =
         points |> List.map fromPoint |> unionMany
 
 [<Struct>]
@@ -306,7 +306,7 @@ module Segment =
         | CubicBezier(_, _, _, endPoint) -> endPoint
         | Arc endpoint -> endpoint.End
 
-    let boundingBox segment =
+    let internal boundingBox segment =
         match segment with
         | Line(startPoint, endPoint) ->
             Ok
@@ -332,8 +332,8 @@ module Segment =
         | CubicBezier(startPoint, control1, control2, endPoint) -> CubicBezier(endPoint, control2, control1, startPoint)
         | Arc endpoint -> Arc { endpoint with Start = endpoint.End; End = endpoint.Start; Sweep = not endpoint.Sweep }
 
-    let chordLength segment = Point.distance (start segment) (finish segment)
-    let chordLengthSquared segment = Point.squaredDistance (start segment) (finish segment)
+    let internal chordLength segment = Point.distance (start segment) (finish segment)
+    let internal chordLengthSquared segment = Point.squaredDistance (start segment) (finish segment)
 
     let withStart newStart segment =
         match segment with
@@ -683,21 +683,21 @@ module Segment =
 
     let directions segment t = directionsWith defaultDirectionOptions segment t
 
-    let defaultLengthOptions: LengthOptions =
+    let internal defaultLengthOptions: LengthOptions =
         { Tolerance = 1.0e-9<length>
           MaxDepth = 20 }
 
-    let defaultDistanceOptions =
+    let internal defaultDistanceOptions =
         { Samples = 100
           Tolerance = 1.0e-9<length>
           MaxIterations = 100 }
 
-    let defaultCrossingOptions =
+    let internal defaultCrossingOptions =
         { Samples = 100
           SignedLineDistanceTolerance = 1.0e-9<length>
           MaxIterations = 100 }
 
-    let defaultMinimizeOptions =
+    let internal defaultMinimizeOptions =
         { Samples = 100
           ParameterTolerance = 1.0e-9<parameter>
           MaxIterations = 100 }
@@ -710,7 +710,7 @@ module Segment =
         elif options.MaxIterations <= 0 then Error(InvalidCrossingMaxIterations options.MaxIterations)
         else Ok()
 
-    let crossingsWith segment (measure: Point<length> -> float<length>) (options: CrossingOptions) =
+    let internal crossingsWith segment (measure: Point<length> -> float<length>) (options: CrossingOptions) =
         let sameSign (a: float<length>) (b: float<length>) =
             (a < 0.0<length> && b < 0.0<length>)
             || (a > 0.0<length> && b > 0.0<length>)
@@ -751,9 +751,9 @@ module Segment =
                                 scan (index + 1) nextT nextValue found))
                 scan 1 0.0<parameter> firstValue []))
 
-    let crossings segment measure = crossingsWith segment measure defaultCrossingOptions
+    let internal crossings segment measure = crossingsWith segment measure defaultCrossingOptions
 
-    let minimizeWith segment measure (options: MinimizeOptions) =
+    let internal minimizeWith segment measure (options: MinimizeOptions) =
         let candidate (t: float<parameter>) = point segment t |> Result.map (fun point -> t, measure point)
         let best ((_, leftValue) as left) ((_, rightValue) as right) = if leftValue <= rightValue then left else right
         let ratio = 0.6180339887498949
@@ -799,7 +799,7 @@ module Segment =
                             |> Result.bind (fun windowBest -> scan (index + 1) nextT (best (best currentBest next) windowBest)))
                 scan 1 0.0<parameter> first)
 
-    let minimize segment measure = minimizeWith segment measure defaultMinimizeOptions
+    let internal minimize segment measure = minimizeWith segment measure defaultMinimizeOptions
 
     let private crossingRootError (error: RootError<length>) =
         match error with
@@ -955,7 +955,7 @@ module Segment =
 
     /// Find crossings between a segment and a ray's supporting line.
     /// Negative ray parameters represent crossings behind the ray origin.
-    let rayCrossingsWith
+    let internal rayCrossingsWith
         segment
         (origin: Point<length>)
         (direction: Point<1>)
@@ -988,7 +988,7 @@ module Segment =
 
     /// Find supporting-line crossings using default crossing options.
     /// Includes negative ray parameters, just like rayCrossingsWith.
-    let rayCrossings segment origin direction =
+    let internal rayCrossings segment origin direction =
         rayCrossingsWith segment origin direction defaultCrossingOptions
 
     let internal validateLengthOptions (options: LengthOptions) =
@@ -1048,14 +1048,14 @@ module Segment =
                 |> Result.bind (fun fb -> refine a b fa fm fb (simpson a b fa fm fb) options.Tolerance options.MaxDepth)))
 
     /// Approximate segment arc length with explicit error and depth controls.
-    let lengthWith segment (options: LengthOptions) =
+    let internal lengthWith segment (options: LengthOptions) =
         validateLengthOptions options
         |> Result.bind (fun () ->
             match segment with
             | Line(startPoint, endPoint) -> Ok(Point.distance startPoint endPoint)
             | _ -> curvedLengthWith segment options)
 
-    let length segment = lengthWith segment defaultLengthOptions
+    let internal length segment = lengthWith segment defaultLengthOptions
 
     let private validateLengthDistance distance segmentLength =
         if distance < 0.0<length> || distance > segmentLength then
@@ -1063,7 +1063,7 @@ module Segment =
         else Ok()
 
     /// Return the segment parameter at a traveled arc length.
-    let parameterAtLengthWith segment distance (options: LengthOptions) =
+    let internal parameterAtLengthWith segment distance (options: LengthOptions) =
         lengthWith segment options
         |> Result.bind (fun segmentLength ->
             validateLengthDistance distance segmentLength
@@ -1084,24 +1084,24 @@ module Segment =
                                 else search low middle (iterations - 1))
                         search 0.0<parameter> 1.0<parameter> 64))
 
-    let parameterAtLength segment distance = parameterAtLengthWith segment distance defaultLengthOptions
+    let internal parameterAtLength segment distance = parameterAtLengthWith segment distance defaultLengthOptions
 
-    let pointAtLengthWith segment distance (options: LengthOptions) =
+    let internal pointAtLengthWith segment distance (options: LengthOptions) =
         parameterAtLengthWith segment distance options |> Result.bind (point segment)
 
-    let pointAtLength segment distance = pointAtLengthWith segment distance defaultLengthOptions
+    let internal pointAtLength segment distance = pointAtLengthWith segment distance defaultLengthOptions
 
-    let derivativeAtLengthWith segment distance (options: LengthOptions) =
+    let internal derivativeAtLengthWith segment distance (options: LengthOptions) =
         parameterAtLengthWith segment distance options |> Result.bind (derivative segment)
 
-    let derivativeAtLength segment distance = derivativeAtLengthWith segment distance defaultLengthOptions
+    let internal derivativeAtLength segment distance = derivativeAtLengthWith segment distance defaultLengthOptions
 
-    let isZeroLength segment tolerance =
+    let internal isZeroLength segment tolerance =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
             Error(InvalidZeroLengthTolerance tolerance)
         else length segment |> Result.map (fun value -> value <= tolerance)
 
-    let betweenLengthsWith segment fromDistance toDistance options =
+    let internal betweenLengthsWith segment fromDistance toDistance options =
         lengthWith segment options
         |> Result.bind (fun segmentLength ->
             parameterAtLengthWith segment fromDistance options
@@ -1109,10 +1109,10 @@ module Segment =
                 parameterAtLengthWith segment toDistance options
                 |> Result.bind (fun toParameter -> between segment fromParameter toParameter)))
 
-    let betweenLengths segment fromDistance toDistance =
+    let internal betweenLengths segment fromDistance toDistance =
         betweenLengthsWith segment fromDistance toDistance defaultLengthOptions
 
-    let betweenLengthsManyWith segment distances options =
+    let internal betweenLengthsManyWith segment distances options =
         lengthWith segment options
         |> Result.bind (fun _ ->
             distances
@@ -1123,10 +1123,10 @@ module Segment =
                     |> Result.map (fun parameter -> parameter :: parameters))) (Ok [])
             |> Result.bind (List.rev >> betweenMany segment))
 
-    let betweenLengthsMany segment distances =
+    let internal betweenLengthsMany segment distances =
         betweenLengthsManyWith segment distances defaultLengthOptions
 
-    let subdivideToMaxLengthWith segment maxLength options =
+    let internal subdivideToMaxLengthWith segment maxLength options =
         if maxLength <= 0.0<length> || not (System.Double.IsFinite(float maxLength)) then
             Error(InvalidSubdivisionMaxLength maxLength)
         else
@@ -1140,7 +1140,7 @@ module Segment =
                     |> List.map (fun index -> if index = pieceCount then segmentLength else float index * step)
                     |> fun distances -> betweenLengthsManyWith segment distances options)
 
-    let subdivideToMaxLength segment maxLength =
+    let internal subdivideToMaxLength segment maxLength =
         subdivideToMaxLengthWith segment maxLength defaultLengthOptions
 
     let internal validateDistanceOptions (options: DistanceOptions) =
@@ -1225,7 +1225,7 @@ module Segment =
     /// arithmetic, not outward-rounded interval arithmetic, and can substantially
     /// overestimate length. Arcs rejected by `Segment.arcCenterData` return
     /// `DegenerateArc`; see that function for endpoint and radius restrictions.
-    let lengthUpperBound segment =
+    let internal lengthUpperBound segment =
         match segment with
         | Line(a,b) -> Ok(Point.distance a b)
         | QuadraticBezier(a,b,c) -> Ok(Point.distance a b + Point.distance b c)
@@ -1255,7 +1255,7 @@ module Segment =
     /// Boundary order is visually clockwise; prefer the point at fromT first
     /// when it is a hull vertex. Equal parameters return one point. Bounds use
     /// ordinary floating-point arithmetic, not outward-rounded arithmetic.
-    let boundingPolygonBetween segment fromT toT =
+    let internal boundingPolygonBetween segment fromT toT =
         if fromT < 0.0<parameter> || fromT > 1.0<parameter> || toT < 0.0<parameter> || toT > 1.0<parameter> then
             Error SplitOutsideSegment
         else
@@ -1300,7 +1300,7 @@ module Segment =
     /// This is an ordinary floating-point bound, not outward-rounded arithmetic.
     /// Arcs rejected by `Segment.arcCenterData` return `DegenerateArc`; see that function
     /// for endpoint and radius restrictions.
-    let boundingPolygon segment = boundingPolygonBetween segment 0.0<parameter> 1.0<parameter>
+    let internal boundingPolygon segment = boundingPolygonBetween segment 0.0<parameter> 1.0<parameter>
 
     let private tangentialErrorIsImproving segment previousT previousValue proposalT proposalValue =
         derivative segment previousT
@@ -1456,7 +1456,7 @@ module Segment =
                 scan 1 0.0<parameter> firstValue [ 1.0<parameter>; 0.0<parameter> ]
                 |> Result.bind (smallestProjection sample segment)))
 
-    let projectionWith target sample (options: DistanceOptions) =
+    let internal projectionWith target sample (options: DistanceOptions) =
         validateDistanceOptions options
         |> Result.bind (fun () ->
             match target with
@@ -1472,10 +1472,10 @@ module Segment =
             | QuadraticBezier _
             | CubicBezier _ -> bezierProjectionWith sample target options)
 
-    let projection target sample = projectionWith target sample defaultDistanceOptions
+    let internal projection target sample = projectionWith target sample defaultDistanceOptions
 
-    let distanceWith target sample options = projectionWith target sample options |> Result.map (fun (_, _, distance) -> distance)
-    let distance target sample = distanceWith target sample defaultDistanceOptions
+    let internal distanceWith target sample options = projectionWith target sample options |> Result.map (fun (_, _, distance) -> distance)
+    let internal distance target sample = distanceWith target sample defaultDistanceOptions
 
     let private controlDistanceToChord startPoint endPoint control =
         let chord = Point.displacement startPoint endPoint
@@ -1557,7 +1557,7 @@ module Segment =
 module Subpath =
     let private defaultWiggleTolerance = 1.0e-9<length>
 
-    let defaultParametricOptions<[<Measure>] 'Param> : ParametricOptions<'Param> =
+    let internal defaultParametricOptions<[<Measure>] 'Param> : ParametricOptions<'Param> =
         { Tolerance = 0.01<length>
           SamplesPerPiece = 5
           InitialPieceCount = 1
@@ -1877,7 +1877,7 @@ module Subpath =
     /// The interval restrictions are the same as for `Subpath.fromParametric`.
     /// Options must satisfy the constraints documented on `ParametricOptions`;
     /// invalid options, failed fits, and exhausted refinement return errors.
-    let fromParametricWith
+    let internal fromParametricWith
         (startValue: float<'Param>)
         (endValue: float<'Param>)
         (pointFunction: float<'Param> -> Point<length>)
@@ -1963,7 +1963,7 @@ module Subpath =
     /// `startValue` and `endValue` must be finite and unequal; descending intervals are allowed.
     /// Otherwise returns `InvalidParametricInterval`. Fitting and construction
     /// errors propagate; this function does not guarantee a successful fit.
-    let fromParametric startValue endValue pointFunction =
+    let internal fromParametric startValue endValue pointFunction =
         fromParametricWith startValue endValue pointFunction defaultParametricOptions
 
     let normalizeZeroLengthLines subpath =
@@ -2217,7 +2217,7 @@ module Subpath =
     /// Throws `System.ArgumentException` for an empty input list, a closed input subpath, or endpoint gaps
     /// that prevent continuous reconstruction. Use `Subpath.join` to handle errors.
     let assertJoin subpaths = assertJoinWith Strict subpaths
-    let boundingBox subpath =
+    let internal boundingBox subpath =
         match subpath.segmentList with
         | [] -> Error EmptySubpath
         | first :: rest ->
@@ -2428,7 +2428,7 @@ module Subpath =
                     validateClosed first first 0 (second :: rest)
                     |> Result.bind (fun () -> build (makePairs points @ [ List.last points, first ])))
 
-    let projectionWith (subpath: Subpath) sample options =
+    let internal projectionWith (subpath: Subpath) sample options =
         Segment.validateDistanceOptions options
         |> Result.bind (fun () ->
             let rec loop index (best: SubpathProjection option) (segments: Segment list) =
@@ -2449,14 +2449,14 @@ module Subpath =
                         loop (index + 1) best rest)
             loop 0 None subpath.segmentList)
 
-    let projection subpath sample = projectionWith subpath sample Segment.defaultDistanceOptions
+    let internal projection subpath sample = projectionWith subpath sample Segment.defaultDistanceOptions
 
-    let distanceWith subpath sample options =
+    let internal distanceWith subpath sample options =
         projectionWith subpath sample options |> Result.map _.Distance
 
-    let distance subpath sample = distanceWith subpath sample Segment.defaultDistanceOptions
+    let internal distance subpath sample = distanceWith subpath sample Segment.defaultDistanceOptions
 
-    let lengthWith subpath (options: LengthOptions) =
+    let internal lengthWith subpath (options: LengthOptions) =
         Segment.validateLengthOptions options
         |> Result.bind (fun () ->
             subpath.segmentList
@@ -2465,15 +2465,15 @@ module Subpath =
                 |> Result.bind (fun total ->
                     Segment.lengthWith segment options |> Result.map (fun value -> total + value))) (Ok 0.0<length>))
 
-    let length subpath = lengthWith subpath Segment.defaultLengthOptions
+    let internal length subpath = lengthWith subpath Segment.defaultLengthOptions
 
     /// Sum cheap segment length bounds. Empty subpaths return zero and the
     /// closed flag adds no implicit segment. See Segment.lengthUpperBound.
-    let lengthUpperBound subpath =
+    let internal lengthUpperBound subpath =
         subpath.segmentList |> List.fold (fun state segment ->
             state |> Result.bind (fun total -> Segment.lengthUpperBound segment |> Result.map (fun bound -> total + bound))) (Ok 0.0<length>)
 
-    let parameterAtLengthWith subpath distance (options: LengthOptions) =
+    let internal parameterAtLengthWith subpath distance (options: LengthOptions) =
         lengthWith subpath options
         |> Result.bind (fun total ->
             if List.isEmpty subpath.segmentList then Error EmptySubpath
@@ -2492,21 +2492,21 @@ module Subpath =
                             else locate (index + 1) (remaining - segmentLength) rest)
                 locate 0 distance subpath.segmentList)
 
-    let parameterAtLength subpath distance =
+    let internal parameterAtLength subpath distance =
         parameterAtLengthWith subpath distance Segment.defaultLengthOptions
 
-    let pointAtLengthWith subpath distance (options: LengthOptions) =
+    let internal pointAtLengthWith subpath distance (options: LengthOptions) =
         parameterAtLengthWith subpath distance options |> Result.bind (point subpath)
 
-    let pointAtLength subpath distance = pointAtLengthWith subpath distance Segment.defaultLengthOptions
+    let internal pointAtLength subpath distance = pointAtLengthWith subpath distance Segment.defaultLengthOptions
 
-    let derivativeAtLengthWith subpath distance (options: LengthOptions) =
+    let internal derivativeAtLengthWith subpath distance (options: LengthOptions) =
         parameterAtLengthWith subpath distance options |> Result.bind (derivative subpath)
 
-    let derivativeAtLength subpath distance =
+    let internal derivativeAtLength subpath distance =
         derivativeAtLengthWith subpath distance Segment.defaultLengthOptions
 
-    let isZeroLength subpath tolerance =
+    let internal isZeroLength subpath tolerance =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then
             Error(InvalidZeroLengthTolerance tolerance)
         elif List.isEmpty subpath.segmentList then Ok false
@@ -2515,25 +2515,25 @@ module Subpath =
             |> List.fold (fun state segment ->
                 state |> Result.bind (fun allZero -> if not allZero then Ok false else Segment.isZeroLength segment tolerance)) (Ok true)
 
-    let betweenLengthsWith subpath fromDistance toDistance options =
+    let internal betweenLengthsWith subpath fromDistance toDistance options =
         parameterAtLengthWith subpath fromDistance options
         |> Result.bind (fun fromParameter ->
             parameterAtLengthWith subpath toDistance options
             |> Result.bind (fun toParameter -> between subpath fromParameter toParameter))
 
-    let betweenLengths subpath fromDistance toDistance =
+    let internal betweenLengths subpath fromDistance toDistance =
         betweenLengthsWith subpath fromDistance toDistance Segment.defaultLengthOptions
 
-    let betweenLengthsManyWith subpath distances options =
+    let internal betweenLengthsManyWith subpath distances options =
         distances
         |> List.fold (fun state distance ->
             state |> Result.bind (fun parameters -> parameterAtLengthWith subpath distance options |> Result.map (fun value -> value :: parameters))) (Ok [])
         |> Result.bind (List.rev >> betweenMany subpath)
 
-    let betweenLengthsMany subpath distances =
+    let internal betweenLengthsMany subpath distances =
         betweenLengthsManyWith subpath distances Segment.defaultLengthOptions
 
-    let subdivideToMaxLengthWith subpath maxLength options =
+    let internal subdivideToMaxLengthWith subpath maxLength options =
         subpath.segmentList
         |> List.fold (fun state segment ->
             state
@@ -2542,7 +2542,7 @@ module Subpath =
                 |> Result.map (fun next -> pieces @ next))) (Ok [])
         |> Result.map (fun segments -> { subpath with segmentList = segments })
 
-    let subdivideToMaxLength subpath maxLength =
+    let internal subdivideToMaxLength subpath maxLength =
         subdivideToMaxLengthWith subpath maxLength Segment.defaultLengthOptions
 
     let toLinesWith options subpath =
@@ -2674,7 +2674,7 @@ module Path =
 
     let directions path parameterValue = directionsWith path parameterValue Segment.defaultDirectionOptions
 
-    let lengthWith path (options: LengthOptions) =
+    let internal lengthWith path (options: LengthOptions) =
         Segment.validateLengthOptions options
         |> Result.bind (fun () ->
             path.subpathList
@@ -2683,14 +2683,14 @@ module Path =
                 |> Result.bind (fun total ->
                     Subpath.lengthWith subpath options |> Result.map (fun value -> total + value))) (Ok 0.0<length>))
 
-    let length path = lengthWith path Segment.defaultLengthOptions
+    let internal length path = lengthWith path Segment.defaultLengthOptions
 
     /// Sum cheap subpath length bounds; empty paths and gaps contribute zero.
-    let lengthUpperBound path =
+    let internal lengthUpperBound path =
         path.subpathList |> List.fold (fun state subpath ->
             state |> Result.bind (fun total -> Subpath.lengthUpperBound subpath |> Result.map (fun bound -> total + bound))) (Ok 0.0<length>)
 
-    let parameterAtLengthWith path distance (options: LengthOptions) =
+    let internal parameterAtLengthWith path distance (options: LengthOptions) =
         lengthWith path options
         |> Result.bind (fun total ->
             if List.isEmpty path.subpathList then Error EmptyPath
@@ -2718,21 +2718,21 @@ module Path =
                                 else locate (remaining - subpathLength) rest)
                     locate distance nonempty)
 
-    let parameterAtLength path distance =
+    let internal parameterAtLength path distance =
         parameterAtLengthWith path distance Segment.defaultLengthOptions
 
-    let pointAtLengthWith path distance (options: LengthOptions) =
+    let internal pointAtLengthWith path distance (options: LengthOptions) =
         parameterAtLengthWith path distance options |> Result.bind (point path)
 
-    let pointAtLength path distance = pointAtLengthWith path distance Segment.defaultLengthOptions
+    let internal pointAtLength path distance = pointAtLengthWith path distance Segment.defaultLengthOptions
 
-    let derivativeAtLengthWith path distance (options: LengthOptions) =
+    let internal derivativeAtLengthWith path distance (options: LengthOptions) =
         parameterAtLengthWith path distance options |> Result.bind (derivative path)
 
-    let derivativeAtLength path distance =
+    let internal derivativeAtLength path distance =
         derivativeAtLengthWith path distance Segment.defaultLengthOptions
 
-    let projectionWith (path: Path) sample options =
+    let internal projectionWith (path: Path) sample options =
         match path.subpathList with
         | [] -> Error EmptyPath
         | subpaths ->
@@ -2757,14 +2757,14 @@ module Path =
                             loop (index + 1) best rest)
                 loop 0 None subpaths)
 
-    let projection path sample = projectionWith path sample Segment.defaultDistanceOptions
+    let internal projection path sample = projectionWith path sample Segment.defaultDistanceOptions
 
-    let distanceWith path sample options =
+    let internal distanceWith path sample options =
         projectionWith path sample options |> Result.map _.Distance
 
-    let distance path sample = distanceWith path sample Segment.defaultDistanceOptions
+    let internal distance path sample = distanceWith path sample Segment.defaultDistanceOptions
 
-    let subdivideToMaxLengthWith path maxLength options =
+    let internal subdivideToMaxLengthWith path maxLength options =
         path.subpathList
         |> List.fold (fun state subpath ->
             state
@@ -2773,10 +2773,10 @@ module Path =
                 |> Result.map (fun next -> next :: subpaths))) (Ok [])
         |> Result.map (fun reversed -> { subpathList = List.rev reversed })
 
-    let subdivideToMaxLength path maxLength =
+    let internal subdivideToMaxLength path maxLength =
         subdivideToMaxLengthWith path maxLength Segment.defaultLengthOptions
 
-    let boundingBox path =
+    let internal boundingBox path =
         match path.subpathList with
         | [] -> Error EmptyPath
         | subpaths ->

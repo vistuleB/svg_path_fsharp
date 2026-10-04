@@ -17,7 +17,7 @@ let private pointSupport point angle = Point.dot point (directionOf angle)
 
 let private segmentSupportPoint segment angle =
     let direction = directionOf angle
-    Segment.minimize segment (fun candidate -> -(float (Point.dot candidate direction)))
+    Fit.segmentMinimize segment (fun candidate -> -(float (Point.dot candidate direction)))
     |> Result.bind (Segment.point segment)
 
 let private originalSupportValue segment angle =
@@ -54,8 +54,8 @@ let private nearValue result expected =
     | Error _ -> false
 
 let private segmentBoxDiameter segment =
-    match Segment.boundingBox segment with
-    | Ok box -> Some(BoundingBox.taxicabDiameter box)
+    match Bounds.segmentBoundingBox segment with
+    | Ok box -> Some(Bounds.boundingBoxTaxicabDiameter box)
     | Error _ -> None
 
 let private supportTolerance segment =
@@ -505,7 +505,7 @@ let private adversarialSpecimens () =
 
 let private connectSegmentAfter segment endPoint =
     let start = Segment.start segment
-    Transform.translateSegment segment (endPoint.X - start.X) (endPoint.Y - start.Y)
+    Transform.segment segment (Transform.translate (endPoint.X - start.X) (endPoint.Y - start.Y))
     |> Result.mapError (fun _ -> ())
 
 let private transformedSpecimenVariants name segment =
@@ -513,13 +513,13 @@ let private transformedSpecimenVariants name segment =
         match transform () with
         | Ok segment -> Some(name + "_" + suffix, segment)
         | Error _ -> None
-    [ apply "translated" (fun () -> Transform.translateSegment segment (Length.fromFloat 37.0) (Length.fromFloat -19.0))
-      apply "rotated" (fun () -> Transform.rotateSegment segment (Degree.fromFloat 37.0))
-      apply "scaled" (fun () -> Transform.scaleSegment segment 1.7)
-      apply "reflected_x" (fun () -> Transform.scaleXYSegment segment -1.0 1.0)
-      apply "reflected_y" (fun () -> Transform.scaleXYSegment segment 1.0 -1.0)
-      apply "stretched" (fun () -> Transform.scaleXYSegment segment 0.25 3.0)
-      apply "skewed_x" (fun () -> Transform.skewXSegment segment (Degree.fromFloat 12.0)) ]
+    [ apply "translated" (fun () -> Transform.segment segment (Transform.translate (Length.fromFloat 37.0) (Length.fromFloat -19.0)))
+      apply "rotated" (fun () -> Transform.segment segment (Transform.rotate (Degree.fromFloat 37.0)))
+      apply "scaled" (fun () -> Transform.segment segment (Transform.scale 1.7))
+      apply "reflected_x" (fun () -> Transform.segment segment (Transform.scaleXY -1.0 1.0))
+      apply "reflected_y" (fun () -> Transform.segment segment (Transform.scaleXY 1.0 -1.0))
+      apply "stretched" (fun () -> Transform.segment segment (Transform.scaleXY 0.25 3.0))
+      apply "skewed_x" (fun () -> Transform.segment segment (Transform.skewX (Degree.fromFloat 12.0))) ]
     |> List.choose id
 
 let private transformedAdversarialSpecimens () =
@@ -684,16 +684,16 @@ let private representativeGeometryIsCovariantAtScale scale =
     let leftPath = rectanglePath 0.0 0.0 4.0 3.0
     let rightPath = rectanglePath 2.0 1.0 6.0 4.0
 
-    let scaledCubic = Transform.scaleSegment cubic scale |> Result.defaultWith (failwithf "%A")
+    let scaledCubic = Transform.segment cubic (Transform.scale scale) |> Result.defaultWith (failwithf "%A")
     let referencePoint =
         Segment.point cubic (Parameter.fromFloat 0.37) |> Result.defaultWith (failwithf "%A")
     let scaledPoint =
         Segment.point scaledCubic (Parameter.fromFloat 0.37)
         |> Result.defaultWith (failwithf "%A")
     let scaledCrossingLeft =
-        Transform.scaleSegment crossingLeft scale |> Result.defaultWith (failwithf "%A")
+        Transform.segment crossingLeft (Transform.scale scale) |> Result.defaultWith (failwithf "%A")
     let scaledCrossingRight =
-        Transform.scaleSegment crossingRight scale |> Result.defaultWith (failwithf "%A")
+        Transform.segment crossingRight (Transform.scale scale) |> Result.defaultWith (failwithf "%A")
     let intersectionOptions: Intersections.IntersectionOptions =
         { Tolerance = Length.fromFloat (1.0e-9 * scale)
           MaxDepth = 48
@@ -702,22 +702,22 @@ let private representativeGeometryIsCovariantAtScale scale =
         Intersections.segmentWith scaledCrossingLeft scaledCrossingRight intersectionOptions
         |> Result.defaultWith (failwithf "%A")
     let scaledOverlapLeft =
-        Transform.scaleSegment overlapLeft scale |> Result.defaultWith (failwithf "%A")
+        Transform.segment overlapLeft (Transform.scale scale) |> Result.defaultWith (failwithf "%A")
     let scaledOverlapRight =
-        Transform.scaleSegment overlapRight scale |> Result.defaultWith (failwithf "%A")
+        Transform.segment overlapRight (Transform.scale scale) |> Result.defaultWith (failwithf "%A")
     let overlapsResult =
         Overlaps.segmentWith scaledOverlapLeft scaledOverlapRight (Length.fromFloat (1.0e-9 * scale))
         |> Result.defaultWith (failwithf "%A")
     let referenceHull = ConvexHull.segment cubic |> Result.defaultWith (failwithf "%A")
     let scaledHull = ConvexHull.segment scaledCubic |> Result.defaultWith (failwithf "%A")
     let referenceHullBox =
-        Subpath.boundingBox referenceHull |> Result.defaultWith (failwithf "%A")
+        Bounds.subpathBoundingBox referenceHull |> Result.defaultWith (failwithf "%A")
     let scaledHullBox =
-        Subpath.boundingBox scaledHull |> Result.defaultWith (failwithf "%A")
+        Bounds.subpathBoundingBox scaledHull |> Result.defaultWith (failwithf "%A")
     let scaledLeftPath =
-        Transform.scalePath leftPath scale |> Result.defaultWith (failwithf "%A")
+        Transform.path leftPath (Transform.scale scale) |> Result.defaultWith (failwithf "%A")
     let scaledRightPath =
-        Transform.scalePath rightPath scale |> Result.defaultWith (failwithf "%A")
+        Transform.path rightPath (Transform.scale scale) |> Result.defaultWith (failwithf "%A")
     let unionResult =
         Csg.unionWith
             scaledLeftPath
@@ -726,7 +726,7 @@ let private representativeGeometryIsCovariantAtScale scale =
             ({ Tolerance = Length.fromFloat (1.0e-6 * scale)
                MinimumChord = Length.fromFloat (1.0e-5 * scale) }: Csg.Options)
         |> Result.defaultWith (failwithf "%A")
-    let unionBox = Path.boundingBox unionResult.Path |> Result.defaultWith (failwithf "%A")
+    let unionBox = Bounds.pathBoundingBox unionResult.Path |> Result.defaultWith (failwithf "%A")
 
     match intersectionsResult, overlapsResult with
     | [ intersection ], [ overlap ] ->

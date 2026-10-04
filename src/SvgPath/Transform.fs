@@ -69,12 +69,6 @@ module Transform =
                 |> Result.bind (fun () -> checkCorrespondence (point transform sourceC) targetC tolerance)
                 |> Result.map (fun () -> transform))
 
-    let translatePoint input x y = point (translate x y) input
-    let scalePoint input factor = point (scale factor) input
-    let scaleXYPoint input x y = point (scaleXY x y) input
-    let rotatePoint input degrees = point (rotate degrees) input
-    let skewXPoint input degrees = point (skewX degrees) input
-    let skewYPoint input degrees = point (skewY degrees) input
 
     let private validate transform =
         if Affine.isFinite transform then Ok transform else Error InvalidMatrix
@@ -124,12 +118,6 @@ module Transform =
         |> Result.mapError PathError
         |> Result.bind (fun box -> segment input (aboutPoint transform (anchorPoint box anchor)))
 
-    let translateSegment input x y = segment input (translate x y)
-    let scaleSegment input factor = segment input (scale factor)
-    let scaleXYSegment input x y = segment input (scaleXY x y)
-    let rotateSegment input degrees = segment input (rotate degrees)
-    let skewXSegment input degrees = segment input (skewX degrees)
-    let skewYSegment input degrees = segment input (skewY degrees)
 
     /// Transform a segment, allowing a collapsed arc to become one line segment.
     ///
@@ -226,12 +214,6 @@ module Transform =
         |> Result.mapError PathError
         |> Result.bind (fun box -> subpath input (aboutPoint transform (anchorPoint box anchor)))
 
-    let translateSubpath input x y = subpath input (translate x y)
-    let scaleSubpath input factor = subpath input (scale factor)
-    let scaleXYSubpath input x y = subpath input (scaleXY x y)
-    let rotateSubpath input degrees = subpath input (rotate degrees)
-    let skewXSubpath input degrees = subpath input (skewX degrees)
-    let skewYSubpath input degrees = subpath input (skewY degrees)
 
     let private transformPathWith transformSubpath input transform =
         validate transform
@@ -256,12 +238,6 @@ module Transform =
         |> Result.mapError PathError
         |> Result.bind (fun box -> path input (aboutPoint transform (anchorPoint box anchor)))
 
-    let translatePath input x y = path input (translate x y)
-    let scalePath input factor = path input (scale factor)
-    let scaleXYPath input x y = path input (scaleXY x y)
-    let rotatePath input degrees = path input (rotate degrees)
-    let skewXPath input degrees = path input (skewX degrees)
-    let skewYPath input degrees = path input (skewY degrees)
 
     let boundingBox (box: BoundingBox) transform : Result<BoundingBox, Error> =
         validate transform

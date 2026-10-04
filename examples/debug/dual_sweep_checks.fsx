@@ -53,7 +53,7 @@ invoke "dualFindExteriors" [|edges;box graph.Vertices;tolerance;box 1;sameList e
 sweep(line (p 0. 0.) (d 1. 0.)) |> error
 sweep(line (p 0. 0.) (d 0.6 0.8)) |> error
 let curve = QuadraticBezier(p -1. 1.,p 0. -1.,p 1. 1.)
-let bounds = Segment.boundingBox curve |> Result.defaultWith (failwithf "%A")
+let bounds = Bounds.segmentBoundingBox curve |> Result.defaultWith (failwithf "%A")
 let edge = record "DualSweepEdge" [|box 0;box 0;box 0;box 1;box curve;box bounds|]
 invoke "dualSweepEdgeHits" [|edge;line (p 0. 0.) (d 1. 0.);box 1e-9<length>|] |> error
 let closeA = record "DualSweepHit" [|box 0;box 0.0<length>;box 1e-8<length>;box 0;box 0;box 1|]

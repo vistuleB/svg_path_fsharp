@@ -76,10 +76,54 @@ let prepareForArcAverseConsumer input =
 - [Arrangement graphs](#arrangement-graphs) and [Boolean operations](#path-csg)
 - [README figures](#readme-figures) and [development](#development)
 
+## Migrating from 2.0 to 3.0
+
+This is an API reorganization; the geometry algorithms and supported operations
+are retained. Choose a module by the task, then the geometry prefix:
+
+| 2.0 entry point | 3.0 entry point |
+| --- | --- |
+| `Segment.length`, `Path.pointAtLength` | `Measure.segmentLength`, `Measure.pathPointAtLength` |
+| `Path.boundingBox` | `Bounds.pathBoundingBox` |
+| `WindingField.pathContainment` | `Containment.pathContainment` |
+| `Segment.projection` | `Distance.segmentProjection` |
+| `Intersections.pathPathClosestPair` | `Distance.pathPathClosestPair` |
+| `Subpath.fromParametric` | `Fit.subpathFromParametric` |
+| `Segment.minimize` | `Fit.segmentMinimize` |
+
+The corresponding `With` variants move with their operations. Geometry types,
+shared options/errors, construction, structural editing, and parameter-based
+evaluation remain in their existing locations. Low-level `Bezier` fitting is
+still available; `Fit` also exposes the constrained cubic fitting operations.
+
+Stroke widths are explicit arguments in every outline operation, including
+`With` variants. Replace `options.Width` with that argument and copy applicable
+fields from `options.Offset` directly into `Stroke.Options`. Offset trimming
+settings were ignored by strokes and are no longer accepted there.
+
+Transform shortcuts such as `translatePath` and `rotateSegment` are removed.
+Build a matrix, then apply it with `Transform.point`, `segment`, `subpath`, or
+`path`. For example:
+
+```fsharp
+Transform.path path (Transform.translate 10.0<length> 20.0<length>)
+Transform.segment segment (Transform.rotate 30.0<degree>)
+Transform.point (Transform.scale 2.0) point
+```
+
+All six matrix constructors remain, as do composition and transformations about
+anchors. Point application takes the matrix first; geometry application takes
+the geometry first, as in 2.0.
+
 ## Module Map
 
 - `SvgPath`: core `Path`, `Subpath`, `Segment`, `Point`, `FillRule`, and shared
   option and error types.
+- `Measure`: lengths, distance-addressed evaluation, and subdivision.
+- `Bounds`: bounding boxes and conservative bounding polygons.
+- `Containment`: point-in-path and winding queries.
+- `Distance`: point projections, distances, and closest pairs between geometry.
+- `Fit`: parametric curve construction and constrained fitting.
 - `Point`: vector-style helpers for `Point<length>` and other measured points.
 - `Parse` and `Serialize`: SVG path-data parsing and serialization.
 - `Affine`: raw six-value affine matrices, composition, and point mapping.
@@ -94,8 +138,7 @@ let prepareForArcAverseConsumer input =
 - `Area`: signed area and SVG fill-rule area for subpaths and paths.
 - `Clip`: curve clipping that keeps original geometry inside a filled clipping
   region without adding closure bridges.
-- `Intersections`: segment, subpath, and path point-intersection queries, plus
-  closest-point pair projections.
+- `Intersections`: segment, subpath, and path point-intersection queries.
 - `Overlaps`: continuous coincident intervals between segments, subpaths, and
   paths.
 - `Encounters`: combined continuous-overlap and isolated point-intersection
@@ -523,10 +566,10 @@ this section maps the available families.
 
 ### Bounding Boxes
 
-Use `Segment.boundingBox`, `Subpath.boundingBox`, and `Path.boundingBox` for
+Use `Bounds.segmentBoundingBox`, `Bounds.subpathBoundingBox`, and `Bounds.pathBoundingBox` for
 axis-aligned bounds. Line, Bezier, and arc extrema are included. Measure a box
-with `BoundingBox.width`, `BoundingBox.height`, `BoundingBox.center`, and
-`BoundingBox.taxicabDiameter`; the diameter is width plus height.
+with `Bounds.boundingBoxWidth`, `Bounds.boundingBoxHeight`, `Bounds.boundingBoxCenter`, and
+`Bounds.boundingBoxTaxicabDiameter`; the diameter is width plus height.
 
 ### Conditional Linearization
 
@@ -560,26 +603,26 @@ cubic approximation in both modes.
 
 ### Optimization Over Segments
 
-Use `Segment.minimize` to find the segment parameter where a scalar function of
+Use `Fit.segmentMinimize` to find the segment parameter where a scalar function of
 the segment point is minimized:
 
 ```fsharp
 let lowestPoint segment =
-    Segment.minimize segment (fun point -> float point.Y)
+    Fit.segmentMinimize segment (fun point -> float point.Y)
 ```
 
 The returned value is a segment parameter in `0.0<parameter>..1.0<parameter>`.
 You can pass it to `Segment.point` or `Segment.split`.
 
 Minimization is numerical and does not require a derivative. Use
-`Segment.minimizeWith` when the default sampling and tolerance are not
+`Fit.segmentMinimizeWith` when the default sampling and tolerance are not
 appropriate.
 
 ### Segment and Subpath Lengths
 
-Use `Segment.length`, `Subpath.length`, or `Path.length` to measure geometry.
+Use `Measure.segmentLength`, `Measure.subpathLength`, or `Measure.pathLength` to measure geometry.
 For cheap upper bounds without numerical integration, use
-`Segment.lengthUpperBound`, `Subpath.lengthUpperBound`, or `Path.lengthUpperBound`.
+`Measure.segmentLengthUpperBound`, `Measure.subpathLengthUpperBound`, or `Measure.pathLengthUpperBound`.
 These use control-polygon lengths for Beziers and angular travel times the
 larger ellipse radius for arcs; they may overestimate substantially and use
 ordinary floating-point arithmetic.
@@ -590,41 +633,41 @@ Length-address helpers convert traveled distances back to ordinary parameters
 and evaluated geometry:
 
 ```fsharp
-Segment.parameterAtLength segment 12.0<length>
-Segment.pointAtLength segment 12.0<length>
-Segment.derivativeAtLength segment 12.0<length>
-Segment.betweenLengths segment 12.0<length> 30.0<length>
-Segment.betweenLengthsMany segment [ 12.0<length>; 20.0<length>; 30.0<length> ]
+Measure.segmentParameterAtLength segment 12.0<length>
+Measure.segmentPointAtLength segment 12.0<length>
+Measure.segmentDerivativeAtLength segment 12.0<length>
+Measure.segmentBetweenLengths segment 12.0<length> 30.0<length>
+Measure.segmentBetweenLengthsMany segment [ 12.0<length>; 20.0<length>; 30.0<length> ]
 
-Subpath.parameterAtLength subpath 25.0<length>
-Subpath.pointAtLength subpath 25.0<length>
-Subpath.derivativeAtLength subpath 25.0<length>
-Subpath.betweenLengths subpath 25.0<length> 60.0<length>
-Subpath.betweenLengthsMany subpath [ 25.0<length>; 40.0<length>; 60.0<length> ]
+Measure.subpathParameterAtLength subpath 25.0<length>
+Measure.subpathPointAtLength subpath 25.0<length>
+Measure.subpathDerivativeAtLength subpath 25.0<length>
+Measure.subpathBetweenLengths subpath 25.0<length> 60.0<length>
+Measure.subpathBetweenLengthsMany subpath [ 25.0<length>; 40.0<length>; 60.0<length> ]
 
-Path.parameterAtLength path 40.0<length>
-Path.pointAtLength path 40.0<length>
-Path.derivativeAtLength path 40.0<length>
+Measure.pathParameterAtLength path 40.0<length>
+Measure.pathPointAtLength path 40.0<length>
+Measure.pathDerivativeAtLength path 40.0<length>
 ```
 
 ### Distances and Projections
 
-Use `Segment.distance` to measure the shortest distance from a point to a
-segment. Use `Segment.projection` when you also need the nearest segment
+Use `Distance.segmentDistance` to measure the shortest distance from a point to a
+segment. Use `Distance.segmentProjection` when you also need the nearest segment
 parameter and point:
 
 ```fsharp
 let distanceToSegment point segment =
-    Segment.distance point segment
+    Distance.segmentDistance point segment
 
 let nearestOnSegment point segment =
-    Segment.projection point segment
+    Distance.segmentProjection point segment
 
 let nearestOnPath point path =
-    Path.projection path point
+    Distance.pathProjection path point
 ```
 
-`Subpath.projection` and `Path.projection` lift the same idea to larger
+`Distance.subpathProjection` and `Distance.pathProjection` lift the same idea to larger
 structures and return public parameters. Move-only subpaths are skipped.
 
 ### Point Containment
@@ -632,8 +675,8 @@ structures and return public parameters. Move-only subpaths are skipped.
 Use containment helpers to classify a point relative to SVG fill geometry:
 
 ```fsharp
-WindingField.subpathContainment point subpath Nonzero
-WindingField.pathContainment point path EvenOdd
+Containment.subpathContainment point subpath Nonzero
+Containment.pathContainment point path EvenOdd
 ```
 
 The result and fill-rule types are:
@@ -739,16 +782,16 @@ edges.
 
 ## Crossings, Intersections, and Overlaps
 
-Use `Segment.crossings` to find parameter values where a scalar predicate
+Use `Containment.segmentCrossings` to find parameter values where a scalar predicate
 changes sign along a segment:
 
 ```fsharp
 let horizontalCrossings segment y =
-    Segment.crossings segment (fun point -> point.Y - y)
+    Containment.segmentCrossings segment (fun point -> point.Y - y)
 ```
 
 The returned values are segment parameters in `0.0<parameter>..1.0<parameter>`.
-Crossing detection is numerical and sampling-based; use `Segment.crossingsWith`
+Crossing detection is numerical and sampling-based; use `Containment.segmentCrossingsWith`
 to tune it.
 
 Use `Intersections.segment` to find point intersections between two segments:
@@ -1239,7 +1282,7 @@ join style defaults to bevel joins. Set `InnerJoin = Some Offset.InnerRound`
 or `Some Offset.InnerBevel` in `Offset.Options` to override that choice.
 `None` retains the style-dependent default. This applies independently to both
 band sides and to single offsets; it does not mean the caller-named inner
-offset. Stroke callers can set it through their nested `Offset` options.
+offset. Stroke callers set `Stroke.Options.InnerJoin` directly.
 
 Use `Offset.subpathUntrimmed`, `Offset.pathUntrimmed`, or their `With` variants
 to obtain the connected offset walks before topological trimming. These are
@@ -1359,19 +1402,22 @@ Stroke.segment (Line(a, b)) 2.0<length> Offset.Round Offset.Butt
 Stroke.subpath subpath 2.0<length> Offset.Round Offset.RoundCap
 Stroke.path path 2.0<length> (Offset.Miter 4.0) Offset.Square
 
-let options = { Stroke.defaultOptions with Width = 2.0<length> }
+let options =
+    { Stroke.defaultOptions with
+        Fitting = { Offset.defaultFittingOptions with Tolerance = 0.01<length> } }
 
-Stroke.subpathWith subpath Offset.Round Offset.RoundCap options
+Stroke.subpathWith subpath 2.0<length> Offset.Round Offset.RoundCap options
 ```
 
-`Stroke.Options` contains `Width` and technical `Offset` settings only.
-All outline operations require explicit join/cap arguments, including dashed
-strokes and forms without `With`. Pure dash extraction takes neither style.
+`Stroke.Options` contains four applicable technical controls: `Fitting`,
+`StalledOffsetDiameter`, `TangentHealAngleDegrees`, and `InnerJoin`.
+All outline operations require explicit width, join, and cap arguments, including
+dashed strokes and forms with `With`. Pure dash extraction takes neither style.
 
 Nonzero strokes delegate to bands with offsets `-Width/2` and `+Width/2`.
-Band construction owns normalization, sides, caps, and trimming. For
-compatibility, strokes disable both side-cusp passes and enable final in-band
-trimming, ignoring nested `BandTrimming` settings. Zero-length strokes retain
+Band construction owns normalization, sides, caps, and trimming. Strokes disable
+both side-cusp passes and enable final in-band trimming; these fixed settings
+are not exposed as stroke options. Zero-length strokes retain
 the cap-specific SVG point behavior.
 `DashOptions.LengthOptions` controls arc-length measurement; the corresponding
 corner-rounding field is `RoundCornerOptions.LengthOptions`.
@@ -1528,7 +1574,12 @@ For points away from a boundary:
 | `difference(left, right)` | it is inside `left` but not `right` |
 | `symmetricDifference(left, right)` | it is inside exactly one operand |
 
-Use the `With` variants with `CsgOptions` to choose the endpoint tolerance and
+Use `Csg.unionPath`, `intersectionPath`, `differencePath`,
+`symmetricDifferencePath`, or `nestedContoursPath` when only the output path is
+needed. Their `With` variants accept numerical options. The existing detailed
+operations retain both `Path` and `Build` for arrangement and source inspection.
+
+Use the `With` variants with `Csg.Options` to choose the endpoint tolerance and
 minimum atomic-edge length-upper-bound threshold (historically `MinimumChord`).
 Returned segments retain their source type where
 possible: lines remain lines, Beziers remain Beziers, and arcs remain arcs after

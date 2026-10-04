@@ -40,8 +40,8 @@ let ``negative zero sizes disable rendering`` () =
 let ``negative zero length returns exact start parameter`` () =
     let curve = QuadraticBezier(p 0. 0.,p 1. 1.,p 2. 0.)
     let subpath = Subpath.create [curve] |> unwrap
-    Assert.Equal(Ok 0.0<parameter>,Segment.parameterAtLength curve -0.0<length>)
-    Assert.Equal(Ok { SegmentIndex=0; T=0.0<parameter> },Subpath.parameterAtLength subpath -0.0<length>)
+    Assert.Equal(Ok 0.0<parameter>,Measure.segmentParameterAtLength curve -0.0<length>)
+    Assert.Equal(Ok { SegmentIndex=0; T=0.0<parameter> },Measure.subpathParameterAtLength subpath -0.0<length>)
 [<Fact>]
 let ``negative zero radius degenerates to line`` () =
     let start,finish = p 1. 1.,p 2. 2.

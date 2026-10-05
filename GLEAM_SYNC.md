@@ -2,6 +2,9 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
+- Gleam `20e01ee`: correct CSG build documentation and explain cap-dependent
+  trimming, historical join extensions, and the new migration steps.
+
 - Gleam `f767179`: named `Intersections.SegmentSubpathIntersection` records
   for intersection and encounter queries, preserving grouping and ordering.
 

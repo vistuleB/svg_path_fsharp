@@ -83,6 +83,8 @@ module Offset =
         | ConstructionFailed
 
     /// Join geometry inserted between adjacent offset segments.
+    /// MiterClip and Arcs are extensions based on historical SVG 2 proposals;
+    /// generated geometry does not require browser support for those styles.
     type Join =
         /// Continue source curvature with tangent circles, clipped at the limit.
         /// On the outer side, diverging rays and reversed endpoints use Round.

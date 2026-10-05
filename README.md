@@ -723,10 +723,10 @@ parameter and point:
 
 ```fsharp
 let distanceToSegment point segment =
-    Distance.segmentDistance point segment
+    Distance.segmentDistance segment point
 
 let nearestOnSegment point segment =
-    Distance.segmentProjection point segment
+    Distance.segmentProjection segment point
 
 let nearestOnPath point path =
     Distance.pathProjection path point
@@ -1305,7 +1305,9 @@ The `Join` cases are `Bevel`, `Miter miterLimit`, `MiterClip miterLimit`,
 are `Butt`, `Square`, and `RoundCap`. Segment offsets take only a join, used
 when degenerate normalization produces multiple traversals. Trimmed single
 offsets take a cap for their internal source-to-offset winding bands, not to
-add caps to the returned one-sided walk.
+add caps to the returned one-sided walk. With `InBandTrimming`, cap geometry
+changes the winding region used to classify survivors and can affect which
+pieces remain. Closed sources have no endpoint caps.
 
 `MiterClip limit` clips an over-limit tip perpendicular to the pivot-to-tip
 direction at `limit * abs(offset)`, rather than falling back immediately to
@@ -1595,7 +1597,7 @@ of a union remain available without rebuilding the arrangement:
 let output = Csg.union left right Nonzero
 
 // output.Path is the reconstructed result.
-// output.Build is the exact ArrangementGraphBuild used to compute it.
+// output.Build is the exact ArrangementSegmentBuild used to compute it.
 ```
 
 `CsgResult.Path` is the reconstructed output path. `CsgResult.Build` exposes the
@@ -1702,3 +1704,15 @@ remain descriptive aliases. Closest-pair results share
 `ClosestPair<'leftAddress, 'rightAddress>` with `LeftAt`, `RightAt`, `LeftPoint`,
 `RightPoint`, and `Distance`; segment addresses retain their parameter units.
 The existing geometry-specific pair type names remain aliases in `Intersections`.
+
+### Provisional v3 diagnostics and intersections
+
+`Csg.CsgArrangementError error` carries a stable `Arrangement.Error`, including
+invalid numerical values. Internal arrangement invariant failures remain
+summarized as `ConstructionFailed`. Offset and stroke fitting accept
+`MaxDepth` from 1 through 5; larger values previously acted as 5 and now return
+`Offset.InvalidMaxDepth`.
+
+`Intersections.segmentSubpath[With]` and `Encounters.segmentSubpath[With]` return
+`Intersections.SegmentSubpathIntersection` records with `Point`, `SegmentT`,
+and `SubpathParameters`. Grouping, ordering, and canonical addresses are unchanged.

@@ -1021,8 +1021,14 @@ let ``segment subpath intersections groups and orders results`` () =
         |> Result.defaultWith (failwithf "%A")
     let found = Intersections.segmentSubpath (line 20.0 0.0 0.0 0.0) source |> Result.defaultWith (failwithf "%A")
     Assert.Equal(2, found.Length)
-    let firstPoint, firstT, firstParameters = found[0]
-    let secondPoint, secondT, secondParameters = found[1]
+    let firstPointRecord = found[0]
+    let firstPoint = firstPointRecord.Point
+    let firstT = firstPointRecord.SegmentT
+    let firstParameters = firstPointRecord.SubpathParameters
+    let secondPointRecord = found[1]
+    let secondPoint = secondPointRecord.Point
+    let secondT = secondPointRecord.SegmentT
+    let secondParameters = secondPointRecord.SubpathParameters
     Assert.True(Point.near 1.0e-6<length> firstPoint (point 10.0 0.0))
     assertNear 0.5 firstT
     let expectedFirst: SubpathParameter list = [ { SegmentIndex = 2; T = 0.5<parameter> } ]
@@ -1036,7 +1042,10 @@ let ``segment subpath intersections groups and orders results`` () =
 let ``segment subpath intersections canonicalizes boundary aliases`` () =
     let middle = point 5.0 0.0
     let source = Subpath.create [ Line(point 0.0 -5.0, middle); Line(middle, point 10.0 -5.0) ] |> Result.defaultWith (failwithf "%A")
-    let foundPoint, segmentT, parameters = Intersections.segmentSubpath (line 0.0 0.0 10.0 0.0) source |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    let foundPointRecord = Intersections.segmentSubpath (line 0.0 0.0 10.0 0.0) source |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    let foundPoint = foundPointRecord.Point
+    let segmentT = foundPointRecord.SegmentT
+    let parameters = foundPointRecord.SubpathParameters
     Assert.True(Point.near 1.0e-6<length> foundPoint middle)
     assertNear 0.5 segmentT
     Assert.Equal<SubpathParameter list>([ { SegmentIndex = 1; T = 0.0<parameter> } ], parameters)
@@ -1048,7 +1057,10 @@ let ``segment subpath intersections canonicalizes closed boundary aliases`` () =
         Subpath.create [ Line(a, point 0.0 -5.0); line 0.0 -5.0 10.0 -5.0; Line(point 10.0 -5.0, a) ]
         |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
-    let foundPoint, segmentT, parameters = Intersections.segmentSubpath (line 0.0 0.0 10.0 0.0) source |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    let foundPointRecord = Intersections.segmentSubpath (line 0.0 0.0 10.0 0.0) source |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    let foundPoint = foundPointRecord.Point
+    let segmentT = foundPointRecord.SegmentT
+    let parameters = foundPointRecord.SubpathParameters
     Assert.True(Point.near 1.0e-6<length> foundPoint a)
     assertNear 0.5 segmentT
     Assert.Equal<SubpathParameter list>([ { SegmentIndex = 0; T = 0.0<parameter> } ], parameters)

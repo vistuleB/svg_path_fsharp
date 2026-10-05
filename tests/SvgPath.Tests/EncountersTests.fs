@@ -330,9 +330,9 @@ module EncountersTests =
         Assert.Equal((p 0.0, p 0.5, p 0.0, p 1.0),
                      (piece.Correspondence.LeftFrom, piece.Correspondence.LeftTo,
                       piece.Correspondence.RightFrom, piece.Correspondence.RightTo))
-        let expected: (Point<length> * float<parameter> * SubpathParameter list) list =
-            [ point 5.0<length> 0.0<length>, p 0.5, [ at 1 0.0 ]
-              point 7.5<length> 0.0<length>, p 0.75, [ at 2 0.5 ] ]
+        let expected: Intersections.SegmentSubpathIntersection list =
+            [ { Point = point 5.0<length> 0.0<length>; SegmentT = p 0.5; SubpathParameters = [ at 1 0.0 ] }
+              { Point = point 7.5<length> 0.0<length>; SegmentT = p 0.75; SubpathParameters = [ at 2 0.5 ] } ]
         Assert.True((expected = found.Intersections))
 
     [<Fact>]

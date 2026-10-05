@@ -21,6 +21,13 @@ module Intersections =
           DiscardedCrossing: int; DiscardedOther: int; PeakRetained: int; DiscardedCandidates: int }
 
     [<Struct>]
+    /// A segment address and all canonical subpath addresses at one point.
+    type SegmentSubpathIntersection =
+        { Point: Point<length>
+          SegmentT: float<parameter>
+          SubpathParameters: SubpathParameter list }
+
+    [<Struct>]
     type SubpathIntersection =
         { Point: Point<length>
           LeftParameters: SubpathParameter list
@@ -1487,7 +1494,7 @@ module Intersections =
         |> Result.map (List.map (fun (intersection: SubpathIntersection) ->
             let segmentParameters = intersection.LeftParameters |> List.map (fun value -> value.T)
             let segmentParameter = segmentParameters |> List.tryHead |> Option.defaultValue 0.0<parameter>
-            intersection.Point, segmentParameter, intersection.RightParameters))
+            { Point = intersection.Point; SegmentT = segmentParameter; SubpathParameters = intersection.RightParameters }))
 
     let segmentSubpathWith segmentValue subpathValue options =
         subpathWith (Subpath.ofSegment segmentValue) subpathValue options
@@ -1497,7 +1504,7 @@ module Intersections =
                 |> List.tryHead
                 |> Option.map (fun value -> value.T)
                 |> Option.defaultValue 0.0<parameter>
-            intersection.Point, segmentParameter, intersection.RightParameters))
+            { Point = intersection.Point; SegmentT = segmentParameter; SubpathParameters = intersection.RightParameters }))
 
     let segmentSubpath segmentValue subpathValue =
         segmentSubpathWith segmentValue subpathValue defaultOptions

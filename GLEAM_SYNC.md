@@ -2,6 +2,9 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
+- Gleam `f767179`: named `Intersections.SegmentSubpathIntersection` records
+  for intersection and encounter queries, preserving grouping and ordering.
+
 - Gleam `0af6fc8`: reject offset/stroke fitting depths outside 1–5.
 
 - Gleam `b1f4d1a`: CSG preserves stable arrangement error payloads.

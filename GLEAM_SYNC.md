@@ -1,6 +1,6 @@
 # Gleam commit-by-commit synchronization
 
-## v3.0.0 API alignment (unreleased)
+## v3.0.0 API alignment (2026-10-05)
 
 - `24546fa`: explicit stroke widths and applicable stroke options.
 - `372c73c`: operation modules and path-only CSG results.
@@ -11,11 +11,11 @@
 F# retains existing argument order and units of measure. Numerical implementations
 remain internal in the core compilation units; the new operation modules expose
 them without public aliases at the former locations. README artwork is unchanged
-and remains pinned to the immutable `assets-v2.0.0` tag.
+and is pinned to the immutable `assets-v3.0.0` tag.
 
-Verification after mirroring `4f2c7c3`:
+Release verification (Gleam release commit `f7e2ca1`):
 
-- `scripts/test-all`: 1,861 fast and 26 slow tests passed.
+- `scripts/test-release`: 1,861 fast and 26 slow tests passed.
 - `scripts/check-readme-recipes`: README and compiled recipe source match.
 - The tests verify the two-field closest-pair record, module ownership, and
   validation across all six configurable pair operations.

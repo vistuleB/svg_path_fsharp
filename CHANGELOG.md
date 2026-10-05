@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.0 - Unreleased
+## 3.0.0 - 2026-10-05
 
 - Group measurement, bounds, containment, distance/projection, and fitting APIs
   into `Measure`, `Bounds`, `Containment`, `Distance`, and `Fit`. Relocated
@@ -16,6 +16,11 @@
 - Remove 24 transform shortcuts; construct a matrix and apply it to geometry.
 - Update tests, figure generators, README examples, and migration guidance.
   Geometry algorithms and units of measure are retained.
+
+- Release verification: `scripts/test-release` passed 1,861 fast and 26 slow
+  tests. All 13 README figures regenerated unchanged and match the artwork
+  pinned by `assets-v3.0.0`; the gallery generator also builds.
+- Updated the NuGet README to immutable 3.0.0 asset and recipe-source links.
 
 ## 2.0.0 - 2026-09-16
 

@@ -17,7 +17,7 @@ let private figureEightBand () =
         (figureEight ())
         18.0<length>
         34.0<length> Offset.Round Offset.Butt
-        Offset.defaultOptions
+        Offset.defaultOptions Offset.defaultBandTrimming
     |> Result.defaultWith (failwithf "%A")
 
 let private supportValue segments angle =

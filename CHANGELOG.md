@@ -2,12 +2,24 @@
 
 ## 3.0.0 - 2026-10-05
 
+Provisional refinements mirrored from Gleam through `92f36e4`:
+
+- Rename subpath partitioning to `Subpath.splitMany` and
+  `Measure.subpathSplitAtLengths[With]`; retain segment interval extraction.
+- Share generic `Projection` and `ClosestPair` records, retaining measured
+  addresses and descriptive aliases; segment projections no longer return tuples.
+- Remove redundant stroke style aliases; label every SVG drawing field.
+- Rename `MinimumChord` to `MinimumLength` and preserve CSG arrangement diagnostics.
+- Reject offset/stroke fitting depths outside 1–5.
+- Return named segment–subpath intersection records, including encounters.
+- Share `Offset.Options` across offsets and strokes. Pass trimming separately
+  to trimmed offset `With` calls; preserve ordinary defaults and stroke policy.
+
 - Group measurement, bounds, containment, distance/projection, and fitting APIs
   into `Measure`, `Bounds`, `Containment`, `Distance`, and `Fit`. Relocated
   entry points are no longer public in their former modules.
-- Make stroke width explicit in all `With` outline operations and flatten
-  `Stroke.Options` to its four applicable technical controls. Remove ignored
-  offset trimming settings from stroke configuration.
+- Make stroke width explicit in all `With` outline operations; shared
+  `Offset.Options` contains only applicable construction controls.
 - Give closest-pair searches `Distance.ClosestPairOptions` with measured
   `Tolerance` and `MaxDepth`, removing the unused `ParameterSnap` field.
 - Document option applicability and add three compiled README recipes with
@@ -17,7 +29,7 @@
 - Update tests, figure generators, README examples, and migration guidance.
   Geometry algorithms and units of measure are retained.
 
-- Release verification: `scripts/test-release` passed 1,861 fast and 26 slow
+- Release verification: `scripts/test-release` passed 1,866 fast and 26 slow
   tests. All 13 README figures regenerated unchanged and match the artwork
   pinned by `assets-v3.0.0`; the gallery generator also builds.
 - Updated the NuGet README to immutable 3.0.0 asset and recipe-source links.

@@ -7,8 +7,8 @@ open Drawing
 module Fixtures =
     let private sourceStyle = "fill:none;stroke:#94a3b8;stroke-width:.055;stroke-linejoin:round"
     let private resultStyle = "fill:none;stroke:#2563eb;stroke-width:.04;stroke-linecap:round;stroke-linejoin:round"
-    let private offset options distance join cap source = Offset.pathWith source distance join cap options |> require "offset"
-    let private band options inner outer join cap source = Offset.subpathBandWith source inner outer join cap options |> require "band"
+    let private offset options trimming distance join cap source = Offset.pathWith source distance join cap options trimming |> require "offset"
+    let private band options trimming inner outer join cap source = Offset.subpathBandWith source inner outer join cap options trimming |> require "band"
 
     let zeroLengthClosepath () =
         let samples = [ "M90 50","round"; "M260 50L260 50","round"; "M90 120","square"; "M260 120L260 120","square"; "M90 230","round"; "M260 230Z","round"; "M90 300","square"; "M260 300Z","square" ]
@@ -20,8 +20,9 @@ module Fixtures =
         let source = parse "M0 -1L-.8660254 -.5L.8660254 .5L.8660254 -.5L-.8660254 .5L0 1"
         [ Offset.NoTrimming,"No final trimming"; Offset.CuspTrimming,"Cusp trimming"; Offset.InBandTrimming,"In-band trimming" ]
         |> List.mapi (fun i (finish,title) ->
-            let options = { Offset.defaultOptions with Offset.SingleOffsetTrimming=({Offside=false;FinalTrimming=finish}: Offset.SingleOffsetTrimming) }
-            let answer = offset options 0.2<length> Offset.Round Offset.Butt source
+            let optionsTrimming = ({Offside=false;FinalTrimming=finish}: Offset.SingleOffsetTrimming)
+            let options = Offset.defaultOptions
+            let answer = offset options optionsTrimming 0.2<length> Offset.Round Offset.Butt source
             let x = 175 + i*350
             String.concat "\n" [label x 30 title; panelPath x 170 90.0 source sourceStyle; panelPath x 170 90.0 answer resultStyle])
         |> String.concat "\n" |> document 1050 320
@@ -30,8 +31,9 @@ module Fixtures =
         let source = parse "M-2 -1.5H2V1.5H-2ZM-1 -.5V.5H1V-.5Z"
         [false,"offside: False";true,"offside: True"]
         |> List.mapi (fun i (offside,title) ->
-            let options = {Offset.defaultOptions with Offset.SingleOffsetTrimming=({Offside=offside;FinalTrimming=Offset.NoTrimming}: Offset.SingleOffsetTrimming)}
-            let answer = offset options 1.2<length> Offset.Round Offset.Butt source
+            let optionsTrimming = ({Offside=offside;FinalTrimming=Offset.NoTrimming}: Offset.SingleOffsetTrimming)
+            let options = Offset.defaultOptions
+            let answer = offset options optionsTrimming 1.2<length> Offset.Round Offset.Butt source
             let x=300+i*600
             String.concat "\n" [label x 32 title;panelPath x 190 75.0 source sourceStyle;panelPath x 190 75.0 answer resultStyle])
         |> String.concat "\n" |> document 1200 380
@@ -40,8 +42,9 @@ module Fixtures =
     let bandCuspTrimming () =
         [true,true,"inner_cusps: True · outer_cusps: True";false,true,"inner_cusps: False · outer_cusps: True";false,false,"inner_cusps: False · outer_cusps: False"]
         |> List.mapi(fun i (inner,outer,title) ->
-            let options={Offset.defaultOptions with Offset.BandTrimming=({InnerCusps=inner;OuterCusps=outer;InBand=true}: Offset.BandTrimming)}
-            let answer=band options 1.6<length> 1.8<length> Offset.Round Offset.Butt concaveSquare
+            let optionsTrimming = ({InnerCusps=inner;OuterCusps=outer;InBand=true}: Offset.BandTrimming)
+            let options = Offset.defaultOptions
+            let answer=band options optionsTrimming 1.6<length> 1.8<length> Offset.Round Offset.Butt concaveSquare
             let x=70+i*420
             let legend = (label (x+140) 30 title).Replace("font-size=\"18\"", "font-size=\"21.78\"")
             String.concat "\n" [legend;panelPath x 95 65.0 answer "fill:#fdba74;fill-opacity:.55;stroke:#c2410c;stroke-width:.025";panelPath x 95 65.0 (Path.ofSubpaths[concaveSquare]) sourceStyle])
@@ -51,8 +54,9 @@ module Fixtures =
     let bandInBandTrimming () =
         [false,"in_band: False";true,"in_band: True"]
         |> List.mapi(fun i (inBand,title) ->
-            let options={Offset.defaultOptions with Offset.BandTrimming=({InnerCusps=true;OuterCusps=true;InBand=inBand}: Offset.BandTrimming)}
-            let answer=band options 18.0<length> 34.0<length> Offset.Round Offset.Butt figureEight
+            let optionsTrimming = ({InnerCusps=true;OuterCusps=true;InBand=inBand}: Offset.BandTrimming)
+            let options = Offset.defaultOptions
+            let answer=band options optionsTrimming 18.0<length> 34.0<length> Offset.Round Offset.Butt figureEight
             let x=320+i*640
             String.concat "\n" [label x 32 title;panelPath x 220 0.78 answer "fill:#bbf7d0;stroke:#14532d;stroke-width:1.782";panelPath x 220 0.78 (Path.ofSubpaths[figureEight]) "fill:none;stroke:#be123c;stroke-width:2;stroke-dasharray:7 6"])
         |> String.concat "\n" |> document 1280 440

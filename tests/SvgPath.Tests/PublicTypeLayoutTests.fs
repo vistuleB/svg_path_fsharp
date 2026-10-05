@@ -8,7 +8,6 @@ let ``operation types belong to their operation modules`` () =
     let expected =
         [ typeof<Distance.ClosestPairOptions>, "SvgPath.Distance"
           typeof<Stroke.Error>, "SvgPath.Stroke"
-          typeof<Stroke.Options>, "SvgPath.Stroke"
           typeof<Stroke.DashOptions>, "SvgPath.Stroke"
           typeof<Offset.Error>, "SvgPath.Offset"
           typeof<Offset.Options>, "SvgPath.Offset"
@@ -40,7 +39,7 @@ let ``root namespace retains geometry but not old operation aliases`` () =
 
 [<Fact>]
 let ``qualified style and option types are usable together`` () =
-    let options: Stroke.Options = Stroke.defaultOptions
+    let options: Offset.Options = Offset.defaultOptions
     let fitting: Offset.FittingOptions = options.Fitting
     let join: Offset.Join = Offset.Round
     let cap: Offset.Cap = Offset.Butt
@@ -70,7 +69,7 @@ let ``v3 operation modules replace the former public entry points`` () =
     for operation in [ "translate"; "scale"; "scaleXY"; "rotate"; "skewX"; "skewY" ] do
         for geometry in [ "Point"; "Segment"; "Subpath"; "Path" ] do
             Assert.DoesNotContain(operation + geometry, transforms)
-    let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields typeof<Stroke.Options>
+    let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields typeof<Offset.Options>
     Assert.Equal<string list>(["Fitting"; "StalledOffsetDiameter"; "TangentHealAngleDegrees"; "InnerJoin"], fields |> Array.map _.Name |> Array.toList)
 
 [<Fact>]
@@ -113,3 +112,34 @@ let ``projection helpers compose across address types`` () =
     Assert.Equal(0.4<parameter>, segment.At)
     let pair = Distance.segmentPathClosestPair line path |> Result.defaultWith (failwithf "%A")
     Assert.Equal(0.0<length>, pairDistance pair)
+
+[<Fact>]
+let ``explicit offset policies preserve default entry points`` () =
+    let source = Subpath.assertCreate [Line(Point.create 0.0<length> 0.0<length>, Point.create 10.0<length> 0.0<length>)]
+    let path = Path.singleton source
+    let options = Offset.defaultOptions
+    let single = Offset.defaultSingleOffsetTrimming
+    let band = Offset.defaultBandTrimming
+    let check expected actual =
+        Assert.True(Result.isOk actual)
+        Assert.Equal(expected, actual)
+    check (Offset.subpath source 1.0<length> Offset.Round Offset.Butt)
+          (Offset.subpathWith source 1.0<length> Offset.Round Offset.Butt options single)
+    check (Offset.path path 1.0<length> Offset.Round Offset.Butt)
+          (Offset.pathWith path 1.0<length> Offset.Round Offset.Butt options single)
+    check (Offset.subpathBand source -1.0<length> 1.0<length> Offset.Round Offset.Butt)
+          (Offset.subpathBandWith source -1.0<length> 1.0<length> Offset.Round Offset.Butt options band)
+    check (Offset.pathBand path -1.0<length> 1.0<length> Offset.Round Offset.Butt)
+          (Offset.pathBandWith path -1.0<length> 1.0<length> Offset.Round Offset.Butt options band)
+    check (Stroke.path path 2.0<length> Offset.Round Offset.Butt)
+          (Stroke.pathWith path 2.0<length> Offset.Round Offset.Butt options)
+
+[<Fact>]
+let ``path bands pass custom trimming to every source`` () =
+    let path = Parse.path "M0 0H10V10 M20 0H30V10" |> Result.defaultWith (failwithf "%A")
+    let options = Offset.defaultOptions
+    let trimming : Offset.BandTrimming = {InnerCusps=false; OuterCusps=false; InBand=false}
+    let expected = path.Subpaths |> List.collect (fun source ->
+        Offset.subpathBandWith source -1.0<length> 1.0<length> Offset.Round Offset.Square options trimming
+        |> Result.defaultWith (failwithf "%A") |> Path.subpaths) |> Path.ofSubpaths
+    Assert.Equal(Ok expected, Offset.pathBandWith path -1.0<length> 1.0<length> Offset.Round Offset.Square options trimming)

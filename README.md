@@ -38,7 +38,7 @@ measure added to audit scalar usage.
 
 Public operation types live in their corresponding modules, following the
 Gleam API's organization: for example, `Offset.Options`, `Offset.Error`,
-`Stroke.Options`, and `Stroke.Error`. Shared geometry types such as `Point`,
+`Offset.Options`, and `Stroke.Error`. Shared geometry types such as `Point`,
 `Segment`, `Subpath`, `Path`, and `Affine` live directly in `SvgPath`.
 One `open SvgPath` makes both the geometry types and operation modules available.
 
@@ -98,7 +98,7 @@ still available; `Fit` also exposes the constrained cubic fitting operations.
 
 Stroke widths are explicit arguments in every outline operation, including
 `With` variants. Replace `options.Width` with that argument and copy applicable
-fields from `options.Offset` directly into `Stroke.Options`. Offset trimming
+fields from `options.Offset` directly into `Offset.Options`. Offset trimming
 settings were ignored by strokes and are no longer accepted there.
 
 Transform shortcuts such as `translatePath` and `rotateSegment` are removed.
@@ -129,9 +129,9 @@ Some controls apply only to specific geometry or stages:
 | Controls | Applicability |
 | --- | --- |
 | `DistanceOptions.Samples` | Arc and sampling-based projection; Bezier projection uses polynomial root isolation. |
-| `Offset.Options.SingleOffsetTrimming` / `BandTrimming` | Single-offset operations use the first; band operations use the second. |
-| `Offset.FittingOptions.MaxDepth` | The pipeline also caps refinement at five generations. |
-| `Stroke.Options` | Fitting, stalled-offset diameter, tangent healing, and inner joins; trimming is fixed. |
+| Offset trimming arguments | Trimmed single-offset `With` calls take `SingleOffsetTrimming`; band `With` calls take `BandTrimming`, separately from construction options. |
+| `Offset.FittingOptions.MaxDepth` | Depth must be in 1–5; other values return `InvalidMaxDepth`. |
+| `Offset.Options` | Fitting, stalled-offset diameter, tangent healing, and inner joins; trimming is fixed. |
 | `Clip.Options.Tolerance` | Arc-length separation for merging cuts, and start-point sampling for pieces no longer than this tolerance. Intersection and containment controls are separate. |
 | `Csg.Options.MinimumLength` | A segment-length upper-bound threshold for discarding refined pieces, despite its legacy name. |
 
@@ -348,7 +348,11 @@ Subpath.derivative subpath at
 Subpath parameters are strict: `SegmentIndex` must address a real segment and
 `T` must be inside `0.0<parameter>..1.0<parameter>`. Unlike segment parameters,
 subpath parameters do not extrapolate beyond a segment. The split helpers only
-return positive-length pieces.
+return positive-length pieces. `Subpath.splitMany` partitions an open subpath
+into all pieces, including those before and after the supplied addresses; an
+empty address list returns the original open subpath. For closed subpaths,
+no addresses returns no pieces, and one address opens the entire loop there.
+`Segment.betweenMany` remains adjacent-interval extraction.
 
 Use `Subpath.create` to construct an open subpath from a nonempty list of
 contiguous segments. `Subpath.close` marks it closed, requiring its end to
@@ -1349,7 +1353,7 @@ join style defaults to bevel joins. Set `InnerJoin = Some Offset.InnerRound`
 or `Some Offset.InnerBevel` in `Offset.Options` to override that choice.
 `None` retains the style-dependent default. This applies independently to both
 band sides and to single offsets; it does not mean the caller-named inner
-offset. Stroke callers set `Stroke.Options.InnerJoin` directly.
+offset. Stroke callers set `Offset.Options.InnerJoin` directly.
 
 Use `Offset.subpathUntrimmed`, `Offset.pathUntrimmed`, or their `With` variants
 to obtain the connected offset walks before topological trimming. These are
@@ -1363,11 +1367,10 @@ but no cap. The offset-map helpers take neither style.
 `SingleOffsetTrimming` controls two consecutive stages:
 
 ```fsharp
-let options =
-    { Offset.defaultOptions with
-        Offset.SingleOffsetTrimming =
-            { Offside = true
-               FinalTrimming = Offset.InBandTrimming } }
+let trimming : Offset.SingleOffsetTrimming =
+    { Offside = true; FinalTrimming = Offset.InBandTrimming }
+Offset.subpathWith subpath 12.0<length> Offset.Round Offset.Butt
+    Offset.defaultOptions trimming
 ```
 
 `Offside` applies only to closed source subpaths. The source and its offset
@@ -1420,12 +1423,10 @@ are closed.
 Band trimming has three independent Boolean controls:
 
 ```fsharp
-let options =
-    { Offset.defaultOptions with
-        Offset.BandTrimming =
-            { InnerCusps = true
-              OuterCusps = true
-              InBand = true } }
+let trimming : Offset.BandTrimming =
+    { InnerCusps = true; OuterCusps = true; InBand = true }
+Offset.subpathBandWith subpath -6.0<length> 6.0<length> Offset.Round Offset.Butt
+    Offset.defaultOptions trimming
 ```
 
 - `InnerCusps` applies side-local cusp trimming to the caller-designated inner
@@ -1460,7 +1461,7 @@ disconnected loops that the default pipeline removes.
 ## Stroke Outlines and Dashes
 
 `Stroke` is a small public wrapper over symmetric offset bands. It
-uses `Stroke.Options` and dash options rather than exposing every
+uses `Offset.Options` and dash options rather than exposing every
 offset-specific detail at the top level. The join and cap styles use the same
 `Join` and `Cap` types as `Offset`.
 
@@ -1470,13 +1471,13 @@ Stroke.subpath subpath 2.0<length> Offset.Round Offset.RoundCap
 Stroke.path path 2.0<length> (Offset.Miter 4.0) Offset.Square
 
 let options =
-    { Stroke.defaultOptions with
+    { Offset.defaultOptions with
         Fitting = { Offset.defaultFittingOptions with Tolerance = 0.01<length> } }
 
 Stroke.subpathWith subpath 2.0<length> Offset.Round Offset.RoundCap options
 ```
 
-`Stroke.Options` contains four applicable technical controls: `Fitting`,
+`Offset.Options` contains four applicable technical controls: `Fitting`,
 `StalledOffsetDiameter`, `TangentHealAngleDegrees`, and `InnerJoin`.
 All outline operations require explicit width, join, and cap arguments, including
 dashed strokes and forms with `With`. Pure dash extraction takes neither style.
@@ -1716,3 +1717,13 @@ summarized as `ConstructionFailed`. Offset and stroke fitting accept
 `Intersections.segmentSubpath[With]` and `Encounters.segmentSubpath[With]` return
 `Intersections.SegmentSubpathIntersection` records with `Point`, `SegmentT`,
 and `SubpathParameters`. Grouping, ordering, and canonical addresses are unchanged.
+
+### Shared construction options and explicit trimming
+
+`Offset.Options` is shared by offset and stroke. Replace the former
+`Stroke.Options` and `Stroke.defaultOptions` with `Offset.Options` and
+`Offset.defaultOptions`. Move a former `SingleOffsetTrimming` or `BandTrimming`
+field into the final `trimming` argument of the applicable offset `With` call.
+Use `Offset.defaultSingleOffsetTrimming` or `Offset.defaultBandTrimming` to keep
+the ordinary behavior. Entry points without `With` keep their signatures and
+default behavior; segment and untrimmed calls need no trimming policy.

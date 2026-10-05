@@ -13,11 +13,12 @@ module ArrangementCapture =
         let document = XDocument.Load(System.IO.Path.Combine(__SOURCE_DIRECTORY__,"Inputs/package_title.svg"))
         let sourceNode = document.Descendants(XName.Get("path","http://www.w3.org/2000/svg")) |> Seq.head
         let source = parse (sourceNode.Attribute(XName.Get "d").Value)
-        let first = Offset.pathWith source 1.05<length> (Offset.Miter 4.0) Offset.Butt Offset.defaultOptions |> require "first offset"
-        let options = {Offset.defaultOptions with Offset.SingleOffsetTrimming={Offset.defaultOptions.SingleOffsetTrimming with Offside=false}}
+        let first = Offset.pathWith source 1.05<length> (Offset.Miter 4.0) Offset.Butt Offset.defaultOptions Offset.defaultSingleOffsetTrimming |> require "first offset"
+        let optionsTrimming = {Offset.defaultSingleOffsetTrimming with Offside=false}
+        let options = Offset.defaultOptions
         Offset.diagnosticClassification.Clear()
         Offset.diagnosticParity.Clear()
-        Offset.pathWith first 1.05<length> (Offset.Miter 4.0) Offset.Butt options |> require "second offset" |> ignore
+        Offset.pathWith first 1.05<length> (Offset.Miter 4.0) Offset.Butt options optionsTrimming |> require "second offset" |> ignore
         let build,eligible,retainedResult = Offset.diagnosticClassification |> Seq.exactlyOne
         let retained = retainedResult |> require "captured classification"
         let reduced = Offset.diagnosticParity |> Seq.exactlyOne |> require "captured parity reduction"

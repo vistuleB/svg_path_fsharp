@@ -150,18 +150,15 @@ module Offset =
     [<Struct>]
     /// Technical options shared by offset, band, and stroke construction.
     /// Main join and cap styles are explicit operation arguments; InnerJoin
-    /// optionally overrides the local inner-corner style.
+    /// optionally overrides the local inner-corner style. Trimmed With operations
+    /// take a separate final SingleOffsetTrimming or BandTrimming argument.
     type Options =
         { Fitting: FittingOptions
           StalledOffsetDiameter: float<length>
           TangentHealAngleDegrees: float<degree>
           /// None chooses InnerRound for Round, InnerBevel for every other style.
           /// Applies independently to each band side and to single offsets.
-          InnerJoin: InnerJoin option
-          /// Used by single-offset operations only.
-          SingleOffsetTrimming: SingleOffsetTrimming
-          /// Used by band operations only, independently of single-offset trimming.
-          BandTrimming: BandTrimming }
+          InnerJoin: InnerJoin option }
 
     [<Struct>]
     type internal LengthSpan =
@@ -718,14 +715,15 @@ module Offset =
         { Fitting = defaultFittingOptions
           StalledOffsetDiameter = defaultStalledOffsetDiameter
           TangentHealAngleDegrees = defaultTangentHealAngleDegrees
-          InnerJoin = None
-          SingleOffsetTrimming =
-            { Offside = true
-              FinalTrimming = InBandTrimming }
-          BandTrimming =
-            { InnerCusps = true
-              OuterCusps = true
-              InBand = true } }
+          InnerJoin = None }
+
+    /// Default single-offset policy: offside trimming followed by in-band trimming.
+    let defaultSingleOffsetTrimming : SingleOffsetTrimming =
+        { Offside = true; FinalTrimming = InBandTrimming }
+
+    /// Default band policy: both side-local cusp passes and final band trimming.
+    let defaultBandTrimming : BandTrimming =
+        { InnerCusps = true; OuterCusps = true; InBand = true }
 
     let private refinementDepth options = min options.Fitting.MaxDepth maximumRefinementGeneration
 
@@ -5398,11 +5396,11 @@ module Offset =
                     |> Result.map List.rev))
 
     let private trimSingleOffsetBuilds
-        builds offset bands (options: Options) =
+        builds offset bands (options: Options) (trimming: SingleOffsetTrimming) =
         finalSingleOffsetSubpaths
             builds offset bands options
-            options.SingleOffsetTrimming.Offside
-            options.SingleOffsetTrimming.FinalTrimming
+            trimming.Offside
+            trimming.FinalTrimming
         |> Result.map (List.filter (fun subpath -> not (List.isEmpty (Subpath.segments subpath))))
         // Single offsets preserve reconstructed traversal, not filled-outline orientation.
         |> Result.map Path.ofSubpaths
@@ -5429,8 +5427,10 @@ module Offset =
     let segment segment offset join = segmentWith segment offset join defaultOptions
 
     /// Constructs and trims one signed offset of a subpath.
-    /// The cap closes the internal source-to-offset winding band.
-    let subpathWith subpath offset join cap options =
+    /// The cap closes the internal source-to-offset winding band and can affect
+    /// in-band survivors, but cap edges are not returned. The final argument is
+    /// a SingleOffsetTrimming policy; defaultSingleOffsetTrimming preserves defaults.
+    let subpathWith subpath offset join cap options trimming =
         validateOptions options
         |> Result.bind (fun _ -> validateJoin join)
         |> Result.bind (fun _ -> normalizeSourceSubpath subpath options)
@@ -5442,11 +5442,11 @@ module Offset =
                 untrimmedBuild.Subpath offset cap
             |> Result.bind (fun band ->
                 trimSingleOffsetBuilds
-                    [ untrimmedBuild ] offset [ band ] options))
+                    [ untrimmedBuild ] offset [ band ] options trimming))
         |> Result.mapError publicError
 
     /// Constructs and trims one signed offset with default options.
-    let subpath subpath offset join cap = subpathWith subpath offset join cap defaultOptions
+    let subpath subpath offset join cap = subpathWith subpath offset join cap defaultOptions defaultSingleOffsetTrimming
 
     /// Constructs the trimmed region between two signed offsets of a subpath.
     /// Either offset ordering is accepted; exchanging them reverses the result.
@@ -5454,7 +5454,7 @@ module Offset =
     /// Cusp trimming applies only to enabled sides. InBand controls the final
     /// joint winding/parity pass; open bands retain caps when it is disabled.
     let subpathBandWith
-        subpath innerOffset outerOffset join cap (options: Options) =
+        subpath innerOffset outerOffset join cap (options: Options) (trimming: BandTrimming) =
         validateOptions options
         |> Result.mapError publicError
         |> Result.bind (fun _ ->
@@ -5467,10 +5467,10 @@ module Offset =
             |> Result.bind (fun build ->
                 match trimBandSideCusps
                           build.InnerCulled normalized innerOffset options
-                          options.BandTrimming.InnerCusps |> Result.mapError publicError,
+                          trimming.InnerCusps |> Result.mapError publicError,
                       trimBandSideCusps
                           build.OuterCulled normalized outerOffset options
-                          options.BandTrimming.OuterCusps |> Result.mapError publicError with
+                          trimming.OuterCusps |> Result.mapError publicError with
                 | Ok(Some inner), Ok(Some outer) ->
                     bandFromSides inner innerOffset outer outerOffset cap
                     |> Result.mapError publicError
@@ -5483,7 +5483,7 @@ module Offset =
                                 [ { Left = 1; Right = 0 }
                                   { Left = 0; Right = 1 } ]
                         let pathResult =
-                            if options.BandTrimming.InBand then
+                            if trimming.InBand then
                                 let candidates, opinions =
                                     match band with
                                     | OpenSubpathBand outline -> [outline],[{Left=0;Right=1}]
@@ -5505,7 +5505,7 @@ module Offset =
     /// Band between signed visual-left-normal offsets with default trimming.
     /// Open sources receive caps; exchanging offsets reverses orientation.
     let subpathBand subpath innerOffset outerOffset join cap =
-        subpathBandWith subpath innerOffset outerOffset join cap defaultOptions
+        subpathBandWith subpath innerOffset outerOffset join cap defaultOptions defaultBandTrimming
 
     let rec private singleOffsetBandsFromBuilds
         (builds: SingleOffsetUntrimmedBuild list)
@@ -5519,7 +5519,7 @@ module Offset =
 
     /// Constructs each source subpath's offset, then trims the builds together.
     /// Offside trimming is source-local; final in-band trimming is shared.
-    let pathWith (path: Path) offset join cap options =
+    let pathWith (path: Path) offset join cap options trimming =
         validateOptions options
         |> Result.mapError publicError
         |> Result.bind (fun _ ->
@@ -5534,36 +5534,36 @@ module Offset =
                 singleOffsetBandsFromBuilds builds offset cap []
                 |> Result.mapError publicError
                 |> Result.bind (fun bands ->
-                    trimSingleOffsetBuilds builds offset bands options
+                    trimSingleOffsetBuilds builds offset bands options trimming
                     |> Result.mapError publicError)))
 
     /// Constructs trimmed path offsets with default options.
-    let path (path: Path) offset join cap = pathWith path offset join cap defaultOptions
+    let path (path: Path) offset join cap = pathWith path offset join cap defaultOptions defaultSingleOffsetTrimming
 
     let rec private bandPathSubpaths
-        subpaths innerOffset outerOffset join cap options converted =
+        subpaths innerOffset outerOffset join cap options trimming converted =
         match subpaths with
         | [] -> Ok(List.rev converted)
         | first :: rest ->
-            subpathBandWith first innerOffset outerOffset join cap options
+            subpathBandWith first innerOffset outerOffset join cap options trimming
             |> Result.bind (fun band ->
-                bandPathSubpaths rest innerOffset outerOffset join cap options
+                bandPathSubpaths rest innerOffset outerOffset join cap options trimming
                     (List.rev (Path.subpaths band) @ converted))
 
     /// Constructs a trimmed offset band independently for each path subpath.
-    let pathBandWith (path: Path) innerOffset outerOffset join cap options =
+    let pathBandWith (path: Path) innerOffset outerOffset join cap options trimming =
         validateOptions options
         |> Result.mapError publicError
         |> Result.bind (fun _ ->
             validateJoin join |> Result.mapError publicError)
         |> Result.bind (fun _ ->
             bandPathSubpaths
-                (Path.subpaths path) innerOffset outerOffset join cap options [])
+                (Path.subpaths path) innerOffset outerOffset join cap options trimming [])
         |> Result.map Path.ofSubpaths
 
     /// Constructs path offset bands with default options.
     let pathBand (path: Path) innerOffset outerOffset join cap =
-        pathBandWith path innerOffset outerOffset join cap defaultOptions
+        pathBandWith path innerOffset outerOffset join cap defaultOptions defaultBandTrimming
 
     let rec private lengthSpans
         (segments: Segment list)

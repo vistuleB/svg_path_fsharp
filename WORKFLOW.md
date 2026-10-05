@@ -6,7 +6,7 @@ release preparation for contributors, whether working manually or with an agent.
 ## Public Type Ownership
 
 - Follow Gleam's module qualification for operation-specific public types:
-  `Offset.Error`, `Stroke.Options`, `Arrangement.Error`, etc. Declare these
+  `Offset.Error`, `Stroke.DashOptions`, `Arrangement.Error`, etc. Declare these
   types inside their owning F# module, rather than as namespace-wide prefixed
   types or generic root-level `Error` / `Options`.
 - Keep shared foundational geometry and core path types in the `SvgPath`

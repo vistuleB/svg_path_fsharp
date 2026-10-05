@@ -2,30 +2,41 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
-- Gleam `20e01ee`: correct CSG build documentation and explain cap-dependent
-  trimming, historical join extensions, and the new migration steps.
+Mirrors Gleam through `92f36e4`, keeping F# units of measure and module conventions.
+The former `f5973b0` batch is recorded as five F# commits:
 
-- Gleam `f767179`: named `Intersections.SegmentSubpathIntersection` records
-  for intersection and encounter queries, preserving grouping and ordering.
+1. Splitting: `Subpath.splitMany` and `Measure.subpathSplitAtLengths[With]`;
+   segment interval extraction is unchanged.
+2. Projections: generic `Projection` and `ClosestPair` records, descriptive
+   aliases, and measured segment addresses in `At`/`LeftAt`/`RightAt` fields.
+3. Styles: use `Offset.Join` and `Offset.Cap`; remove redundant Stroke aliases.
+4. Size threshold: `MinimumLength` replaces `MinimumChord`, including arguments
+   and validation errors; filtering still uses the segment length upper bound.
+5. SVG: all `Svg.ThingToDraw` fields are labelled; positional calls remain valid.
 
-- Gleam `0af6fc8`: reject offset/stroke fitting depths outside 1–5.
+Subsequent Gleam commits are mirrored individually:
 
-- Gleam `b1f4d1a`: CSG preserves stable arrangement error payloads.
+- `b1f4d1a`: preserve stable arrangement diagnostics in CSG errors.
+- `0af6fc8`: reject offset/stroke fitting depths outside 1–5.
+- `f767179`: named `Intersections.SegmentSubpathIntersection` records in point
+  intersection and encounter queries, preserving grouping and ordering.
+- `20e01ee`: document CSG build types, cap-dependent trimming, historical join
+  extensions, and migration steps.
+- `92f36e4`: share `Offset.Options`; trimmed offset `With` calls take their
+  applicable policy as the final argument. Remove `Stroke.Options` and its
+  default. Ordinary defaults and stroke's fixed trimming policy are unchanged.
 
-- Gleam `f5973b0` (projections): generic `Projection` and `ClosestPair` records,
-  geometry-specific aliases, and measured segment addresses in `At` fields.
+Validation of this provisional port:
 
-- Gleam `f5973b0` (SVG labels): label every `Svg.ThingToDraw` field and align
-  `path`, `at`, `radii`, `content`, and `size`; retain positional construction.
+- `scripts/test-release`: 1,866 fast and 26 slow tests passed.
+- `scripts/generate-readme-figures --check`: all 13 figures match.
+- `dotnet build tools/GalleryFigures/GalleryFigures.fsproj -p:GalleryDiagnostics=true`:
+  passed with no warnings or errors.
+- External F# consumer smoke: labelled SVG constructors, generic records,
+  measured addresses, split names, and shared construction options passed.
+- `scripts/check-readme-recipes` and `git diff --check`: passed.
 
-- Gleam `f5973b0` (size threshold): rename `MinimumChord` to `MinimumLength`,
-  including argument names and validation errors; retain length-upper-bound semantics.
-
-- Gleam `f5973b0` (styles): remove redundant `Stroke.Join`/`Stroke.Cap` aliases;
-  callers use `Offset.Join` and `Offset.Cap`.
-
-- Gleam `f5973b0` (splitting): `Subpath.splitMany` and
-  `Measure.subpathSplitAtLengths[With]`; segment interval extraction unchanged.
+This is provisional source preparation; no release tags or NuGet uploads changed.
 
 ## v3.0.0 API alignment (2026-10-05)
 

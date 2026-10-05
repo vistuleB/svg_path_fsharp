@@ -35,15 +35,13 @@ let ``inner_bevel_override_does_not_change_outer_round_join_test`` () =
 
 [<Fact>]
 let ``band_inner_join_is_local_not_the_named_inner_offset_test`` () =
-    let options =
-        {Offset.defaultOptions with
-            InnerJoin = Some Offset.InnerRound
-            BandTrimming = {InnerCusps=false; OuterCusps=false; InBand=false}}
+    let optionsTrimming : Offset.BandTrimming = {InnerCusps=false; OuterCusps=false; InBand=false}
+    let options = { Offset.defaultOptions with InnerJoin = Some Offset.InnerRound }
     for inner, outer in [-1.0<length>, 1.0<length>; 1.0<length>, -1.0<length>] do
-        let band = Offset.subpathBandWith (corner 10.0) inner outer Offset.Bevel Offset.Butt options |> ok
+        let band = Offset.subpathBandWith (corner 10.0) inner outer Offset.Bevel Offset.Butt options optionsTrimming |> ok
         Assert.Equal(1, band.Subpaths |> List.exactlyOne |> arcs)
         let beveled = Offset.subpathBandWith (corner 10.0) inner outer Offset.Bevel Offset.Butt
-                        {options with InnerJoin = Some Offset.InnerBevel} |> ok
+                        {options with InnerJoin = Some Offset.InnerBevel} optionsTrimming |> ok
         Assert.Equal(0, beveled.Subpaths |> List.exactlyOne |> arcs)
 
 [<Fact>]

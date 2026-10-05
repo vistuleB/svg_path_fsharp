@@ -276,7 +276,7 @@ let private packageTitlePath () =
 
 let private packageTitleOptions () =
     { Subject.defaultOptions with
-        Fitting = ({ Tolerance = 0.01<length>; Samples = 5; MaxDepth = 12 }: Offset.FittingOptions) }
+        Fitting = ({ Tolerance = 0.01<length>; Samples = 5; MaxDepth = 5 }: Offset.FittingOptions) }
 
 [<Fact>]
 let ``default_distance_options_test`` () =
@@ -418,7 +418,7 @@ let ``endpoint_near_reversal_is_absorbed_into_stalled_piece_test`` () =
     let source = Subpath.create [ segment ] |> Result.defaultWith (failwithf "%A")
     let options =
         { Subject.defaultOptions with
-            Fitting = ({ Tolerance = 0.01<length>; Samples = 5; MaxDepth = 12 }: Offset.FittingOptions) }
+            Fitting = ({ Tolerance = 0.01<length>; Samples = 5; MaxDepth = 5 }: Offset.FittingOptions) }
     match Subject.internalOffsetSourceTrace source 1.04<length> options with
     | Ok [ { Pieces = Offset.OffsetSourceTraceStalled(_, stalled) :: Offset.OffsetSourceTraceDRefined(_, _, sourceFrom, _, _, _, _, _, _) :: _ } ] ->
         Assert.True(Measure.segmentChordLength stalled < 0.001<length>)
@@ -913,3 +913,18 @@ let ``open line round stroke matches Gleam contour topology`` () =
     let contours = Path.subpaths result
     Assert.Single(contours) |> ignore
     Assert.True(Subpath.isClosed contours[0])
+
+
+[<Fact>]
+let ``offset and stroke reject unsupported fitting depths`` () =
+    let line = Line(Point.create 0.0<length> 0.0<length>, Point.create 10.0<length> 0.0<length>)
+    for depth in [-1; 0; 6; 12] do
+        let fitting = { Offset.defaultFittingOptions with MaxDepth = depth }
+        Assert.Equal(Error(Offset.InvalidMaxDepth depth),
+            Offset.segmentWith line 1.0<length> Offset.Round { Offset.defaultOptions with Fitting = fitting })
+        Assert.Equal(Error(Stroke.StrokeOffsetError(Offset.InvalidMaxDepth depth)),
+            Stroke.pathWith Path.empty 1.0<length> Offset.Round Offset.Butt { Stroke.defaultOptions with Fitting = fitting })
+    for depth in [1; 5] do
+        let result = Offset.segmentWith line 1.0<length> Offset.Round
+                        { Offset.defaultOptions with Fitting = { Offset.defaultFittingOptions with MaxDepth = depth } }
+        Assert.True(Result.isOk result)

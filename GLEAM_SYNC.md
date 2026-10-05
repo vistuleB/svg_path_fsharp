@@ -2,6 +2,8 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
+- Gleam `0af6fc8`: reject offset/stroke fitting depths outside 1–5.
+
 - Gleam `b1f4d1a`: CSG preserves stable arrangement error payloads.
 
 - Gleam `f5973b0` (projections): generic `Projection` and `ClosestPair` records,

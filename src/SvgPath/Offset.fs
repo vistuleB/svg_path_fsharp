@@ -139,6 +139,7 @@ module Offset =
 
     [<Struct>]
     /// Accuracy and recursion controls for fitting offset curves.
+    /// MaxDepth must be between one and five inclusive.
     type FittingOptions =
         { Tolerance: float<length>
           Samples: int
@@ -738,7 +739,7 @@ module Offset =
             Error(InternalInvalidTolerance options.Fitting.Tolerance)
         elif options.Fitting.Samples <= 0 then
             Error(InternalInvalidSamples options.Fitting.Samples)
-        elif options.Fitting.MaxDepth <= 0 then
+        elif options.Fitting.MaxDepth <= 0 || options.Fitting.MaxDepth > maximumRefinementGeneration then
             Error(InternalInvalidMaxDepth options.Fitting.MaxDepth)
         elif options.StalledOffsetDiameter < 0.0<length>
              || not (System.Double.IsFinite(float options.StalledOffsetDiameter)) then

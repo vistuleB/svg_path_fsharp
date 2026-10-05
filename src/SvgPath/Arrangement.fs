@@ -31,11 +31,14 @@ module Arrangement =
           ReverseMultiplicity: int }
 
     [<Struct>]
-    /// A reference to an arrangement edge in either stored or reversed direction.
+    /// An incident edge directed outward from its vertex in CyclicOrders.
+    /// Reversed is false for the stored edge direction and true for its reverse.
     type OrientedArrangementEdge = { EdgeId: int; Reversed: bool }
 
     /// A noded planar graph. CyclicOrders stores clockwise groups of incident
     /// oriented edges; a group can contain edges whose local order is unresolved.
+    /// validateRepresentation accepts open arrangements; validateClosedBoundaries
+    /// additionally requires even weighted degree at every vertex.
     type ArrangementGraph =
         { Vertices: ArrangementVertex list
           Edges: ArrangementEdge list
@@ -124,14 +127,16 @@ module Arrangement =
         /// Minimum length-upper-bound threshold must be positive.
         | InternalInvalidMinimumLength of minimumLength: float<length>
         | InternalInvalidEndpointSliverTolerance of tolerance: float<parameter>
-        /// Legacy chord label carries the segment length upper bound.
-        | InternalSegmentTooShort of chord: float<length> * minimum: float<length>
+        /// A segment length upper bound is below the requested threshold.
+        | InternalSegmentTooShort of lengthUpperBound: float<length> * minimum: float<length>
         | InternalSegmentCollapsedToVertex of vertex: int
         | InternalLoopEdge of vertex: int
         | InternalMissingArrangementVertex of vertex: int
         | InternalMissingArrangementEdge of edge: int
         | InternalIsolatedVertex of vertex: int
         | InternalInvalidMultiplicity of edge: int
+        | InternalDuplicateVertexId of vertex: int
+        | InternalDuplicateEdgeId of edge: int
         | InternalOddWeightedDegree of vertex: int * degree: int
         | InternalEdgeEndpointMismatch of edge: int * vertex: int * distance: float<length>
         | InternalVertexWithoutEndpointSamples of vertex: int
@@ -159,8 +164,12 @@ module Arrangement =
         /// Minimum length-upper-bound threshold must be positive.
         | InvalidMinimumLength of minimumLength: float<length>
         | InvalidEndpointSliverTolerance of tolerance: float<parameter>
-        /// Legacy chord label carries the segment length upper bound.
-        | SegmentTooShort of chord: float<length> * minimum: float<length>
+        /// A segment length upper bound is below the requested threshold.
+        | SegmentTooShort of lengthUpperBound: float<length> * minimum: float<length>
+        /// The bounded dual sweep search could not certify all face relationships.
+        /// This does not establish that the input graph is invalid.
+        | DualCertificationFailed
+        /// Construction or validation failed a graph invariant.
         | ConstructionFailed
 
     let internal publicError = function
@@ -168,7 +177,8 @@ module Arrangement =
         | InternalInvalidArrangementTolerance value -> InvalidArrangementTolerance value
         | InternalInvalidMinimumLength value -> InvalidMinimumLength value
         | InternalInvalidEndpointSliverTolerance value -> InvalidEndpointSliverTolerance value
-        | InternalSegmentTooShort(chord, minimum) -> SegmentTooShort(chord, minimum)
+        | InternalSegmentTooShort(lengthUpperBound, minimum) -> SegmentTooShort(lengthUpperBound, minimum)
+        | InternalDualSweepExhausted _ -> DualCertificationFailed
         | _ -> ConstructionFailed
 
     let internal empty = { Vertices = []; Edges = []; CyclicOrders = [] }
@@ -226,17 +236,27 @@ module Arrangement =
                               CyclicOrders = [] })
                     | _ -> Ok { Vertices = vertices; Edges = edges; CyclicOrders = [] })
 
-    // Checks edges and endpoint clusters, including closed-boundary degree parity.
-    // This does not validate cyclic orders.
+    let private firstDuplicate ids =
+        let rec loop seen = function
+            | [] -> None
+            | id :: rest when Set.contains id seen -> Some id
+            | id :: rest -> loop (Set.add id seen) rest
+        loop Set.empty ids
+
+    // Checks local representation, without requiring closed-boundary parity.
     let private validateInternal (graph: ArrangementGraph) tolerance minimumLength =
+        let duplicateVertex = graph.Vertices |> List.map _.Id |> firstDuplicate
+        let duplicateEdge = graph.Edges |> List.map _.Id |> firstDuplicate
         if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
         elif minimumLength <= 0.0<length> || not (finite minimumLength) then Error(InternalInvalidMinimumLength minimumLength)
+        elif Option.isSome duplicateVertex then Error(InternalDuplicateVertexId duplicateVertex.Value)
+        elif Option.isSome duplicateEdge then Error(InternalDuplicateEdgeId duplicateEdge.Value)
         else
             let vertex id = graph.Vertices |> List.tryFind (fun item -> item.Id = id)
             let edgeError =
                 graph.Edges
                 |> List.tryPick (fun edge ->
-                    if edge.ForwardMultiplicity + edge.ReverseMultiplicity <= 0 then Some(InternalInvalidMultiplicity edge.Id)
+                    if edge.ForwardMultiplicity < 0 || edge.ReverseMultiplicity < 0 || edge.ForwardMultiplicity + edge.ReverseMultiplicity <= 0 then Some(InternalInvalidMultiplicity edge.Id)
                     elif edge.StartVertex = edge.EndVertex then Some(InternalLoopEdge edge.StartVertex)
                     elif vertex edge.StartVertex |> Option.isNone then Some(InternalMissingArrangementVertex edge.StartVertex)
                     elif vertex edge.EndVertex |> Option.isNone then Some(InternalMissingArrangementVertex edge.EndVertex)
@@ -259,7 +279,6 @@ module Arrangement =
                     else
                         let degree = graph.Edges |> List.filter (fun edge -> edge.StartVertex = vertex.Id || edge.EndVertex = vertex.Id) |> List.sumBy (fun edge -> edge.ForwardMultiplicity + edge.ReverseMultiplicity)
                         if degree = 0 then Some(InternalIsolatedVertex vertex.Id)
-                        elif degree % 2 <> 0 then Some(InternalOddWeightedDegree(vertex.Id, degree))
                         else
                             match SmallestEnclosingCircle.points vertex.EndpointSamples with
                             | Error _ -> Some(InternalVertexWithoutEndpointSamples vertex.Id)
@@ -273,11 +292,32 @@ module Arrangement =
           Point: Point<length>
           Angle: float<degree> }
 
-    /// Validates edges, endpoint clusters, and closed-boundary degree parity.
-    /// Does not validate cyclic orders; open-boundary graphs may fail parity.
-    let validate graph tolerance minimumLength =
+    /// Check local representation invariants for open or closed arrangements.
+    /// Checks unique vertex/edge IDs, nonnegative directional multiplicities with
+    /// positive totals, references, non-loop edges, endpoint tolerance, minimum
+    /// length upper bounds, endpoint-cluster centers/radii, and incidence.
+    /// Use the construction tolerance and minimum length. Does not certify
+    /// atomicity, pairwise intersections, cached bounds, or cyclic orders.
+    /// Use build to establish the full construction invariants.
+    let validateRepresentation graph tolerance minimumLength =
         validateInternal graph tolerance minimumLength
         |> Result.mapError publicError
+
+    /// Check representation invariants and even weighted degree at every vertex.
+    /// Adds closed-boundary parity to validateRepresentation; does not certify
+    /// geometric atomicity or guarantee successful dual construction.
+    let validateClosedBoundaries graph tolerance minimumLength =
+        validateRepresentation graph tolerance minimumLength
+        |> Result.bind (fun () ->
+            graph.Vertices
+            |> List.tryPick (fun vertex ->
+                let degree =
+                    graph.Edges
+                    |> List.filter (fun edge -> edge.StartVertex = vertex.Id || edge.EndVertex = vertex.Id)
+                    |> List.sumBy (fun edge -> edge.ForwardMultiplicity + edge.ReverseMultiplicity)
+                if degree % 2 <> 0 then Some(InternalOddWeightedDegree(vertex.Id, degree))
+                else None)
+            |> function Some error -> Error(publicError error) | None -> Ok ())
 
     let private orientedSegment (graph: ArrangementGraph) (oriented: OrientedArrangementEdge) =
         graph.Edges
@@ -1380,6 +1420,9 @@ module Arrangement =
           Starts: bool
           Angle: float<degree> }
 
+    /// Derive faces from clockwise cyclic orders and certified line sweeps.
+    /// Exhausting the search budget returns DualCertificationFailed; contradictory
+    /// accepted results and invariant failures return ConstructionFailed.
     let dual graph =
         dualInternal graph
         |> Result.mapError publicError

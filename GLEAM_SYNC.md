@@ -1,5 +1,24 @@
 # Gleam commit-by-commit synchronization
 
+## Arrangement refinements from Gleam `58d9ce3`
+
+Mirrors the four Gleam arrangement changes in `58d9ce3`:
+
+- Rename `SegmentTooShort.chord` to `lengthUpperBound`, retaining `float<length>`.
+- Clarify the orientation contract of the already-public `OrientedArrangementEdge`.
+- Map exhausted dual sweep searches to `DualCertificationFailed`; contradictions
+  and other invariant failures remain `ConstructionFailed`.
+- Replace `validate` with `validateRepresentation` and `validateClosedBoundaries`.
+  Both check unique IDs and nonnegative directional multiplicities; only the
+  latter requires even weighted degree. Neither certifies geometric atomicity.
+
+Six regression tests mirror the Gleam cases. Existing closed-boundary validation
+callers retain their previous parity requirement under the new name.
+
+Validation: `scripts/test-release` passed 1,872 fast and 26 slow tests. An external
+F# consumer smoke verified both validators, the public oriented-edge type, and
+the measured error payload. README recipes and `git diff --check` also passed.
+
 ## Provisional v3 changes after the withdrawn Gleam release
 
 Mirrors Gleam through `92f36e4`, keeping F# units of measure and module conventions.

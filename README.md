@@ -1567,9 +1567,17 @@ with one occurrence in each direction.
 
 `Arrangement.build` is the supported constructor. Direct construction remains
 possible for inspection, serialization, and tests, but callers then assume
-responsibility for the documented graph invariants. `Arrangement.validate`
-checks local representation and closed-boundary invariants that do not require
-pairwise intersection tests.
+responsibility for the documented graph invariants.
+`Arrangement.validateRepresentation` checks local representation invariants
+for open or closed arrangements, including unique IDs and nonnegative directional
+multiplicities. `Arrangement.validateClosedBoundaries` additionally requires
+even weighted degree at every vertex. Neither certifies geometric atomicity or
+pairwise intersections; use the construction tolerance and minimum length.
+
+`CyclicOrders` uses the public `Arrangement.OrientedArrangementEdge` type.
+Dual construction returns `DualCertificationFailed` when its bounded sweep
+search cannot certify face relationships; this does not prove an invalid graph.
+Contradictions and invariant failures remain `ConstructionFailed`.
 
 `ArrangementDrawing` provides reusable drawing primitives for the transparent
 graph representation. `ArrangementDrawing.drawing` shows vertices, edges, and

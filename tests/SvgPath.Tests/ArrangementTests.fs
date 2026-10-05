@@ -31,7 +31,7 @@ module ArrangementTests =
         | Ok build ->
             Assert.Equal(4, build.Graph.Vertices.Length)
             Assert.Equal(4, build.Graph.Edges.Length)
-            Assert.Equal(Ok(), Arrangement.validate build.Graph 1.0e-6<length> 1.0e-5<length>)
+            Assert.Equal(Ok(), Arrangement.validateClosedBoundaries build.Graph 1.0e-6<length> 1.0e-5<length>)
 
     [<Fact>]
     let ``atomic insertion clusters endpoints and consolidates reversal`` () =
@@ -106,7 +106,7 @@ module ArrangementTests =
     [<Fact>]
     let ``open_chain_fails_final_even_degree_invariant_test`` () =
         let graph = graphWithEdges [ line 0.0 0.0 1.0 0.0 ] |> Result.defaultWith (fun error -> failwithf "%A" error)
-        match Arrangement.validate graph 1.0e-9<length> 1.0e-12<length> with
+        match Arrangement.validateClosedBoundaries graph 1.0e-9<length> 1.0e-12<length> with
         | Error Arrangement.ConstructionFailed -> ()
         | other -> failwithf "unexpected result: %A" other
 

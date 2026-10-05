@@ -106,7 +106,7 @@ let ``shared endpoints do not hide an interior crossing`` () =
             Assert.Equal(3,List.length build.Graph.Vertices)
             Assert.Equal(4,List.length build.Graph.Edges)
             Assert.True(build.Graph.Vertices |> List.exists (fun vertex -> Point.distance vertex.Point (point 0.5 0.)<1e-9<length>))
-            Assert.Equal(Ok(),Arrangement.validate build.Graph 1e-9<length> 1e-8<length>)
+            Assert.Equal(Ok(),Arrangement.validateClosedBoundaries build.Graph 1e-9<length> 1e-8<length>)
 
 [<Fact>]
 let ``shared endpoint lens keeps distinct edges`` () =
@@ -505,7 +505,7 @@ let ``builder_consolidates_phase_shifted_opposite_circle_arcs_test`` () =
     Assert.Equal(4, graph.Vertices.Length)
     Assert.Equal(4, graph.Edges.Length)
     Assert.True(graph.Edges |> List.forall (fun edge -> edge.ForwardMultiplicity = 1 && edge.ReverseMultiplicity = 1))
-    Assert.Equal(Ok(), Arrangement.validate graph tolerance minimumLength)
+    Assert.Equal(Ok(), Arrangement.validateClosedBoundaries graph tolerance minimumLength)
 
 [<Fact>]
 let ``builder_consolidates_near_equal_circles_inside_tolerance_test`` () =
@@ -602,11 +602,11 @@ let ``build_with_rejects_negative_endpoint_sliver_tolerance_test`` () =
 
 [<Fact>]
 let ``validation_rejects_invalid_numeric_options_test`` () =
-    Assert.Equal(Error(Arrangement.InvalidArrangementTolerance 0.0<length>), Arrangement.validate Arrangement.empty 0.0<length> minimumLength)
-    Assert.Equal(Error(Arrangement.InvalidMinimumLength 0.0<length>), Arrangement.validate Arrangement.empty tolerance 0.0<length>)
+    Assert.Equal(Error(Arrangement.InvalidArrangementTolerance 0.0<length>), Arrangement.validateClosedBoundaries Arrangement.empty 0.0<length> minimumLength)
+    Assert.Equal(Error(Arrangement.InvalidMinimumLength 0.0<length>), Arrangement.validateClosedBoundaries Arrangement.empty tolerance 0.0<length>)
     let infinite = LanguagePrimitives.FloatWithMeasure<length> System.Double.PositiveInfinity
-    Assert.Equal(Error(Arrangement.InvalidArrangementTolerance infinite), Arrangement.validate Arrangement.empty infinite minimumLength)
-    Assert.Equal(Error(Arrangement.InvalidMinimumLength infinite), Arrangement.validate Arrangement.empty tolerance infinite)
+    Assert.Equal(Error(Arrangement.InvalidArrangementTolerance infinite), Arrangement.validateClosedBoundaries Arrangement.empty infinite minimumLength)
+    Assert.Equal(Error(Arrangement.InvalidMinimumLength infinite), Arrangement.validateClosedBoundaries Arrangement.empty tolerance infinite)
     Assert.Equal(Error(Arrangement.InternalInvalidArrangementTolerance infinite), Arrangement.cyclicOrdersWith Arrangement.empty infinite 3)
     Assert.Equal(Error(Arrangement.InternalInvalidArrangementTolerance 0.0<length>), Arrangement.cyclicOrdersWith Arrangement.empty 0.0<length> 0)
 
@@ -625,7 +625,7 @@ let ``validation_rejects_vertex_sample_outside_official_tolerance_test`` () =
             Edges = [ edge 0 segment 0 1 ] }
     Assert.Equal(
         Error(Arrangement.ConstructionFailed),
-        Arrangement.validate graph 1.0<length> minimumLength)
+        Arrangement.validateClosedBoundaries graph 1.0<length> minimumLength)
 
 [<Fact>]
 let ``validation_rejects_noncanonical_vertex_center_test`` () =
@@ -640,7 +640,7 @@ let ``validation_rejects_noncanonical_vertex_center_test`` () =
                      Point = point 10.0 0.0
                      EndpointSamples = [ point 10.0 0.0 ] }: Arrangement.ArrangementVertex) ]
             Edges = [ edge 0 segment 0 1 ] }
-    match Arrangement.validate graph 1.0<length> minimumLength with
+    match Arrangement.validateClosedBoundaries graph 1.0<length> minimumLength with
     | Error Arrangement.ConstructionFailed -> ()
     | other -> failwithf "unexpected result: %A" other
 
@@ -653,7 +653,7 @@ let ``validation_rejects_vertex_without_endpoint_samples_test`` () =
                 [ ({ Id = 0; Point = point 0.0 0.0; EndpointSamples = [] }: Arrangement.ArrangementVertex)
                   ({ Id = 1; Point = point 10.0 0.0; EndpointSamples = [ point 10.0 0.0 ] }: Arrangement.ArrangementVertex) ]
             Edges = [ edge 0 segment 0 1 ] }
-    Assert.Equal(Error Arrangement.ConstructionFailed, Arrangement.validate graph tolerance minimumLength)
+    Assert.Equal(Error Arrangement.ConstructionFailed, Arrangement.validateClosedBoundaries graph tolerance minimumLength)
 
 [<Fact>]
 let ``reversed_duplicate_increments_reverse_multiplicity_test`` () =
@@ -739,3 +739,50 @@ let ``drawing_contains_edges_vertices_and_multiplicity_labels_test`` () =
         Arrangement.insertAtomicSegment Arrangement.empty (line 0.0 0.0 10.0 0.0) tolerance minimumLength
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(7, ArrangementDrawing.drawing graph |> List.length)
+
+let private openValidationGraph () =
+    let source = Subpath.create [line 0.0 0.0 10.0 0.0] |> Result.defaultWith (failwithf "%A") |> fun subpath -> Path.ofSubpaths [subpath]
+    Arrangement.build [source] tolerance minimumLength
+    |> Result.map _.Graph
+    |> Result.defaultWith (failwithf "%A")
+
+[<Fact>]
+let public_open_build_passes_representation_only () =
+    let graph = openValidationGraph ()
+    Assert.Equal(Ok(), Arrangement.validateRepresentation graph tolerance minimumLength)
+    Assert.Equal(Error Arrangement.ConstructionFailed, Arrangement.validateClosedBoundaries graph tolerance minimumLength)
+
+let private assertInvalidRepresentation graph =
+    Assert.Equal(Error Arrangement.ConstructionFailed, Arrangement.validateRepresentation graph tolerance minimumLength)
+    Assert.Equal(Error Arrangement.ConstructionFailed, Arrangement.validateClosedBoundaries graph tolerance minimumLength)
+
+[<Fact>]
+let validators_reject_duplicate_vertex_ids () =
+    let graph = openValidationGraph ()
+    { graph with Vertices = graph.Vertices.Head :: graph.Vertices }
+    |> assertInvalidRepresentation
+
+[<Fact>]
+let validators_reject_duplicate_edge_ids () =
+    let graph = openValidationGraph ()
+    { graph with Edges = graph.Edges.Head :: graph.Edges }
+    |> assertInvalidRepresentation
+
+[<Fact>]
+let validators_reject_negative_directional_multiplicities () =
+    let graph = openValidationGraph ()
+    for forward, reverse in [-1, 3; 3, -1] do
+        let edge = { graph.Edges.Head with ForwardMultiplicity = forward; ReverseMultiplicity = reverse }
+        { graph with Edges = [edge] } |> assertInvalidRepresentation
+
+[<Fact>]
+let dual_search_exhaustion_has_distinct_public_error () =
+    Assert.Equal(Arrangement.DualCertificationFailed, Arrangement.publicError (Arrangement.InternalDualSweepExhausted 2))
+    Assert.Equal(Arrangement.ConstructionFailed, Arrangement.publicError (Arrangement.InternalDualSweepContradiction 2))
+    Assert.Equal(Arrangement.ConstructionFailed, Arrangement.publicError (Arrangement.InternalDualMissingEdgeFace(2, false)))
+
+[<Fact>]
+let short_segment_public_error_has_measured_length_upper_bound () =
+    Assert.Equal(
+        Error(Arrangement.SegmentTooShort(lengthUpperBound = 10.0<length>, minimum = 11.0<length>)),
+        Arrangement.validateRepresentation (openValidationGraph ()) tolerance 11.0<length>)

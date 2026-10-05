@@ -43,7 +43,7 @@ let ``csg result retains its arrangement build`` () =
     let result = Csg.union (rectangle 0.0 0.0 2.0 2.0) (rectangle 1.0 0.0 3.0 2.0) Nonzero |> Result.defaultWith (failwithf "%A")
     Assert.Equal(8, result.Build.Segments.Length)
     Assert.Single(Path.subpaths result.Path) |> ignore
-    Assert.Equal(Ok(), Arrangement.validate result.Build.Graph 1.0e-6<length> 1.0e-5<length>)
+    Assert.Equal(Ok(), Arrangement.validateClosedBoundaries result.Build.Graph 1.0e-6<length> 1.0e-5<length>)
 
 [<Fact>]
 let ``overlapping rectangles match expected union geometry`` () =

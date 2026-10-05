@@ -2,6 +2,14 @@
 
 ## 3.0.0 - 2026-10-05
 
+Further arrangement refinements mirrored from the Gleam working tree:
+
+- Replace `Arrangement.validate` with `validateRepresentation` and
+  `validateClosedBoundaries`; reject duplicate IDs and negative multiplicities.
+- Rename `SegmentTooShort.chord` to measured `lengthUpperBound`.
+- Document the already-public `OrientedArrangementEdge` orientation contract.
+- Return `DualCertificationFailed` for exhausted dual sweep searches.
+
 Provisional refinements mirrored from Gleam through `92f36e4`:
 
 - Rename subpath partitioning to `Subpath.splitMany` and

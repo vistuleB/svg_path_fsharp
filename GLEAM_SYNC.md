@@ -2,6 +2,8 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
+- Gleam `b1f4d1a`: CSG preserves stable arrangement error payloads.
+
 - Gleam `f5973b0` (projections): generic `Projection` and `ClosestPair` records,
   geometry-specific aliases, and measured segment addresses in `At` fields.
 

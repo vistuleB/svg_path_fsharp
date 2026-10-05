@@ -51,3 +51,10 @@ module CsgAdditionalTests =
                   Path.subpaths (rectangle 2.0 2.0 6.0 6.0) |> List.head ]
         let output = Csg.nestedContours path |> result
         Assert.Equal(2, Path.subpaths output |> List.length)
+
+    [<Fact>]
+    let ``CSG preserves stable arrangement validation errors`` () =
+        Assert.Equal(Error(Csg.CsgArrangementError(Arrangement.InvalidArrangementTolerance 0.0<length>)),
+            Csg.unionWith Path.empty Path.empty Nonzero { Csg.defaultOptions with Tolerance = 0.0<length> })
+        Assert.Equal(Error(Csg.CsgArrangementError(Arrangement.InvalidMinimumLength -1.0<length>)),
+            Csg.nestedContoursWith Path.empty { Csg.defaultOptions with MinimumLength = -1.0<length> })

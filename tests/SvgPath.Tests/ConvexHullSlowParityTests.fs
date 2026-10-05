@@ -724,7 +724,7 @@ let private representativeGeometryIsCovariantAtScale scale =
             scaledRightPath
             Nonzero
             ({ Tolerance = Length.fromFloat (1.0e-6 * scale)
-               MinimumChord = Length.fromFloat (1.0e-5 * scale) }: Csg.Options)
+               MinimumLength = Length.fromFloat (1.0e-5 * scale) }: Csg.Options)
         |> Result.defaultWith (failwithf "%A")
     let unionBox = Bounds.pathBoundingBox unionResult.Path |> Result.defaultWith (failwithf "%A")
 

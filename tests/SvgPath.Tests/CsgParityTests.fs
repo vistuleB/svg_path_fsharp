@@ -25,7 +25,7 @@ let ``open subpath fill closure is included in arrangement`` () =
 [<Fact>]
 let ``fine csg tolerance preserves square boundary`` () =
     let square = rectangle 0. 0. 10. 10.
-    let options = {Csg.defaultOptions with Tolerance=1e-12<length>;MinimumChord=1e-5<length>}
+    let options = {Csg.defaultOptions with Tolerance=1e-12<length>;MinimumLength=1e-5<length>}
     let result = Csg.unionWith square Path.empty Nonzero options |> output
     Assert.Equal(100.0,float(area result),6)
     Assert.Single(Path.subpaths result) |> ignore
@@ -34,7 +34,7 @@ let ``fine csg tolerance preserves square boundary`` () =
 
 [<Fact>]
 let ``fine csg tolerance preserves nested contours`` () =
-    let result = Csg.nestedContoursWith (rectangle 0. 0. 10. 10.) {Csg.defaultOptions with Tolerance=1e-12<length>;MinimumChord=1e-5<length>} |> output
+    let result = Csg.nestedContoursWith (rectangle 0. 0. 10. 10.) {Csg.defaultOptions with Tolerance=1e-12<length>;MinimumLength=1e-5<length>} |> output
     Assert.Equal(100.0,float(area result),6)
     Assert.Single(Path.subpaths result) |> ignore
 

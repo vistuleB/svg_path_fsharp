@@ -7,11 +7,11 @@ namespace SvgPath
 module Csg =
 
     [<Struct>]
-    /// Finite positive tolerances. MinimumChord is a historical name for the
+    /// Finite positive tolerances. MinimumLength is the
     /// segment-length upper-bound threshold, not endpoint chord distance.
     type Options =
         { Tolerance: float<length>
-          MinimumChord: float<length> }
+          MinimumLength: float<length> }
 
     type BoundaryTopologyFailure =
         | SectorMismatch
@@ -28,7 +28,7 @@ module Csg =
 
     let defaultOptions =
         { Tolerance = 1.0e-6<length>
-          MinimumChord = 1.0e-5<length> }
+          MinimumLength = 1.0e-5<length> }
 
     type private BooleanOperation =
         | Union
@@ -58,7 +58,7 @@ module Csg =
                 // Include implicit fill closure in the arrangement inventory.
                 if List.isEmpty segments || Point.near 0.0<length> start finish then segments
                 else segments @ [Line(finish,start)])
-        Arrangement.buildWith segments options.Tolerance options.MinimumChord 0.0<parameter>
+        Arrangement.buildWith segments options.Tolerance options.MinimumLength 0.0<parameter>
         |> Result.mapError (fun _ -> CsgArrangementError)
 
     let private filled winding fillRule =

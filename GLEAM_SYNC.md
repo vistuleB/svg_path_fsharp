@@ -2,6 +2,9 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
+- Gleam `f5973b0` (size threshold): rename `MinimumChord` to `MinimumLength`,
+  including argument names and validation errors; retain length-upper-bound semantics.
+
 - Gleam `f5973b0` (styles): remove redundant `Stroke.Join`/`Stroke.Cap` aliases;
   callers use `Offset.Join` and `Offset.Cap`.
 

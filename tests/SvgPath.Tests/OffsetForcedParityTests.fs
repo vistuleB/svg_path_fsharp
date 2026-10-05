@@ -4,12 +4,12 @@ open SvgPath
 open Xunit
 
 let private tolerance = 0.000001<length>
-let private minimumChord = 0.00001<length>
+let private minimumLength = 0.00001<length>
 let private point x y = Point.create (Length.fromFloat x) (Length.fromFloat y)
 let private line ax ay bx by = Line(point ax ay, point bx by)
 
 let private buildSegments segments =
-    Arrangement.buildWith segments tolerance minimumChord 0.0<parameter>
+    Arrangement.buildWith segments tolerance minimumLength 0.0<parameter>
     |> Result.defaultWith (failwithf "%A")
 
 [<Fact>]

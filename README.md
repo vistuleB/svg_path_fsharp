@@ -133,7 +133,7 @@ Some controls apply only to specific geometry or stages:
 | `Offset.FittingOptions.MaxDepth` | The pipeline also caps refinement at five generations. |
 | `Stroke.Options` | Fitting, stalled-offset diameter, tangent healing, and inner joins; trimming is fixed. |
 | `Clip.Options.Tolerance` | Arc-length separation for merging cuts, and start-point sampling for pieces no longer than this tolerance. Intersection and containment controls are separate. |
-| `Csg.Options.MinimumChord` | A segment-length upper-bound threshold for discarding refined pieces, despite its legacy name. |
+| `Csg.Options.MinimumLength` | A segment-length upper-bound threshold for discarding refined pieces, despite its legacy name. |
 
 Analytic cases may not need iterative controls. Tolerances have different units
 and contracts and are not interchangeable global error bounds.
@@ -1525,7 +1525,7 @@ Arrangement.build [ left; right ] 0.000001<length> 0.00001<length>
 image records, in original path, subpath, and segment order, the graph-edge
 identifiers produced from one source segment and whether each traversal reverses
 the stored edge direction. An image can be empty when all pieces of an input
-segment have a length upper bound below `MinimumChord`. Despite its historical
+segment have a length upper bound below `MinimumLength`. Despite its historical
 name, this threshold is not endpoint chord length: a loop is not discarded
 merely because its endpoints coincide.
 
@@ -1645,7 +1645,7 @@ needed. Their `With` variants accept numerical options. The existing detailed
 operations retain both `Path` and `Build` for arrangement and source inspection.
 
 Use the `With` variants with `Csg.Options` to choose the endpoint tolerance and
-minimum atomic-edge length-upper-bound threshold (historically `MinimumChord`).
+minimum atomic-edge length-upper-bound threshold (historically `MinimumLength`).
 Returned segments retain their source type where
 possible: lines remain lines, Beziers remain Beziers, and arcs remain arcs after
 splitting.

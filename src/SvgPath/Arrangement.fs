@@ -20,7 +20,7 @@ module Arrangement =
 
     [<Struct>]
     /// One atomic geometric edge, including directional source multiplicities.
-    /// Its length upper bound is at least the legacy minimumChord size threshold.
+    /// Its length upper bound is at least the minimumLength size threshold.
     type ArrangementEdge =
         { Id: int
           Segment: Segment
@@ -108,7 +108,7 @@ module Arrangement =
 
     /// Detailed arrangement build for direct segment-list construction.
     /// An image may be empty when every refined piece's length upper bound falls
-    /// below the historically named minimumChord threshold.
+    /// below the minimumLength threshold.
     type ArrangementSegmentBuild =
         { Graph: ArrangementGraph
           Segments: Segment list
@@ -122,7 +122,7 @@ module Arrangement =
         | InternalSelfIntersectionSubdivisionFailed of sourceIndex: int
         | InternalInvalidArrangementTolerance of tolerance: float<length>
         /// Minimum length-upper-bound threshold must be positive.
-        | InternalInvalidMinimumChord of minimumChord: float<length>
+        | InternalInvalidMinimumLength of minimumLength: float<length>
         | InternalInvalidEndpointSliverTolerance of tolerance: float<parameter>
         /// Legacy chord label carries the segment length upper bound.
         | InternalSegmentTooShort of chord: float<length> * minimum: float<length>
@@ -157,7 +157,7 @@ module Arrangement =
         | ArrangementSegmentError of error: SegmentError
         | InvalidArrangementTolerance of tolerance: float<length>
         /// Minimum length-upper-bound threshold must be positive.
-        | InvalidMinimumChord of minimumChord: float<length>
+        | InvalidMinimumLength of minimumLength: float<length>
         | InvalidEndpointSliverTolerance of tolerance: float<parameter>
         /// Legacy chord label carries the segment length upper bound.
         | SegmentTooShort of chord: float<length> * minimum: float<length>
@@ -166,7 +166,7 @@ module Arrangement =
     let internal publicError = function
         | InternalArrangementSegmentError error -> ArrangementSegmentError error
         | InternalInvalidArrangementTolerance value -> InvalidArrangementTolerance value
-        | InternalInvalidMinimumChord value -> InvalidMinimumChord value
+        | InternalInvalidMinimumLength value -> InvalidMinimumLength value
         | InternalInvalidEndpointSliverTolerance value -> InvalidEndpointSliverTolerance value
         | InternalSegmentTooShort(chord, minimum) -> SegmentTooShort(chord, minimum)
         | _ -> ConstructionFailed
@@ -196,12 +196,12 @@ module Arrangement =
     let private segmentLengthBound segment =
         Segment.lengthUpperBound segment |> Result.mapError InternalArrangementSegmentError
 
-    let internal insertAtomicSegment (graph: ArrangementGraph) segment tolerance minimumChord =
+    let internal insertAtomicSegment (graph: ArrangementGraph) segment tolerance minimumLength =
         if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
-        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
+        elif minimumLength <= 0.0<length> || not (finite minimumLength) then Error(InternalInvalidMinimumLength minimumLength)
         else
           segmentLengthBound segment |> Result.bind (fun size ->
-            if size < minimumChord then Error(InternalSegmentTooShort(size,minimumChord))
+            if size < minimumLength then Error(InternalSegmentTooShort(size,minimumLength))
             else
                 let vertices, startVertex = attachVertex tolerance (Segment.start segment) graph.Vertices
                 let vertices, endVertex = attachVertex tolerance (Segment.finish segment) vertices
@@ -228,9 +228,9 @@ module Arrangement =
 
     // Checks edges and endpoint clusters, including closed-boundary degree parity.
     // This does not validate cyclic orders.
-    let private validateInternal (graph: ArrangementGraph) tolerance minimumChord =
+    let private validateInternal (graph: ArrangementGraph) tolerance minimumLength =
         if tolerance <= 0.0<length> || not (finite tolerance) then Error(InternalInvalidArrangementTolerance tolerance)
-        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
+        elif minimumLength <= 0.0<length> || not (finite minimumLength) then Error(InternalInvalidMinimumLength minimumLength)
         else
             let vertex id = graph.Vertices |> List.tryFind (fun item -> item.Id = id)
             let edgeError =
@@ -248,7 +248,7 @@ module Arrangement =
                         else
                             match segmentLengthBound edge.Segment with
                             | Error error -> Some error
-                            | Ok size when size<minimumChord -> Some(InternalSegmentTooShort(size,minimumChord))
+                            | Ok size when size<minimumLength -> Some(InternalSegmentTooShort(size,minimumLength))
                             | Ok _ -> None)
             match edgeError with
             | Some error -> Error error
@@ -275,8 +275,8 @@ module Arrangement =
 
     /// Validates edges, endpoint clusters, and closed-boundary degree parity.
     /// Does not validate cyclic orders; open-boundary graphs may fail parity.
-    let validate graph tolerance minimumChord =
-        validateInternal graph tolerance minimumChord
+    let validate graph tolerance minimumLength =
+        validateInternal graph tolerance minimumLength
         |> Result.mapError publicError
 
     let private orientedSegment (graph: ArrangementGraph) (oriented: OrientedArrangementEdge) =
@@ -527,23 +527,23 @@ module Arrangement =
                             loop (if motion <= tolerance then distinct else first :: distinct) rest))
         loop [] parameters
 
-    let private parameterLengthBoundLongEnough segment fromParameter toParameter minimumChord =
+    let private parameterLengthBoundLongEnough segment fromParameter toParameter minimumLength =
         Segment.between segment fromParameter toParameter
         |> Result.mapError InternalArrangementSegmentError
         |> Result.bind segmentLengthBound
-        |> Result.map (fun size -> size>=minimumChord)
+        |> Result.map (fun size -> size>=minimumLength)
 
-    let private retainMinimumLengthCuts segment parameters minimumChord =
+    let private retainMinimumLengthCuts segment parameters minimumLength =
         let replaceHead value = function | [] -> [ value ] | _ :: rest -> value :: rest
         let rec loop previous retained = function
             | [] -> Ok(List.rev retained)
             | [ last ] ->
-                parameterLengthBoundLongEnough segment previous last minimumChord
+                parameterLengthBoundLongEnough segment previous last minimumLength
                 |> Result.map (fun longEnough -> List.rev(if longEnough then last :: retained else replaceHead last retained))
             | candidate :: next :: rest ->
-                parameterLengthBoundLongEnough segment previous candidate minimumChord
+                parameterLengthBoundLongEnough segment previous candidate minimumLength
                 |> Result.bind (fun beforeLongEnough ->
-                    parameterLengthBoundLongEnough segment candidate next minimumChord
+                    parameterLengthBoundLongEnough segment candidate next minimumLength
                     |> Result.bind (fun afterLongEnough ->
                         if beforeLongEnough && afterLongEnough then loop candidate (candidate :: retained) (next :: rest)
                         else loop previous retained (next :: rest)))
@@ -551,13 +551,13 @@ module Arrangement =
         | [] | [ _ ] -> Ok parameters
         | start :: rest -> loop start [ start ] rest
 
-    let private retainedSplitSegments minimumChord segments =
+    let private retainedSplitSegments minimumLength segments =
         segments |> List.fold (fun state segment -> state |> Result.bind (fun retained ->
-            segmentLengthBound segment |> Result.map (fun size -> if size>=minimumChord then retained @ [segment] else retained))) (Ok [])
+            segmentLengthBound segment |> Result.map (fun size -> if size>=minimumLength then retained @ [segment] else retained))) (Ok [])
 
-    let private effectiveCutParameters segment cuts tolerance minimumChord =
+    let private effectiveCutParameters segment cuts tolerance minimumLength =
         distinctParameters segment tolerance (List.sort (0.0<parameter> :: 1.0<parameter> :: cuts))
-        |> Result.bind (fun parameters -> retainMinimumLengthCuts segment parameters minimumChord)
+        |> Result.bind (fun parameters -> retainMinimumLengthCuts segment parameters minimumLength)
         |> Result.bind (fun parameters ->
             let interior =
                 match parameters with
@@ -568,10 +568,10 @@ module Arrangement =
             | _ ->
                 Segment.betweenManyInside segment (List.sort (0.0<parameter> :: 1.0<parameter> :: interior))
                 |> Result.mapError InternalArrangementSegmentError
-                |> Result.bind (retainedSplitSegments minimumChord)
+                |> Result.bind (retainedSplitSegments minimumLength)
                 |> Result.map (fun retained -> if retained.Length >= 2 then interior else []))
 
-    let private splitAtomicPiece (piece: AtomicPiece) (cuts: float<parameter> list) tolerance minimumChord =
+    let private splitAtomicPiece (piece: AtomicPiece) (cuts: float<parameter> list) tolerance minimumLength =
         distinctParameters piece.Segment tolerance (List.sort (0.0<parameter> :: 1.0<parameter> :: cuts))
         |> Result.bind (fun parameters ->
             Segment.betweenManyInside piece.Segment parameters
@@ -580,7 +580,7 @@ module Arrangement =
                 List.zip segments (List.pairwise parameters)
                 |> List.fold (fun state (segment, (fromParameter, toParameter)) -> state |> Result.bind (fun pieces ->
                   segmentLengthBound segment |> Result.map (fun size ->
-                    if size < minimumChord then pieces
+                    if size < minimumLength then pieces
                     else
                         let interpolate (left: float<parameter>) (right: float<parameter>) (t: float<parameter>) =
                             if t=0.0<parameter> then left elif t=1.0<parameter> then right
@@ -613,7 +613,7 @@ module Arrangement =
 
     let private nextEdgeId (edges: ArrangementEdge list) = edges |> List.fold (fun maximum edge -> max maximum (edge.Id + 1)) 0
 
-    let private splitProgressiveGraphEdge (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) edgeId cuts tolerance minimumChord =
+    let private splitProgressiveGraphEdge (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) edgeId cuts tolerance minimumLength =
         match graph.Edges |> List.tryFind (fun edge -> edge.Id = edgeId) with
         | None -> Error(InternalMissingArrangementEdge edgeId)
         | Some edge ->
@@ -623,9 +623,9 @@ module Arrangement =
                 |> Result.mapError InternalArrangementSegmentError
                 |> Result.map (fun segments -> segments,parameters))
             |> Result.bind (fun (segments,parameters) ->
-              retainedSplitSegments minimumChord segments |> Result.bind (fun retained ->
+              retainedSplitSegments minimumLength segments |> Result.bind (fun retained ->
                 match retained with
-                | [] -> Error(InternalSegmentTooShort(0.0<length>, minimumChord))
+                | [] -> Error(InternalSegmentTooShort(0.0<length>, minimumLength))
                 | _ ->
                     let firstId = edge.Id
                     let followingId = nextEdgeId graph.Edges
@@ -633,7 +633,7 @@ module Arrangement =
                         state
                         |> Result.bind (fun (vertices, replacements, references) ->
                           segmentLengthBound segment |> Result.bind (fun size ->
-                            if size<minimumChord then Ok(vertices,replacements,references)
+                            if size<minimumLength then Ok(vertices,replacements,references)
                             else
                                 let id = if List.isEmpty replacements then firstId else followingId + replacements.Length - 1
                                 let vertices, startVertex = attachVertex tolerance (Segment.start segment) vertices
@@ -664,7 +664,7 @@ module Arrangement =
                 uniqueVertexForEndpoint graph.Vertices (Segment.finish piece.Segment) tolerance
                 |> Result.map (fun endMatch -> { Piece = piece; Bounds = bounds; StartMatch = startMatch; EndMatch = endMatch })))
 
-    let private splitPieceAtExistingVertex (piece: AtomicPiece) (graph: ArrangementGraph) tolerance minimumChord =
+    let private splitPieceAtExistingVertex (piece: AtomicPiece) (graph: ArrangementGraph) tolerance minimumLength =
         Segment.boundingBox piece.Segment
         |> Result.mapError InternalArrangementSegmentError
         |> Result.bind (fun bounds ->
@@ -679,7 +679,7 @@ module Arrangement =
             find graph.Vertices)
         |> Result.bind (function
             | None -> Ok None
-            | Some cut -> splitAtomicPiece piece [ cut ] tolerance minimumChord |> Result.map Some)
+            | Some cut -> splitAtomicPiece piece [ cut ] tolerance minimumLength |> Result.map Some)
 
     let private validatePieceEndpointVertices (piece: AtomicPiece) (graph: ArrangementGraph) tolerance =
         uniqueVertexForEndpoint graph.Vertices (Segment.start piece.Segment) tolerance
@@ -748,16 +748,16 @@ module Arrangement =
                     elif forward then { edge with ForwardMultiplicity = edge.ForwardMultiplicity + 1 }
                     else { edge with ReverseMultiplicity = edge.ReverseMultiplicity + 1 }) }
 
-    let private insertCorrespondingPiece (context: IncomingContext) (graph: ArrangementGraph) tolerance minimumChord =
+    let private insertCorrespondingPiece (context: IncomingContext) (graph: ArrangementGraph) tolerance minimumLength =
         findCorrespondingEdge context graph.Edges tolerance
         |> Result.bind (function
             | Some(edgeId, sameDirection) -> Ok(incrementEdge graph edgeId sameDirection, edgeId, not sameDirection)
             | None ->
                 let edgeId = nextEdgeId graph.Edges
-                insertAtomicSegment graph context.Piece.Segment tolerance minimumChord
+                insertAtomicSegment graph context.Piece.Segment tolerance minimumLength
                 |> Result.map (fun next -> next, edgeId, false))
 
-    let private splitExistingEdgeAtEndpoint (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) endpoint tolerance minimumChord =
+    let private splitExistingEdgeAtEndpoint (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) endpoint tolerance minimumLength =
         let rec find (edges: ArrangementEdge list) =
             match edges with
             | [] -> Ok None
@@ -767,40 +767,40 @@ module Arrangement =
                 |> Result.bind (function
                     | None -> find rest
                     | Some t ->
-                        effectiveCutParameters edge.Segment [ t ] tolerance minimumChord
+                        effectiveCutParameters edge.Segment [ t ] tolerance minimumLength
                         |> Result.bind (function
                             | [] -> find rest
-                            | cuts -> splitProgressiveGraphEdge graph images edge.Id cuts tolerance minimumChord |> Result.map Some))
+                            | cuts -> splitProgressiveGraphEdge graph images edge.Id cuts tolerance minimumLength |> Result.map Some))
         find graph.Edges
 
-    let private splitExistingEdgeAtIncomingEndpoint (context: IncomingContext) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) tolerance minimumChord =
-        splitExistingEdgeAtEndpoint graph images (Segment.start context.Piece.Segment) tolerance minimumChord
+    let private splitExistingEdgeAtIncomingEndpoint (context: IncomingContext) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) tolerance minimumLength =
+        splitExistingEdgeAtEndpoint graph images (Segment.start context.Piece.Segment) tolerance minimumLength
         |> Result.bind (function
             | Some result -> Ok(Some result)
-            | None -> splitExistingEdgeAtEndpoint graph images (Segment.finish context.Piece.Segment) tolerance minimumChord)
+            | None -> splitExistingEdgeAtEndpoint graph images (Segment.finish context.Piece.Segment) tolerance minimumLength)
 
-    let private progressiveCompareEdgeCuts (context: IncomingContext) (edge: ArrangementEdge) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) existingCuts incomingCuts tolerance minimumChord =
-        effectiveCutParameters edge.Segment existingCuts tolerance minimumChord
+    let private progressiveCompareEdgeCuts (context: IncomingContext) (edge: ArrangementEdge) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) existingCuts incomingCuts tolerance minimumLength =
+        effectiveCutParameters edge.Segment existingCuts tolerance minimumLength
         |> Result.bind (fun existingParameters ->
-            effectiveCutParameters context.Piece.Segment incomingCuts tolerance minimumChord
+            effectiveCutParameters context.Piece.Segment incomingCuts tolerance minimumLength
             |> Result.bind (fun incomingParameters ->
                 match existingParameters, incomingParameters with
                 | [], [] -> Ok(ProgressiveContinue(graph, images))
                 | _ ->
                     (if List.isEmpty existingParameters then Ok(graph, images)
-                     else splitProgressiveGraphEdge graph images edge.Id existingParameters tolerance minimumChord)
+                     else splitProgressiveGraphEdge graph images edge.Id existingParameters tolerance minimumLength)
                     |> Result.bind (fun (graph, images) ->
                         match incomingParameters with
                         | [] -> Ok(ProgressiveReplaceIncoming(graph, images, [ context.Piece ]))
                         | cuts ->
-                            splitAtomicPiece context.Piece cuts tolerance minimumChord
+                            splitAtomicPiece context.Piece cuts tolerance minimumLength
                             |> Result.map (fun replacements -> ProgressiveReplaceIncoming(graph, images, replacements)))))
 
-    let private progressiveInsertDirect (context:IncomingContext) graph images tolerance minimumChord =
+    let private progressiveInsertDirect (context:IncomingContext) graph images tolerance minimumLength =
         let piece = context.Piece
         // Existing-edge comparisons are finished. Children re-enter ordinary
         // insertion, which will discover their mutual non-endpoint intersections.
-        Intersections.segmentSelfWith piece.Segment {MinimumArcLengthSeparation=minimumChord;DistanceTolerance=tolerance/2.0}
+        Intersections.segmentSelfWith piece.Segment {MinimumArcLengthSeparation=minimumLength;DistanceTolerance=tolerance/2.0}
         |> Result.mapError InternalArrangementSegmentError
         |> Result.bind (function
             | hit::_ ->
@@ -815,10 +815,10 @@ module Arrangement =
                         let depth = piece.SelfSplitDepth+1
                         [{piece with Segment=left;SourceTo=sourceMiddle;SelfSplitDepth=depth};{piece with Segment=right;SourceFrom=sourceMiddle;SelfSplitDepth=depth}]
                         |> List.fold (fun state child -> state |> Result.bind (fun kept ->
-                            segmentLengthBound child.Segment |> Result.map (fun size -> if size>=minimumChord then kept @ [child] else kept))) (Ok [])
+                            segmentLengthBound child.Segment |> Result.map (fun size -> if size>=minimumLength then kept @ [child] else kept))) (Ok [])
                         |> Result.map (fun replacements -> ProgressivePieceReplaced(graph,images,replacements)))
             | [] ->
-                insertCorrespondingPiece context graph tolerance minimumChord
+                insertCorrespondingPiece context graph tolerance minimumLength
                 |> Result.map (fun (graph,edgeId,reversed) ->
                     let reference:ArrangementSegmentEdgeImage = {EdgeId=edgeId;Reversed=reversed;From=piece.SourceFrom;To=piece.SourceTo;Own=false}
                     ProgressivePieceInserted(graph,appendImageReference piece.SourceIndex reference images))
@@ -826,52 +826,52 @@ module Arrangement =
                     | Error(InternalSegmentCollapsedToVertex _) | Error(InternalSegmentTooShort _) -> Ok(ProgressivePieceInserted(graph,images))
                     | result -> result)
 
-    let private progressiveCompareEdges (context: IncomingContext) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) tolerance minimumChord endpointSliverTolerance =
+    let private progressiveCompareEdges (context: IncomingContext) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) tolerance minimumLength endpointSliverTolerance =
         let rec compare graph images (edges: ArrangementEdge list) =
             match edges with
             | [] ->
-                progressiveInsertDirect context graph images tolerance minimumChord
+                progressiveInsertDirect context graph images tolerance minimumLength
             | edge :: rest when not (boundingBoxesOverlap context.Bounds edge.Bounds tolerance) -> compare graph images rest
             | edge :: rest ->
                 // Shared endpoint vertices do not exclude interior intersections.
                 pairCuts context edge tolerance endpointSliverTolerance
                 |> Result.bind (fun (existingCuts, incomingCuts) ->
-                    progressiveCompareEdgeCuts context edge graph images existingCuts incomingCuts tolerance minimumChord)
+                    progressiveCompareEdgeCuts context edge graph images existingCuts incomingCuts tolerance minimumLength)
                 |> Result.bind (function
                     | ProgressiveContinue(nextGraph, nextImages) -> compare nextGraph nextImages rest
                     | ProgressiveReplaceIncoming(nextGraph, nextImages, replacements) ->
                         Ok(ProgressivePieceReplaced(nextGraph, nextImages, replacements)))
         compare graph images graph.Edges
 
-    let private progressiveInsertPiece (piece: AtomicPiece) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) tolerance minimumChord endpointSliverTolerance =
+    let private progressiveInsertPiece (piece: AtomicPiece) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) tolerance minimumLength endpointSliverTolerance =
         incomingContext piece graph tolerance
         |> Result.bind (fun context ->
-            splitExistingEdgeAtIncomingEndpoint context graph images tolerance minimumChord
+            splitExistingEdgeAtIncomingEndpoint context graph images tolerance minimumLength
             |> Result.bind (function
                 | Some(graph, images) -> Ok(ProgressivePieceReplaced(graph, images, [ piece ]))
-                | None -> progressiveCompareEdges context graph images tolerance minimumChord endpointSliverTolerance))
+                | None -> progressiveCompareEdges context graph images tolerance minimumLength endpointSliverTolerance))
 
-    let private progressiveInsertPieces (pieces: AtomicPiece list) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) tolerance minimumChord endpointSliverTolerance =
+    let private progressiveInsertPieces (pieces: AtomicPiece list) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) tolerance minimumLength endpointSliverTolerance =
         let rec loop (stack: AtomicPiece list) (graph: ArrangementGraph) (images: ArrangementSourceSegmentImage list) =
             match stack with
             | [] -> Ok(graph, images)
             | piece :: rest ->
-                splitPieceAtExistingVertex piece graph tolerance minimumChord
+                splitPieceAtExistingVertex piece graph tolerance minimumLength
                 |> Result.bind (function
                     | Some replacements -> loop (replacements @ rest) graph images
                     | None ->
                         validatePieceEndpointVertices piece graph tolerance
-                        |> Result.bind (fun () -> progressiveInsertPiece piece graph images tolerance minimumChord endpointSliverTolerance)
+                        |> Result.bind (fun () -> progressiveInsertPiece piece graph images tolerance minimumLength endpointSliverTolerance)
                         |> Result.bind (function
                             | ProgressivePieceInserted(graph, images) -> loop rest graph images
                             | ProgressivePieceReplaced(graph, images, replacements) -> loop (replacements @ rest) graph images))
         loop pieces graph images
 
-    let private atomicPieces minimumChord (indexed: IndexedSegment list) =
+    let private atomicPieces minimumLength (indexed: IndexedSegment list) =
         indexed
         |> List.fold (fun state source -> state |> Result.bind (fun pieces ->
           segmentLengthBound source.Segment |> Result.map (fun size ->
-            if size < minimumChord then pieces
+            if size < minimumLength then pieces
             else
                 pieces @ [
                     { SourceIndex = source.FlatIndex
@@ -995,11 +995,11 @@ module Arrangement =
 
     /// Build directly from a flat segment list without source normalization.
     /// Self-intersections are checked after existing edges. Split children
-    /// re-enter ordinary insertion. minimumChord filters by length upper bound,
+    /// re-enter ordinary insertion. minimumLength filters by length upper bound,
     /// so zero-chord loops are not discarded merely for coincident endpoints.
-    let internal buildWith segments vertexTolerance minimumChord (endpointSliverTolerance: float<parameter>) =
+    let internal buildWith segments vertexTolerance minimumLength (endpointSliverTolerance: float<parameter>) =
         if vertexTolerance <= 0.0<length> || not (finite vertexTolerance) then Error(InternalInvalidArrangementTolerance vertexTolerance)
-        elif minimumChord <= 0.0<length> || not (finite minimumChord) then Error(InternalInvalidMinimumChord minimumChord)
+        elif minimumLength <= 0.0<length> || not (finite minimumLength) then Error(InternalInvalidMinimumLength minimumLength)
         elif endpointSliverTolerance < 0.0<parameter> || System.Double.IsNaN(float endpointSliverTolerance) || System.Double.IsInfinity(float endpointSliverTolerance) then
             Error(InternalInvalidEndpointSliverTolerance endpointSliverTolerance)
         else
@@ -1009,8 +1009,8 @@ module Arrangement =
                 |> List.map (fun (index, segment) ->
                     { FlatIndex = index; PathIndex = 0; SubpathIndex = 0; SegmentIndex = index; Segment = segment })
             let workingImages = indexed |> List.map (fun source -> {SegmentIndex=source.FlatIndex;Edges=[]})
-            atomicPieces minimumChord indexed
-            |> Result.bind (fun pieces -> progressiveInsertPieces pieces empty workingImages vertexTolerance minimumChord endpointSliverTolerance)
+            atomicPieces minimumLength indexed
+            |> Result.bind (fun pieces -> progressiveInsertPieces pieces empty workingImages vertexTolerance minimumLength endpointSliverTolerance)
             |> Result.bind (fun (graph, workingImages) ->
                     let images = markOwnership workingImages
                     let edgeImages = edgeSourceImages graph images
@@ -1023,10 +1023,10 @@ module Arrangement =
 
     /// Build an arrangement and preserve each input path segment's edge image.
     /// Nodes paths into an arrangement and records every source segment image.
-    let private buildInternal (paths: Path list) tolerance minimumChord =
+    let private buildInternal (paths: Path list) tolerance minimumLength =
         let indexed = indexPaths paths
         let segments = indexed |> List.map _.Segment
-        buildWith segments tolerance minimumChord 0.0<parameter>
+        buildWith segments tolerance minimumLength 0.0<parameter>
         |> Result.map (fun built ->
             let images =
                 List.zip indexed built.SegmentImages
@@ -1038,8 +1038,8 @@ module Arrangement =
             { Graph = built.Graph; SegmentImages = images })
 
     /// Builds a planar arrangement and ordered source-segment edge images.
-    let build paths tolerance minimumChord =
-        buildInternal paths tolerance minimumChord
+    let build paths tolerance minimumLength =
+        buildInternal paths tolerance minimumLength
         |> Result.mapError publicError
 
     let private segmentImageEdgesInternal (build: ArrangementGraphBuild) (image: ArrangementSegmentImage) =

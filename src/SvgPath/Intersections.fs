@@ -131,7 +131,10 @@ module Intersections =
 
     [<Struct>]
     type IntersectionOptions =
-        { Tolerance: float<length>
+        { /// Final results must satisfy this geometric tolerance. General curve-pair
+          /// refinement uses a roundoff allowance internally; unachievable accuracy
+          /// can return a certification error rather than an empty result.
+          Tolerance: float<length>
           MaxDepth: int
           ParameterSnap: ParameterSnap }
 
@@ -944,36 +947,45 @@ module Intersections =
     let internal elizabethBeamIntersections left right options =
         validateOptions options |> Result.mapError CurveSolverPathError
         |> Result.bind (fun () ->
-            let tolerance = min options.Tolerance 1e-13<length>
-            elizabethEndpointCandidates left right tolerance |> Result.mapError CurveSolverPathError
-            |> Result.bind (fun endpoints ->
-                let rec generation pending report index decayStart cache =
-                    match pending with
-                    | [] -> elizabethFinishCandidates left right report.Intersections |> Result.bind (fun intersections ->
-                        elizabethSelectCandidates left right intersections |> Result.map (fun selected ->
-                            {report with Intersections=selected;DiscardedCandidates=List.length intersections-List.length selected}))
-                    | _ ->
-                        pending |> elizabethTryMap (fun window ->
-                            elizabethWindowOverlaps left right window |> Result.map (fun overlaps -> window,overlaps))
-                        |> Result.mapError CurveSolverPathError
-                        |> Result.bind (fun overlapping ->
-                            let survivors = overlapping |> List.filter snd |> List.map fst
-                            let decayStart = match decayStart with None when List.length survivors > 1000 || index >= 5 -> Some index | _ -> decayStart
-                            elizabethBeamSelect left right survivors (elizabethGenerationBudget index decayStart) cache
-                            |> Result.bind (fun (kept,crossingLost,otherLost,cache) ->
-                                let report = {report with Examined=report.Examined+List.length pending;DiscardedCrossing=report.DiscardedCrossing+crossingLost;DiscardedOther=report.DiscardedOther+otherLost;PeakRetained=max report.PeakRetained (List.length kept)}
-                                kept |> List.fold (fun state window -> state |> Result.bind (fun (next,candidates) ->
-                                    if window.LeftTo-window.LeftFrom <= elizabethParameterResolution && window.RightTo-window.RightFrom <= elizabethParameterResolution then
-                                        elizabethTerminalCandidates left right window tolerance |> Result.mapError CurveSolverPathError
-                                        |> Result.map (fun found -> next,found @ candidates)
-                                    else
-                                        let children = splitNine window
-                                        if window.Depth <= 0 || List.isEmpty children then Error(CurveSolverDepthLimit(window.LeftFrom,window.LeftTo,window.RightFrom,window.RightTo))
-                                        else Ok(List.fold (fun next child -> child::next) next children,candidates))) (Ok([],report.Intersections))
-                                |> Result.bind (fun (next,candidates) -> generation next {report with Intersections=candidates} (index+1) decayStart cache)))
-                generation (initialWindows options.MaxDepth)
-                    {Intersections=endpoints;Examined=0;DiscardedCrossing=0;DiscardedOther=0;PeakRetained=0;DiscardedCandidates=0}
-                    1 None {Samples=Map.empty;Lookups=0;Hits=0;LeftPoints=Map.empty;RightPoints=Map.empty}))
+            // Bound curve-evaluation roundoff using both geometric enclosures.
+            // Sixteen machine epsilons allow for evaluation/subtraction rounding.
+            Segment.boundingPolygon left |> Result.mapError CurveSolverPathError
+            |> Result.bind (fun leftPoints ->
+              Segment.boundingPolygon right |> Result.mapError CurveSolverPathError
+              |> Result.bind (fun rightPoints ->
+                let magnitude =
+                    leftPoints @ rightPoints
+                    |> List.fold (fun size p -> max size (max (abs p.X) (abs p.Y))) 0.0<length>
+                let tolerance = max (min options.Tolerance 1e-13<length>) (magnitude * 3.552713678800501e-15)
+                elizabethEndpointCandidates left right tolerance |> Result.mapError CurveSolverPathError
+                |> Result.bind (fun endpoints ->
+                    let rec generation pending report index decayStart cache =
+                        match pending with
+                        | [] -> elizabethFinishCandidates left right report.Intersections |> Result.bind (fun intersections ->
+                            elizabethSelectCandidates left right intersections |> Result.map (fun selected ->
+                                {report with Intersections=selected;DiscardedCandidates=List.length intersections-List.length selected}))
+                        | _ ->
+                            pending |> elizabethTryMap (fun window ->
+                                elizabethWindowOverlaps left right window |> Result.map (fun overlaps -> window,overlaps))
+                            |> Result.mapError CurveSolverPathError
+                            |> Result.bind (fun overlapping ->
+                                let survivors = overlapping |> List.filter snd |> List.map fst
+                                let decayStart = match decayStart with None when List.length survivors > 1000 || index >= 5 -> Some index | _ -> decayStart
+                                elizabethBeamSelect left right survivors (elizabethGenerationBudget index decayStart) cache
+                                |> Result.bind (fun (kept,crossingLost,otherLost,cache) ->
+                                    let report = {report with Examined=report.Examined+List.length pending;DiscardedCrossing=report.DiscardedCrossing+crossingLost;DiscardedOther=report.DiscardedOther+otherLost;PeakRetained=max report.PeakRetained (List.length kept)}
+                                    kept |> List.fold (fun state window -> state |> Result.bind (fun (next,candidates) ->
+                                        if window.LeftTo-window.LeftFrom <= elizabethParameterResolution && window.RightTo-window.RightFrom <= elizabethParameterResolution then
+                                            elizabethTerminalCandidates left right window tolerance |> Result.mapError CurveSolverPathError
+                                            |> Result.map (fun found -> next,found @ candidates)
+                                        else
+                                            let children = splitNine window
+                                            if window.Depth <= 0 || List.isEmpty children then Error(CurveSolverDepthLimit(window.LeftFrom,window.LeftTo,window.RightFrom,window.RightTo))
+                                            else Ok(List.fold (fun next child -> child::next) next children,candidates))) (Ok([],report.Intersections))
+                                    |> Result.bind (fun (next,candidates) -> generation next {report with Intersections=candidates} (index+1) decayStart cache)))
+                    generation (initialWindows options.MaxDepth)
+                        {Intersections=endpoints;Examined=0;DiscardedCrossing=0;DiscardedOther=0;PeakRetained=0;DiscardedCandidates=0}
+                        1 None {Samples=Map.empty;Lookups=0;Hits=0;LeftPoints=Map.empty;RightPoints=Map.empty}))))
 
     let private curveCurveIntersections left right options =
         elizabethBeamIntersections left right options |> Result.map (fun report -> report.Intersections)

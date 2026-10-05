@@ -903,6 +903,10 @@ These are numerical results, not exact algebraic root certificates. Candidates
 satisfy the geometric tolerance, but several distinct parameter pairs can
 approximate one mathematical contact, especially at tangencies or nearly
 coincident curves. Candidate counts need not equal mathematical root counts.
+Curve-pair refinement accounts for floating-point rounding at the input
+coordinate scale. Final certification still enforces the requested tolerance;
+requesting accuracy below representable precision can produce an error.
+
 The bounded, heuristic curve-pair search can error when refinement cannot
 finish; success does not prove that every mathematical root was found.
 

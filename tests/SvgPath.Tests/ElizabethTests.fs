@@ -123,3 +123,41 @@ let ``elizabeth_kissing_candidates_obey_resolution_contract_test`` () =
 let ``elizabeth_disjoint_windows_need_no_refinement_test`` () =
     let other = QuadraticBezier(p 0.0 1.0,p 0.5 1.0,p 1.0 1.0)
     Assert.True(Intersections.segmentWith horizontal other {options with MaxDepth=1} = Ok [])
+
+let private scaleCrossing scale dx dy =
+    let pt x y = p (x * scale + dx) (y * scale + dy)
+    CubicBezier(pt 60.0 30.0, pt 90.0 30.0, pt 90.0 60.0, pt 120.0 30.0),
+    CubicBezier(pt 20.0 -10.0, pt 50.0 40.0, pt 80.0 -20.0, pt 110.0 50.0)
+
+let private checkScaleCrossing scale dx dy =
+    let left, right = scaleCrossing scale dx dy
+    for options in [Intersections.defaultOptions; {Intersections.defaultOptions with Tolerance = 1e-6<length>}] do
+        let hits = Intersections.segmentWith left right options |> unwrap
+        Assert.Equal(1, hits.Length)
+        let hit = hits.Head
+        Assert.True(abs(float hit.LeftT - 0.8120634871623037) < 1e-8)
+        Assert.True(abs(float hit.RightT - 0.9540694360628613) < 1e-8)
+        let allowed = scale * 1e-7 + max (abs dx) (abs dy) * 1e-12
+        Assert.True(abs(float hit.Point.X - (105.86624924565754 * scale + dx)) < allowed)
+        Assert.True(abs(float hit.Point.Y - (41.15407707522564 * scale + dy)) < allowed)
+
+[<Fact>]
+let transverse_cubics_preserve_intersection_across_scales () =
+    for scale in [1.; 16.; 30.; 1000.] do checkScaleCrossing scale 0. 0.
+
+[<Fact>]
+let transverse_cubics_preserve_intersection_after_translation () =
+    for offset in [-1000000.; 1000000.] do checkScaleCrossing 1. offset (-offset)
+
+[<Fact>]
+let roundoff_allowance_does_not_join_separated_curves () =
+    for offset in [0.; -1000000.; 1000000.] do
+        let curve gap = QuadraticBezier(p offset (offset+gap), p (offset+1.) (offset+1.+gap), p (offset+2.) (offset+gap))
+        Assert.Equal<Intersections.SegmentIntersection list>([], Intersections.segment (curve 0.) (curve 0.00001) |> unwrap)
+
+[<Fact>]
+let unrepresentable_tolerance_reports_error_instead_of_empty_result () =
+    let left, right = scaleCrossing 16. 0. 0.
+    match Intersections.segmentWith left right {Intersections.defaultOptions with Tolerance = 1e-14<length>} with
+    | Error(InternalUncertifiedSegmentIntersection _) -> ()
+    | other -> failwithf "Expected explicit certification failure, got %A" other

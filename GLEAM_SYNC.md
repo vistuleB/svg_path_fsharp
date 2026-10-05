@@ -1,5 +1,16 @@
 # Gleam commit-by-commit synchronization
 
+## Curve-intersection roundoff correction
+
+Mirrors Gleam `aecc214`, fixing missed scaled cubic intersections.
+Curve-pair refinement and endpoint lookup use a coordinate-dependent roundoff
+allowance derived from both segment enclosures. Final certification retains
+its strict requested tolerance. Regression coverage includes scales 1/16/30/1000,
+translations of ±1,000,000, separated curves, and explicit failure when the
+requested tolerance cannot certify the candidate.
+
+Validation: `scripts/test-release` passed 1,876 fast and 26 slow tests.
+
 ## Arrangement refinements from Gleam `58d9ce3`
 
 Mirrors the four Gleam arrangement changes in `58d9ce3`:

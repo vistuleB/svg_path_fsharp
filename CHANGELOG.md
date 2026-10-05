@@ -2,6 +2,10 @@
 
 ## 3.0.0 - 2026-10-05
 
+- Fix missed curve intersections at larger coordinates by accounting for
+  floating-point evaluation error during curve-pair refinement and endpoint
+  lookup. Final certification still enforces the requested tolerance.
+
 Further arrangement refinements mirrored from the Gleam working tree:
 
 - Replace `Arrangement.validate` with `validateRepresentation` and

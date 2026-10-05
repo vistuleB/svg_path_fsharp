@@ -8,13 +8,13 @@ module Svg =
 
     /// One item rendered inside a generated SVG document.
     type ThingToDraw =
-        | StyledPath of Path * style: string
-        | Rectangle of topLeft: Point<length> * width: float<length> * height: float<length> * style: string
-        | RotatedRectangle of topLeft: Point<length> * width: float<length> * height: float<length> * style: string * rotation: float<degree> * origin: Point<length>
+        | StyledPath of path: Path * style: string
+        | Rectangle of at: Point<length> * width: float<length> * height: float<length> * style: string
+        | RotatedRectangle of at: Point<length> * width: float<length> * height: float<length> * style: string * rotation: float<degree> * origin: Point<length>
         | Circle of center: Point<length> * radius: float<length> * style: string
-        | Ellipse of center: Point<length> * radius: Point<length> * style: string
-        | Text of label: string * style: string * point: Point<length> * fontSize: float<length>
-        | RotatedText of label: string * style: string * point: Point<length> * fontSize: float<length> * rotation: float<degree> * origin: Point<length>
+        | Ellipse of center: Point<length> * radii: Point<length> * style: string
+        | Text of content: string * style: string * at: Point<length> * size: float<length>
+        | RotatedText of content: string * style: string * at: Point<length> * size: float<length> * rotation: float<degree> * origin: Point<length>
 
     type ThingsToDraw = ThingToDraw list
 

@@ -2,6 +2,9 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
+- Gleam `f5973b0` (SVG labels): label every `Svg.ThingToDraw` field and align
+  `path`, `at`, `radii`, `content`, and `size`; retain positional construction.
+
 - Gleam `f5973b0` (size threshold): rename `MinimumChord` to `MinimumLength`,
   including argument names and validation errors; retain length-upper-bound semantics.
 

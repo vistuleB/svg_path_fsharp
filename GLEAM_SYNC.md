@@ -2,6 +2,9 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
+- Gleam `f5973b0` (styles): remove redundant `Stroke.Join`/`Stroke.Cap` aliases;
+  callers use `Offset.Join` and `Offset.Cap`.
+
 - Gleam `f5973b0` (splitting): `Subpath.splitMany` and
   `Measure.subpathSplitAtLengths[With]`; segment interval extraction unchanged.
 

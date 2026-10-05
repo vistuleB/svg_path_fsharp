@@ -28,8 +28,6 @@ module Stroke =
           Offset: float<length>
           LengthOptions: LengthOptions }
 
-    type Join = Offset.Join
-    type Cap = Offset.Cap
 
     let defaultOptions =
         { Fitting = Offset.defaultOptions.Fitting

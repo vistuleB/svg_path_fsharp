@@ -42,8 +42,8 @@ let ``root namespace retains geometry but not old operation aliases`` () =
 let ``qualified style and option types are usable together`` () =
     let options: Stroke.Options = Stroke.defaultOptions
     let fitting: Offset.FittingOptions = options.Fitting
-    let join: Stroke.Join = Offset.Round
-    let cap: Stroke.Cap = Offset.Butt
+    let join: Offset.Join = Offset.Round
+    let cap: Offset.Cap = Offset.Butt
     Assert.Equal(Offset.Round, join)
     Assert.Equal(Offset.Butt, cap)
     Assert.Equal(Offset.defaultOptions.Fitting, fitting)

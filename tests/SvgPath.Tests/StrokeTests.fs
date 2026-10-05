@@ -368,5 +368,5 @@ let ``stroke converts explicit miter errors and preserves technical options`` ()
 [<Fact>]
 let ``stroke exposes Offset.Join and Offset.Cap type aliases`` () =
     let source = simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)
-    let path = Stroke.subpathWith source 1.0<length> Stroke.Join.Round Stroke.Cap.RoundCap Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
+    let path = Stroke.subpathWith source 1.0<length> Offset.Join.Round Offset.Cap.RoundCap Stroke.defaultOptions |> Result.defaultWith (failwithf "%A")
     Assert.Single(path.Subpaths) |> ignore

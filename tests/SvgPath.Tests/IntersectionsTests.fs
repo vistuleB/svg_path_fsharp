@@ -251,7 +251,7 @@ let ``near parallel line projection is scale invariant`` () =
             |> Result.defaultWith (failwithf "%A")
         let projection =
             Distance.segmentSegmentClosestPairWith (scaled left) (scaled right)
-                { Intersections.defaultOptions with Tolerance = 1.0e-12<length> * scale }
+                { Distance.defaultClosestPairOptions with Tolerance = 1.0e-12<length> * scale }
             |> Result.defaultWith (failwithf "%A")
         assertParameterNear 0.5<parameter> projection.LeftT 1.0e-6
         assertParameterNear 0.5<parameter> projection.RightT 1.0e-6

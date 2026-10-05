@@ -30,28 +30,52 @@ module Distance =
 
     let pathProjectionWith = Path.projectionWith
 
-    let defaultClosestPairOptions = Intersections.defaultOptions
+    /// Controls for closest-pair searches. Intersection parameter snapping does not apply.
+    /// Invalid values retain InvalidIntersectionTolerance and InvalidIntersectionMaxDepth.
+    [<Struct>]
+    type ClosestPairOptions =
+        { /// Finite positive geometric tolerance, not a certified global error bound.
+          Tolerance: float<length>
+          /// Positive subdivision limit, also used for boundary projection refinement.
+          /// Analytic line-line searches need no subdivision.
+          MaxDepth: int }
+
+    /// Default tolerance is 1e-9 length units; maximum subdivision depth is 48.
+    let defaultClosestPairOptions: ClosestPairOptions =
+        { Tolerance = Intersections.defaultOptions.Tolerance
+          MaxDepth = Intersections.defaultOptions.MaxDepth }
+
+    let private pairSearchOptions (options: ClosestPairOptions): Intersections.IntersectionOptions =
+        { Tolerance = options.Tolerance
+          MaxDepth = options.MaxDepth
+          ParameterSnap = Intersections.NoParameterSnap }
 
     let segmentSegmentClosestPair = Intersections.segmentSegmentClosestPair
 
-    let segmentSegmentClosestPairWith = Intersections.segmentSegmentClosestPairWith
+    let segmentSegmentClosestPairWith left right (options: ClosestPairOptions) =
+        Intersections.segmentSegmentClosestPairWith left right (pairSearchOptions options)
 
     let segmentSubpathClosestPair = Intersections.segmentSubpathClosestPair
 
-    let segmentSubpathClosestPairWith = Intersections.segmentSubpathClosestPairWith
+    let segmentSubpathClosestPairWith left right (options: ClosestPairOptions) =
+        Intersections.segmentSubpathClosestPairWith left right (pairSearchOptions options)
 
     let segmentPathClosestPair = Intersections.segmentPathClosestPair
 
-    let segmentPathClosestPairWith = Intersections.segmentPathClosestPairWith
+    let segmentPathClosestPairWith left right (options: ClosestPairOptions) =
+        Intersections.segmentPathClosestPairWith left right (pairSearchOptions options)
 
     let subpathSubpathClosestPair = Intersections.subpathSubpathClosestPair
 
-    let subpathSubpathClosestPairWith = Intersections.subpathSubpathClosestPairWith
+    let subpathSubpathClosestPairWith left right (options: ClosestPairOptions) =
+        Intersections.subpathSubpathClosestPairWith left right (pairSearchOptions options)
 
     let subpathPathClosestPair = Intersections.subpathPathClosestPair
 
-    let subpathPathClosestPairWith = Intersections.subpathPathClosestPairWith
+    let subpathPathClosestPairWith left right (options: ClosestPairOptions) =
+        Intersections.subpathPathClosestPairWith left right (pairSearchOptions options)
 
     let pathPathClosestPair = Intersections.pathPathClosestPair
 
-    let pathPathClosestPairWith = Intersections.pathPathClosestPairWith
+    let pathPathClosestPairWith left right (options: ClosestPairOptions) =
+        Intersections.pathPathClosestPairWith left right (pairSearchOptions options)

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root"
+# Compare the documented module with the source compiled by dotnet test.
+if ! awk '
+  /<!-- tested-recipes:start -->/ { recipe = 1; next }
+  /<!-- tested-recipes:end -->/ { recipe = 0; next }
+  recipe && !/^```/ { print }
+' README.md | cmp - tests/SvgPath.Tests/ReadmeRecipes.fs; then
+  echo "README recipe code differs from tests/SvgPath.Tests/ReadmeRecipes.fs" >&2
+  exit 1
+fi

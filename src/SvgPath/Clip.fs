@@ -10,6 +10,8 @@ module Clip =
     type Options =
         { Intersection: Intersections.IntersectionOptions
           Containment: ContainmentOptions
+          /// Arc-length separation for merging cuts; selects start-point sampling
+          /// for pieces no longer than this tolerance.
           Tolerance: float<length> }
 
     let defaultOptions =

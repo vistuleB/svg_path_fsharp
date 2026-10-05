@@ -5,15 +5,23 @@
 - `24546fa`: explicit stroke widths and applicable stroke options.
 - `372c73c`: operation modules and path-only CSG results.
 - `8b42250`: remove 24 transform shortcuts and migrate callers.
+- `4f2c7c3`: focused closest-pair options, option applicability documentation,
+  and three compiled README recipes with a source-consistency check.
 
 F# retains existing argument order and units of measure. Numerical implementations
 remain internal in the core compilation units; the new operation modules expose
 them without public aliases at the former locations. README artwork is unchanged
 and remains pinned to the immutable `assets-v2.0.0` tag.
 
-Verification:
+Verification after mirroring `4f2c7c3`:
 
-- `scripts/test-all`: 1,857 fast and 26 slow tests passed.
+- `scripts/test-all`: 1,861 fast and 26 slow tests passed.
+- `scripts/check-readme-recipes`: README and compiled recipe source match.
+- The tests verify the two-field closest-pair record, module ownership, and
+  validation across all six configurable pair operations.
+
+Earlier v3 relocation verification:
+
 - `scripts/generate-readme-figures --check`: passed with unchanged artwork.
 - Both figure generators build; Gallery uses `-p:GalleryDiagnostics=true`.
 - Compiled-assembly inspection verified all 101 relocated entries are public

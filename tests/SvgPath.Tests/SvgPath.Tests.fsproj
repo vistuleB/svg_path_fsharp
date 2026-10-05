@@ -7,6 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ReadmeRecipes.fs" />
+    <Compile Include="ReadmeRecipesTests.fs" />
     <Compile Include="PublicTypeLayoutTests.fs" />
     <Compile Include="InnerJoinTests.fs" />
     <Compile Include="IntersectionContractSupport.fs" />

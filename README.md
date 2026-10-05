@@ -115,6 +115,71 @@ All six matrix constructors remain, as do composition and transformations about
 anchors. Point application takes the matrix first; geometry application takes
 the geometry first, as in 2.0.
 
+## Numerical controls and complete recipes
+
+`Distance.ClosestPairOptions` contains only `Tolerance: float<length>` and
+`MaxDepth: int`. Use `Distance.defaultClosestPairOptions` for defaults. All six
+closest-pair `With` operations accept this record. Replace the former
+`Intersections.IntersectionOptions` record and remove `ParameterSnap`: closest-pair
+searches never used that setting. Defaults, geometry behavior, and existing
+validation errors are preserved.
+
+Some controls apply only to specific geometry or stages:
+
+| Controls | Applicability |
+| --- | --- |
+| `DistanceOptions.Samples` | Arc and sampling-based projection; Bezier projection uses polynomial root isolation. |
+| `Offset.Options.SingleOffsetTrimming` / `BandTrimming` | Single-offset operations use the first; band operations use the second. |
+| `Offset.FittingOptions.MaxDepth` | The pipeline also caps refinement at five generations. |
+| `Stroke.Options` | Fitting, stalled-offset diameter, tangent healing, and inner joins; trimming is fixed. |
+| `Clip.Options.Tolerance` | Arc-length separation for merging cuts, and start-point sampling for pieces no longer than this tolerance. Intersection and containment controls are separate. |
+| `Csg.Options.MinimumChord` | A segment-length upper-bound threshold for discarding refined pieces, despite its legacy name. |
+
+Analytic cases may not need iterative controls. Tolerances have different units
+and contracts and are not interchangeable global error bounds.
+
+These recipes fit and trim by distance, recover a reusable nearest-point address,
+and combine a stroke outline with a filled region. Units and error diagnostics
+are preserved; the derivative has units of `length/parameter`. The block is compiled from
+[`ReadmeRecipes.fs`](tests/SvgPath.Tests/ReadmeRecipes.fs) and covered by behavior
+tests. `scripts/test-fast` checks that the README matches the compiled source.
+
+<!-- tested-recipes:start -->
+```fsharp
+module ReadmeRecipes
+
+open SvgPath
+
+// Fit on 0..1, then retain the middle half by traveled distance.
+let middleHalf (point: float<parameter> -> Point<length>) =
+    Fit.subpathFromParametric 0.0<parameter> 1.0<parameter> point
+    |> Result.bind (fun curve ->
+        Measure.subpathLength curve
+        |> Result.bind (fun length ->
+            Measure.subpathBetweenLengths curve (length * 0.25) (length * 0.75)))
+
+// Recover a nearest address and its derivative. The derivative may be zero
+// at a singularity and is not a unit tangent.
+let nearestLocation point path =
+    Distance.pathProjection path point
+    |> Result.bind (fun projection ->
+        Path.derivative path projection.At
+        |> Result.map (fun derivative -> projection, derivative))
+
+// Preserve diagnostics when composing operations with different error types.
+type OutlineUnionError =
+    | StrokeFailure of error: Stroke.Error
+    | BooleanFailure of error: Csg.Error
+
+let outlineUnion centerlines width filledRegion =
+    Stroke.path centerlines width Offset.Round Offset.Butt
+    |> Result.mapError StrokeFailure
+    |> Result.bind (fun outline ->
+        Csg.unionPath outline filledRegion Nonzero
+        |> Result.mapError BooleanFailure)
+```
+<!-- tested-recipes:end -->
+
 ## Module Map
 
 - `SvgPath`: core `Path`, `Subpath`, `Segment`, `Point`, `FillRule`, and shared

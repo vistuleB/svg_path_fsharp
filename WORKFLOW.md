@@ -19,6 +19,13 @@ release preparation for contributors, whether working manually or with an agent.
 - Labels describe the carried value: for example, `divergence`, not `depth`,
   when reporting fitting error remaining at a recursion limit.
 
+## Tested README Recipes
+
+Keep the `tested-recipes` block in `README.md` identical to
+`tests/SvgPath.Tests/ReadmeRecipes.fs`. The fast-test script runs
+`scripts/check-readme-recipes` to verify this. Behavior checks live in
+`ReadmeRecipesTests.fs`; both files are compiled by the test project.
+
 ## Test Profiles And Reporting
 
 - `scripts/test-fast`: all tests except the slow convex-hull suite.

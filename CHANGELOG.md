@@ -8,6 +8,10 @@
 - Make stroke width explicit in all `With` outline operations and flatten
   `Stroke.Options` to its four applicable technical controls. Remove ignored
   offset trimming settings from stroke configuration.
+- Give closest-pair searches `Distance.ClosestPairOptions` with measured
+  `Tolerance` and `MaxDepth`, removing the unused `ParameterSnap` field.
+- Document option applicability and add three compiled README recipes with
+  behavior tests and a README/source consistency check in the fast-test script.
 - Add path-only Boolean operations alongside the existing detailed results.
 - Remove 24 transform shortcuts; construct a matrix and apply it to geometry.
 - Update tests, figure generators, README examples, and migration guidance.

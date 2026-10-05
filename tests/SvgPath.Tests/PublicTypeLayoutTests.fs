@@ -6,7 +6,8 @@ open Xunit
 [<Fact>]
 let ``operation types belong to their operation modules`` () =
     let expected =
-        [ typeof<Stroke.Error>, "SvgPath.Stroke"
+        [ typeof<Distance.ClosestPairOptions>, "SvgPath.Distance"
+          typeof<Stroke.Error>, "SvgPath.Stroke"
           typeof<Stroke.Options>, "SvgPath.Stroke"
           typeof<Stroke.DashOptions>, "SvgPath.Stroke"
           typeof<Offset.Error>, "SvgPath.Offset"
@@ -81,3 +82,19 @@ let ``path-only boolean output composes with measurement and transforms`` () =
     let moved = Transform.path result (Transform.translate 3.0<length> 4.0<length>) |> Result.defaultWith (failwithf "%A")
     Assert.Equal(Ok 50.0<length>, Measure.pathLength moved)
     Assert.Equal(Csg.union left right Nonzero |> Result.map _.Path, Ok result)
+
+[<Fact>]
+let ``closest pair options validate even for empty geometry`` () =
+    let line = Line(Point.create 0.0<length> 0.0<length>, Point.create 10.0<length> 0.0<length>)
+    let subpath = Subpath.ofSegment line
+    for options, expected in
+        [ { Distance.defaultClosestPairOptions with Tolerance = 0.0<length> }, InvalidIntersectionTolerance 0.0<length>
+          { Distance.defaultClosestPairOptions with MaxDepth = 0 }, InvalidIntersectionMaxDepth 0 ] do
+        Assert.Equal(Error expected, Distance.segmentSegmentClosestPairWith line line options)
+        Assert.Equal(Error expected, Distance.segmentSubpathClosestPairWith line subpath options)
+        Assert.Equal(Error expected, Distance.segmentPathClosestPairWith line Path.empty options)
+        Assert.Equal(Error expected, Distance.subpathSubpathClosestPairWith subpath subpath options)
+        Assert.Equal(Error expected, Distance.subpathPathClosestPairWith subpath Path.empty options)
+        Assert.Equal(Error expected, Distance.pathPathClosestPairWith Path.empty Path.empty options)
+    let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields typeof<Distance.ClosestPairOptions>
+    Assert.Equal<string list>(["Tolerance"; "MaxDepth"], fields |> Array.map _.Name |> Array.toList)

@@ -155,7 +155,9 @@ module Offset =
           /// None chooses InnerRound for Round, InnerBevel for every other style.
           /// Applies independently to each band side and to single offsets.
           InnerJoin: InnerJoin option
+          /// Used by single-offset operations only.
           SingleOffsetTrimming: SingleOffsetTrimming
+          /// Used by band operations only, independently of single-offset trimming.
           BandTrimming: BandTrimming }
 
     [<Struct>]

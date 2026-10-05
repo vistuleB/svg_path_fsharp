@@ -37,53 +37,12 @@ module Intersections =
         { MinimumArcLengthSeparation: float<length>
           DistanceTolerance: float<length> }
 
-    [<Struct>]
-    type SegmentSegmentProjection =
-        { LeftT: float<parameter>
-          RightT: float<parameter>
-          LeftPoint: Point<length>
-          RightPoint: Point<length>
-          Distance: float<length> }
-
-    [<Struct>]
-    type SegmentSubpathProjection =
-        { LeftT: float<parameter>
-          RightAt: SubpathParameter
-          LeftPoint: Point<length>
-          RightPoint: Point<length>
-          Distance: float<length> }
-
-    [<Struct>]
-    type SegmentPathProjection =
-        { LeftT: float<parameter>
-          RightAt: PathParameter
-          LeftPoint: Point<length>
-          RightPoint: Point<length>
-          Distance: float<length> }
-
-    [<Struct>]
-    type SubpathSubpathProjection =
-        { LeftAt: SubpathParameter
-          RightAt: SubpathParameter
-          LeftPoint: Point<length>
-          RightPoint: Point<length>
-          Distance: float<length> }
-
-    [<Struct>]
-    type SubpathPathProjection =
-        { LeftAt: SubpathParameter
-          RightAt: PathParameter
-          LeftPoint: Point<length>
-          RightPoint: Point<length>
-          Distance: float<length> }
-
-    [<Struct>]
-    type PathPathProjection =
-        { LeftAt: PathParameter
-          RightAt: PathParameter
-          LeftPoint: Point<length>
-          RightPoint: Point<length>
-          Distance: float<length> }
+    type SegmentSegmentProjection = ClosestPair<float<parameter>, float<parameter>>
+    type SegmentSubpathProjection = ClosestPair<float<parameter>, SubpathParameter>
+    type SegmentPathProjection = ClosestPair<float<parameter>, PathParameter>
+    type SubpathSubpathProjection = ClosestPair<SubpathParameter, SubpathParameter>
+    type SubpathPathProjection = ClosestPair<SubpathParameter, PathParameter>
+    type PathPathProjection = ClosestPair<PathParameter, PathParameter>
 
     [<Struct>]
     type SubpathSelfIntersection =
@@ -1048,8 +1007,8 @@ module Intersections =
         |> Result.bind (fun leftPoint ->
             Segment.point right rightT
             |> Result.map (fun rightPoint ->
-                ({ LeftT = leftT
-                   RightT = rightT
+                ({ LeftAt = leftT
+                   RightAt = rightT
                    LeftPoint = leftPoint
                    RightPoint = rightPoint
                    Distance = Point.distance leftPoint rightPoint } : SegmentSegmentProjection)))
@@ -1159,9 +1118,9 @@ module Intersections =
             else
                 segmentListProjection [ left ] right.Segments options
                 |> Result.map (fun (_, rightIndex, (projection: SegmentSegmentProjection)) ->
-                    let rightAt: SubpathParameter = { SegmentIndex = rightIndex; T = projection.RightT }
+                    let rightAt: SubpathParameter = { SegmentIndex = rightIndex; T = projection.RightAt }
                     let result: SegmentSubpathProjection =
-                        { LeftT = projection.LeftT
+                        { LeftAt = projection.LeftAt
                           RightAt = rightAt
                           LeftPoint = projection.LeftPoint
                           RightPoint = projection.RightPoint
@@ -1197,8 +1156,8 @@ module Intersections =
                 segmentListProjection [ left ] segments options
                 |> Result.map (fun (_, rightIndex, (projection: SegmentSegmentProjection)) ->
                     let result: SegmentPathProjection =
-                        { LeftT = projection.LeftT
-                          RightAt = addressWithT addresses[rightIndex] projection.RightT
+                        { LeftAt = projection.LeftAt
+                          RightAt = addressWithT addresses[rightIndex] projection.RightAt
                           LeftPoint = projection.LeftPoint
                           RightPoint = projection.RightPoint
                           Distance = projection.Distance }
@@ -1214,8 +1173,8 @@ module Intersections =
             else
                 segmentListProjection left.Segments right.Segments options
                 |> Result.map (fun (leftIndex, rightIndex, (projection: SegmentSegmentProjection)) ->
-                    let leftAt: SubpathParameter = { SegmentIndex = leftIndex; T = projection.LeftT }
-                    let rightAt: SubpathParameter = { SegmentIndex = rightIndex; T = projection.RightT }
+                    let leftAt: SubpathParameter = { SegmentIndex = leftIndex; T = projection.LeftAt }
+                    let rightAt: SubpathParameter = { SegmentIndex = rightIndex; T = projection.RightAt }
                     let result: SubpathSubpathProjection =
                         { LeftAt = leftAt
                           RightAt = rightAt
@@ -1236,10 +1195,10 @@ module Intersections =
                 |> Result.bind (fun (segments, addresses) ->
                     segmentListProjection left.Segments segments options
                     |> Result.map (fun (leftIndex, rightIndex, (projection: SegmentSegmentProjection)) ->
-                        let leftAt: SubpathParameter = { SegmentIndex = leftIndex; T = projection.LeftT }
+                        let leftAt: SubpathParameter = { SegmentIndex = leftIndex; T = projection.LeftAt }
                         let result: SubpathPathProjection =
                             { LeftAt = leftAt
-                              RightAt = addressWithT addresses[rightIndex] projection.RightT
+                              RightAt = addressWithT addresses[rightIndex] projection.RightAt
                               LeftPoint = projection.LeftPoint
                               RightPoint = projection.RightPoint
                               Distance = projection.Distance }
@@ -1258,8 +1217,8 @@ module Intersections =
                     segmentListProjection leftSegments rightSegments options
                     |> Result.map (fun (leftIndex, rightIndex, (projection: SegmentSegmentProjection)) ->
                         let result: PathPathProjection =
-                            { LeftAt = addressWithT leftAddresses[leftIndex] projection.LeftT
-                              RightAt = addressWithT rightAddresses[rightIndex] projection.RightT
+                            { LeftAt = addressWithT leftAddresses[leftIndex] projection.LeftAt
+                              RightAt = addressWithT rightAddresses[rightIndex] projection.RightAt
                               LeftPoint = projection.LeftPoint
                               RightPoint = projection.RightPoint
                               Distance = projection.Distance }

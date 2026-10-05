@@ -59,18 +59,24 @@ type PathParameter =
       At: SubpathParameter }
 
 [<Struct>]
-/// The closest known point on a subpath, including its address and distance.
-type SubpathProjection =
-    { At: SubpathParameter
+/// A nearest point and its reusable geometry address. Ties return one valid point.
+type Projection<'address> =
+    { At: 'address
       Point: Point<length>
       Distance: float<length> }
 
 [<Struct>]
-/// The closest known point on a path, including its address and distance.
-type PathProjection =
-    { At: PathParameter
-      Point: Point<length>
+/// A closest pair with independent address types for the two geometries.
+type ClosestPair<'leftAddress, 'rightAddress> =
+    { LeftAt: 'leftAddress
+      RightAt: 'rightAddress
+      LeftPoint: Point<length>
+      RightPoint: Point<length>
       Distance: float<length> }
+
+type SegmentProjection = Projection<float<parameter>>
+type SubpathProjection = Projection<SubpathParameter>
+type PathProjection = Projection<PathParameter>
 
 /// Errors returned by core segment, subpath, and path operations.
 type SegmentError =

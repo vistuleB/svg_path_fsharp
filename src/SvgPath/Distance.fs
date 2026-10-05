@@ -10,9 +10,13 @@ module Distance =
 
     let segmentDistanceWith = Segment.distanceWith
 
-    let segmentProjection = Segment.projection
+    let segmentProjection segment sample : Result<SegmentProjection, SegmentError> =
+        Segment.projection segment sample
+        |> Result.map (fun (at, point, distance) -> { At = at; Point = point; Distance = distance })
 
-    let segmentProjectionWith = Segment.projectionWith
+    let segmentProjectionWith segment sample options : Result<SegmentProjection, SegmentError> =
+        Segment.projectionWith segment sample options
+        |> Result.map (fun (at, point, distance) -> { At = at; Point = point; Distance = distance })
 
     let subpathProjection = Subpath.projection
 

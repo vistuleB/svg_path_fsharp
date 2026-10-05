@@ -1692,3 +1692,13 @@ dotnet test tests/SvgPath.Tests/SvgPath.Tests.fsproj --filter "Category!=Slow"
 The generated README SVGs are not part of the `SvgPath` NuGet package. The
 package includes the Markdown README itself, the compiled library, XML docs,
 license metadata, repository metadata, and the `FSharp.Core` dependency.
+
+### Provisional v3 projection records
+
+Point projections return `Projection<'address>` with `At`, `Point`, and
+`Distance`. Segment projections now return `SegmentProjection` rather than a
+tuple; their `At` is `float<parameter>`. `SubpathProjection` and `PathProjection`
+remain descriptive aliases. Closest-pair results share
+`ClosestPair<'leftAddress, 'rightAddress>` with `LeftAt`, `RightAt`, `LeftPoint`,
+`RightPoint`, and `Distance`; segment addresses retain their parameter units.
+The existing geometry-specific pair type names remain aliases in `Intersections`.

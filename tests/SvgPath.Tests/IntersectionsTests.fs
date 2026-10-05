@@ -253,8 +253,8 @@ let ``near parallel line projection is scale invariant`` () =
             Distance.segmentSegmentClosestPairWith (scaled left) (scaled right)
                 { Distance.defaultClosestPairOptions with Tolerance = 1.0e-12<length> * scale }
             |> Result.defaultWith (failwithf "%A")
-        assertParameterNear 0.5<parameter> projection.LeftT 1.0e-6
-        assertParameterNear 0.5<parameter> projection.RightT 1.0e-6
+        assertParameterNear 0.5<parameter> projection.LeftAt 1.0e-6
+        assertParameterNear 0.5<parameter> projection.RightAt 1.0e-6
         Assert.Equal(0.0<length>, projection.Distance)
 
 [<Fact>]
@@ -263,8 +263,8 @@ let ``segment projection reports crossing separated and overlapping lines`` () =
     let crossing = Line(point 5.0 -2.0, point 5.0 2.0)
     let crossed = Distance.segmentSegmentClosestPair horizontal crossing |> Result.defaultWith (failwithf "%A")
     Assert.Equal(0.0<length>, crossed.Distance)
-    assertParameterNear 0.5<parameter> crossed.LeftT 1.0e-9
-    assertParameterNear 0.5<parameter> crossed.RightT 1.0e-9
+    assertParameterNear 0.5<parameter> crossed.LeftAt 1.0e-9
+    assertParameterNear 0.5<parameter> crossed.RightAt 1.0e-9
 
     let separated = Line(point 2.0 3.0, point 8.0 3.0)
     let nearest = Distance.segmentSegmentClosestPair horizontal separated |> Result.defaultWith (failwithf "%A")

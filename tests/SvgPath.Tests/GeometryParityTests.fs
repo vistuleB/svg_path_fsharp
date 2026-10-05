@@ -24,8 +24,8 @@ let ``subpath conditional linearization rejects negative tolerance`` () =
 [<Fact>]
 let ``segment segment projection reports crossing line pair`` () =
     let found = Distance.segmentSegmentClosestPair (line 0.0 0.0 3.0 3.0) (line 1.0 0.0 1.0 3.0) |> Result.defaultWith (failwithf "%A")
-    Assert.Equal(1.0 / 3.0, ratio found.LeftT, 6)
-    Assert.Equal(1.0 / 3.0, ratio found.RightT, 6)
+    Assert.Equal(1.0 / 3.0, ratio found.LeftAt, 6)
+    Assert.Equal(1.0 / 3.0, ratio found.RightAt, 6)
     Assert.True(found.Distance < 1.0e-6<length>)
     Assert.True(Point.distance found.LeftPoint (point 1.0 1.0) < 1.0e-6<length>)
     Assert.True(Point.distance found.RightPoint (point 1.0 1.0) < 1.0e-6<length>)
@@ -662,14 +662,14 @@ let ``path point rejects invalid path parameters`` () =
 
 [<Fact>]
 let ``segment projection returns line parameter point and distance`` () =
-    let t, found, distance = Distance.segmentProjection (line 0.0 0.0 10.0 0.0) (point 4.0 3.0) |> Result.defaultWith (failwithf "%A")
+    let { At = t; Point = found; Distance = distance } = Distance.segmentProjection (line 0.0 0.0 10.0 0.0) (point 4.0 3.0) |> Result.defaultWith (failwithf "%A")
     assertNear 0.4 t
     Assert.True(Point.near 1.0e-6<length> found (point 4.0 0.0))
     assertLengthNear 3.0 distance
 
 [<Fact>]
 let ``segment projection clamps to line endpoint`` () =
-    let t, found, distance = Distance.segmentProjection (line 0.0 0.0 10.0 0.0) (point 13.0 4.0) |> Result.defaultWith (failwithf "%A")
+    let { At = t; Point = found; Distance = distance } = Distance.segmentProjection (line 0.0 0.0 10.0 0.0) (point 13.0 4.0) |> Result.defaultWith (failwithf "%A")
     assertNear 1.0 t
     Assert.True(Point.near 1.0e-6<length> found (point 10.0 0.0))
     assertLengthNear 5.0 distance
@@ -677,7 +677,7 @@ let ``segment projection clamps to line endpoint`` () =
 [<Fact>]
 let ``segment projection returns curve parameter point and distance`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
-    let t, found, distance = Distance.segmentProjection curve (point 10.0 15.0) |> Result.defaultWith (failwithf "%A")
+    let { At = t; Point = found; Distance = distance } = Distance.segmentProjection curve (point 10.0 15.0) |> Result.defaultWith (failwithf "%A")
     assertNear 0.5 t
     Assert.True(Point.near 1.0e-6<length> found (point 10.0 10.0))
     assertLengthNear 5.0 distance
@@ -685,7 +685,7 @@ let ``segment projection returns curve parameter point and distance`` () =
 [<Fact>]
 let ``projection returns quadratic parameter point and distance`` () =
     let curve = QuadraticBezier(point 0.0 0.0, point 10.0 20.0, point 20.0 0.0)
-    let t, found, distance = Distance.segmentProjection curve (point 10.0 15.0) |> Result.defaultWith (failwithf "%A")
+    let { At = t; Point = found; Distance = distance } = Distance.segmentProjection curve (point 10.0 15.0) |> Result.defaultWith (failwithf "%A")
     assertNear 0.5 t
     Assert.True(Point.near 1.0e-6<length> found (point 10.0 10.0))
     assertLengthNear 5.0 distance
@@ -709,14 +709,14 @@ let ``polished bezier projections have small tangential error`` () =
         for x in projectionComparisonCoordinates do
             for y in projectionComparisonCoordinates do
                 let query = point x y
-                let t, _, _ = Distance.segmentProjection segment query |> Result.defaultWith (failwithf "%A")
+                let { At = t; Point = _; Distance = _ } = Distance.segmentProjection segment query |> Result.defaultWith (failwithf "%A")
                 if t > 0.0<parameter> && t < 1.0<parameter> then
                     Assert.True(projectionTangentialError query segment t < 1.0e-7<length>)
 
 [<Fact>]
 let ``projection handles unreliable near cusp tangent`` () =
     let segment = QuadraticBezier(point 0.0 0.0, point 1.0 1.0, point 0.00000001 0.0)
-    let t, _, distance = Distance.segmentProjection segment (point 0.5 0.6) |> Result.defaultWith (failwithf "%A")
+    let { At = t; Point = _; Distance = distance } = Distance.segmentProjection segment (point 0.5 0.6) |> Result.defaultWith (failwithf "%A")
     Assert.InRange(t, 0.0<parameter>, 1.0<parameter>)
     Assert.True(distance >= 0.0<length>)
 
@@ -729,7 +729,7 @@ let ``projection of bezier points respects tolerance`` () =
     for segment in segments do
         for t in parameters do
             let sample = Segment.point segment t |> Result.defaultWith (failwithf "%A")
-            let _, _, distance = Distance.segmentProjection segment sample |> Result.defaultWith (failwithf "%A")
+            let { At = _; Point = _; Distance = distance } = Distance.segmentProjection segment sample |> Result.defaultWith (failwithf "%A")
             Assert.True(distance <= 1.0e-9<length>)
 
 [<Fact>]
@@ -743,7 +743,7 @@ let ``projection of curve points respects geometric tolerance`` () =
     for segment in segments do
         for t in parameters do
             let sample = Segment.point segment t |> Result.defaultWith (failwithf "%A")
-            let _, _, distance = Distance.segmentProjectionWith segment sample options |> Result.defaultWith (failwithf "%A")
+            let { At = _; Point = _; Distance = distance } = Distance.segmentProjectionWith segment sample options |> Result.defaultWith (failwithf "%A")
             Assert.True(distance <= 1.0e-9<length>)
 
 [<Fact>]

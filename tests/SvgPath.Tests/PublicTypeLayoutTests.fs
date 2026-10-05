@@ -98,3 +98,18 @@ let ``closest pair options validate even for empty geometry`` () =
         Assert.Equal(Error expected, Distance.pathPathClosestPairWith Path.empty Path.empty options)
     let fields = Microsoft.FSharp.Reflection.FSharpType.GetRecordFields typeof<Distance.ClosestPairOptions>
     Assert.Equal<string list>(["Tolerance"; "MaxDepth"], fields |> Array.map _.Name |> Array.toList)
+
+[<Fact>]
+let ``projection helpers compose across address types`` () =
+    let projectionDistance (value: Projection<'address>) = value.Distance
+    let pairDistance (value: ClosestPair<'left, 'right>) = value.Distance
+    let line = Line(Point.create 0.0<length> 0.0<length>, Point.create 10.0<length> 0.0<length>)
+    let sample = Point.create 4.0<length> 3.0<length>
+    let segment = Distance.segmentProjection line sample |> Result.defaultWith (failwithf "%A")
+    let path = Path.singleton (Subpath.ofSegment line)
+    let pathProjection = Distance.pathProjection path sample |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(3.0<length>, projectionDistance segment)
+    Assert.Equal(3.0<length>, projectionDistance pathProjection)
+    Assert.Equal(0.4<parameter>, segment.At)
+    let pair = Distance.segmentPathClosestPair line path |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(0.0<length>, pairDistance pair)

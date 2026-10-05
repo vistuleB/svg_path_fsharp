@@ -2,6 +2,9 @@
 
 ## Provisional v3 changes after the withdrawn Gleam release
 
+- Gleam `f5973b0` (projections): generic `Projection` and `ClosestPair` records,
+  geometry-specific aliases, and measured segment addresses in `At` fields.
+
 - Gleam `f5973b0` (SVG labels): label every `Svg.ThingToDraw` field and align
   `path`, `at`, `radii`, `content`, and `size`; retain positional construction.
 

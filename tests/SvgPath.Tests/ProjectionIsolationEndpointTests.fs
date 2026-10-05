@@ -9,7 +9,7 @@ let private reversed () = Segment.between original fromT toT |> get |> Segment.r
 [<Fact>]
 let ``projection keeps better isolation endpoint without sign change`` () =
     let query = Segment.point original (fromT+(toT-fromT)*0.5) |> get
-    let t,_,distance = Distance.segmentProjection (reversed()) query |> get
+    let { At = t; Distance = distance } = Distance.segmentProjection (reversed()) query |> get
     Assert.True(distance<1e-12<length>)
     Assert.True(abs(t-0.5<parameter>)<1e-12<parameter>)
 [<Fact>]

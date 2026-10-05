@@ -1,5 +1,10 @@
 # Gleam commit-by-commit synchronization
 
+## Provisional v3 changes after the withdrawn Gleam release
+
+- Gleam `f5973b0` (splitting): `Subpath.splitMany` and
+  `Measure.subpathSplitAtLengths[With]`; segment interval extraction unchanged.
+
 ## v3.0.0 API alignment (2026-10-05)
 
 - `24546fa`: explicit stroke widths and applicable stroke options.

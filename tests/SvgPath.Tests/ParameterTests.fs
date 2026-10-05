@@ -174,7 +174,7 @@ let ``subpath between wraps closed intervals`` () =
 
 [<Fact>]
 let ``subpaths between open returns outer pieces`` () =
-    let pieces = Subpath.betweenMany (openLines 3) [ at 0 0.5; at 2 0.5 ] |> Result.defaultWith (failwithf "%A")
+    let pieces = Subpath.splitMany (openLines 3) [ at 0 0.5; at 2 0.5 ] |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, pieces.Length)
     Assert.Equal<Segment list>([ line 0.0 5.0 ], pieces[0].Segments)
     Assert.Equal<Segment list>([ line 5.0 10.0; line 10.0 20.0; line 20.0 25.0 ], pieces[1].Segments)
@@ -185,10 +185,10 @@ let ``subpaths between open rejects boundary and duplicate points`` () =
     let subpath = openLines 2
     Assert.Equal(
         Error(InvalidSubpathParameter(0, t 0.0, 2)),
-        Subpath.betweenMany subpath [ at 0 0.0 ])
+        Subpath.splitMany subpath [ at 0 0.0 ])
     Assert.Equal(
         Error(InvalidSubpathInterval(at 1 0.0, at 1 0.0)),
-        Subpath.betweenMany subpath [ at 0 1.0; at 1 0.0 ])
+        Subpath.splitMany subpath [ at 0 1.0; at 1 0.0 ])
 
 [<Fact>]
 let ``subpaths between closed accepts cyclic order`` () =
@@ -197,7 +197,7 @@ let ``subpaths between closed accepts cyclic order`` () =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
         |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
-    let pieces = Subpath.betweenMany closed [ at 2 0.5; at 3 0.5; at 1 0.5 ] |> Result.defaultWith (failwithf "%A")
+    let pieces = Subpath.splitMany closed [ at 2 0.5; at 3 0.5; at 1 0.5 ] |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, pieces.Length)
     Assert.Equal(2, pieces[0].Segments.Length)
     Assert.Equal(3, pieces[1].Segments.Length)
@@ -210,7 +210,7 @@ let ``subpaths between closed accepts single split point`` () =
         Subpath.create [ Line(a, b); Line(b, c); Line(c, d); Line(d, a) ]
         |> Result.bind (Subpath.close)
         |> Result.defaultWith (failwithf "%A")
-    let opened = Subpath.betweenMany closed [ at 1 0.5 ] |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
+    let opened = Subpath.splitMany closed [ at 1 0.5 ] |> Result.defaultWith (failwithf "%A") |> List.exactlyOne
     Assert.False(opened.Closed)
     Assert.Equal(point 10.0 5.0, opened.Start)
     Assert.Equal(point 10.0 5.0, Segment.finish (List.last opened.Segments))
@@ -224,7 +224,7 @@ let ``subpaths between closed rejects duplicate and nonlinear order`` () =
         |> Result.defaultWith (failwithf "%A")
     Assert.Equal(
         Error(InvalidSubpathInterval(at 0 0.0, at 0 0.0)),
-        Subpath.betweenMany closed [ at 3 1.0; at 0 0.0 ])
+        Subpath.splitMany closed [ at 3 1.0; at 0 0.0 ])
     Assert.Equal(
         Error(InvalidSubpathInterval(at 3 0.5, at 2 0.5)),
-        Subpath.betweenMany closed [ at 2 0.5; at 1 0.5; at 3 0.5 ])
+        Subpath.splitMany closed [ at 2 0.5; at 1 0.5; at 3 0.5 ])

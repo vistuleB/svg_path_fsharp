@@ -605,7 +605,7 @@ let ``subpath between lengths crosses segments`` () =
 [<Fact>]
 let ``subpaths between lengths splits open subpath`` () =
     let source = Subpath.create [ line 0.0 0.0 10.0 0.0; line 10.0 0.0 20.0 0.0; line 20.0 0.0 30.0 0.0 ] |> Result.defaultWith (failwithf "%A")
-    let pieces = Measure.subpathBetweenLengthsMany source [ 5.0<length>; 25.0<length> ] |> Result.defaultWith (failwithf "%A")
+    let pieces = Measure.subpathSplitAtLengths source [ 5.0<length>; 25.0<length> ] |> Result.defaultWith (failwithf "%A")
     Assert.Equal(3, pieces.Length)
     Assert.True(Subpath.segments pieces[0] = [ line 0.0 0.0 5.0 0.0 ])
     Assert.True(Subpath.segments pieces[1] = [ line 5.0 0.0 10.0 0.0; line 10.0 0.0 20.0 0.0; line 20.0 0.0 25.0 0.0 ])

@@ -340,7 +340,7 @@ let at = { SegmentIndex = 1; T = 0.5<parameter> }
 
 Subpath.split subpath at
 Subpath.between subpath { SegmentIndex = 0; T = 0.5<parameter> } { SegmentIndex = 2; T = 0.25<parameter> }
-Subpath.betweenMany subpath [ { SegmentIndex = 0; T = 0.5<parameter> }; { SegmentIndex = 2; T = 0.25<parameter> } ]
+Subpath.splitMany subpath [ { SegmentIndex = 0; T = 0.5<parameter> }; { SegmentIndex = 2; T = 0.25<parameter> } ]
 Subpath.point subpath at
 Subpath.derivative subpath at
 ```
@@ -708,7 +708,7 @@ Measure.subpathParameterAtLength subpath 25.0<length>
 Measure.subpathPointAtLength subpath 25.0<length>
 Measure.subpathDerivativeAtLength subpath 25.0<length>
 Measure.subpathBetweenLengths subpath 25.0<length> 60.0<length>
-Measure.subpathBetweenLengthsMany subpath [ 25.0<length>; 40.0<length>; 60.0<length> ]
+Measure.subpathSplitAtLengths subpath [ 25.0<length>; 40.0<length>; 60.0<length> ]
 
 Measure.pathParameterAtLength path 40.0<length>
 Measure.pathPointAtLength path 40.0<length>

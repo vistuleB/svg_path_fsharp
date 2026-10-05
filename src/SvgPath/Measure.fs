@@ -74,9 +74,9 @@ module Measure =
 
     let subpathBetweenLengthsWith = Subpath.betweenLengthsWith
 
-    let subpathBetweenLengthsMany = Subpath.betweenLengthsMany
+    let subpathSplitAtLengths = Subpath.splitAtLengths
 
-    let subpathBetweenLengthsManyWith = Subpath.betweenLengthsManyWith
+    let subpathSplitAtLengthsWith = Subpath.splitAtLengthsWith
 
     let pathLength = Path.length
 

@@ -2370,7 +2370,10 @@ module Subpath =
                 intervalSegments subpath at last
                 |> Result.bind (fun before -> intervalSegments subpath first at |> Result.bind (fun after -> create (before @ after))))
 
-    let betweenMany subpath points =
+    /// Partition at traversal addresses. Open paths retain both outer pieces;
+    /// no addresses returns the original open path. Closed paths return no
+    /// pieces for no addresses, and one opened loop for a single address.
+    let splitMany subpath points =
         points
         |> List.fold (fun state point ->
             state |> Result.bind (fun validated -> parameterCanonicalize subpath point |> Result.map (fun value -> value :: validated))) (Ok [])
@@ -2524,14 +2527,14 @@ module Subpath =
     let internal betweenLengths subpath fromDistance toDistance =
         betweenLengthsWith subpath fromDistance toDistance Segment.defaultLengthOptions
 
-    let internal betweenLengthsManyWith subpath distances options =
+    let internal splitAtLengthsWith subpath distances options =
         distances
         |> List.fold (fun state distance ->
             state |> Result.bind (fun parameters -> parameterAtLengthWith subpath distance options |> Result.map (fun value -> value :: parameters))) (Ok [])
-        |> Result.bind (List.rev >> betweenMany subpath)
+        |> Result.bind (List.rev >> splitMany subpath)
 
-    let internal betweenLengthsMany subpath distances =
-        betweenLengthsManyWith subpath distances Segment.defaultLengthOptions
+    let internal splitAtLengths subpath distances =
+        splitAtLengthsWith subpath distances Segment.defaultLengthOptions
 
     let internal subdivideToMaxLengthWith subpath maxLength options =
         subpath.segmentList

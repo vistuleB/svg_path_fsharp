@@ -231,13 +231,13 @@ module Stroke =
         else Ok subpath
 
     let private firstSplitPiece (subpath: Subpath) distance options =
-        Subpath.betweenLengthsManyWith subpath [ distance ] options
+        Subpath.splitAtLengthsWith subpath [ distance ] options
         |> Result.bind (function
             | first :: _ -> Ok first
             | [] -> Subpath.betweenLengthsWith subpath 0.0<length> distance options)
 
     let private lastSplitPiece (subpath: Subpath) distance options =
-        Subpath.betweenLengthsManyWith subpath [ distance ] options
+        Subpath.splitAtLengthsWith subpath [ distance ] options
         |> Result.bind (function
             | [] -> Subpath.betweenLengthsWith subpath distance distance options
             | pieces -> Ok(List.last pieces))

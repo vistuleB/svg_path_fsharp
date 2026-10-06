@@ -2,6 +2,9 @@
 
 ## 3.0.0 - 2026-10-05
 
+- Remove the unused internal callback minimum-width default wrapper. Retain
+  the explicit-options hook used by focused support-search tests.
+
 - Fix missed curve intersections at larger coordinates by accounting for
   floating-point evaluation error during curve-pair refinement and endpoint
   lookup. Final certification still enforces the requested tolerance.

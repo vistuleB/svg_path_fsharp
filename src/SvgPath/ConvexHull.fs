@@ -1734,9 +1734,6 @@ module ConvexHull =
     let internal minimumWidthWith support diameterUpperBound options =
         adaptiveDirectionalExtremum true support diameterUpperBound options
 
-    let internal minimumWidth support diameterUpperBound =
-        minimumWidthWith support diameterUpperBound defaultWidthSearchOptions
-
     let internal diameterWith support diameterUpperBound options =
         adaptiveDirectionalExtremum false support diameterUpperBound options
 

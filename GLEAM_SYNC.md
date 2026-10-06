@@ -1,5 +1,16 @@
 # Gleam commit-by-commit synchronization
 
+## Confirmed dead-code cleanup
+
+Gleam removes seven unused angle diagnostics, their ten private-only helpers,
+and two unused callback minimum-width wrappers (490 source lines total).
+F# has no matching angle diagnostics. Remove only its unused `minimumWidth`
+default wrapper; retain `minimumWidthWith`, which has two focused tests of the
+shared adaptive support search. Public segment/subpath/path width APIs remain.
+
+Validation: `scripts/test-release` passed 1,876 fast and 26 slow tests; no tests
+were removed. Gleam also passed its release suite (1,680 fast and 26 slow).
+
 ## Curve-intersection roundoff correction
 
 Mirrors Gleam `aecc214`, fixing missed scaled cubic intersections.

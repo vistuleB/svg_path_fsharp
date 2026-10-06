@@ -1,5 +1,11 @@
 # Gleam commit-by-commit synchronization
 
+## Coordinate-scale tolerance guidance
+
+Mirrors Gleam `0ca6767`: README and API documentation for absolute length tolerances,
+uniform scaling of offset/stroke settings, and fill-rule area accuracy and cost.
+No defaults or numerical behavior change. README recipe checks pass in both ports.
+
 ## Large-coordinate stroke projection correction
 
 Mirrors Gleam `cb40ef8`: arrangement and overlap matching share a

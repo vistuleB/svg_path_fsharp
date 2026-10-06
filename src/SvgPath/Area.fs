@@ -10,6 +10,13 @@ type private AreaMode = FillRuleArea of FillRule | AbsoluteWindingArea
 /// within 1e-12 times the larger width/height of the linearized path's box,
 /// including line-only inputs. This differs from curve-to-line tolerance;
 /// neither tolerance directly bounds final area error.
+/// Linearization tolerance is an absolute distance in path coordinate units.
+/// Under uniform scaling by positive s, scale it by s for comparable relative
+/// detail; area itself scales by s*s. Fixed tolerance on enlarged geometry can
+/// create many more edges, making pairwise arrangement processing expensive.
+/// Comparing successively tighter tolerances is an accuracy check, not a
+/// certified bound. Signed area uses direct integrals with different winding
+/// semantics and cannot generally replace fill-rule area.
 [<RequireQualifiedAccess>]
 module Area =
     let private relativeTolerance = 1.0e-12

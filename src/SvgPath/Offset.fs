@@ -152,6 +152,10 @@ module Offset =
     /// Main join and cap styles are explicit operation arguments; InnerJoin
     /// optionally overrides the local inner-corner style. Trimmed With operations
     /// take a separate final SingleOffsetTrimming or BandTrimming argument.
+    /// Fitting.Tolerance and StalledOffsetDiameter are absolute lengths in path
+    /// coordinate units. For comparable relative detail after uniform scaling,
+    /// scale both with offset distance or stroke width. Leave sample counts,
+    /// depth limits, angles, and miter limits unchanged.
     type Options =
         { Fitting: FittingOptions
           StalledOffsetDiameter: float<length>

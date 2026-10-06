@@ -273,6 +273,10 @@ module BoundingBox =
 
 [<Struct>]
 /// Accuracy and recursion limits for converting curves to line segments.
+/// Tolerance is an absolute distance in path coordinate units (default 0.01).
+/// Scale it with uniformly scaled geometry for comparable relative detail;
+/// keep MaxDepth unchanged. Smaller tolerances can require more subdivisions.
+/// When used for fill-rule area, this is not a bound on the final area error.
 type LinearizeOptions =
     { Tolerance: float<length>
       MaxDepth: int }

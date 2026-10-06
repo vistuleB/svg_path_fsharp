@@ -150,7 +150,7 @@ module internal OverlapDetection =
         let y = coordinateMatches target sample false tolerance
         combineCoordinateMatches x y |> Result.bind (fun coordinates ->
             let projected =
-                match Segment.projection target sample with
+                match Segment.projectionForMatching target sample tolerance with
                 | Ok(t,_,_) -> Ok[t]
                 | Error(DistanceMaxIterationsReached _ as error) ->
                     if completeCoordinate x || completeCoordinate y then Ok[] else Error error

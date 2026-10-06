@@ -1480,6 +1480,24 @@ module Segment =
 
     let internal projection target sample = projectionWith target sample defaultDistanceOptions
 
+    // Retry stalled absolute refinement at coordinate resolution. Keep the
+    // matching tolerance unchanged, and preserve errors in the uncertainty band.
+    let internal projectionForMatching target sample matchingTolerance =
+        match projection target sample with
+        | Error(DistanceMaxIterationsReached _ as originalError) ->
+            boundingPolygon target |> Result.bind (fun enclosure ->
+                let magnitude =
+                    (sample :: enclosure)
+                    |> List.fold (fun size p -> max size (max (abs p.X) (abs p.Y))) 0.0<length>
+                let roundoff = magnitude * 0.000000000000003552713678800501
+                if roundoff <= defaultDistanceOptions.Tolerance then Error originalError
+                else
+                    projectionWith target sample { defaultDistanceOptions with Tolerance = roundoff }
+                    |> Result.bind (fun ((_, _, distance) as found) ->
+                        if distance <= matchingTolerance || distance > matchingTolerance + roundoff then Ok found
+                        else Error originalError))
+        | found -> found
+
     let internal distanceWith target sample options = projectionWith target sample options |> Result.map (fun (_, _, distance) -> distance)
     let internal distance target sample = distanceWith target sample defaultDistanceOptions
 

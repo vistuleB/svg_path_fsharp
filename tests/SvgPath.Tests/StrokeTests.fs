@@ -371,3 +371,50 @@ let ``stroke exposes Offset.Join and Offset.Cap type aliases`` () =
     let source = simpleLineSubpath (point 0.0 0.0) (point 10.0 0.0)
     let path = Stroke.subpathWith source 1.0<length> Offset.Join.Round Offset.Cap.RoundCap Offset.defaultOptions |> Result.defaultWith (failwithf "%A")
     Assert.Single(path.Subpaths) |> ignore
+
+[<Fact>]
+let ``large coordinates with scaled fitting options preserve stroke geometry`` () =
+    let outline scale =
+        let p x y = Point.create (x * scale * 1.0<length>) (y * scale * 1.0<length>)
+        let source = Subpath.ofSegment (QuadraticBezier(p 0. 0., p 50. 40., p 100. 0.))
+        let defaults = Offset.defaultOptions
+        let options = { defaults with
+                            Fitting = { defaults.Fitting with Tolerance = defaults.Fitting.Tolerance * scale }
+                            StalledOffsetDiameter = defaults.StalledOffsetDiameter * scale }
+        let path = Stroke.subpathWith source (4.0<length> * scale) Offset.Round Offset.Butt options
+                   |> Result.defaultWith (failwithf "%A")
+        let result = List.exactlyOne (Path.subpaths path)
+        Assert.True(Subpath.isClosed result)
+        Assert.Equal(6, result.Segments.Length)
+        result.Segments
+    let reference = outline 1.0
+    for scale in [1000.0; 100000.0] do
+        for actual, expected in List.zip (outline scale) reference do
+            for t in [0.0; 0.25; 0.5; 0.75; 1.0] do
+                let a = Segment.point actual (Parameter.fromFloat t) |> Result.defaultWith (failwithf "%A")
+                let b = Segment.point expected (Parameter.fromFloat t) |> Result.defaultWith (failwithf "%A")
+                Assert.True(abs (a.X / scale - b.X) < 0.000001<length>)
+                Assert.True(abs (a.Y / scale - b.Y) < 0.000001<length>)
+
+[<Fact>]
+let ``matching projection preserves uncertain threshold`` () =
+    let p x y = Point.create (x * 1.0<length>) (y * 1.0<length>)
+    let segment = CubicBezier(
+        p 10124939.009510884 156173.76188860607,
+        p 8433479.483413106 1509341.3827668284,
+        p 6722287.76636116 2200000.0,
+        p 5000000.0 2200000.0)
+    let sample = p 5000000.0 1800000.0
+    let assertUnresolved = function
+        | Error(DistanceMaxIterationsReached _) -> ()
+        | other -> failwithf "Expected unresolved projection, got %A" other
+    Segment.projection segment sample |> assertUnresolved
+    let t, _, distance = Segment.projectionForMatching segment sample 0.000000002<length>
+                         |> Result.defaultWith (failwithf "%A")
+    Assert.Equal(1.0<parameter>, t)
+    Assert.Equal(400000.0<length>, distance)
+    Segment.projectionForMatching segment sample (400000.0<length> - 0.00000001<length>)
+    |> assertUnresolved
+    let _, _, witness = Segment.projectionForMatching segment sample 400000.0<length>
+                        |> Result.defaultWith (failwithf "%A")
+    Assert.True(witness <= 400000.0<length>)

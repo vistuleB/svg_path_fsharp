@@ -540,7 +540,7 @@ module Arrangement =
             match segment with
             | Line(startPoint, finishPoint) -> vertexProjectsToLineInterior vertex startPoint finishPoint tolerance
             | _ ->
-                Segment.projection segment vertex
+                Segment.projectionForMatching segment vertex tolerance
                 |> Result.mapError InternalArrangementSegmentError
                 |> Result.map (fun (t, _, distance) ->
                     if distance <= tolerance && t > 0.0<parameter> && t < 1.0<parameter> then Some t else None)

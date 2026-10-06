@@ -1,5 +1,20 @@
 # Gleam commit-by-commit synchronization
 
+## Large-coordinate stroke projection correction
+
+Mirrors Gleam `cb40ef8`: arrangement and overlap matching share a
+projection retry when absolute refinement stalls below coordinate resolution.
+The retry uses 16 machine epsilons times the largest enclosure/sample coordinate.
+It retains the matching tolerance and errors within the unresolved distance band;
+public projection defaults and offset fitting defaults are unchanged.
+
+Regressions compare normalized stroke geometry at scales 1, 1,000 and 100,000
+with explicitly scaled fitting options, and preserve uncertain matching errors.
+
+Validation: `scripts/test-release` passed 1,878 fast and 26 slow F# tests.
+Gleam passed 1,682 fast, 26 slow, and 340 portable tests on each of Erlang and
+JavaScript through its `scripts/test-release`.
+
 ## Confirmed dead-code cleanup
 
 Gleam removes seven unused angle diagnostics, their ten private-only helpers,

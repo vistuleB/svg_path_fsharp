@@ -2,6 +2,13 @@
 
 ## 3.0.0 - 2026-10-05
 
+- Fix large-coordinate stroke construction failing in internal point projections.
+  Arrangement and overlap matching retry stalled refinement with a coordinate
+  roundoff allowance, retain the original matching tolerance, and preserve
+  errors for unresolved near-threshold decisions. Public projection defaults
+  remain unchanged. Regressions compare stroke geometry at scales 1, 1,000,
+  and 100,000 and check the uncertain matching threshold.
+
 - Remove the unused internal callback minimum-width default wrapper. Retain
   the explicit-options hook used by focused support-search tests.
 

@@ -19,6 +19,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Units.fs" />
     <Compile Include="InternalNumber.fs" />
+    <Compile Include="ParameterNormalization.fs" />
     <Compile Include="Format.fs" />
     <Compile Include="Trig.fs" />
     <Compile Include="Point.fs" />

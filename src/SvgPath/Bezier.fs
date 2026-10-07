@@ -201,23 +201,13 @@ module Bezier =
             let control2 = derivative curve toParameter |> Point.scale (-parameterDelta / 3.0) |> fun v -> Point.translate v endPoint
             CubicBezierData(startPoint, control1, control2, endPoint)
 
-    let private normalizedProgresses points =
-        points
-        |> List.map InternalNumber.normalizeZero
-        |> List.distinct
-        |> List.sort
-        |> List.skipWhile ((=) (parameter 0.0))
-        |> List.rev
-        |> List.skipWhile ((=) (parameter 1.0))
-        |> List.rev
-
     let splitMany curve points =
-        let points = normalizedProgresses points
+        let points = ParameterNormalization.normalizeSplits points
         let boundaries = parameter 0.0 :: (points @ [ parameter 1.0 ])
         boundaries |> List.pairwise |> List.map (fun (fromParameter, toParameter) -> between curve fromParameter toParameter)
 
     let splitManyInside curve points =
-        let points = normalizedProgresses points
+        let points = ParameterNormalization.normalizeSplits points
         if points |> List.exists (fun t -> t < parameter 0.0 || t > parameter 1.0) then
             Error SplitOutsideBezier
         else

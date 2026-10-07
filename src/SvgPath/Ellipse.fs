@@ -211,22 +211,12 @@ module Ellipse =
     let arcSplitInside arc t =
         if t < parameter 0.0 || t > parameter 1.0 then Error SplitOutsideArc else Ok(arcSplit arc t)
 
-    let private normalizedProgresses points =
-        points
-        |> List.map InternalNumber.normalizeZero
-        |> List.distinct
-        |> List.sort
-        |> List.skipWhile ((=) (parameter 0.0))
-        |> List.rev
-        |> List.skipWhile ((=) (parameter 1.0))
-        |> List.rev
-
     let arcSplitMany arc points =
-        let boundaries = parameter 0.0 :: normalizedProgresses points @ [ parameter 1.0 ]
+        let boundaries = parameter 0.0 :: ParameterNormalization.normalizeSplits points @ [ parameter 1.0 ]
         boundaries |> List.pairwise |> List.map (fun (fromParameter, toParameter) -> arcBetween arc fromParameter toParameter)
 
     let arcSplitManyInside arc points =
-        let points = normalizedProgresses points
+        let points = ParameterNormalization.normalizeSplits points
         if points |> List.exists (fun t -> t < parameter 0.0 || t > parameter 1.0) then
             Error SplitOutsideArc
         else

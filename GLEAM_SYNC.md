@@ -1,5 +1,26 @@
 # Gleam commit-by-commit synchronization
 
+## Internal duplication cleanup
+
+- Gleam `3911498`: share exact split-parameter normalization between Bézier and
+  ellipse. Mirrored in F# `4374e75`, retaining each port's existing algorithm.
+- Gleam `56ab4c7`: intersections reuse core Bézier conversion helpers. F# already
+  shares point types and has no corresponding duplicated segment converter.
+- Gleam `89d132d`: share adjacent-line construction with explicit tolerance and
+  corrected positive remainder between stroke and offset. Mirrored here. F# has
+  no equivalent copied integer-power routine to consolidate.
+- Gleam `8316a16`: wrap `Affine` inside opaque `transform.Matrix`; constructors
+  remain unchanged. F# already uses `Affine` directly, so needs no change.
+
+These changes preserve exact duplicate/endpoint rules, numerical operation
+order, and the original 1e-9 adjacent-point tolerances. Numerically different
+helpers, including intersections' simpler remainder, remain separate.
+Gleam portable coverage now includes existing transform and signed-zero split
+regressions on both backends (400 tests each).
+
+Validation: `scripts/test-release` passed 1,881 fast and 26 slow F# tests;
+Gleam passed 1,685 fast, 26 slow, and 400 portable tests per backend.
+
 ## Area sweeps from Gleam `d64a8b9`
 
 Mirror x-axis sweeps for candidate edge intersections and active slab crossings.

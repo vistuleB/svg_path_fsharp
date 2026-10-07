@@ -28,6 +28,7 @@
     <Compile Include="Root.fs" />
     <Compile Include="Bezier.fs" />
     <Compile Include="SvgPath.fs" />
+    <Compile Include="LineConstruction.fs" />
     <Compile Include="Measure.fs" />
     <Compile Include="Bounds.fs" />
     <Compile Include="Fit.fs" />

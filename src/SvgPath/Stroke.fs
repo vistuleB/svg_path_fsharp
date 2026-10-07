@@ -67,15 +67,6 @@ module Stroke =
                 Segment.validateLengthOptions options.LengthOptions
                 |> Result.mapError StrokePathError)
 
-    let rec private lineSegmentsBetween points =
-        match points with
-        | []
-        | [ _ ] -> []
-        | first :: second :: rest ->
-            let tail = lineSegmentsBetween (second :: rest)
-            if Point.near 1.0e-9<length> first second then tail
-            else Line(first, second) :: tail
-
     let private zeroLengthRoundStrokePath center radius =
         let right = Point.translate (Point.create radius 0.0<length>) center
         let left = Point.translate (Point.create -radius 0.0<length>) center
@@ -96,7 +87,7 @@ module Stroke =
         let topRight = Point.subtract (Point.add center along) across
         let bottomRight = Point.add (Point.add center along) across
         let bottomLeft = Point.add (Point.subtract center along) across
-        lineSegmentsBetween [ topLeft; topRight; bottomRight; bottomLeft; topLeft ]
+        LineConstruction.segments 1.0e-9<length> [ topLeft; topRight; bottomRight; bottomLeft; topLeft ]
         |> Subpath.create
         |> Result.bind (Subpath.close)
         |> Result.map Path.singleton
@@ -156,13 +147,6 @@ module Stroke =
 
     let path path width join cap = pathWith path width join cap Offset.defaultOptions
 
-    let private positiveRemainder (value: float<length>) (modulus: float<length>) =
-        let turns = floor (value / modulus)
-        let remainder = value - turns * modulus
-        if remainder < 0.0<length> then remainder + modulus
-        elif remainder >= modulus then remainder - modulus
-        else remainder
-
     let private dashStart pattern offset =
         let rec loop index remainingOffset = function
             | [] -> 0, 0.0<length>
@@ -181,7 +165,7 @@ module Stroke =
 
     let private dashIntervals length pattern offset =
         let patternLength = List.sum pattern
-        let startIndex, startRemaining = dashStart pattern (positiveRemainder offset patternLength)
+        let startIndex, startRemaining = dashStart pattern (InternalNumber.positiveRemainder offset patternLength)
         let rec loop position index remaining reversed =
             if position > length || (position = length && remaining > 0.0<length>) then List.rev reversed
             elif remaining <= 0.0<length> then

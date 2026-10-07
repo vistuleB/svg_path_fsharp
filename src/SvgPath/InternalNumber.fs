@@ -42,3 +42,11 @@ module InternalNumber =
         if Double.IsFinite(float result) then Ok result else Error()
 
     let isFinite value = Double.IsFinite value
+
+    /// Wrap a value for a positive modulus, correcting rounded boundary results.
+    let internal positiveRemainder (value: float<'Unit>) (modulus: float<'Unit>) =
+        let turns = floor (value / modulus)
+        let remainder = value - turns * modulus
+        if remainder < 0.0<_> then remainder + modulus
+        elif remainder >= modulus then remainder - modulus
+        else remainder

@@ -2813,17 +2813,8 @@ module Offset =
             if leftT >= 0.0<length> && rightT <= 0.0<length> && pointIsFinite point then Ok point
             else Error()
 
-    let rec private lineSegmentsBetween points =
-        match points with
-        | []
-        | [ _ ] -> []
-        | first :: second :: rest ->
-            let tail = lineSegmentsBetween (second :: rest)
-            if Point.near pointTolerance first second then tail
-            else Line(first, second) :: tail
-
     let private clippedMiterJoin startPoint finish pivot apex limit =
-        let bevel = lineSegmentsBetween [startPoint; finish]
+        let bevel = LineConstruction.segments pointTolerance [startPoint; finish]
         match Point.normalize (Point.subtract apex pivot) with
         | None -> bevel
         | Some axis ->
@@ -2837,7 +2828,7 @@ module Offset =
                 let p = Point.interpolate startPoint apex (Parameter.fromFloat ((limit-a)/(tip-a)))
                 let q = Point.interpolate finish apex (Parameter.fromFloat ((limit-b)/(tip-b)))
                 if pointIsFinite p && pointIsFinite q then
-                    lineSegmentsBetween [startPoint; p; q; finish]
+                    LineConstruction.segments pointTolerance [startPoint; p; q; finish]
                 else bevel
 
     let private directedMiterJoin
@@ -2846,7 +2837,7 @@ module Offset =
         match directedLineIntersection
                 startPoint left.NudgedEndTangentDirection
                 finish right.NudgedStartTangentDirection with
-        | Error _ -> Ok(lineSegmentsBetween [ startPoint; finish ])
+        | Error _ -> Ok(LineConstruction.segments pointTolerance [ startPoint; finish ])
         | Ok apex ->
             let corner = offsetSegmentSourceEnd left.Source
             let miterLength = Point.distance corner apex
@@ -2854,23 +2845,23 @@ module Offset =
             let withinLimit =
                 offsetDistance <= pointTolerance || miterLength / offsetDistance <= miterLimit
             if withinLimit && pointIsFinite apex then
-                Ok(lineSegmentsBetween [ startPoint; apex; finish ])
+                Ok(LineConstruction.segments pointTolerance [ startPoint; apex; finish ])
             elif clip && pointIsFinite apex then
                 Ok(clippedMiterJoin startPoint finish corner apex (miterLimit * offsetDistance))
-            else Ok(lineSegmentsBetween [ startPoint; finish ])
+            else Ok(LineConstruction.segments pointTolerance [ startPoint; finish ])
 
     let private roundJoin
         (left: GHealedOffsetSegment) (_right: GHealedOffsetSegment)
         startPoint finish offset =
         let radius = abs offset
-        if radius <= pointTolerance then Ok(lineSegmentsBetween [ startPoint; finish ])
+        if radius <= pointTolerance then Ok(LineConstruction.segments pointTolerance [ startPoint; finish ])
         else
             let corner = offsetSegmentSourceEnd left.Source
             let startRadius = Point.displacement corner startPoint
             let endRadius = Point.displacement corner finish
             let angle = signedAngle startRadius endRadius
             if abs angle <= angleToleranceDegrees then
-                Ok(lineSegmentsBetween [ startPoint; finish ])
+                Ok(LineConstruction.segments pointTolerance [ startPoint; finish ])
             else
                 Ok [ Arc
                     { Start = startPoint
@@ -3158,7 +3149,7 @@ module Offset =
                         | false, _ -> join
                     match selected with
                     | Arcs limit -> arcsJoinSegments left right startPoint finish offset limit
-                    | Bevel -> Ok(lineSegmentsBetween [ startPoint; finish ])
+                    | Bevel -> Ok(LineConstruction.segments pointTolerance [ startPoint; finish ])
                     | Miter limit -> directedMiterJoin left right startPoint finish offset limit false
                     | MiterClip limit -> directedMiterJoin left right startPoint finish offset limit true
                     | Round -> roundJoin left right startPoint finish offset))
@@ -4370,10 +4361,10 @@ module Offset =
 
     let private bandCapSegments fromPoint toPoint (outward: Point<1>) radius cap =
         match cap with
-        | Butt -> lineSegmentsBetween [ fromPoint; toPoint ]
+        | Butt -> LineConstruction.segments pointTolerance [ fromPoint; toPoint ]
         | Square ->
             let extension = Point.scale radius outward
-            lineSegmentsBetween [ fromPoint; Point.add fromPoint extension; Point.add toPoint extension; toPoint ]
+            LineConstruction.segments pointTolerance [ fromPoint; Point.add fromPoint extension; Point.add toPoint extension; toPoint ]
         | RoundCap ->
             [ Arc { Start = fromPoint; Radius = Point.create radius radius
                     XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true; End = toPoint } ]
@@ -4381,7 +4372,7 @@ module Offset =
     let private openBandEndCap sideA sideB cap =
         let fromPoint, toPoint = Subpath.finish sideA, Subpath.finish sideB
         match cap, List.tryLast (Subpath.segments sideA) with
-        | Butt, _ | _, None -> Ok(lineSegmentsBetween [ fromPoint; toPoint ])
+        | Butt, _ | _, None -> Ok(LineConstruction.segments pointTolerance [ fromPoint; toPoint ])
         | _, Some last ->
             unitTangent last 1.0<parameter>
             |> Result.map (fun tangent -> bandCapSegments fromPoint toPoint tangent (Point.distance fromPoint toPoint / 2.0) cap)
@@ -4389,7 +4380,7 @@ module Offset =
     let private openBandStartCap sideA sideB cap =
         let fromPoint, toPoint = Subpath.start sideB, Subpath.start sideA
         match cap, List.tryHead (Subpath.segments sideB) with
-        | Butt, _ | _, None -> Ok(lineSegmentsBetween [ fromPoint; toPoint ])
+        | Butt, _ | _, None -> Ok(LineConstruction.segments pointTolerance [ fromPoint; toPoint ])
         | _, Some first ->
             unitTangent first 0.0<parameter>
             |> Result.map (fun tangent -> bandCapSegments fromPoint toPoint (Point.negate tangent) (Point.distance fromPoint toPoint / 2.0) cap)
@@ -5597,20 +5588,11 @@ module Offset =
                 max total (span.StartDistance + span.Length))
                 (first.StartDistance + first.Length)
 
-    let private positiveRemainder
-        (value: float<length>)
-        (modulus: float<length>) =
-        let turns = floor (value / modulus)
-        let remainder = value - turns * modulus
-        if remainder < 0.0<length> then remainder + modulus
-        elif remainder >= modulus then remainder - modulus
-        else remainder
-
     let private offsetMapDistance
         (distance: float<length>)
         (totalLength: float<length>)
         closedValue =
-        if closedValue then Ok(positiveRemainder distance totalLength)
+        if closedValue then Ok(InternalNumber.positiveRemainder distance totalLength)
         elif distance < 0.0<length> || distance > totalLength then
             Error(InternalInvalidOffsetMapDistance(distance, totalLength))
         else Ok distance

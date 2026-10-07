@@ -2,6 +2,9 @@
 
 ## 3.0.0 - 2026-10-05
 
+- Share internal split normalization, adjacent-line construction, and corrected
+  positive-remainder helpers without changing public APIs or tolerance policies.
+
 - Accelerate fill-rule and absolute-winding area with x-axis sweeps for
   candidate edge intersections and active slab crossings. Keep existing
   linearization, intersection, merging, and winding rules; densely overlapping

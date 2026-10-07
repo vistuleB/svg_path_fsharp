@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.0 - 2026-10-05
+## 3.0.0 - 2026-10-07
 
 - Share internal split normalization, adjacent-line construction, and corrected
   positive-remainder helpers without changing public APIs or tolerance policies.
@@ -27,7 +27,7 @@
   floating-point evaluation error during curve-pair refinement and endpoint
   lookup. Final certification still enforces the requested tolerance.
 
-Further arrangement refinements mirrored from the Gleam working tree:
+Arrangement API refinements:
 
 - Replace `Arrangement.validate` with `validateRepresentation` and
   `validateClosedBoundaries`; reject duplicate IDs and negative multiplicities.
@@ -35,7 +35,7 @@ Further arrangement refinements mirrored from the Gleam working tree:
 - Document the already-public `OrientedArrangementEdge` orientation contract.
 - Return `DualCertificationFailed` for exhausted dual sweep searches.
 
-Provisional refinements mirrored from Gleam through `92f36e4`:
+Additional API refinements:
 
 - Rename subpath partitioning to `Subpath.splitMany` and
   `Measure.subpathSplitAtLengths[With]`; retain segment interval extraction.

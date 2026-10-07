@@ -1,6 +1,7 @@
 namespace SvgPath
 
 type private AreaEdge = { Start: Point<length>; Finish: Point<length> }
+type private AreaEdgeSpan = { Edge: AreaEdge; Index: int; MinX: float<length>; MaxX: float<length> }
 type private Crossing = { Edge: AreaEdge; Y: float<length>; Winding: int }
 type private CrossingGroup = { Edge: AreaEdge; Y: float<length>; Winding: int; Crossings: int }
 type private AreaMode = FillRuleArea of FillRule | AbsoluteWindingArea
@@ -129,13 +130,36 @@ module Area =
             | _ -> value :: kept) []
         |> List.rev
 
-    let private arrangementXs edges tolerance =
+    // Preserve original operand and equal-height crossing order after sorting.
+    let private edgeSpans edges =
+        edges |> List.mapi (fun index edge ->
+            { Edge = edge; Index = index
+              MinX = min edge.Start.X edge.Finish.X
+              MaxX = max edge.Start.X edge.Finish.X })
+        |> List.sortBy _.MinX
+
+    let private arrangementXs edges spans tolerance =
         let endpoints = edges |> List.collect (fun edge -> [ edge.Start.X; edge.Finish.X ])
-        let intersections =
-            edges
-            |> List.mapi (fun index edge -> edges |> List.skip (index + 1) |> List.choose (edgeIntersectionX edge))
-            |> List.concat
-        dedupeSorted tolerance (endpoints @ intersections)
+        // Include the narrow phase's relaxed endpoint parameters and rounding.
+        let magnitude = spans |> List.fold (fun size span -> max size (max (abs span.MinX) (abs span.MaxX))) 0.0<length>
+        let padding = tolerance + magnitude * 0.000000000000003552713678800501
+        let rec sweep pending active xs =
+            match pending with
+            | [] -> xs
+            | first :: rest ->
+                let active = active |> List.filter (fun span -> span.MaxX + padding >= first.MinX - padding)
+                let xs = active |> List.fold (fun xs second ->
+                    let found =
+                        if first.Index < second.Index then edgeIntersectionX first.Edge second.Edge
+                        else edgeIntersectionX second.Edge first.Edge
+                    match found with Some x -> x :: xs | None -> xs) xs
+                sweep rest (first :: active) xs
+        dedupeSorted tolerance (endpoints @ sweep spans [] [])
+
+    let rec private slabEdges pending active x =
+        match pending with
+        | first :: rest when first.MinX < x -> slabEdges rest (first :: active) x
+        | _ -> pending, active |> List.filter (fun span -> span.MaxX > x)
 
     let private edgeYAt edge x =
         let dx = edge.Finish.X - edge.Start.X
@@ -186,11 +210,20 @@ module Area =
             | [] -> 0.0<length^2>
             | _ ->
                 let tolerance = arrangementTolerance edges
-                arrangementXs edges tolerance
-                |> List.pairwise
-                |> List.sumBy (fun (left, right) ->
-                    if right <= left then 0.0<length^2>
-                    else crossingGroups edges ((left + right) / 2.0) tolerance |> fun groups -> slabArea groups left right mode))
+                let spans = edgeSpans edges
+                let rec sweep (xs: float<length> list) pending active area =
+                    match xs with
+                    | left :: right :: rest ->
+                        let middle = (left + right) / 2.0
+                        let pending, active = slabEdges pending active middle
+                        let contribution =
+                            if right <= left then 0.0<length^2>
+                            else
+                                let edges = active |> List.sortBy _.Index |> List.map _.Edge
+                                crossingGroups edges middle tolerance |> fun groups -> slabArea groups left right mode
+                        sweep (right :: rest) pending active (area + contribution)
+                    | _ -> area
+                sweep (arrangementXs edges spans tolerance) spans [] 0.0<length^2>)
 
     let absoluteWindingPathWith path options = arrangementArea path AbsoluteWindingArea options
     let absoluteWindingPath path = absoluteWindingPathWith path Segment.defaultLinearizeOptions

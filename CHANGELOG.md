@@ -2,6 +2,11 @@
 
 ## 3.0.0 - 2026-10-05
 
+- Accelerate fill-rule and absolute-winding area with x-axis sweeps for
+  candidate edge intersections and active slab crossings. Keep existing
+  linearization, intersection, merging, and winding rules; densely overlapping
+  x-ranges can still require quadratic work.
+
 - Document coordinate-scale tolerance choices, offset/stroke length settings,
   and the distinction between area linearization accuracy and area error.
 

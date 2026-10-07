@@ -146,3 +146,37 @@ let ``fill area rejects invalid linearization options`` () =
     let options = { Tolerance = 0.0<length>; MaxDepth = 20 }
     Assert.Equal(Error(InvalidLinearizeTolerance 0.0<length>), Area.subpathWith subpath Nonzero options)
     Assert.Equal(Error(InvalidLinearizeTolerance 0.0<length>), Area.absoluteWindingSubpathWith subpath options)
+
+[<Fact>]
+let ``finely linearized quadratic preserves filled area`` () =
+    for scale in [1.0; 1000.0; 100000.0] do
+        let p x y = point (x * scale) (y * scale)
+        let path = Path.ofSubpaths [Subpath.ofSegment (QuadraticBezier(p 0.0 0.0, p 50.0 40.0, p 100.0 0.0))]
+        let lines = Path.toLines path |> Result.defaultWith (failwithf "%A")
+        let expected = abs (Area.signedPath lines) / scale / scale
+        for rule in [Nonzero; EvenOdd] do
+            let actual = Area.path path rule |> Result.defaultWith (failwithf "%A")
+            assertAreaNear 0.00000001<length^2> expected (actual / scale / scale)
+        let absolute = Area.absoluteWindingPath path |> Result.defaultWith (failwithf "%A")
+        assertAreaNear 0.00000001<length^2> expected (absolute / scale / scale)
+
+[<Fact>]
+let ``area sweep preserves disjoint self crossings and multiplicity`` () =
+    let loops = [0 .. 63] |> List.map (fun i ->
+        let x = float i * 3.0
+        polygon [point x 0.; point (x+2.) 2.; point x 2.; point (x+2.) 0.])
+    for loops in [loops; List.rev loops] do
+        let path = Path.ofSubpaths (loops @ loops)
+        let nonzero = Area.path path Nonzero |> Result.defaultWith (failwithf "%A")
+        let evenodd = Area.path path EvenOdd |> Result.defaultWith (failwithf "%A")
+        let absolute = Area.absoluteWindingPath path |> Result.defaultWith (failwithf "%A")
+        assertAreaNear 0.000001<length^2> 128.0<length^2> nonzero
+        assertAreaNear 0.000001<length^2> 0.0<length^2> evenodd
+        assertAreaNear 0.000001<length^2> 256.0<length^2> absolute
+
+[<Fact>]
+let ``area sweep handles adjacent vertical boundaries`` () =
+    let path = [0 .. 63] |> List.map (fun i -> square (float i) 0.0 1.0 |> polygon) |> Path.ofSubpaths
+    for rule in [Nonzero; EvenOdd] do
+        let actual = Area.path path rule |> Result.defaultWith (failwithf "%A")
+        assertAreaNear 0.000001<length^2> 64.0<length^2> actual

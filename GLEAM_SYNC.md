@@ -1,5 +1,25 @@
 # Gleam commit-by-commit synchronization
 
+## Area sweeps from Gleam `d64a8b9`
+
+Mirror x-axis sweeps for candidate edge intersections and active slab crossings.
+Retain the previous narrow-phase operand order and equal-height crossing order,
+with padded candidate bounds covering relaxed endpoint parameters and rounding.
+Linearization and winding/merging rules remain unchanged. Dense overlapping
+x-ranges can still require quadratic work.
+
+Matching regressions cover fine quadratic approximations through scale 100,000,
+repeated disjoint self-crossing contours, and adjacent vertical boundaries.
+`scripts/test-release` passed 1,881 fast and 26 slow F# tests. Gleam passed
+1,685 fast, 26 slow, and 343 portable tests on each of Erlang and JavaScript.
+A development differential probe matched the previous Gleam implementation
+exactly on 3,000 filled/absolute-winding calculations.
+
+The reproducible JavaScript benchmark lives in Gleam's
+`scripts/benchmark-area.mjs`. In a fresh-worker run, the 2,048-segment case fell
+from 790 ms to 25 ms; the 32,768-segment case went from exceeding an eight-second
+timeout to 202 ms. These are fixture-specific observations, not timing guarantees.
+
 ## Coordinate-scale tolerance guidance
 
 Mirrors Gleam `0ca6767`: README and API documentation for absolute length tolerances,

@@ -10,7 +10,7 @@ module TransformSerializeTests =
         for scale,shear in [2.0,1e-6;2.0,-1e-6;2000000.0,1.0] do
             let matrix = Transform.fromTuple (scale,0.0,shear,scale,0.0<length>,0.0<length>)
             let text = TransformSerialize.toStringWith matrix options
-            Assert.StartsWith("matrix(",text)
+            Assert.Contains("skewX(",text)
             let decoded = TransformParse.attribute text |> Result.defaultWith (failwithf "%A")
             let a,b,c,d,e,f = Transform.toTuple decoded
             Assert.True(a=scale && b=0.0 && d=scale && e=0.0<length> && f=0.0<length>)
@@ -86,8 +86,8 @@ module TransformSerializeTests =
 
     [<Fact>]
     let ``transform matrix fallback serializes`` () =
-        let transform = Transform.matrix 2.0 3.0 5.0 7.0 11.0<length> 13.0<length>
-        Assert.Equal("matrix(2 3 5 7 11 13)", TransformSerialize.toString transform)
+        let transform = Transform.matrix 2.0 3.0 4.0 6.0 11.0<length> 13.0<length>
+        Assert.Equal("matrix(2 3 4 6 11 13)", TransformSerialize.toString transform)
 
     [<Fact>]
     let ``transform serialization uses decimal options`` () =
@@ -170,11 +170,11 @@ module TransformSerializeTests =
         Assert.Equal("rotate(30.000001)", TransformSerialize.toStringWith transform (TransformSerialize.decimalOptions 6))
 
     [<Fact>]
-    let ``reflected rotation matrix uses matrix fallback`` () =
+    let ``reflected rotation matrix uses signed scale`` () =
         let transform = Transform.matrix 0.0 2.0 3.0 0.0 10.0<length> 20.0<length>
-        Assert.Equal("matrix(0 2 3 0 10 20)", TransformSerialize.toString transform)
+        Assert.Equal("translate(10 20) rotate(90) scale(2 -3)", TransformSerialize.toString transform)
 
     [<Fact>]
-    let ``parsed unmatched transform serializes to matrix`` () =
+    let ``parsed shear scale uses decomposition`` () =
         let transform = TransformParse.attribute "skewX(30) scale(2)" |> Result.defaultWith (failwithf "%A")
-        Assert.Equal("matrix(2 0 1.155 2 0 0)", TransformSerialize.toStringWith transform (TransformSerialize.decimalOptions 3))
+        Assert.Equal("skewX(30) scale(2)", TransformSerialize.toStringWith transform (TransformSerialize.decimalOptions 3))

@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.1.0 - 2026-10-13
+
+- Mirror Gleam’s affine factorization API: `Affine.decompose`,
+  `decomposeWithOrder`, and `recompose`, with 24 typed algebraic orders and
+  numerical reconstruction checks. Preserve F# length and angle units.
+- Distinguish impossible orders from numerical failures, including rank
+  information lost during normalization. Document singular translation,
+  quadratic boundary tolerance, sensitive factors, and extreme-range limits.
+- Use the affine engine for general readable transform serialization, retaining
+  direct `skewY` output. Add strict `TransformSerialize.toStringInOrder` and
+  checks on rounded SVG factors. Ordinary output falls back to matrix notation
+  when decomposition or formatting is unsuitable.
+- Existing signatures remain compatible. **Pretty-printed strings may change**,
+  including general skew factorizations and reflected scales. Decimal options
+  still govern rounding; use `forceMatrix` to require matrix notation.
+- Add all-order numerical grids, formatter regressions, and the 52 saved
+  Paper.js matrix assertions, adapting only five equivalent -180/+180 degree
+  endpoint conventions. Include reconstruction and serialization round trips.
+
 ## 3.0.1 - 2026-10-12
 
 - Recover near-endpoint ray crossings when coefficient-relative polynomial roots

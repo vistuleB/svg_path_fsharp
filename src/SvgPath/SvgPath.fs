@@ -843,6 +843,19 @@ module Segment =
                 refineLineCrossing
                     segment pointOnLine normal tolerance leftT leftValue middle (remaining - 1))
 
+    // Ordered projected controls prove monotonicity; endpoint signs alone do not.
+    let private lineCrossingIsMonotone segment pointOnLine normal =
+        let controls =
+            match segment with
+            | Line(a, b) -> [a; b]
+            | QuadraticBezier(a, b, c) -> [a; b; c]
+            | CubicBezier(a, b, c, d) -> [a; b; c; d]
+            | Arc _ -> []
+        let values = controls |> List.map (fun p -> Point.dot (Point.displacement pointOnLine p) normal)
+        not (List.isEmpty values) &&
+            (List.pairwise values |> List.forall (fun (a, b) -> a <= b)
+             || List.pairwise values |> List.forall (fun (a, b) -> a >= b))
+
     let private polishLineCrossingRoots
         segment pointOnLine normal roots (options: CrossingOptions) signedLineDistanceTolerance =
         roots
@@ -854,6 +867,22 @@ module Segment =
                 |> Result.bind (fun estimateValue ->
                     if abs estimateValue <= signedLineDistanceTolerance then
                         Ok(isolation.Estimate :: crossings)
+                    elif (isolation.Estimate = 0.0<parameter> || isolation.Estimate = 1.0<parameter>)
+                         && lineCrossingIsMonotone segment pointOnLine normal then
+                        // Widen only a rejected endpoint candidate with a proven monotone projection.
+                        lineCrossingValue segment pointOnLine normal 0.0<parameter>
+                        |> Result.bind (fun leftValue ->
+                            lineCrossingValue segment pointOnLine normal 1.0<parameter>
+                            |> Result.bind (fun rightValue ->
+                                if abs leftValue <= signedLineDistanceTolerance then Ok(0.0<parameter> :: crossings)
+                                elif abs rightValue <= signedLineDistanceTolerance then Ok(1.0<parameter> :: crossings)
+                                elif crossingValuesHaveSameSign leftValue rightValue then Ok crossings
+                                else
+                                    refineLineCrossing segment pointOnLine normal signedLineDistanceTolerance
+                                        0.0<parameter> leftValue 1.0<parameter> options.MaxIterations
+                                    |> Result.bind (function
+                                        | Some parameter -> Ok(parameter :: crossings)
+                                        | None -> Error(CrossingMaxIterationsReached(isolation.Estimate, estimateValue)))))
                     else
                         match root.Kind with
                         | NegativeToPositive

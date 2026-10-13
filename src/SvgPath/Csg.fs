@@ -22,6 +22,10 @@ module Csg =
         | CsgPathError of error: SegmentError
         | InternalBoundaryTopologyError of vertex: int * reason: BoundaryTopologyFailure
 
+    /// Binary output endpoints use the shared arrangement vertex positions, moving
+    /// each endpoint by at most the build tolerance. Controls and arc parameters
+    /// are retained; this does not bound the interior displacement of an arc.
+    /// Stored arrangement edges remain unchanged.
     type CsgResult =
         { Path: Path
           Build: Arrangement.ArrangementSegmentBuild }
@@ -142,20 +146,25 @@ module Csg =
                         if successor.Starts then Ok(Map.add incoming.Id successor.EdgeId links)
                         else Error(InternalBoundaryTopologyError(incoming.EndVertex, SectorMismatch))))) (Ok Map.empty)
 
-    let private trace edges links tolerance reversePositiveLayers =
+    let private trace edges links (vertices: Map<int, Point<length>>) reversePositiveLayers =
+        // Replace only newly constructed output geometry, after sector pairing.
+        let outputSegment edge =
+            edge.Segment
+            |> Segment.withStart vertices[edge.StartVertex]
+            |> Segment.withFinish vertices[edge.EndVertex]
         let byId = edges |> List.map (fun edge -> edge.Id, edge) |> Map.ofList
         let rec cycle seed current remaining segments limit =
             if limit <= 0 then Error(InternalBoundaryTopologyError(current.EndVertex, TraceFailed))
             else
                 match Map.tryFind current.Id links with
                 | None -> Error(InternalBoundaryTopologyError(current.EndVertex, TraceFailed))
-                | Some nextId when nextId = seed.Id -> Ok(List.rev (current.Segment :: segments), remaining)
+                | Some nextId when nextId = seed.Id -> Ok(List.rev (outputSegment current :: segments), remaining)
                 | Some nextId ->
                     match Map.tryFind nextId byId with
                     | None -> Error(InternalBoundaryTopologyError(current.EndVertex, TraceFailed))
                     | Some next when not (Set.contains nextId remaining) ->
                         Error(InternalBoundaryTopologyError(current.EndVertex, TraceFailed))
-                    | Some next -> cycle seed next (Set.remove nextId remaining) (current.Segment :: segments) (limit - 1)
+                    | Some next -> cycle seed next (Set.remove nextId remaining) (outputSegment current :: segments) (limit - 1)
         let rec gather remaining contours =
             if Set.isEmpty remaining then Ok(List.rev contours)
             else
@@ -163,8 +172,8 @@ module Csg =
                 let seed = byId[seedId]
                 cycle seed seed (Set.remove seedId remaining) [] (Set.count remaining + 1)
                 |> Result.bind (fun (segments, remaining) ->
-                    Subpath.createWith (WiggleWith tolerance) segments
-                    |> Result.bind (Subpath.closeWith (WiggleWith tolerance))
+                    Subpath.create segments
+                    |> Result.bind (Subpath.close)
                     |> Result.mapError CsgPathError
                     |> Result.bind (fun subpath ->
                         let subpath = if reversePositiveLayers && seed.Layer > 0 then Subpath.reverse subpath else subpath
@@ -175,7 +184,7 @@ module Csg =
         classify operation fillRule options.Tolerance left right build.Graph.Edges
         |> Result.bind (fun edges ->
             pairSectors edges
-            |> Result.bind (fun links -> trace edges links options.Tolerance false))
+            |> Result.bind (fun links -> trace edges links (build.Graph.Vertices |> List.map (fun vertex -> vertex.Id, vertex.Point) |> Map.ofList) false))
         |> Result.map (Path.ofSubpaths >> fun path -> { Path = path; Build = build })
 
     let private booleanWith operation left right fillRule options =

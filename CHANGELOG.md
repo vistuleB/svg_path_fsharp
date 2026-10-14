@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.1.0 - 2026-10-13
+## 3.1.0 - 2026-10-14
 
 - Mirror Gleam’s affine factorization API: `Affine.decompose`,
   `decomposeWithOrder`, and `recompose`, with 24 typed algebraic orders and
@@ -18,6 +18,20 @@
 - Add all-order numerical grids, formatter regressions, and the 52 saved
   Paper.js matrix assertions, adapting only five equivalent -180/+180 degree
   endpoint conventions. Include reconstruction and serialization round trips.
+
+- Reconstruct binary CSG boundaries using the arrangement's cyclic edge order
+  and per-operand face windings. Preserve narrow filled regions, tangent joins,
+  source multiplicity, and implicit closing edges; discard exact closed retraces.
+- Recover rejected polynomial line crossings in Bernstein form, checking the
+  geometric residual and iteration limit. Canonicalize signed-zero root candidates.
+- Preserve certified full polynomial overlaps when endpoint projections produce
+  competing nearby addresses; require a control-point bound and shared monotonicity.
+- Ignore exact zero-length lines beside curves during offset/stroke normalization,
+  preserving all-point and invalid-arc error behavior.
+- Make long-path construction and SVG parsing stack-safe, including long numeric
+  inputs, repeated commands, and implicit command groups.
+- Organize Paper.js-derived checks separately from native regressions and document
+  known API differences. This audit does not claim complete Paper.js equivalence.
 
 ## 3.0.1 - 2026-10-12
 

@@ -1681,8 +1681,8 @@ path; it trusts that the supplied source corresponds to the graph.
 ## Path CSG
 
 `Csg` performs operations on the filled point-sets represented by SVG paths. It
-builds an arrangement graph, measures the winding field on either side of its
-edges, applies the requested fill rule, and reconstructs the necessary boundary
+builds an arrangement graph, propagates each operand’s winding across its
+faces, applies the requested fill rule, and reconstructs the necessary boundary
 cycles.
 
 ```fsharp

@@ -464,3 +464,50 @@ let ``parser tracked relative serialization is stable after parsing`` () =
     let once = Parse.path source |> Result.defaultWith (failwithf "%A") |> fun path -> Serialize.pathWith path options
     let twice = Parse.path once |> Result.defaultWith (failwithf "%A") |> fun path -> Serialize.pathWith path options
     Assert.Equal(once, twice)
+
+[<Fact>]
+let ``compact curve groups omit decimal separators`` () =
+    let source = Parse.path "M0 0Q1.5 .5 .5 .5" |> Result.defaultWith (failwithf "%A")
+    let encoded = Serialize.pathWith source (Serialize.decimalOptions 1 |> Serialize.minimizeWhitespace)
+    Assert.Equal("M0 0Q1.5.5.5.5", encoded)
+    Assert.Equal(Ok source, Parse.path encoded)
+
+[<Fact>]
+let ``compact repeated commands retain integer boundaries`` () =
+    let source = Parse.path "M0 0L1.5 .5L.5 2L.5 .5" |> Result.defaultWith (failwithf "%A")
+    for newlines in [Serialize.OneLine; Serialize.AtSubpaths] do
+        let options = { Serialize.decimalOptions 1 with MinimizeWhitespace=true; RepeatCommands=false; UseHorizontalVertical=false; Newlines=newlines }
+        let encoded = Serialize.pathWith source options
+        Assert.Equal("M0 0L1.5.5.5 2 .5.5", encoded)
+        Assert.Equal(Ok source, Parse.path encoded)
+
+[<Fact>]
+let ``compact group boundaries inspect final token including exponents`` () =
+    for control in ["1.5 2"; "1.5-2"; "1.5 .5"; "1.5-.5"; "1 1e-20"] do
+        let source = Parse.path ("M0 0Q" + control + " .5 .5") |> Result.defaultWith (failwithf "%A")
+        let options = {Serialize.defaultOptions with MinimizeWhitespace=true; RightDecimals=NumberFormat.System}
+        let encoded = Serialize.pathWith source options
+        if control = "1 1e-20" then
+            Assert.Equal(Parse.path (encoded.Replace(".5", " .5")), Parse.path encoded)
+        else Assert.Equal(Ok source, Parse.path encoded)
+
+[<Fact>]
+let ``compact initial axis line prefers shorter command`` () =
+    let source = Parse.path "M100 100L100 200" |> Result.defaultWith (failwithf "%A")
+    let compact = Serialize.minifyingOptions 3
+    Assert.Equal("m100 100v100", Serialize.pathWith source compact)
+    Assert.Equal("M100 100V200", Serialize.pathWith source {compact with Relative=false})
+    Assert.Equal("m100 100 0 100", Serialize.pathWith source {compact with UseHorizontalVertical=false})
+
+[<Fact>]
+let ``compact scientific spelling preserves rounding`` () =
+    let source = Parse.path "M100000 -0.00001L123000 0.0000014" |> Result.defaultWith (failwithf "%A")
+    let encoded = Serialize.pathWith source (Serialize.decimalOptions 6 |> Serialize.minimizeWhitespace)
+    Assert.Equal("M1e5-1e-5L123e3 1e-6", encoded)
+    Assert.Equal(Parse.path "M100000 -0.00001L123000 0.000001", Parse.path encoded)
+
+[<Fact>]
+let ``compact scientific spelling respects fixed format`` () =
+    let source = Parse.path "M100000 0.00001" |> Result.defaultWith (failwithf "%A")
+    Assert.Equal("M100000.000000.000010", Serialize.pathWith source (Serialize.fixedDecimalOptions 6 |> Serialize.minimizeWhitespace))
+    Assert.Equal("M 100000 0.00001", Serialize.pathWith source (Serialize.decimalOptions 6))

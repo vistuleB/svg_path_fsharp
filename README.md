@@ -213,6 +213,14 @@ let outlineUnion centerlines width filledRegion =
     |> Result.bind (fun outline ->
         Csg.unionPath outline filledRegion Nonzero
         |> Result.mapError BooleanFailure)
+
+// Choose one coordinate mode for the whole path; retain relative on ties.
+// This serializes twice and compares size, not geometric accuracy.
+let smallerPathData (path: Path) decimalPlaces =
+    let options = Serialize.minifyingOptions decimalPlaces
+    let relative = Serialize.pathWith path options
+    let absolute = Serialize.pathWith path { options with Relative = false }
+    if absolute.Length < relative.Length then absolute else relative
 ```
 <!-- tested-recipes:end -->
 
@@ -1128,7 +1136,7 @@ and [stroke line caps](https://www.w3.org/TR/SVG2/painting.html#LineCaps).
 There is a similar difference between `M 0,0` and `M 0,0 Z`, with the `Z`
 command supplying a zero-length line segment to the subpath:
 
-![Zero-length closepath behavior](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/zero_length_closepath_probe.svg)
+![Zero-length closepath behavior](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/zero_length_closepath_probe.svg)
 
 ```xml
 <path d="M 90,50" style="fill:none;stroke:blue;stroke-width:24;stroke-linecap:round;" />
@@ -1411,9 +1419,9 @@ direction at `limit * abs(offset)`, rather than falling back immediately to
 Bevel. Divergent extensions or a clipping plane behind either join endpoint
 use Bevel; the join does not shorten neighboring segments.
 
-![Miter versus clipped miter](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/miter_clip_comparison.svg)
+![Miter versus clipped miter](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/miter_clip_comparison.svg)
 
-![MiterClip limits](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/miter_clip_limits.svg)
+![MiterClip limits](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/miter_clip_limits.svg)
 
 `Arcs limit` continues source curvature with tangent circles (a line for zero
 or unavailable endpoint curvature), adjusting nonintersecting circles while
@@ -1423,9 +1431,9 @@ source endpoints use Round. Limits that would trim neighbors use Bevel.
 Both join limits must be finite and positive. Failed circle construction
 returns `ConstructionFailed`.
 
-![Arcs self-intersecting example](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/arcs_join_self_intersection.svg)
+![Arcs self-intersecting example](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/arcs_join_self_intersection.svg)
 
-![Arcs disjoint circles](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/arcs_join_comparison_2.svg)
+![Arcs disjoint circles](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/arcs_join_comparison_2.svg)
 
 These follow the [published SVG 2 proposal](https://www.w3.org/TR/SVG2/painting.html#LineJoinShape),
 not a promise of browser support: `arcs` was adopted on
@@ -1482,13 +1490,13 @@ The final stage is selected independently:
 The following open source has no offside stage, so the panels isolate the three
 final-trimming choices:
 
-![Single offset with no final trimming, cusp trimming, and in-band trimming](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/single_offset_final_trimming.svg)
+![Single offset with no final trimming, cusp trimming, and in-band trimming](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/single_offset_final_trimming.svg)
 
 For closed contours, `Offside` is an additional and independent operation. In
 this example the source contains oppositely oriented concentric rectangles; the
 final trimming mode is `NoTrimming` in both panels:
 
-![Single offset of concentric rectangles with offside trimming disabled and enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/single_offset_offside_trimming.svg)
+![Single offset of concentric rectangles with offside trimming disabled and enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/single_offset_offside_trimming.svg)
 
 The defaults are `Offside = true` and `FinalTrimming = InBandTrimming`.
 Adjacent reversed/non-reversed loops created locally during offset assembly are
@@ -1539,12 +1547,12 @@ the band's orientation. This enumeration is skipped when `InBand = false`.
 The cusp switches act before joint band trimming. The four-concave-corner
 example below holds `InBand = true` while changing the two side-local switches:
 
-![Band trimming with both, one, and neither side-local cusp pass enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/band_cusp_trimming.svg)
+![Band trimming with both, one, and neither side-local cusp pass enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/band_cusp_trimming.svg)
 
 The figure-eight below holds both cusp switches at `true` and changes only the
 final joint pass:
 
-![Figure-eight band with in-band trimming disabled and enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/band_in_band_trimming.svg)
+![Figure-eight band with in-band trimming disabled and enabled](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/band_in_band_trimming.svg)
 
 All three band switches default to `true`. Turning a stage off is useful for
 inspection and for specialized callers that want to preserve intermediate
@@ -1611,7 +1619,7 @@ are split into atomic edges. The left panel uses one color per source subpath;
 the right panel shows the resulting vertices, directed edges, winding levels,
 and directional multiplicities.
 
-![Two overlapping square subpaths and their arrangement graph](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/arrangement_graph_overlapping_squares.svg)
+![Two overlapping square subpaths and their arrangement graph](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/arrangement_graph_overlapping_squares.svg)
 
 ```fsharp
 Arrangement.build [ left; right ] 0.000001<length> 0.00001<length>
@@ -1656,7 +1664,7 @@ circle's subdivision is shifted by 45 degrees. The graph splits the common
 circle at all four source endpoints and represents each geometric edge once,
 with one occurrence in each direction.
 
-![Oppositely directed equal circles with phase-shifted arc subdivisions and their arrangement graph](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/arrangement_graph_semantic_circle_overlap.svg)
+![Oppositely directed equal circles with phase-shifted arc subdivisions and their arrangement graph](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/arrangement_graph_semantic_circle_overlap.svg)
 
 `Arrangement.build` is the supported constructor. Direct construction remains
 possible for inspection, serialization, and tests, but callers then assume
@@ -1725,14 +1733,14 @@ Under `Nonzero`, any nonzero winding level is filled. The arrangement panel's
 black numbers are the winding levels immediately to the left and right of each
 directed edge; its red numbers are forward and reverse source multiplicities.
 
-![Eight-panel ArrangementGraph CSG example using the Nonzero fill rule](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/arrangement_csg_nonzero.svg)
+![Eight-panel ArrangementGraph CSG example using the Nonzero fill rule](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/arrangement_csg_nonzero.svg)
 
 The same inputs and arrangement produce different Boolean boundaries under
 `EvenOdd`, where winding parity determines whether a sector is filled. The final
 `nestedContours` panel is unchanged because that unary operation preserves the
 complete signed winding field and does not take a fill rule.
 
-![Eight-panel ArrangementGraph CSG example using the EvenOdd fill rule](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.0/figures/arrangement_csg_evenodd.svg)
+![Eight-panel ArrangementGraph CSG example using the EvenOdd fill rule](https://raw.githubusercontent.com/vistuleB/svg_path_fsharp/assets-v3.1.1/figures/arrangement_csg_evenodd.svg)
 
 For points away from a boundary:
 
@@ -1828,3 +1836,18 @@ field into the final `trimming` argument of the applicable offset `With` call.
 Use `Offset.defaultSingleOffsetTrimming` or `Offset.defaultBandTrimming` to keep
 the ordinary behavior. Entry points without `With` keep their signatures and
 default behavior; segment and untrimmed calls need no trimming policy.
+
+### Compact serialization policies
+
+Compact unpadded `AtMost` numbers may use shorter scientific notation after
+rounding. Initial lines may use a shorter enabled H/V command. Fixed and padded
+numeric layouts retain their contracts; compact strings can change in 3.1.1.
+The tested `smallerPathData` recipe compares whole-path absolute and relative
+output, retaining relative on ties. It runs serialization twice and compares
+uncompressed size, not geometric accuracy; it does not mix coordinate modes.
+
+Decimal places are not a geometric error bound. Endpoint-form arcs near radius
+correction can be sensitive, and more digits need not monotonically reduce
+geometric error. For explicit SVG arc normalization before transformation or
+serialization, use `Path.normalizeSvgArcs`: zero-radius arcs become lines and
+coincident-endpoint arcs are omitted. This does not simplify other geometry.

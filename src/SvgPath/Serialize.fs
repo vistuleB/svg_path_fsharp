@@ -57,6 +57,8 @@ module Serialize =
           UseSmoothCurves = true
           Newlines = OneLine }
 
+    /// Decimal places govern numeric rounding, not geometric error. Endpoint-form
+    /// arcs near radius correction can remain sensitive even at higher precision.
     let decimalOptions decimalPlaces = { defaultOptions with RightDecimals = NumberFormat.AtMost decimalPlaces }
     let fixedDecimalOptions decimalPlaces = { defaultOptions with RightDecimals = NumberFormat.RightDecimalOptions.Fixed decimalPlaces }
     let relativeOptions = { defaultOptions with Relative = true }
@@ -72,6 +74,9 @@ module Serialize =
     let withLeftDecimals left (options: Options) = { options with LeftDecimals = left }
     let withRightDecimals right (options: Options) = { options with RightDecimals = right }
 
+    /// Compact output prefers shorter initial H/V commands and shorter scientific
+    /// spellings of already-rounded, unpadded AtMost numbers. Fixed and padded
+    /// numeric layouts are retained; equal-length spellings keep the prior form.
     let minifyingOptions decimalPlaces =
         relativeDecimalOptions decimalPlaces
         |> minimizeWhitespace
@@ -90,9 +95,29 @@ module Serialize =
         elif value.StartsWith("-0.", StringComparison.Ordinal) then "-" + value.Substring 2
         else value
 
+    // Rewrite only already-rounded text, retaining the decimal spelling on ties.
+    let private shorterScientific (value: string) =
+        if value.Contains("e") || value.Contains("E") then value
+        else
+            let sign, unsigned = if value.StartsWith("-") then "-", value.Substring(1) else "", value
+            let parts = unsigned.Split('.')
+            let digits, places = if parts.Length = 2 then parts.[0] + parts.[1], parts.[1].Length else unsigned, 0
+            let significant = digits.TrimStart('0')
+            let trimmed = significant.TrimEnd('0')
+            if trimmed.Length = 0 then value
+            else
+                let exponent = significant.Length - trimmed.Length - places
+                let candidate = sign + trimmed + "e" + exponent.ToString(CultureInfo.InvariantCulture)
+                if candidate.Length < value.Length then candidate else value
+
     let private number (value: float<'Unit>) (format: SerializationFormat) =
         let formatted = NumberFormat.number (float value) format.NumberFormat
-        if format.Options.MinimizeWhitespace then minimizeLeadingZero formatted else formatted
+        if not format.Options.MinimizeWhitespace then formatted
+        else
+            let compact = minimizeLeadingZero formatted
+            match format.Options.LeftDecimals, format.Options.RightDecimals with
+            | NumberFormat.Succinct, NumberFormat.AtMost _ -> shorterScientific compact
+            | _ -> compact
 
     let private rawNumber (value: float<'Unit>) (options: Options) = NumberFormat.rawNumber (float value) (numberOptions options)
     let private quantizedNumber (value: float<length>) (format: SerializationFormat) =
@@ -106,18 +131,21 @@ module Serialize =
     let private add left right = Point.add left right
     let private origin = Point.create 0.0<length> 0.0<length>
 
+    let private finalNumberAcceptsDecimalBoundary (left: string) =
+        let mutable i = left.Length - 1
+        while i >= 0 && left.[i] >= '0' && left.[i] <= '9' do i <- i - 1
+        i >= 0 && (left.[i] = '.' || left.[i] = 'e' || left.[i] = 'E'
+                   || ((left.[i] = '-' || left.[i] = '+') && i > 0 && (left.[i-1] = 'e' || left.[i-1] = 'E')))
+
     let private minimizedSeparator (left: string) (right: string) =
-        if right.StartsWith("-", StringComparison.Ordinal) || right.StartsWith("+", StringComparison.Ordinal) then ""
-        elif right.StartsWith(".", StringComparison.Ordinal) && left.Contains(".", StringComparison.Ordinal) then ""
+        if right.StartsWith("-") || right.StartsWith("+") then ""
+        elif right.StartsWith(".") && finalNumberAcceptsDecimalBoundary left then ""
         else " "
 
-    let private commandChunkSeparator (right: string) (options: Options) =
-        if options.MinimizeWhitespace && (right.StartsWith("-") || right.StartsWith("+")) then "" else " "
+    let private commandChunkSeparator left right (options: Options) =
+        if options.MinimizeWhitespace then minimizedSeparator left right else " "
 
-    let private groupSeparator _left right options =
-        // The previous group may contain multiple numbers; a decimal point
-        // in an earlier token cannot disambiguate its final integer token.
-        commandChunkSeparator right options
+    let private groupSeparator left right options = commandChunkSeparator left right options
 
     let private pointValue point format =
         let x = number point.X format
@@ -238,9 +266,9 @@ module Serialize =
         match commands with
         | [] -> ""
         | first :: rest ->
-            rest |> List.fold (fun joined next ->
-                let separator = if Set.contains (commandName next) commandNames then (if format.Options.MinimizeWhitespace then "" else " ") else commandChunkSeparator next format.Options
-                joined + separator + next) first
+            rest |> List.fold (fun (joined, previous) next ->
+                let separator = if Set.contains (commandName next) commandNames then (if format.Options.MinimizeWhitespace then "" else " ") else commandChunkSeparator previous next format.Options
+                joined + separator + next, next) (first, first) |> fst
 
     let private joinCommands commands format =
         match format.Options.Newlines with
@@ -273,21 +301,29 @@ module Serialize =
             | [] -> ""
             | first :: rest ->
                 rest
-                |> List.fold (fun joined next ->
+                |> List.fold (fun (joined, previous) next ->
                     let separator =
                         let name = commandName next
                         if name = "M" || name = "m" then "\n"
                         elif Set.contains name commandNames then
                             if format.Options.MinimizeWhitespace then "" else " "
-                        else commandChunkSeparator next format.Options
-                    joined + separator + next) first
+                        else commandChunkSeparator previous next format.Options
+                    joined + separator + next, next) (first, first) |> fst
+
+    let private preferInitialShorthand move line implicit format =
+        format.Options.MinimizeWhitespace
+        && List.contains (commandName line) ["H"; "V"; "h"; "v"]
+        && (joinCommands [move; line] format).Length < String.length implicit
 
     let private absoluteSubpath (subpath: Subpath) format =
         let segments = dropClosingLine subpath
         let move, remaining =
             match segments with
-            | Line(_, endpoint) :: rest when not format.Options.ExplicitInitialLineto ->
-                command "M" (joinGroups [ pointValue subpath.Start format; pointValue endpoint format ] format) format, rest
+            | Line(startPoint, endpoint) :: rest when not format.Options.ExplicitInitialLineto ->
+                let implicit = command "M" (joinGroups [ pointValue subpath.Start format; pointValue endpoint format ] format) format
+                let move = command "M" (pointValue subpath.Start format) format
+                if preferInitialShorthand move (absoluteLine startPoint endpoint format) implicit format then move, segments
+                else implicit, rest
             | _ -> command "M" (pointValue subpath.Start format) format, segments
         let _, reversed =
             remaining |> List.fold (fun (previous, output) segment ->
@@ -401,9 +437,12 @@ module Serialize =
                 let lineFormat = { format with Options = { format.Options with UseHorizontalVertical = false } }
                 let lineCommands, next = trackedLine startPoint endPoint currentState lineFormat
                 let arguments = commandArguments (List.exactlyOne lineCommands) format.Options
-                move <- move + commandChunkSeparator arguments format.Options + arguments
-                currentState <- next
-                segments <- rest
+                let implicit = move + commandChunkSeparator move arguments format.Options + arguments
+                let shorthand, _ = trackedLine startPoint endPoint currentState format
+                if not (preferInitialShorthand move (List.exactlyOne shorthand) implicit format) then
+                    move <- implicit
+                    currentState <- next
+                    segments <- rest
             | _ -> ()
         let commands = ResizeArray<string>()
         commands.Add move

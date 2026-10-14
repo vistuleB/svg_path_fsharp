@@ -34,3 +34,14 @@ let ``stroke union recipe preserves geometry and errors`` () =
     let size = Area.path combined Nonzero |> require
     Assert.True(abs (size - 30.0<length^2>) < 0.000001<length^2>)
     Assert.Equal(Error(ReadmeRecipes.StrokeFailure(Stroke.InvalidStrokeOutlineWidth 0.0<length>)), ReadmeRecipes.outlineUnion line 0.0<length> region)
+
+[<Fact>]
+let ``smaller path recipe chooses either mode and retains ties`` () =
+    for source, prefix in ["M10 50L0 50L80 50", "M"; "M1000 1000L1001 1001", "m"; "M0 0L1 1", "m"] do
+        let path = Parse.path source |> require
+        let encoded = ReadmeRecipes.smallerPathData path 3
+        Assert.StartsWith(prefix, encoded)
+        Assert.Equal(Ok path, Parse.path encoded)
+        let options = Serialize.minifyingOptions 3
+        Assert.True(encoded.Length <= (Serialize.pathWith path options).Length)
+        Assert.True(encoded.Length <= (Serialize.pathWith path {options with Relative=false}).Length)

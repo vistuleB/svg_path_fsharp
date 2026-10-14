@@ -29,3 +29,11 @@ let outlineUnion centerlines width filledRegion =
     |> Result.bind (fun outline ->
         Csg.unionPath outline filledRegion Nonzero
         |> Result.mapError BooleanFailure)
+
+// Choose one coordinate mode for the whole path; retain relative on ties.
+// This serializes twice and compares size, not geometric accuracy.
+let smallerPathData (path: Path) decimalPlaces =
+    let options = Serialize.minifyingOptions decimalPlaces
+    let relative = Serialize.pathWith path options
+    let absolute = Serialize.pathWith path { options with Relative = false }
+    if absolute.Length < relative.Length then absolute else relative

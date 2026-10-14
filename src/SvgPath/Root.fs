@@ -201,6 +201,11 @@ module internal Root =
 
     let private distinctCandidates (candidates: RootCandidate list) =
         candidates
+        |> List.map (fun candidate ->
+            let i = candidate.Isolation
+            {candidate with Isolation={Lower=InternalNumber.normalizeZero i.Lower
+                                       Estimate=InternalNumber.normalizeZero i.Estimate
+                                       Upper=InternalNumber.normalizeZero i.Upper}})
         |> List.sortBy (fun candidate -> candidate.Isolation.Estimate)
         |> List.fold
             (fun kept candidate ->
@@ -549,3 +554,35 @@ module internal Root =
                 Error(NotBracketed(left, right, leftValue, rightValue))
             else
                 bisectIsolationLoop f left leftValue right maxIterations certified
+
+    /// Bernstein fallback for rejected power-basis crossings. Empty roots do not
+    /// certify separation; callers must validate geometric residuals.
+    let bernsteinRootsWith (controls: float<'Value> list) (options: PolynomialOptions) =
+        let rec evaluate values (t: float<parameter>) =
+            match values with
+            | [] -> 0.0<_>
+            | [value] -> value
+            | _ -> values |> List.pairwise |> List.map (fun (a,b) -> a*(1.0-float t)+b*float t) |> fun next -> evaluate next t
+        let rec solve values =
+            match values with
+            | [] | [_] -> Ok []
+            | [a;b] ->
+                if a=0.0<_> && b=0.0<_> then Ok []
+                elif a=0.0<_> then Ok [0.0<parameter>]
+                elif b=0.0<_> then Ok [1.0<parameter>]
+                elif sameSign a b then Ok []
+                else Ok [Parameter.fromFloat(float (a/(a-b)))]
+            | _ ->
+                let derivative = values |> List.pairwise |> List.map (fun (a,b) -> b-a)
+                solve derivative |> Result.bind (fun critical ->
+                    let boundaries = 0.0<parameter> :: ((critical |> List.filter (fun t -> t>0.0<parameter> && t<1.0<parameter>)) @ [1.0<parameter>])
+                    let exact = boundaries |> List.filter (fun t -> evaluate values t = 0.0<_>)
+                    boundaries |> List.pairwise |> List.fold (fun state (a,b) ->
+                        state |> Result.bind (fun roots ->
+                            let fa,fb = evaluate values a,evaluate values b
+                            if fa=0.0<_> || fb=0.0<_> || sameSign fa fb then Ok roots
+                            else bisectIsolationUntil (evaluate values) a b options.MaxIterations (fun _ _ -> false)
+                                 |> Result.map (fun isolation -> isolation.Estimate::roots))) (Ok exact)
+                    |> Result.map (List.map InternalNumber.normalizeZero >> List.sort >> List.distinct))
+        if options.MaxIterations<=0 then Error(InvalidMaxIterations options.MaxIterations)
+        else solve controls

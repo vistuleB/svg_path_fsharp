@@ -1033,8 +1033,14 @@ module Offset =
                     (if subpath.Closed then Subpath.close normalized else Ok(Subpath.``open`` normalized))
                     |> Result.mapError InternalPathError)
 
-    let internal normalizeSourceSubpath subpath options =
-        normalizeShortSourceRuns subpath 0.001<length>
+    let internal normalizeSourceSubpath (subpath: Subpath) options =
+        let retained = subpath.Segments |> List.filter (function Line(a,b) -> a <> b | _ -> true)
+        let cleaned =
+            if List.isEmpty retained then Ok subpath
+            else Subpath.createWith Strict retained
+                 |> Result.bind (fun cleaned -> if subpath.Closed then Subpath.closeWith Strict cleaned else Ok cleaned)
+                 |> Result.mapError InternalPathError
+        cleaned |> Result.bind (fun source -> normalizeShortSourceRuns source 0.001<length>)
         |> Result.bind (fun subpath ->
             Degeneracy.normalizeDegenerateSegments subpath options.Fitting.Tolerance
             |> Result.mapError InternalSourceNormalizationError)

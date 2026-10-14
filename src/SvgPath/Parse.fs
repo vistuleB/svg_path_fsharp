@@ -108,10 +108,9 @@ module Parse =
                     loop (index + 1) (Command(character, index) :: reversed) arcPosition
                 elif numberStart character then
                     let raw, next = readNumber input index arcArgumentPosition
-                    parseNumber raw
-                    |> Result.mapError (fun reason -> reason, index)
-                    |> Result.bind (fun value ->
-                        loop next (Number(value, index) :: reversed) (nextArcArgumentPosition arcArgumentPosition))
+                    match parseNumber raw with
+                    | Error reason -> Error(reason,index)
+                    | Ok value -> loop next (Number(value,index)::reversed) (nextArcArgumentPosition arcArgumentPosition)
                 else Error(UnsupportedCommand(string character), index)
         loop 0 [] None
 
@@ -179,187 +178,103 @@ module Parse =
                     |> Result.map (fun sweepValue -> radiusX, radiusY, rotation, large, sweepValue, endX, endY, rest))
             | _ -> Error(expectedNumber state tokens))
 
+    // Each handler returns remaining tokens and state. Only this driver advances
+    // to another command, avoiding recursive calls through Result.bind closures.
+    let private repeated tokens state step =
+        let rec loop current rest parsed =
+            match rest with
+            | Number _ :: _ ->
+                match step current rest with
+                | Error error -> Error error
+                | Ok(next,tail) -> loop next tail true
+            | _ when parsed -> Ok(rest,current)
+            | _ -> Error(expectedNumber current rest)
+        loop state tokens false
+
+    let private pairs tokens state relative =
+        repeated tokens state (fun current rest ->
+            takeNumbers 2 current rest |> Result.bind (fun (values,tail) ->
+                let endpoint = targetPoint current (values[0]*1.0<length>) (values[1]*1.0<length>) relative
+                appendLine current endpoint |> Result.map (fun next -> next,tail)))
+
+    let private parseCommand command tokens state =
+        let relative = Char.IsLower command
+        let code = Char.ToUpperInvariant command
+        if code='M' then
+            takeNumbers 2 state tokens |> Result.bind (fun (values,rest) ->
+                let finished=finishActive state
+                let basePoint=if relative && finished.HasCurrent then finished.Current else Point.create 0.0<length> 0.0<length>
+                let target=Point.create (basePoint.X+values[0]*1.0<length>) (basePoint.Y+values[1]*1.0<length>)
+                let moved={finished with Subpath=Subpath.empty target;Current=target;HasCurrent=true;Active=true;LastCubicControl=None;LastQuadraticControl=None}
+                match rest with Number _ :: _ -> pairs rest moved relative | _ -> Ok(rest,moved))
+        else
+            ensureCurrent state |> Result.bind (fun () ->
+                match code with
+                | 'Z' ->
+                    if not state.Active then Ok(tokens,state)
+                    else
+                        let startPoint=Subpath.start state.Subpath
+                        Subpath.closeWith Bridge state.Subpath
+                        |> Result.mapError (fun error -> ParsedPathError error,state.At)
+                        |> Result.map (fun subpath ->
+                            let next =
+                                { state with
+                                    Subpaths = subpath :: state.Subpaths
+                                    Subpath = Subpath.empty startPoint
+                                    Current = startPoint
+                                    HasCurrent = true
+                                    Active = false
+                                    LastCubicControl = None
+                                    LastQuadraticControl = None }
+                            tokens,next)
+                | 'L' -> pairs tokens state relative
+                | 'H' | 'V' ->
+                    repeated tokens state (fun current rest ->
+                        takeNumbers 1 current rest |> Result.bind (fun (values,tail) ->
+                            let value=values[0]*1.0<length>
+                            let endpoint=
+                                if code='H' then Point.create (if relative then current.Current.X+value else value) current.Current.Y
+                                else Point.create current.Current.X (if relative then current.Current.Y+value else value)
+                            appendLine current endpoint |> Result.map (fun next -> next,tail)))
+                | 'Q' | 'T' ->
+                    let smooth=code='T'
+                    repeated tokens state (fun current rest ->
+                        takeNumbers (if smooth then 2 else 4) current rest |> Result.bind (fun (values,tail) ->
+                            let target i=targetPoint current (values[i]*1.0<length>) (values[i+1]*1.0<length>) relative
+                            let control,endpoint=
+                                if smooth then
+                                    current.LastQuadraticControl |> Option.map (fun value -> reflect value current.Current) |> Option.defaultValue current.Current, target 0
+                                else target 0,target 2
+                            appendSegment current (QuadraticBezier(current.Current,control,endpoint)) endpoint
+                            |> Result.map (fun next -> {next with LastQuadraticControl=Some control},tail)))
+                | 'C' | 'S' ->
+                    let smooth=code='S'
+                    repeated tokens state (fun current rest ->
+                        takeNumbers (if smooth then 4 else 6) current rest |> Result.bind (fun (values,tail) ->
+                            let target i=targetPoint current (values[i]*1.0<length>) (values[i+1]*1.0<length>) relative
+                            let control1,control2,endpoint=
+                                if smooth then
+                                    (current.LastCubicControl |> Option.map (fun value -> reflect value current.Current) |> Option.defaultValue current.Current),target 0,target 2
+                                else target 0,target 2,target 4
+                            appendSegment current (CubicBezier(current.Current,control1,control2,endpoint)) endpoint
+                            |> Result.map (fun next -> {next with LastCubicControl=Some control2},tail)))
+                | 'A' ->
+                    repeated tokens state (fun current rest ->
+                        takeArc current rest |> Result.bind (fun (rx,ry,rotation,largeArc,sweep,x,y,tail) ->
+                            let endpoint=targetPoint current (x*1.0<length>) (y*1.0<length>) relative
+                            let segment=Arc {Start=current.Current;Radius=Point.create (rx*1.0<length>) (ry*1.0<length>)
+                                             XAxisRotation=rotation*1.0<degree>;LargeArc=largeArc;Sweep=sweep;End=endpoint}
+                            appendSegment current segment endpoint |> Result.map (fun next -> next,tail)))
+                | _ -> Error(UnsupportedCommand(string command),state.At))
+
     let rec private parseTokens tokens state : Result<Path, ErrorReason * int> =
         match tokens with
         | [] -> Ok(Path.ofSubpaths (state |> finishActive |> _.Subpaths |> List.rev))
-        | Number(_, at) :: _ -> Error(ExpectedCommand, at)
-        | Command(command, at) :: rest -> parseCommand command rest { state with At = at }
-
-    and private parseCommand command tokens state =
-        let relative = Char.IsLower command
-        match Char.ToUpperInvariant command with
-        | 'M' -> parseMove tokens state relative
-        | 'L' -> parsePairs tokens state relative appendLine
-        | 'H' -> parseSingles tokens state (fun current value ->
-            let endpoint = if relative then Point.create (current.Current.X + value) current.Current.Y else Point.create value current.Current.Y
-            appendLine current endpoint)
-        | 'V' -> parseSingles tokens state (fun current value ->
-            let endpoint = if relative then Point.create current.Current.X (current.Current.Y + value) else Point.create current.Current.X value
-            appendLine current endpoint)
-        | 'Q' -> parseQuadratics tokens state relative false
-        | 'T' -> parseQuadratics tokens state relative true
-        | 'C' -> parseCubics tokens state relative false
-        | 'S' -> parseCubics tokens state relative true
-        | 'A' -> parseArcs tokens state relative
-        | 'Z' -> parseClose tokens state
-        | _ -> Error(UnsupportedCommand(string command), state.At)
-
-    and private parseMove tokens state relative =
-        takeNumbers 2 state tokens
-        |> Result.bind (fun (values, rest) ->
-            match values with
-            | [ x; y ] ->
-                let finished = finishActive state
-                let basePoint =
-                    if relative && finished.HasCurrent then finished.Current
-                    else Point.create 0.0<length> 0.0<length>
-                let target = Point.create (basePoint.X + x * 1.0<length>) (basePoint.Y + y * 1.0<length>)
-                let moved =
-                    { finished with
-                        Subpath = Subpath.empty target
-                        Current = target
-                        HasCurrent = true
-                        Active = true
-                        LastCubicControl = None
-                        LastQuadraticControl = None }
-                parseImplicitLines rest moved relative
-            | _ -> Error(expectedNumber state tokens))
-
-    and private parseImplicitLines tokens state relative =
-        match tokens with
-        | Number _ :: _ ->
-            takeNumbers 2 state tokens
-            |> Result.bind (fun (values, rest) ->
-                match values with
-                | [ x; y ] ->
-                    let endpoint = targetPoint state (x * 1.0<length>) (y * 1.0<length>) relative
-                    appendLine state endpoint
-                    |> Result.bind (fun next -> parseImplicitLines rest next relative)
-                | _ -> Error(expectedNumber state tokens))
-        | _ -> parseTokens tokens state
-
-    and private parsePairs tokens state relative append =
-        ensureCurrent state
-        |> Result.bind (fun () ->
-            let rec loop current rest parsed =
-                match rest with
-                | Number _ :: _ ->
-                    takeNumbers 2 current rest
-                    |> Result.bind (fun (values, tail) ->
-                        match values with
-                        | [ x; y ] ->
-                            append current (targetPoint current (x * 1.0<length>) (y * 1.0<length>) relative)
-                            |> Result.bind (fun next -> loop next tail true)
-                        | _ -> Error(expectedNumber current rest))
-                | _ when parsed -> parseTokens rest current
-                | _ -> Error(expectedNumber current rest)
-            loop state tokens false)
-
-    and private parseSingles tokens state append =
-        ensureCurrent state
-        |> Result.bind (fun () ->
-            let rec loop current rest parsed =
-                match rest with
-                | Number(value, _) :: tail -> append current (value * 1.0<length>) |> Result.bind (fun next -> loop next tail true)
-                | _ when parsed -> parseTokens rest current
-                | _ -> Error(expectedNumber current rest)
-            loop state tokens false)
-
-    and private parseQuadratics tokens state relative smooth =
-        ensureCurrent state
-        |> Result.bind (fun () ->
-            let arity = if smooth then 2 else 4
-            let rec loop current rest parsed =
-                match rest with
-                | Number _ :: _ ->
-                    takeNumbers arity current rest
-                    |> Result.bind (fun (values, tail) ->
-                        let control, endpoint =
-                            if smooth then
-                                let control = current.LastQuadraticControl |> Option.map (fun value -> reflect value current.Current) |> Option.defaultValue current.Current
-                                let endpoint = targetPoint current (values[0] * 1.0<length>) (values[1] * 1.0<length>) relative
-                                control, endpoint
-                            else
-                                targetPoint current (values[0] * 1.0<length>) (values[1] * 1.0<length>) relative,
-                                targetPoint current (values[2] * 1.0<length>) (values[3] * 1.0<length>) relative
-                        appendSegment current (QuadraticBezier(current.Current, control, endpoint)) endpoint
-                        |> Result.map (fun next -> { next with LastQuadraticControl = Some control })
-                        |> Result.bind (fun next -> loop next tail true))
-                | _ when parsed -> parseTokens rest current
-                | _ -> Error(expectedNumber current rest)
-            loop state tokens false)
-
-    and private parseCubics tokens state relative smooth =
-        ensureCurrent state
-        |> Result.bind (fun () ->
-            let arity = if smooth then 4 else 6
-            let rec loop current rest parsed =
-                match rest with
-                | Number _ :: _ ->
-                    takeNumbers arity current rest
-                    |> Result.bind (fun (values, tail) ->
-                        let control1, control2, endpoint =
-                            if smooth then
-                                let first = current.LastCubicControl |> Option.map (fun value -> reflect value current.Current) |> Option.defaultValue current.Current
-                                first,
-                                targetPoint current (values[0] * 1.0<length>) (values[1] * 1.0<length>) relative,
-                                targetPoint current (values[2] * 1.0<length>) (values[3] * 1.0<length>) relative
-                            else
-                                targetPoint current (values[0] * 1.0<length>) (values[1] * 1.0<length>) relative,
-                                targetPoint current (values[2] * 1.0<length>) (values[3] * 1.0<length>) relative,
-                                targetPoint current (values[4] * 1.0<length>) (values[5] * 1.0<length>) relative
-                        appendSegment current (CubicBezier(current.Current, control1, control2, endpoint)) endpoint
-                        |> Result.map (fun next -> { next with LastCubicControl = Some control2 })
-                        |> Result.bind (fun next -> loop next tail true))
-                | _ when parsed -> parseTokens rest current
-                | _ -> Error(expectedNumber current rest)
-            loop state tokens false)
-
-    and private parseArcs tokens state relative =
-        ensureCurrent state
-        |> Result.bind (fun () ->
-            let rec loop current rest parsed =
-                match rest with
-                | Number _ :: _ ->
-                    takeArc current rest
-                    |> Result.bind (fun (radiusX, radiusY, rotation, largeArc, sweep, endX, endY, tail) ->
-                        let endpoint = targetPoint current (endX * 1.0<length>) (endY * 1.0<length>) relative
-                        let radiusX = radiusX * 1.0<length>
-                        let radiusY = radiusY * 1.0<length>
-                        let next =
-                            // Preserve arc data; SVG interpretation is explicitly requested
-                            // through Path.normalizeSvgArcs, not performed by parsing.
-                            appendSegment current
-                                (Arc
-                                    { Start = current.Current
-                                      Radius = Point.create radiusX radiusY
-                                      XAxisRotation = rotation * 1.0<degree>
-                                      LargeArc = largeArc
-                                      Sweep = sweep
-                                      End = endpoint }) endpoint
-                        next |> Result.bind (fun value -> loop value tail true))
-                | _ when parsed -> parseTokens rest current
-                | _ -> Error(expectedNumber current rest)
-            loop state tokens false)
-
-    and private parseClose tokens state =
-        ensureCurrent state
-        |> Result.bind (fun () ->
-            if not state.Active then parseTokens tokens state
-            else
-                let startPoint = Subpath.start state.Subpath
-                Subpath.closeWith Bridge state.Subpath
-                |> Result.mapError (fun error -> ParsedPathError error, state.At)
-                |> Result.bind (fun subpath ->
-                    parseTokens tokens
-                        { state with
-                            Subpaths = subpath :: state.Subpaths
-                            Subpath = Subpath.empty startPoint
-                            Current = startPoint
-                            HasCurrent = true
-                            Active = false
-                            LastCubicControl = None
-                            LastQuadraticControl = None }))
+        | Number(_,at) :: _ -> Error(ExpectedCommand,at)
+        | Command(command,at) :: rest ->
+            match parseCommand command rest {state with At=at} with
+            | Error error -> Error error
+            | Ok(remaining,next) -> parseTokens remaining next
 
     /// Parse an SVG path-data string. Empty input and `none` produce an empty path.
     /// Drawing after closepath begins a new subpath at the retained start point.

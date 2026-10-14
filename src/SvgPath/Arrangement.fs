@@ -1339,7 +1339,13 @@ module Arrangement =
             let budget = dualSweepAttemptsPerQuestion * (List.length walks + components.Length)
             dualFindExteriors edges graph.Vertices tolerance components.Length [] 1729L budget
             |> Result.bind (fun exteriors ->
-                dualFindPlacements edges graph.Vertices tolerance walks exteriors [] 7919L budget
+                (match exteriors with
+                 | [exterior] ->
+                     // Connected boundary walks already identify faces; only infinity needs certification.
+                     walks |> List.mapi (fun id _ ->
+                         { Walk=id; Signature=dualSignature [exterior.Component,id] exteriors walks
+                           Confirmations=dualSweepConfirmations }) |> Ok
+                 | _ -> dualFindPlacements edges graph.Vertices tolerance walks exteriors [] 7919L budget)
                 |> Result.map (fun placements ->
                     walks |> List.mapi (fun id walk ->
                         let placement = placements |> List.find (fun p -> p.Walk=id)

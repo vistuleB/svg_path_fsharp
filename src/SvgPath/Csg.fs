@@ -49,19 +49,20 @@ module Csg =
 
     type private BoundaryRay =
         { EdgeId: int
-          Starts: bool
-          Angle: float<degree> }
+          Starts: bool }
 
-    let private build paths options =
-        let segments =
-            paths
-            |> List.collect Path.subpaths
-            |> List.collect (fun subpath ->
+    let private pathSegments paths =
+        paths
+        |> List.collect Path.subpaths
+        |> List.collect (fun subpath ->
                 let segments = Subpath.segments subpath
                 let start,finish = Subpath.start subpath,Subpath.finish subpath
                 // Include implicit fill closure in the arrangement inventory.
                 if List.isEmpty segments || Point.near 0.0<length> start finish then segments
                 else segments @ [Line(finish,start)])
+
+    let private build paths options =
+        let segments = pathSegments paths
         Arrangement.buildWith segments options.Tolerance options.MinimumLength 0.0<parameter>
         |> Result.mapError (Arrangement.publicError >> CsgArrangementError)
 
@@ -77,74 +78,61 @@ module Csg =
         | Difference -> left && not right
         | SymmetricDifference -> left <> right
 
-    let private classify
-        (operation: BooleanOperation)
-        (fillRule: FillRule)
-        (tolerance: float<length>)
-        (leftPath: Path)
-        (rightPath: Path)
-        (edges: Arrangement.ArrangementEdge list) : Result<BoundaryEdge list, Error> =
-        edges
-        |> List.fold (fun state edge ->
-            state
-            |> Result.bind (fun boundary ->
-                WindingField.segmentSideNonzeroLevels edge.Segment leftPath (tolerance * 16.0) { WindingField.defaultOptions with Tolerance=tolerance }
-                |> Result.mapError CsgPathError
-                |> Result.bind (fun (leftA, rightA) ->
-                    WindingField.segmentSideNonzeroLevels edge.Segment rightPath (tolerance * 16.0) { WindingField.defaultOptions with Tolerance=tolerance }
-                    |> Result.mapError CsgPathError
-                    |> Result.map (fun (leftB, rightB) ->
+    let private operandWindings (built: Arrangement.ArrangementSegmentBuild) dual leftCount isLeft =
+        let changes : Arrangement.EdgeWindingChange list =
+            built.EdgeImages |> List.map (fun image ->
+                { EdgeId = image.EdgeId
+                  RightMinusLeft = image.Sources |> List.sumBy (fun source ->
+                    if (source.SegmentIndex < leftCount) <> isLeft then 0
+                    elif source.Reversed then -1 else 1) })
+        Arrangement.faceWindings dual changes
+        |> Result.mapError (fun _ -> CsgArrangementError Arrangement.ConstructionFailed)
+        |> Result.map (List.map (fun face -> face.FaceId, face.Value) >> Map.ofList)
+
+    let private classify operation fillRule (dual: Arrangement.DualArrangementGraph)
+        (left: Map<int,int>) (right: Map<int,int>) (edges: Arrangement.ArrangementEdge list) =
+        let faces = dual.EdgeFaces |> List.map (fun face -> face.EdgeId, face) |> Map.ofList
+        edges |> List.fold (fun state edge ->
+            state |> Result.bind (fun boundary ->
+                let invalid = Error(CsgArrangementError Arrangement.ConstructionFailed)
+                match Map.tryFind edge.Id faces with
+                | None -> invalid
+                | Some face ->
+                    match Map.tryFind face.LeftFace left, Map.tryFind face.RightFace left,
+                          Map.tryFind face.LeftFace right, Map.tryFind face.RightFace right with
+                    | Some leftA, Some rightA, Some leftB, Some rightB ->
                         let activeLeft = combine operation (filled leftA fillRule) (filled leftB fillRule)
                         let activeRight = combine operation (filled rightA fillRule) (filled rightB fillRule)
-                        if activeLeft = activeRight then boundary
+                        if activeLeft = activeRight then Ok boundary
                         elif activeRight then
-                            boundary @
-                                [ { Id = edge.Id; Layer = 0; Segment = edge.Segment
-                                    StartVertex = edge.StartVertex; EndVertex = edge.EndVertex } ]
+                            Ok ({ Id=edge.Id; Layer=0; Segment=edge.Segment
+                                  StartVertex=edge.StartVertex; EndVertex=edge.EndVertex } :: boundary)
                         else
-                            boundary @
-                                [ { Id = edge.Id; Layer = 0; Segment = Segment.reverse edge.Segment
-                                    StartVertex = edge.EndVertex; EndVertex = edge.StartVertex } ])))) (Ok [])
+                            Ok ({ Id=edge.Id; Layer=0; Segment=Segment.reverse edge.Segment
+                                  StartVertex=edge.EndVertex; EndVertex=edge.StartVertex } :: boundary)
+                    | _ -> invalid)) (Ok []) |> Result.map List.rev
 
-    let private ray edge starts =
-        let t = if starts then 0.0<parameter> else 1.0<parameter>
-        Segment.directions edge.Segment t
-        |> Result.mapError CsgPathError
-        |> Result.bind (fun directions ->
-            let direction = if starts then directions.Outgoing else directions.Incoming
-            match direction with
-            | None ->
-                let vertex = if starts then edge.StartVertex else edge.EndVertex
-                Error(InternalBoundaryTopologyError(vertex, SectorMismatch))
-            | Some direction ->
-                let outward = if starts then direction else Point.scale -1.0 direction
-                Ok { EdgeId = edge.Id; Starts = starts; Angle = Point.heading outward })
-
-    let private pairSectors edges =
-        edges
-        |> List.fold (fun state incoming ->
-            state
-            |> Result.bind (fun links ->
-                let incident =
-                    edges
-                    |> List.filter (fun edge ->
-                        edge.Layer = incoming.Layer &&
-                        (edge.StartVertex = incoming.EndVertex || edge.EndVertex = incoming.EndVertex))
-                incident
-                |> List.fold (fun rayState edge ->
-                    rayState
-                    |> Result.bind (fun rays ->
-                        if edge.StartVertex = incoming.EndVertex then ray edge true |> Result.map (fun value -> value :: rays)
-                        else ray edge false |> Result.map (fun value -> value :: rays))) (Ok [])
-                |> Result.bind (fun rays ->
-                    let ordered = rays |> List.sortBy (fun value -> float value.Angle)
-                    match ordered |> List.tryFindIndex (fun value -> value.EdgeId = incoming.Id && not value.Starts) with
-                    | None -> Error(InternalBoundaryTopologyError(incoming.EndVertex, SectorMismatch))
-                    | Some index when List.isEmpty ordered -> Error(InternalBoundaryTopologyError(incoming.EndVertex, SectorMismatch))
+    let private pairSectors (graph: Arrangement.ArrangementGraph) (edges: BoundaryEdge list) =
+        let boundary = edges |> List.map (fun edge -> edge.Id, edge) |> Map.ofList
+        let orders = Map.ofList graph.CyclicOrders
+        edges |> List.fold (fun state incoming ->
+            state |> Result.bind (fun links ->
+                let vertex = incoming.EndVertex
+                let invalid = Error(InternalBoundaryTopologyError(vertex, SectorMismatch))
+                match Map.tryFind vertex orders with
+                | None -> invalid
+                | Some groups ->
+                    // Preserve the arrangement's geometric clockwise order, including tangent ties.
+                    let ordered = groups |> List.concat |> List.choose (fun incident ->
+                        Map.tryFind incident.EdgeId boundary |> Option.bind (fun edge ->
+                            if edge.Layer <> incoming.Layer then None
+                            else Some {EdgeId=edge.Id; Starts=edge.StartVertex=vertex}))
+                    match ordered |> List.tryFindIndex (fun ray -> ray.EdgeId=incoming.Id && not ray.Starts) with
+                    | None -> invalid
                     | Some index ->
-                        let successor = ordered[(index + 1) % ordered.Length]
+                        let successor = ordered[(index+1) % ordered.Length]
                         if successor.Starts then Ok(Map.add incoming.Id successor.EdgeId links)
-                        else Error(InternalBoundaryTopologyError(incoming.EndVertex, SectorMismatch))))) (Ok Map.empty)
+                        else invalid)) (Ok Map.empty)
 
     let private trace edges links (vertices: Map<int, Point<length>>) reversePositiveLayers =
         // Replace only newly constructed output geometry, after sector pairing.
@@ -172,24 +160,34 @@ module Csg =
                 let seed = byId[seedId]
                 cycle seed seed (Set.remove seedId remaining) [] (Set.count remaining + 1)
                 |> Result.bind (fun (segments, remaining) ->
-                    Subpath.create segments
-                    |> Result.bind (Subpath.close)
-                    |> Result.mapError CsgPathError
-                    |> Result.bind (fun subpath ->
-                        let subpath = if reversePositiveLayers && seed.Layer > 0 then Subpath.reverse subpath else subpath
-                        gather remaining (subpath :: contours)))
+                    let reduced = segments |> List.fold (fun stack segment ->
+                        match stack with
+                        | previous :: rest when previous = Segment.reverse segment -> rest
+                        | _ -> segment :: stack) []
+                    if List.isEmpty reduced then gather remaining contours
+                    else
+                        Subpath.create segments
+                        |> Result.bind (Subpath.close)
+                        |> Result.mapError CsgPathError
+                        |> Result.bind (fun subpath ->
+                            let subpath = if reversePositiveLayers && seed.Layer > 0 then Subpath.reverse subpath else subpath
+                            gather remaining (subpath :: contours)))
         gather (edges |> List.map _.Id |> Set.ofList) []
 
-    let private booleanFromBuild operation fillRule options left right (build: Arrangement.ArrangementSegmentBuild) =
-        classify operation fillRule options.Tolerance left right build.Graph.Edges
+    let private booleanFromBuild operation fillRule leftCount (build: Arrangement.ArrangementSegmentBuild) =
+        Arrangement.dual build.Graph |> Result.mapError CsgArrangementError
+        |> Result.bind (fun dual ->
+            operandWindings build dual leftCount true |> Result.bind (fun left ->
+                operandWindings build dual leftCount false |> Result.bind (fun right ->
+                    classify operation fillRule dual left right build.Graph.Edges)))
         |> Result.bind (fun edges ->
-            pairSectors edges
+            pairSectors build.Graph edges
             |> Result.bind (fun links -> trace edges links (build.Graph.Vertices |> List.map (fun vertex -> vertex.Id, vertex.Point) |> Map.ofList) false))
         |> Result.map (Path.ofSubpaths >> fun path -> { Path = path; Build = build })
 
     let private booleanWith operation left right fillRule options =
         build [ left; right ] options
-        |> Result.bind (booleanFromBuild operation fillRule options left right)
+        |> Result.bind (booleanFromBuild operation fillRule (pathSegments [left] |> List.length))
 
     let unionWith left right fillRule options = booleanWith Union left right fillRule options
     let union left right fillRule = unionWith left right fillRule defaultOptions

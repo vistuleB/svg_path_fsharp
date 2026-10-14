@@ -992,6 +992,27 @@ module Segment =
                               Kind = Ambiguous })
                         |> Ok)
 
+    let private recoverBernsteinCrossings segment origin normal (options: CrossingOptions) tolerance originalError =
+        let controls =
+            match segment with
+            | Line(a,b) -> [a;b]
+            | QuadraticBezier(a,b,c) -> [a;b;c]
+            | CubicBezier(a,b,c,d) -> [a;b;c;d]
+            | Arc _ -> []
+            |> List.map (fun p -> Point.dot (Point.displacement origin p) normal)
+        if List.isEmpty controls then Error originalError
+        elif List.forall (fun value -> value>tolerance) controls || List.forall (fun value -> value < -tolerance) controls then Ok []
+        else
+            Root.bernsteinRootsWith controls {MaxIterations=options.MaxIterations}
+            |> Result.mapError crossingRootError
+            |> Result.bind (fun roots ->
+                if List.isEmpty roots then Error originalError
+                else roots |> List.fold (fun state t ->
+                    state |> Result.bind (fun () ->
+                        lineCrossingValue segment origin normal t |> Result.bind (fun value ->
+                            if abs value<=tolerance then Ok () else Error originalError))) (Ok ())
+                     |> Result.map (fun () -> roots))
+
     /// Find crossings between a segment and a ray's supporting line.
     /// Negative ray parameters represent crossings behind the ray origin.
     let internal rayCrossingsWith
@@ -1014,6 +1035,11 @@ module Segment =
                     polishLineCrossingRoots
                         segment origin normal roots options
                         (options.SignedLineDistanceTolerance * sqrt directionSquared))
+                |> function
+                   | Error(CrossingMaxIterationsReached _ as error) ->
+                       recoverBernsteinCrossings segment origin normal options
+                           (options.SignedLineDistanceTolerance * sqrt directionSquared) error
+                   | result -> result
                 |> Result.bind (fun roots ->
                     roots
                     |> List.fold (fun state root ->
@@ -1682,10 +1708,11 @@ module Subpath =
         | [], next :: rest -> reconcileCustom rest [ next ] previousIndex first reconcile
         | previous :: before, [] -> Ok(List.rev (previous :: before))
         | previous :: before, next :: rest ->
-            validateReplacement previousIndex previous (reconcile previous next { First = first; Last = List.isEmpty rest; Closing = false })
-            |> Result.bind (fun replacement ->
+            match validateReplacement previousIndex previous (reconcile previous next { First = first; Last = List.isEmpty rest; Closing = false }) with
+            | Error error -> Error error
+            | Ok replacement ->
                 let accumulated = (List.rev replacement) @ before
-                reconcileCustom rest accumulated (previousIndex + List.length replacement - 1) false reconcile)
+                reconcileCustom rest accumulated (previousIndex + List.length replacement - 1) false reconcile
 
     let private strictReconcile previous next closing =
         if closing then [ previous ] else [ previous; next ]

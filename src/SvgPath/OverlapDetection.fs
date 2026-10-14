@@ -254,6 +254,31 @@ module internal OverlapDetection =
         intervalsCover left (min candidate.LeftFrom candidate.LeftTo) (max candidate.LeftFrom candidate.LeftTo)
         && intervalsCover right (min candidate.RightFrom candidate.RightTo) (max candidate.RightFrom candidate.RightTo)
 
+    let private polynomialControls = function
+        | Line(a,b) -> [a;b]
+        | QuadraticBezier(a,b,c) -> [a;b;c]
+        | CubicBezier(a,b,c,d) -> [a;b;c;d]
+        | Arc _ -> []
+
+    let private preferCertifiedFullOverlap left right tolerance candidates =
+        let a = polynomialControls left
+        let increasing values =
+            let pairs = List.pairwise values
+            List.forall (fun (x,y) -> x<=y) pairs && List.exists (fun (x,y) -> x<y) pairs
+        let monotone coordinate b =
+            let x,y = List.map coordinate a, List.map coordinate b
+            (increasing x && increasing y) || (increasing (List.rev x) && increasing (List.rev y))
+        candidates |> List.tryFind (fun candidate ->
+            let b =
+                if candidate.RightFrom=0.0<parameter> && candidate.RightTo=1.0<parameter> then polynomialControls right
+                elif candidate.RightFrom=1.0<parameter> && candidate.RightTo=0.0<parameter> then polynomialControls right |> List.rev
+                else []
+            candidate.LeftFrom=0.0<parameter> && candidate.LeftTo=1.0<parameter>
+            && not(List.isEmpty a) && a.Length=b.Length
+            && List.forall2 (pointsNear tolerance) a b
+            && (monotone (fun p -> p.X) b || monotone (fun p -> p.Y) b))
+        |> function Some full -> [full] | None -> candidates
+
     // Sampled overlap detection proposes intervals from endpoint matches;
     // every overlap boundary is assumed to be an input segment endpoint.
     let detectWithSamples left right tolerance samples =
@@ -293,7 +318,7 @@ module internal OverlapDetection =
                     if candidates.NonAffine |> List.exists (fun rejected -> not(candidateCovered rejected candidates.Affine)) then
                         Error NonAffineOverlapCorrespondence
                     else
-                        match mergeAll tolerance candidates.Affine with
+                        match mergeAll tolerance (preferCertifiedFullOverlap left right tolerance candidates.Affine) with
                         | Ok merged -> Ok merged
                         | Error _ -> Ok []))
 

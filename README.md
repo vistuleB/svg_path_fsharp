@@ -1799,8 +1799,8 @@ inside the `.nupkg`.
 ## Development
 
 ```shell
-scripts/test-fast          # ordinary tests, excluding the slow convex-hull suite
-scripts/test-slow          # the slow convex-hull suite only
+scripts/test-fast          # ordinary tests, excluding the slow suite
+scripts/test-slow          # convex-hull and Paper.js stress tests
 scripts/test-all           # full suite (fast then slow)
 scripts/test-release       # canonical pre-release verification (full suite)
 scripts/generate-readme-figures

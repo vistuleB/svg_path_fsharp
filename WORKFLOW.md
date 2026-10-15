@@ -28,8 +28,8 @@ Keep the `tested-recipes` block in `README.md` identical to
 
 ## Test Profiles And Reporting
 
-- `scripts/test-fast`: all tests except the slow convex-hull suite.
-- `scripts/test-slow`: convex-hull stress tests only.
+- `scripts/test-fast`: all tests except the slow suite.
+- `scripts/test-slow`: convex-hull and Paper.js stress tests.
 - `scripts/test-all`: both profiles.
 - `scripts/test-release`: canonical pre-release verification, including both
   profiles; fast tests alone do not verify a release.

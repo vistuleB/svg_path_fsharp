@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Port the four Gleam slow Paper.js crossing/address checks and complete
+  Boolean fixture 107's containment grid. Keep the new fixture files in the
+  slow test profile.
+
 ## 3.1.2 - 2026-10-15
 
 - Mirror the completed Gleam FloBezier audit: retain folded collinear overlap

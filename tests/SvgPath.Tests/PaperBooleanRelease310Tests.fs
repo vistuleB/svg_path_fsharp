@@ -74,6 +74,16 @@ module PaperBooleanRelease310Tests =
         let expected = Parse.path "M551.12365,634.03909c-12.92155,3.89332 -26.02251,5.96091 -39.12365,5.96091c-112,0 -224,-151.11 -224,-302.22c0,-1.90016 0.01384,-3.80031 0.04172,-5.7c-0.00057,0 -0.00115,0 -0.00172,0c0.41767,-28.39212 3.97401,-56.67943 11.39515,-83.29466c23.67168,-84.89992 86.67163,-152.78534 212.56485,-152.78534c168,0 224,120.89 224,241.78c0,133.43422 -87.33052,266.86844 -184.87635,296.25909z" |> unwrap
         check actual expected
 
+        // Match Gleam's 7x7 filled-region check, excluding boundary samples.
+        for x in [243.2; 332.8; 422.40000000000003; 512.0; 601.6; 691.2; 780.8000000000001] do
+            for y in [41.599999999999994; 150.4; 259.20000000000005; 368.00000000000006; 476.8; 585.6; 694.4000000000001] do
+                let point = p x y
+                let a = Distance.pathDistance actual point |> unwrap
+                let b = Distance.pathDistance expected point |> unwrap
+                if a > 0.001<length> && b > 0.001<length> then
+                    let want = Containment.pathContainment point expected Nonzero |> unwrap
+                    Assert.Equal(Ok want, Containment.pathContainment point actual Nonzero)
+
     [<Fact>]
     let ``Paper Boolean fixture 122 geometry`` () =
         let left = Path.ofSubpaths [

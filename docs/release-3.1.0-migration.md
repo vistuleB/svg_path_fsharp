@@ -25,3 +25,8 @@ Native regressions separately protect exact API contracts. The Paper.js MIT
 notice is retained in `paperjs-matrix-LICENSE.txt` and applies to these fixtures
 as well. The complete upstream audit catalog remains in the Gleam repository at
 `scripts/paperjs/INDEX.md`; F# does not claim to execute that entire inventory.
+
+The [2026-10-15 focused parity inventory](paperjs-test-parity-inventory.md)
+records the four originally missing slow-fixture checks and the containment-grid
+assertions omitted from the fixture 107 port, along with their subsequent test
+ports, related coverage and scope limits.

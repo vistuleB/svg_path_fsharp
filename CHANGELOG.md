@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.2 - 2026-10-15
 
 - Mirror the completed Gleam FloBezier audit: retain folded collinear overlap
   boundaries and reject unsupported traversal correspondence explicitly.

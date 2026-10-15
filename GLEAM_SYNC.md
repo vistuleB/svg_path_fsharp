@@ -1,5 +1,53 @@
 # Gleam commit-by-commit synchronization
 
+## FloBezier audit and centered curve search — 2026-10-15
+
+Ported the final Gleam implementation through `575a5b2`:
+
+- `b3bb1a9`: closest-pair search processes windows with the recursive call
+  outside result callbacks, preserving tail recursion in F#.
+- `dd381a2`: propose folded collinear overlap boundaries from scalar extrema;
+  preserve non-affine/conflicting traversal errors and distinguish a turn contact
+  from positive-length overlap using actual extrema instead of the control hull.
+- `0d96855`: partition Bézier length integration at coordinate extrema and share
+  the total absolute tolerance among those initial intervals.
+- `e09bef8`: exactly constant polynomial segments contribute no continuous
+  overlap and use parameter zero for contacts. Preserve other-curve addresses,
+  option validation and degenerate-arc errors.
+- `a7d8cc7`, `575a5b2`: one centered polynomial search in approximately
+  `[-100,100]` per axis, with original-coordinate endpoint seeds and final
+  certification. The intermediate supplementary search from `269a535` is not
+  retained. Arcs and degenerate/nonfinite control ranges retain the existing
+  search. No new public option or signature.
+- `36d812f`, `b4b492a`: retain the documented numerical candidate-count and
+  search-completeness limitations; the upstream archive and closed comparison
+  ledger remain in Gleam's `scripts/flobezier/`.
+
+`FloBezierAuditTests.fs` mirrors all 18 regressions in the five new Gleam test
+files (overlap, length, constants, conditioning and closest pairs). Existing
+intersection tests continue to check known parameters and geometric residuals.
+The same three candidate-count snapshots as Gleam changed: flat cubic crossing
+9→6, off-center quadratic tangency 4→1, and shared endpoints 4→2 (raw/snapped).
+The initial full fast-profile run had only those three snapshot failures;
+2,007 other tests passed.
+
+Validation:
+
+- `dotnet test tests/SvgPath.Tests/SvgPath.Tests.fsproj --no-restore --filter FullyQualifiedName~FloBezierAuditTests`:
+  all 18 new regressions passed.
+- Final `scripts/test-release`: 2,010 fast and 26 slow tests passed, zero failures
+  or skips (fast 1m23s; slow 27s).
+- `git diff --check`: passed.
+
+Figure validation:
+
+- `scripts/generate-gallery-figures`: 33 succeeded, zero failures.
+- `scripts/generate-readme-figures`: all 13 generated successfully.
+- 45 of 46 SVGs are byte-for-byte unchanged. The second-offset arrangement SVG
+  retains identical nonnumeric content and numeric-token count; its maximum
+  coordinate change is approximately `4.13e-10`.
+
+
 ## Internal duplication cleanup
 
 - Gleam `3911498`: share exact split-parameter normalization between Bézier and

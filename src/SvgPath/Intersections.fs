@@ -519,38 +519,42 @@ module Intersections =
             | [] when List.isEmpty next -> Ok(windows, best)
             | [] -> generations next [] best windows
             | window :: rest ->
-                pieceBoundingBox window.Left
-                |> Result.bind (fun leftBox ->
-                    pieceBoundingBox window.Right
-                    |> Result.bind (fun rightBox ->
-                        if boxDistanceSquared leftBox rightBox > best.DistanceSquared then
-                            generations rest next best windows
-                        elif window.RemainingDepth <= 0
-                             || (BoundingBox.taxicabDiameter leftBox <= terminalSubdivisionTolerance
-                                 && BoundingBox.taxicabDiameter rightBox <= terminalSubdivisionTolerance) then
-                            let added = addTerminalWindowGrid window.Left window.Right windows
-                            added
-                            |> List.take 9
-                            |> List.fold (fun state terminal ->
-                                state
-                                |> Result.bind (fun best ->
-                                    let leftT = interpolate terminal.Left.From terminal.Left.To terminal.StartLeftT
-                                    let rightT = interpolate terminal.Right.From terminal.Right.To terminal.StartRightT
-                                    globalDistanceMinimumAt terminal.Left terminal.Right leftT rightT
-                                    |> Result.map (closerMinimum best))) (Ok best)
-                            |> Result.bind (fun best -> generations rest next best added)
-                        elif BoundingBox.taxicabDiameter leftBox >= BoundingBox.taxicabDiameter rightBox then
-                            let first, second = splitPiece window.Left
-                            let children =
-                                [ { window with Left = second; RemainingDepth = window.RemainingDepth - 1 }
-                                  { window with Left = first; RemainingDepth = window.RemainingDepth - 1 } ]
-                            generations rest (children @ next) best windows
-                        else
-                            let first, second = splitPiece window.Right
-                            let children =
-                                [ { window with Right = second; RemainingDepth = window.RemainingDepth - 1 }
-                                  { window with Right = first; RemainingDepth = window.RemainingDepth - 1 } ]
-                            generations rest (children @ next) best windows))
+                let inspected =
+                    pieceBoundingBox window.Left
+                    |> Result.bind (fun leftBox ->
+                        pieceBoundingBox window.Right
+                        |> Result.bind (fun rightBox ->
+                            if boxDistanceSquared leftBox rightBox > best.DistanceSquared then
+                                Ok(windows,best,next)
+                            elif window.RemainingDepth <= 0
+                                 || (BoundingBox.taxicabDiameter leftBox <= terminalSubdivisionTolerance
+                                     && BoundingBox.taxicabDiameter rightBox <= terminalSubdivisionTolerance) then
+                                let added = addTerminalWindowGrid window.Left window.Right windows
+                                added
+                                |> List.take 9
+                                |> List.fold (fun state terminal ->
+                                    state
+                                    |> Result.bind (fun best ->
+                                        let leftT = interpolate terminal.Left.From terminal.Left.To terminal.StartLeftT
+                                        let rightT = interpolate terminal.Right.From terminal.Right.To terminal.StartRightT
+                                        globalDistanceMinimumAt terminal.Left terminal.Right leftT rightT
+                                        |> Result.map (closerMinimum best))) (Ok best)
+                                |> Result.map (fun best -> added,best,next)
+                            elif BoundingBox.taxicabDiameter leftBox >= BoundingBox.taxicabDiameter rightBox then
+                                let first, second = splitPiece window.Left
+                                let children =
+                                    [ { window with Left = second; RemainingDepth = window.RemainingDepth - 1 }
+                                      { window with Left = first; RemainingDepth = window.RemainingDepth - 1 } ]
+                                Ok(windows,best,children @ next)
+                            else
+                                let first, second = splitPiece window.Right
+                                let children =
+                                    [ { window with Right = second; RemainingDepth = window.RemainingDepth - 1 }
+                                      { window with Right = first; RemainingDepth = window.RemainingDepth - 1 } ]
+                                Ok(windows,best,children @ next)))
+                match inspected with
+                | Error error -> Error error
+                | Ok(windows,best,next) -> generations rest next best windows
         generations
             [ { Left = left; Right = right; RemainingDepth = maxDepth } ]
             [] best []
@@ -668,45 +672,6 @@ module Intersections =
         if chord <= 0.0<length> then parameterTolerance
         else Parameter.fromFloat(float (tolerance / chord))
 
-    let private segmentDefiningPoints = function
-        | Line(startPoint, endPoint) -> Some [ startPoint; endPoint ]
-        | QuadraticBezier(startPoint, control, endPoint) -> Some [ startPoint; control; endPoint ]
-        | CubicBezier(startPoint, control1, control2, endPoint) ->
-            Some [ startPoint; control1; control2; endPoint ]
-        | Arc _ -> None
-
-    let private segmentProjectionOverlapsLine points lineStart lineEnd tolerance =
-        match points with
-        | [] -> false
-        | first :: rest ->
-            let firstT = lineProjectionT first lineStart lineEnd
-            let minimum, maximum =
-                rest
-                |> List.fold (fun (minimum, maximum) pointValue ->
-                    let t = lineProjectionT pointValue lineStart lineEnd
-                    min minimum t, max maximum t) (firstT, firstT)
-            min 1.0<parameter> maximum - max 0.0<parameter> minimum
-            > Parameter.fromFloat(float tolerance)
-
-    let private segmentLiesOnLine segmentValue lineStart lineEnd tolerance =
-        let direction = Point.displacement lineStart lineEnd
-        let directionLength = Point.norm direction
-        match directionLength <= 0.0<length>, segmentDefiningPoints segmentValue with
-        | true, _
-        | false, None -> false
-        | false, Some points ->
-            points
-            |> List.forall (fun pointValue ->
-                abs (cross direction (Point.displacement lineStart pointValue)) / directionLength <= tolerance)
-            && segmentProjectionOverlapsLine points lineStart lineEnd tolerance
-
-    let private lineSegmentsAreCollinear lineStart lineEnd segmentStart segmentEnd tolerance =
-        let direction = Point.displacement lineStart lineEnd
-        let directionLength = Point.norm direction
-        directionLength > 0.0<length>
-        && abs (cross direction (Point.displacement lineStart segmentStart)) / directionLength <= tolerance
-        && abs (cross direction (Point.displacement lineStart segmentEnd)) / directionLength <= tolerance
-
     let private collinearLinePointIntersections
         lineStart lineEnd segmentStart segmentEnd lineIsLeft lineParameterTolerance =
         let segmentStartLineT = lineProjectionT segmentStart lineStart lineEnd
@@ -766,20 +731,32 @@ module Intersections =
                 |> List.rev
                 |> Ok)
 
-    let private lineSegmentIntersections lineStart lineEnd lineIsLeft segmentValue options =
-        let lineDirection = Point.displacement lineStart lineEnd
-        let lineParameterTolerance = parameterToleranceForChord lineDirection options.Tolerance
-        if segmentLiesOnLine segmentValue lineStart lineEnd options.Tolerance then Error OverlappingSegments
-        else
-            match segmentValue with
-            | Line(segmentStart, segmentEnd)
-                when lineSegmentsAreCollinear lineStart lineEnd segmentStart segmentEnd options.Tolerance ->
-                collinearLinePointIntersections
-                    lineStart lineEnd segmentStart segmentEnd lineIsLeft lineParameterTolerance
-            | _ ->
-                lineSegmentIntersectionsByRay
-                    lineStart lineEnd lineIsLeft segmentValue options lineParameterTolerance
+    let private collinearCurvePointIntersections lineStart lineEnd lineIsLeft segment parameters tolerance parameterTolerance =
+        let positions = parameters |> List.map (fun t -> Segment.point segment t |> Result.map (fun p -> t,p,lineProjectionT p lineStart lineEnd))
+        positions |> List.fold (fun state item -> state |> Result.bind (fun items -> item |> Result.map (fun x -> x::items))) (Ok [])
+        |> Result.map List.rev
+        |> Result.bind (fun positions ->
+            let values = positions |> List.map (fun (_,_,t) -> t)
+            let low = max 0.0<parameter> (List.min values)
+            let high = min 1.0<parameter> (List.max values)
+            if high-low > parameterTolerance then Error OverlappingSegments
+            elif high < low-parameterTolerance then Ok []
+            else
+                let lineT = clamp01 ((low+high)/2.0)
+                let p = Point.interpolate lineStart lineEnd lineT
+                let contacts = positions |> List.choose (fun (t,at,_) -> if Point.distance at p <= tolerance then Some t else None)
+                (if List.isEmpty contacts then OverlapDetection.pointParameters segment p tolerance else Ok contacts)
+                |> Result.map (List.map (fun t ->
+                    if lineIsLeft then {LeftT=lineT;RightT=t;Point=p} else {LeftT=t;RightT=lineT;Point=p})))
 
+    let private lineSegmentIntersections lineStart lineEnd lineIsLeft segmentValue options =
+        let lineParameterTolerance = parameterToleranceForChord (Point.displacement lineStart lineEnd) options.Tolerance
+        match OverlapDetection.collinearParameters segmentValue lineStart lineEnd options.Tolerance with
+        | Some parameters ->
+            match segmentValue with
+            | Line(a,b) -> collinearLinePointIntersections lineStart lineEnd a b lineIsLeft lineParameterTolerance
+            | _ -> collinearCurvePointIntersections lineStart lineEnd lineIsLeft segmentValue parameters options.Tolerance lineParameterTolerance
+        | None -> lineSegmentIntersectionsByRay lineStart lineEnd lineIsLeft segmentValue options lineParameterTolerance
 
     let private elizabethParameterResolution = 1e-9<parameter>
     let private elizabethDedupeResolution = 1e-7<parameter>
@@ -944,20 +921,21 @@ module Intersections =
             |> Result.map List.concat)
         |> Result.map List.concat
 
-    let internal elizabethBeamIntersections left right options =
+    let private elizabethSearchTolerance left right options =
+        Segment.boundingPolygon left |> Result.mapError CurveSolverPathError
+        |> Result.bind (fun a ->
+            Segment.boundingPolygon right |> Result.mapError CurveSolverPathError
+            |> Result.map (fun b ->
+                let magnitude = a@b |> List.fold (fun size p -> max size (max (abs p.X) (abs p.Y))) 0.0<length>
+                max (min options.Tolerance 1e-13<length>) (magnitude*3.552713678800501e-15)))
+
+    let private elizabethBeamWithEndpointSeeds left right options seeds =
         validateOptions options |> Result.mapError CurveSolverPathError
         |> Result.bind (fun () ->
-            // Bound curve-evaluation roundoff using both geometric enclosures.
-            // Sixteen machine epsilons allow for evaluation/subtraction rounding.
-            Segment.boundingPolygon left |> Result.mapError CurveSolverPathError
-            |> Result.bind (fun leftPoints ->
-              Segment.boundingPolygon right |> Result.mapError CurveSolverPathError
-              |> Result.bind (fun rightPoints ->
-                let magnitude =
-                    leftPoints @ rightPoints
-                    |> List.fold (fun size p -> max size (max (abs p.X) (abs p.Y))) 0.0<length>
-                let tolerance = max (min options.Tolerance 1e-13<length>) (magnitude * 3.552713678800501e-15)
-                elizabethEndpointCandidates left right tolerance |> Result.mapError CurveSolverPathError
+            elizabethSearchTolerance left right options |> Result.bind (fun tolerance ->
+                (match seeds with
+                 | Some seeds -> Ok seeds
+                 | None -> elizabethEndpointCandidates left right tolerance |> Result.mapError CurveSolverPathError)
                 |> Result.bind (fun endpoints ->
                     let rec generation pending report index decayStart cache =
                         match pending with
@@ -985,21 +963,60 @@ module Intersections =
                                     |> Result.bind (fun (next,candidates) -> generation next {report with Intersections=candidates} (index+1) decayStart cache)))
                     generation (initialWindows options.MaxDepth)
                         {Intersections=endpoints;Examined=0;DiscardedCrossing=0;DiscardedOther=0;PeakRetained=0;DiscardedCandidates=0}
-                        1 None {Samples=Map.empty;Lookups=0;Hits=0;LeftPoints=Map.empty;RightPoints=Map.empty}))))
+                        1 None {Samples=Map.empty;Lookups=0;Hits=0;LeftPoints=Map.empty;RightPoints=Map.empty})))
 
+    let internal elizabethBeamIntersections left right options =
+        elizabethBeamWithEndpointSeeds left right options None
+
+    // One centered search; original-metric endpoint matching and final certification
+    // preserve the public tolerance. Arcs and degenerate ranges use the existing search.
     let private curveCurveIntersections left right options =
-        elizabethBeamIntersections left right options |> Result.map (fun report -> report.Intersections)
-        |> Result.mapError (function
+        let controls = function
+            | Line(a,b) -> [a;b]
+            | QuadraticBezier(a,b,c) -> [a;b;c]
+            | CubicBezier(a,b,c,d) -> [a;b;c;d]
+            | Arc _ -> []
+        let points = match left,right with Arc _,_ | _,Arc _ -> [] | _ -> controls left @ controls right
+        let search =
+            match points with
+            | [] -> elizabethBeamIntersections left right options
+            | first::rest ->
+                let low,high = rest |> List.fold (fun (low,high) p ->
+                    Point.create (min low.X p.X) (min low.Y p.Y),Point.create (max high.X p.X) (max high.Y p.Y)) (first,first)
+                let dx,dy = high.X-low.X,high.Y-low.Y
+                if not(System.Double.IsFinite(float dx) && System.Double.IsFinite(float dy)) || dx<=0.0<length> || dy<=0.0<length> then
+                    elizabethBeamIntersections left right options
+                else
+                    let normalize (p:Point<length>) = Point.create (200.0<length>*((p.X-(low.X+dx/2.0))/dx)) (200.0<length>*((p.Y-(low.Y+dy/2.0))/dy))
+                    Segment.mapPoints normalize left |> Result.mapError CurveSolverPathError |> Result.bind (fun a ->
+                        Segment.mapPoints normalize right |> Result.mapError CurveSolverPathError |> Result.bind (fun b ->
+                            elizabethSearchTolerance left right options |> Result.bind (fun tolerance ->
+                                elizabethEndpointCandidates left right tolerance |> Result.mapError CurveSolverPathError |> Result.bind (fun endpoints ->
+                                    let seeds = endpoints |> List.map (fun hit -> {hit with Point=normalize hit.Point})
+                                    elizabethBeamWithEndpointSeeds a b {options with Tolerance=1e-12<length>;ParameterSnap=NoParameterSnap} (Some seeds)))))
+        search |> Result.mapError (function
             | CurveSolverPathError error -> error
             | CurveSolverDepthLimit(a,b,c,d) -> IntersectionDepthLimitReached(a,b,c,d))
+        |> Result.bind (fun report -> report.Intersections |> elizabethTryMap (fun candidate ->
+            Segment.point left candidate.LeftT |> Result.bind (fun p ->
+                Segment.point right candidate.RightT |> Result.map (fun q -> {candidate with Point=midpoint p q}))))
+        |> Result.map (List.sortBy (fun hit -> hit.LeftT,hit.RightT))
 
     let private segmentIntersectionsValidOptions left right options =
-        match left, right with
-        | Line(startPoint, endPoint), _ ->
-            lineSegmentIntersections startPoint endPoint true right options
-        | _, Line(startPoint, endPoint) ->
-            lineSegmentIntersections startPoint endPoint false left options
-        | _ -> curveCurveIntersections left right options
+        let constant p other isLeft =
+            OverlapDetection.pointParameters other p options.Tolerance
+            |> Result.map (List.sort >> List.map (fun t ->
+                if isLeft then {LeftT=0.0<parameter>;RightT=t;Point=p} else {LeftT=t;RightT=0.0<parameter>;Point=p}))
+        match OverlapDetection.constantPoint left,OverlapDetection.constantPoint right with
+        | Some a,Some b ->
+            Ok(if Point.distance a b <= options.Tolerance then [{LeftT=0.0<parameter>;RightT=0.0<parameter>;Point=a}] else [])
+        | Some p,None -> constant p right true
+        | None,Some p -> constant p left false
+        | None,None ->
+            match left,right with
+            | Line(a,b),_ -> lineSegmentIntersections a b true right options
+            | _,Line(a,b) -> lineSegmentIntersections a b false left options
+            | _ -> curveCurveIntersections left right options
 
     let segmentWithoutOverlapPrecheckWith left right options =
         validateOptions options
@@ -1019,6 +1036,10 @@ module Intersections =
                         | OverlappingSegments -> InternalOverlapClassificationInconsistency
                         | error -> error)))
 
+    /// Point intersections; exactly constant polynomials use parameter zero and
+    /// contribute no continuous overlap. Distinct addresses on the other segment remain.
+    /// General polynomial pairs search in centered [-100,100] coordinates, while
+    /// endpoint matching and final certification retain the original geometric tolerance.
     let segment left right = segmentWith left right defaultOptions
 
     let private projectionAt left right leftT rightT =

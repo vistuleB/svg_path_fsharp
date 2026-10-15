@@ -73,6 +73,8 @@ module Overlaps =
     let segmentWith left right tolerance =
         OverlapDetection.detect left right tolerance |> Result.map (List.map fromRaw)
 
+    /// Exactly constant polynomials have no positive-length overlap.
+    /// Use Intersections.segment for their point contacts.
     let segment left right = segmentWith left right defaultTolerance
 
     let private comparePieces (first: SubpathOverlapPiece) (second: SubpathOverlapPiece) =

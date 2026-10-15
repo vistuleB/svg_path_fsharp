@@ -192,6 +192,7 @@ module Encounters =
     /// reach the same point without following the overlap correspondence.
     /// Intersections explained by overlaps are removed; the remainder is
     /// deduplicated and sorted by LeftT.
+    /// Constant polynomials use canonical parameter zero and have no continuous overlap.
     let segment left right = segmentWith left right Intersections.defaultOptions
 
     let subpathWith left right options =

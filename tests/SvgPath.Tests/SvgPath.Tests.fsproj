@@ -113,6 +113,7 @@
     <Compile Include="CuspSmallLoopTests.fs" />
     <Compile Include="BandFaceLoopsTests.fs" />
     <Compile Include="ElizabethTests.fs" />
+    <Compile Include="FloBezierAuditTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

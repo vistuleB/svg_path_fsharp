@@ -182,7 +182,7 @@ let ``flat cubic crossing regression`` () =
     let found = Intersections.segment rising falling |> Result.defaultWith (failwithf "%A")
     IntersectionContractSupport.assertKnown found 0.5<parameter> 0.5<parameter> 1e-7<parameter>
     IntersectionContractSupport.assertCandidates found rising falling 1e-13<length>
-    Assert.Equal(9, found.Length) // Numerical candidate-count snapshot.
+    Assert.Equal(6, found.Length) // Centered-search numerical candidate-count snapshot.
 
 [<Fact>]
 let ``disjoint quadratics regression`` () =
@@ -197,7 +197,7 @@ let ``production off center kissing quadratics`` () =
     let found = Intersections.segment left right |> Result.defaultWith (failwithf "%A")
     IntersectionContractSupport.assertKnown found 0.37<parameter> 0.63<parameter> 1e-7<parameter>
     IntersectionContractSupport.assertCandidates found left right 1e-13<length>
-    Assert.Equal(4, found.Length) // Numerical candidate-count snapshot.
+    Assert.Equal(1, found.Length) // Centered-search numerical candidate-count snapshot.
 
 [<Fact>]
 let ``production two close quadratic crossings`` () =

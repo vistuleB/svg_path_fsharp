@@ -739,8 +739,10 @@ For cheap upper bounds without numerical integration, use
 These use control-polygon lengths for Beziers and angular travel times the
 larger ellipse radius for arcs; they may overestimate substantially and use
 ordinary floating-point arithmetic.
-Lines are exact. Beziers and arcs use adaptive integration. Distances are true
-path-coordinate lengths, not normalized fractions.
+Lines are exact. Béziers and arcs use adaptive integration. Bézier integration
+starts at coordinate-extremum boundaries, sharing the absolute error budget
+across the resulting intervals. Distances are true path-coordinate lengths,
+not normalized fractions.
 
 Length-address helpers convert traveled distances back to ordinary parameters
 and evaluated geometry:
@@ -947,9 +949,18 @@ These are numerical results, not exact algebraic root certificates. Candidates
 satisfy the geometric tolerance, but several distinct parameter pairs can
 approximate one mathematical contact, especially at tangencies or nearly
 coincident curves. Candidate counts need not equal mathematical root counts.
-Curve-pair refinement accounts for floating-point rounding at the input
-coordinate scale. Final certification still enforces the requested tolerance;
+General polynomial pairs with finite positive control-point ranges use one
+search centered and scaled independently to approximately `[-100,100]` per axis.
+Endpoint matching, overlap decisions, and final certification use the original
+coordinates. Normalization does not change the caller's geometric tolerance;
 requesting accuracy below representable precision can produce an error.
+
+Exactly constant lines and Béziers use the canonical parameter `0.0` and
+contribute no continuous overlap. Two constant segments have at most one contact,
+represented by `(0.0, 0.0)`. Distinct matching addresses on a nonconstant segment
+are retained. Constancy requires every defining point to be equal, without a
+tolerance; equal endpoints alone do not make a curve constant. Degenerate SVG
+arcs retain their existing normalization/error behavior.
 
 The bounded, heuristic curve-pair search can error when refinement cannot
 finish; success does not prove that every mathematical root was found.
@@ -980,7 +991,8 @@ such segments before overlap detection. At a matching tolerance,
 `Overlaps.segment` reports an overlap.
 
 The overlap detector is intended for non-degenerate segments whose overlap
-boundaries occur at an endpoint of at least one input segment. Arrangement
+boundaries occur at an endpoint of at least one input segment, with interior
+turning points also included for collinear polynomial segments. Arrangement
 construction establishes that working model through progressive endpoint,
 intersection, and overlap-boundary splitting. Subpath and path overlap values
 retain their constituent piecewise-affine segment correspondences, and the

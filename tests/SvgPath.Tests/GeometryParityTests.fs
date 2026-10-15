@@ -989,7 +989,7 @@ let ``segment intersections prefers shared endpoint over near endpoint minimum``
     let snapped = Intersections.segmentWith left right { Tolerance = 1.0e-9<length>; MaxDepth = 64; ParameterSnap = Intersections.DecimalParameterSnap 7 } |> Result.defaultWith (failwithf "%A")
     for found in [raw;snapped] do
         IntersectionContractSupport.assertCandidates found left right 1e-9<length>
-        Assert.Equal(4, found.Length) // Numerical candidate-count snapshot.
+        Assert.Equal(2, found.Length) // Centered-search numerical candidate-count snapshot.
         let endpoint = found |> List.find (fun hit -> hit.LeftT=1.0<parameter> && hit.RightT=0.0<parameter>)
         Assert.Equal(point 2.8236048558813205 2.9152343073348637, endpoint.Point)
         for hit in found do

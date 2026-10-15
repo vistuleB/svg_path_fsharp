@@ -26,6 +26,43 @@ type private OverlapCandidates = { Affine: RawOverlap list; NonAffine: RawOverla
 module internal OverlapDetection =
     let private parameterTolerance = 1.0e-12<parameter>
 
+    let private polynomialControls = function
+        | Line(a,b) -> [a;b]
+        | QuadraticBezier(a,b,c) -> [a;b;c]
+        | CubicBezier(a,b,c,d) -> [a;b;c;d]
+        | Arc _ -> []
+
+    // Constancy is exact; equal endpoints alone can describe a retraced curve.
+    let constantPoint = function
+        | Line(a,b) when a=b -> Some a
+        | QuadraticBezier(a,b,c) when a=b && a=c -> Some a
+        | CubicBezier(a,b,c,d) when a=b && a=c && a=d -> Some a
+        | _ -> None
+
+    let collinearParameters segment (start:Point<length>) (finish:Point<length>) tolerance =
+        let dx,dy = finish.X-start.X,finish.Y-start.Y
+        let length = Point.distance start finish
+        let controls = polynomialControls segment
+        if length <= 0.0<length> || List.isEmpty controls
+           || not(List.forall (fun (p:Point<length>) -> abs(dx*(p.Y-start.Y)-dy*(p.X-start.X))/length <= tolerance) controls) then None
+        else
+            let curve =
+                match segment with
+                | Line(a,b) -> Bezier.LinearBezierData(a,b)
+                | QuadraticBezier(a,b,c) -> Bezier.QuadraticBezierData(a,b,c)
+                | CubicBezier(a,b,c,d) -> Bezier.CubicBezierData(a,b,c,d)
+                | Arc _ -> failwith "non-polynomial collinear segment"
+            Some(List.distinct ([0.0<parameter>;1.0<parameter>] @ Bezier.projectionExtrema curve (Point.create (dx/length) (dy/length))))
+
+    let private collinearBoundaries left right tolerance =
+        match polynomialControls left @ polynomialControls right with
+        | [] -> None
+        | origin::rest ->
+            let finish = rest |> List.fold (fun best p -> if Point.distance origin p > Point.distance origin best then p else best) origin
+            match collinearParameters left origin finish tolerance, collinearParameters right origin finish tolerance with
+            | Some a,Some b -> Some(a,b)
+            | _ -> None
+
     let private canonical overlap =
         if overlap.LeftFrom <= overlap.LeftTo then overlap
         else
@@ -166,10 +203,10 @@ module internal OverlapDetection =
                         found @ [{Source=source;SourceT=sourceT;TargetT=t;Distance=Point.distance sample at}]))) (Ok []))
 
     let private endpointProjections left right tolerance =
-        [ endpointProjection LeftEndpoint 0.0<parameter> (Segment.start left) right tolerance
-          endpointProjection LeftEndpoint 1.0<parameter> (Segment.finish left) right tolerance
-          endpointProjection RightEndpoint 0.0<parameter> (Segment.start right) left tolerance
-          endpointProjection RightEndpoint 1.0<parameter> (Segment.finish right) left tolerance ]
+        let a,b = collinearBoundaries left right tolerance |> Option.defaultValue ([0.0<parameter>;1.0<parameter>],[0.0<parameter>;1.0<parameter>])
+        [ for source,segment,target,parameters in [LeftEndpoint,left,right,a;RightEndpoint,right,left,b] do
+            for t in parameters do
+                yield Segment.point segment t |> Result.bind (fun p -> endpointProjection source t p target tolerance) ]
         |> List.fold (fun state item ->
             match state, item with
             | Ok items, Ok item -> Ok(item :: items)
@@ -254,12 +291,6 @@ module internal OverlapDetection =
         intervalsCover left (min candidate.LeftFrom candidate.LeftTo) (max candidate.LeftFrom candidate.LeftTo)
         && intervalsCover right (min candidate.RightFrom candidate.RightTo) (max candidate.RightFrom candidate.RightTo)
 
-    let private polynomialControls = function
-        | Line(a,b) -> [a;b]
-        | QuadraticBezier(a,b,c) -> [a;b;c]
-        | CubicBezier(a,b,c,d) -> [a;b;c;d]
-        | Arc _ -> []
-
     let private preferCertifiedFullOverlap left right tolerance candidates =
         let a = polynomialControls left
         let increasing values =
@@ -280,10 +311,15 @@ module internal OverlapDetection =
         |> function Some full -> [full] | None -> candidates
 
     // Sampled overlap detection proposes intervals from endpoint matches;
-    // every overlap boundary is assumed to be an input segment endpoint.
+    // collinear polynomial turning points are also overlap boundaries.
     let detectWithSamples left right tolerance samples =
         if tolerance < 0.0<length> || not (System.Double.IsFinite(float tolerance)) then Error(InvalidOverlapTolerance tolerance)
         elif samples <= 0 then Error(InvalidOverlapSamples samples)
+        elif Option.isSome(constantPoint left) || Option.isSome(constantPoint right) then
+            match left,right with
+            | Arc _,_ -> Segment.arcCenterData left |> Result.map (fun _ -> [])
+            | _,Arc _ -> Segment.arcCenterData right |> Result.map (fun _ -> [])
+            | _ -> Ok []
         else
             endpointProjections left right tolerance
             |> Result.bind (fun projections ->
@@ -320,6 +356,9 @@ module internal OverlapDetection =
                     else
                         match mergeAll tolerance (preferCertifiedFullOverlap left right tolerance candidates.Affine) with
                         | Ok merged -> Ok merged
-                        | Error _ -> Ok []))
+                        | Error _ ->
+                            match collinearBoundaries left right tolerance with
+                            | Some(a,b) when a.Length>2 || b.Length>2 -> Error NonAffineOverlapCorrespondence
+                            | _ -> Ok []))
 
     let detect left right tolerance = detectWithSamples left right tolerance 5

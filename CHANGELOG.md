@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Mirror the completed Gleam FloBezier audit: retain folded collinear overlap
+  boundaries and reject unsupported traversal correspondence explicitly.
+- Canonicalize contacts of exactly constant polynomial segments at parameter
+  zero, preserving distinct addresses on the other segment and arc validation.
+- Partition Bézier length integration at coordinate extrema before refinement.
+- Search polynomial curve pairs once in centered `[-100,100]` coordinates,
+  preserving original-coordinate endpoint matching and final certification.
+- Keep closest-pair window traversal in tail position for bounded stack use.
+  Public signatures and options are unchanged.
+
 ## 3.1.1 - 2026-10-14
 
 - Remove optional numeric separators in compact path output while preserving

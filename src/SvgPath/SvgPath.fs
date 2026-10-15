@@ -1102,15 +1102,25 @@ module Segment =
                         |> Result.bind (fun leftLength ->
                             refine middle b fm frm fb right (tolerance / 2.0) (depth - 1)
                             |> Result.map (fun rightLength -> leftLength + rightLength))))
-        let a = 0.0<parameter>
-        let b = 1.0<parameter>
-        let middle = 0.5<parameter>
-        speed segment a
-        |> Result.bind (fun fa ->
-            speed segment middle
-            |> Result.bind (fun fm ->
-                speed segment b
-                |> Result.bind (fun fb -> refine a b fa fm fb (simpson a b fa fm fb) options.Tolerance options.MaxDepth)))
+        let turns =
+            match segment with
+            | QuadraticBezier _ | CubicBezier _ ->
+                let curve = asBezier segment
+                Bezier.projectionExtrema curve (Point.create 1.0 0.0)
+                @ Bezier.projectionExtrema curve (Point.create 0.0 1.0)
+                |> List.filter (fun t -> t>0.0<parameter> && t<1.0<parameter>)
+                |> List.distinct |> List.sort
+            | _ -> []
+        let intervals = [0.0<parameter>] @ turns @ [1.0<parameter>] |> List.pairwise
+        let tolerance = options.Tolerance / float intervals.Length
+        intervals |> List.fold (fun state (a,b) ->
+            state |> Result.bind (fun total ->
+                let middle = (a+b)/2.0
+                speed segment a |> Result.bind (fun fa ->
+                    speed segment middle |> Result.bind (fun fm ->
+                        speed segment b |> Result.bind (fun fb ->
+                            refine a b fa fm fb (simpson a b fa fm fb) tolerance options.MaxDepth
+                            |> Result.map (fun value -> total+value)))))) (Ok 0.0<length>)
 
     /// Approximate segment arc length with explicit error and depth controls.
     let internal lengthWith segment (options: LengthOptions) =

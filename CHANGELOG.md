@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.3 - 2026-10-15
 
 - Port the four Gleam slow Paper.js crossing/address checks and complete
   Boolean fixture 107's containment grid. Keep the new fixture files in the

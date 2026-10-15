@@ -6,6 +6,11 @@
   Boolean fixture 107's containment grid. Keep the new fixture files in the
   slow test profile.
 
+- Mirror Gleam FL001 (d6c7b63): seed line–curve closest-pair searches with
+  evaluated crossing witnesses to avoid excessive subdivision and descent work.
+  Preserve positive near-contact distances and the existing fallback search.
+  F# already uses a stack-safe fold for the descent list.
+
 ## 3.1.2 - 2026-10-15
 
 - Mirror the completed Gleam FloBezier audit: retain folded collinear overlap

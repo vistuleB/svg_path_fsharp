@@ -116,6 +116,7 @@
     <Compile Include="BandFaceLoopsTests.fs" />
     <Compile Include="ElizabethTests.fs" />
     <Compile Include="FloBezierAuditTests.fs" />
+    <Compile Include="FlattenClosestPairTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

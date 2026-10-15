@@ -559,17 +559,6 @@ module Intersections =
             [ { Left = left; Right = right; RemainingDepth = maxDepth } ]
             [] best []
 
-    let private segmentPairProjectionMinima left right options =
-        let leftPiece = { Segment = left; From = 0.0<parameter>; To = 1.0<parameter> }
-        let rightPiece = { Segment = right; From = 0.0<parameter>; To = 1.0<parameter> }
-        boundaryMinima left right options
-        |> Result.bind (fun boundaries ->
-            let best = boundaries |> List.reduce closerMinimum
-            collectProjectionTerminalWindows leftPiece rightPiece best options.MaxDepth
-            |> Result.bind (fun (windows, best) ->
-                minimaFromTerminalWindows (List.rev windows) options.Tolerance
-                |> Result.map (fun terminal -> best :: boundaries @ terminal)))
-
     let internal validateOptions options =
         if options.Tolerance <= 0.0<length> || not (System.Double.IsFinite(float options.Tolerance)) then
             Error(InvalidIntersectionTolerance options.Tolerance)
@@ -757,6 +746,43 @@ module Intersections =
             | Line(a,b) -> collinearLinePointIntersections lineStart lineEnd a b lineIsLeft lineParameterTolerance
             | _ -> collinearCurvePointIntersections lineStart lineEnd lineIsLeft segmentValue parameters options.Tolerance lineParameterTolerance
         | None -> lineSegmentIntersectionsByRay lineStart lineEnd lineIsLeft segmentValue options lineParameterTolerance
+
+    // Evaluate crossing witnesses on the original segments: approximate contacts
+    // supply an upper bound, not an assumed zero distance. Failed crossing queries
+    // leave the existing distance search intact.
+    let private seedProjectionFromLineCrossings left right best options =
+        let crossings =
+            match left, right with
+            | Line(start, finish), _ -> lineSegmentIntersections start finish true right options
+            | _, Line(start, finish) -> lineSegmentIntersections start finish false left options
+            | _, _ -> Ok []
+        match crossings with
+        | Error _ -> Ok best
+        | Ok hits ->
+            let leftPiece = { Segment = left; From = 0.0<parameter>; To = 1.0<parameter> }
+            let rightPiece = { Segment = right; From = 0.0<parameter>; To = 1.0<parameter> }
+            hits
+            // Tolerant intersections can admit parameters outside finite segments.
+            // Only points on both finite segments provide a valid distance bound.
+            |> List.filter (fun hit ->
+                hit.LeftT >= 0.0<parameter> && hit.LeftT <= 1.0<parameter>
+                && hit.RightT >= 0.0<parameter> && hit.RightT <= 1.0<parameter>)
+            |> List.fold (fun state hit ->
+                state |> Result.bind (fun best ->
+                    globalDistanceMinimumAt leftPiece rightPiece hit.LeftT hit.RightT
+                    |> Result.map (closerMinimum best))) (Ok best)
+
+    let private segmentPairProjectionMinima left right options =
+        let leftPiece = { Segment = left; From = 0.0<parameter>; To = 1.0<parameter> }
+        let rightPiece = { Segment = right; From = 0.0<parameter>; To = 1.0<parameter> }
+        boundaryMinima left right options
+        |> Result.bind (fun boundaries ->
+            let best = boundaries |> List.reduce closerMinimum
+            seedProjectionFromLineCrossings left right best options
+            |> Result.bind (fun best -> collectProjectionTerminalWindows leftPiece rightPiece best options.MaxDepth)
+            |> Result.bind (fun (windows, best) ->
+                minimaFromTerminalWindows (List.rev windows) options.Tolerance
+                |> Result.map (fun terminal -> best :: boundaries @ terminal)))
 
     let private elizabethParameterResolution = 1e-9<parameter>
     let private elizabethDedupeResolution = 1e-7<parameter>

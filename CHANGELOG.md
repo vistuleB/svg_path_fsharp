@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.4 - 2026-10-16
 
 - Mirror FL002–FL004: certify affine line overlaps from endpoint distances,
   reject backwards line correspondences, and evaluate cyclic-order samples

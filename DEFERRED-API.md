@@ -25,6 +25,12 @@ intersection when the caller explicitly retains shorter pieces.
 ### Preserved implementation
 
 - Local branch in each repository: `codex/v4-api`.
+- Focused restoration commits: Gleam `5d0ca55b4f1bf7859ed25447fad5b17df83492f1`;
+  F# `cd5b4a7d04d79d2d28e09ff84f0fa9d9d1079ed0`.
+- Compatible main-branch commits: Gleam `cb22d9a`; F# `f795014`.
+- Each restoration commit changes only the CSG source and its FL004 regression
+  file. Both files were verified byte-for-byte against their previously tested
+  versions before the compatibility adjustment.
 - The focused commit on that branch restores the public case, its documentation,
   and the regression assertions checking operand index and nonzero net flow.
 - Original implementation history: Gleam `bf59110d`; F# `c7a6e52`.

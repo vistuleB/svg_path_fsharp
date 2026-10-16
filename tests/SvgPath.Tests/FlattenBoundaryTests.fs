@@ -75,13 +75,12 @@ let private right () =
       Line(p -0.216865327338229 0.794226858765446,p -0.214786655677953 0.455460687589484)
     ] |> Subpath.create |> unwrap |> fun subpath -> Path.ofSubpaths [subpath]
 
+// API-001 keeps the detailed operand/vertex/flow diagnostic private in 3.x.
 [<Fact>]
-let fl004_filtered_boundary_reports_operand () =
+let fl004_filtered_boundary_preserves_public_error_contract () =
     match Csg.intersectionPath (left ()) (right ()) EvenOdd with
-    | Error(Csg.RefinedBoundaryNotClosed(index,_,flow)) ->
-        Assert.Equal(1,index)
-        Assert.NotEqual(0,flow)
-    | result -> failwithf "Expected open operand boundary, got %A" result
+    | Error(Csg.CsgArrangementError Arrangement.ConstructionFailed) -> ()
+    | result -> failwithf "Expected existing arrangement error, got %A" result
 
 [<Fact>]
 let fl004_retained_boundary_intersection () =

@@ -9,8 +9,8 @@ module Csg =
     [<Struct>]
     /// Finite positive tolerances. MinimumLength is the
     /// segment-length upper-bound threshold, not endpoint chord distance.
-    /// If discarding pieces opens an operand boundary, RefinedBoundaryNotClosed
-    /// is returned without silently lowering the threshold or widening clustering.
+    /// If discarding pieces opens an operand boundary, CsgArrangementError
+    /// Arrangement.ConstructionFailed is returned without silently lowering the threshold or widening clustering.
     type Options =
         { Tolerance: float<length>
           MinimumLength: float<length> }
@@ -22,11 +22,11 @@ module Csg =
     type Error =
         | CsgArrangementError of error: Arrangement.Error
         | CsgPathError of error: SegmentError
-        /// Refinement left an open operand boundary. pathIndex is zero-based
-        /// (left 0, right 1); netFlow is incoming minus outgoing multiplicity.
-        /// Reducing MinimumLength may retain the missing connections.
-        | RefinedBoundaryNotClosed of pathIndex: int * vertex: int * netFlow: int
         | InternalBoundaryTopologyError of vertex: int * reason: BoundaryTopologyFailure
+
+    // Deferred public diagnostic: see DEFERRED-API.md (API-001).
+    type private RefinedBoundaryFailure =
+        | RefinedBoundaryNotClosed of pathIndex: int * vertex: int * netFlow: int
 
     /// Binary output endpoints use the shared arrangement vertex positions, moving
     /// each endpoint by at most the build tolerance. Controls and arc parameters
@@ -91,7 +91,9 @@ module Csg =
         let segments = pathSegments paths
         Arrangement.buildWith segments options.Tolerance options.MinimumLength 0.0<parameter>
         |> Result.mapError (Arrangement.publicError >> CsgArrangementError)
-        |> Result.bind (validateRefinedBoundaries paths)
+        |> Result.bind (fun built ->
+            validateRefinedBoundaries paths built
+            |> Result.mapError (fun _ -> CsgArrangementError Arrangement.ConstructionFailed))
 
     let private filled winding fillRule =
         match fillRule with

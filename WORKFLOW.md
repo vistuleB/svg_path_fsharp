@@ -206,3 +206,11 @@ Release workflow:
 - If a NuGet release is replaced, move both relevant tags deliberately:
   `vX.Y.Z` on `main`, and `assets-vX.Y.Z` on `markdown-assets` if README
   figures changed.
+
+## Deferred Public API Changes
+
+Before release preparation or a public API change, review
+[DEFERRED-API.md](DEFERRED-API.md) in both the Gleam and F# repositories.
+API-001 (the detailed refined-boundary CSG error) is reserved for 4.0.0;
+3.x retains the existing public error union and the internal boundary guard.
+Keep the deferred-change register synchronized across both implementations.

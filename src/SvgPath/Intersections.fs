@@ -901,8 +901,11 @@ module Intersections =
         elizabethCachedPair left right a c cache |> Result.bind (fun ((p,r,firstDistance),cache) ->
             elizabethCachedPair left right b d cache |> Result.bind (fun ((q,s,lastDistance),cache) ->
                 let crossing = chordCrossing p q r s
-                let parameters = [a,d;b,c;(a+b)/2.0,(c+d)/2.0]
-                let parameters = match crossing with None -> parameters | Some(u,v) -> parameters @ [interpolate a b u,interpolate c d v]
+                // Rank with four corners and one chord-derived sample on the actual curves.
+                // Closest chord parameters help when noncrossing chords bound a curve
+                // crossing and the two windows have very different lengths.
+                let u,v = crossing |> Option.defaultWith (fun () -> chordClosestParameters p q r s)
+                let parameters = [a,d;b,c;interpolate a b u,interpolate c d v]
                 let initial = min firstDistance lastDistance,cache,(if firstDistance <= lastDistance then a,c else b,d)
                 parameters |> List.fold (fun state (u,v) -> state |> Result.bind (fun (score,cache,best) ->
                     elizabethCachedPair left right u v cache |> Result.map (fun ((_,_,distance),cache) ->

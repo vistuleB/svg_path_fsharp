@@ -161,3 +161,26 @@ let unrepresentable_tolerance_reports_error_instead_of_empty_result () =
     match Intersections.segmentWith left right {Intersections.defaultOptions with Tolerance = 1e-14<length>} with
     | Error(InternalUncertifiedSegmentIntersection _) -> ()
     | other -> failwithf "Expected explicit certification failure, got %A" other
+
+// Flatten Boolean fixture 4295: ranking used to discard the crossing window.
+[<Fact>]
+let flatten_fl006_unequal_arc_spans_keep_crossing () =
+    let left =
+        Arc { Start = p 59.76247350201103 59.7377048577821
+              Radius = p 84.49938828627135 84.49938828627135
+              XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = true
+              End = p 59.70692262458793 59.79322713698864 }
+    let right =
+        Arc { Start = p 120.0 34.793757084085456
+              Radius = p 85.20624291591454 85.20624291591454
+              XAxisRotation = 0.0<degree>; LargeArc = false; Sweep = false
+              End = p 34.793757084085456 119.99999999999999 }
+    for a,b in [left,right; right,left] do
+        let hits = Intersections.segment a b |> unwrap
+        Assert.Equal(1, hits.Length)
+        let hit = hits.Head
+        Assert.True(abs(hit.Point.X - 59.73753072787354<length>) < 1e-9<length>)
+        Assert.True(abs(hit.Point.Y - 59.76264755924401<length>) < 1e-9<length>)
+        let pa,pb = Segment.point a hit.LeftT |> unwrap, Segment.point b hit.RightT |> unwrap
+        Assert.True(abs(pa.X-pb.X) < 1e-12<length>)
+        Assert.True(abs(pa.Y-pb.Y) < 1e-12<length>)

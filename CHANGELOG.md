@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Mirror the FL006 curve-intersection ranking fix: use four corners and one
+  chord-derived sample to retain a short-arc crossing previously discarded by
+  the bounded search. The portable regression checks both operand orders.
+
 ## 3.1.3 - 2026-10-15
 
 - Port the four Gleam slow Paper.js crossing/address checks and complete

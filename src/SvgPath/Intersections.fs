@@ -513,6 +513,44 @@ module Intersections =
     let private closerMinimum best candidate =
         if candidate.DistanceSquared < best.DistanceSquared then candidate else best
 
+    // Directional projection gaps conservatively bound arc-window separation.
+    let private arcPieceProjectionRange piece origin direction =
+        Segment.arcCenterData piece.Segment |> Result.bind (fun arc ->
+            let parameters = Ellipse.arcProjectionExtrema arc direction
+                             |> List.filter (fun t -> t > piece.From && t < piece.To)
+            (piece.From::piece.To::parameters)
+            |> List.fold (fun state t ->
+                state |> Result.bind (fun values ->
+                    Segment.point piece.Segment t |> Result.map (fun point ->
+                        Point.dot (Point.displacement origin point) direction :: values))) (Ok [])
+            |> Result.map (fun values ->
+                // Expand for reconstruction/projection rounding; caller tolerance is unchanged.
+                let magnitude = abs arc.Center.X + abs arc.Center.Y + abs origin.X + abs origin.Y
+                                + arc.Radius.X + arc.Radius.Y
+                let slack = 1.4210854715202004e-14 * magnitude
+                List.min values - slack, List.max values + slack))
+
+    let private arcProjectionWindowBound left right boxBound best =
+        match left.Segment,right.Segment with
+        | Arc _,Arc _ when boxBound <= best.DistanceSquared ->
+            let t,u = (left.From+left.To)/2.0,(right.From+right.To)/2.0
+            Segment.point left.Segment t |> Result.bind (fun p ->
+                Segment.point right.Segment u |> Result.bind (fun q ->
+                    globalDistanceMinimumAt left right t u |> Result.bind (fun candidate ->
+                        let best = closerMinimum best candidate
+                        let delta = Point.displacement p q
+                        let scale = max (abs delta.X) (abs delta.Y)
+                        if scale = 0.0<length> || not (System.Double.IsFinite(float scale)) then Ok(boxBound,best)
+                        else
+                            let x,y = delta.X/scale,delta.Y/scale
+                            let norm = sqrt(x*x+y*y)
+                            let direction = Point.create (x/norm) (y/norm)
+                            arcPieceProjectionRange left p direction |> Result.bind (fun (leftMin,leftMax) ->
+                                arcPieceProjectionRange right p direction |> Result.map (fun (rightMin,rightMax) ->
+                                    let gap = max 0.0<length> (max (rightMin-leftMax) (leftMin-rightMax))
+                                    max boxBound (gap*gap),best)))))
+        | _ -> Ok(boxBound,best)
+
     let private collectProjectionTerminalWindows left right best maxDepth =
         let rec generations current next best windows =
             match current with
@@ -524,34 +562,36 @@ module Intersections =
                     |> Result.bind (fun leftBox ->
                         pieceBoundingBox window.Right
                         |> Result.bind (fun rightBox ->
-                            if boxDistanceSquared leftBox rightBox > best.DistanceSquared then
-                                Ok(windows,best,next)
-                            elif window.RemainingDepth <= 0
-                                 || (BoundingBox.taxicabDiameter leftBox <= terminalSubdivisionTolerance
-                                     && BoundingBox.taxicabDiameter rightBox <= terminalSubdivisionTolerance) then
-                                let added = addTerminalWindowGrid window.Left window.Right windows
-                                added
-                                |> List.take 9
-                                |> List.fold (fun state terminal ->
-                                    state
-                                    |> Result.bind (fun best ->
-                                        let leftT = interpolate terminal.Left.From terminal.Left.To terminal.StartLeftT
-                                        let rightT = interpolate terminal.Right.From terminal.Right.To terminal.StartRightT
-                                        globalDistanceMinimumAt terminal.Left terminal.Right leftT rightT
-                                        |> Result.map (closerMinimum best))) (Ok best)
-                                |> Result.map (fun best -> added,best,next)
-                            elif BoundingBox.taxicabDiameter leftBox >= BoundingBox.taxicabDiameter rightBox then
-                                let first, second = splitPiece window.Left
-                                let children =
-                                    [ { window with Left = second; RemainingDepth = window.RemainingDepth - 1 }
-                                      { window with Left = first; RemainingDepth = window.RemainingDepth - 1 } ]
-                                Ok(windows,best,children @ next)
-                            else
-                                let first, second = splitPiece window.Right
-                                let children =
-                                    [ { window with Right = second; RemainingDepth = window.RemainingDepth - 1 }
-                                      { window with Right = first; RemainingDepth = window.RemainingDepth - 1 } ]
-                                Ok(windows,best,children @ next)))
+                            arcProjectionWindowBound window.Left window.Right (boxDistanceSquared leftBox rightBox) best
+                            |> Result.bind (fun (lowerBound,best) ->
+                                if lowerBound > best.DistanceSquared then
+                                    Ok(windows,best,next)
+                                elif window.RemainingDepth <= 0
+                                     || (BoundingBox.taxicabDiameter leftBox <= terminalSubdivisionTolerance
+                                         && BoundingBox.taxicabDiameter rightBox <= terminalSubdivisionTolerance) then
+                                    let added = addTerminalWindowGrid window.Left window.Right windows
+                                    added
+                                    |> List.take 9
+                                    |> List.fold (fun state terminal ->
+                                        state
+                                        |> Result.bind (fun best ->
+                                            let leftT = interpolate terminal.Left.From terminal.Left.To terminal.StartLeftT
+                                            let rightT = interpolate terminal.Right.From terminal.Right.To terminal.StartRightT
+                                            globalDistanceMinimumAt terminal.Left terminal.Right leftT rightT
+                                            |> Result.map (closerMinimum best))) (Ok best)
+                                    |> Result.map (fun best -> added,best,next)
+                                elif BoundingBox.taxicabDiameter leftBox >= BoundingBox.taxicabDiameter rightBox then
+                                    let first, second = splitPiece window.Left
+                                    let children =
+                                        [ { window with Left = second; RemainingDepth = window.RemainingDepth - 1 }
+                                          { window with Left = first; RemainingDepth = window.RemainingDepth - 1 } ]
+                                    Ok(windows,best,children @ next)
+                                else
+                                    let first, second = splitPiece window.Right
+                                    let children =
+                                        [ { window with Right = second; RemainingDepth = window.RemainingDepth - 1 }
+                                          { window with Right = first; RemainingDepth = window.RemainingDepth - 1 } ]
+                                    Ok(windows,best,children @ next))))
                 match inspected with
                 | Error error -> Error error
                 | Ok(windows,best,next) -> generations rest next best windows
@@ -1120,6 +1160,41 @@ module Intersections =
                     projectionAt left right best.LeftT best.RightT)
         | _ -> failwith "expected two line segments"
 
+    // Endpoint projections, crossings and stationary normal projections cover
+    // finite line/arc minima without a two-parameter subdivision search.
+    let private lineArcProjectionMinima line curve options =
+        boundaryMinima line curve options |> Result.bind (fun boundary ->
+            let start,finish = Segment.start line,Segment.finish line
+            if start = finish then Ok boundary
+            else
+                let direction = Point.displacement start finish
+                let scale = max (abs direction.X) (abs direction.Y)
+                let normal = Point.create (-direction.Y/scale) (direction.X/scale)
+                Segment.arcCenterData curve |> Result.bind (fun arc ->
+                    lineSegmentIntersections start finish true curve options |> Result.bind (fun crossings ->
+                        let parameters = Ellipse.arcProjectionExtrema arc normal @ List.map (fun (hit: SegmentIntersection) -> hit.RightT) crossings
+                        parameters |> List.fold (fun state t ->
+                            state |> Result.bind (fun minima ->
+                                let t = clamp01 t
+                                Segment.point curve t |> Result.bind (fun point ->
+                                    globalDistanceMinimumAt
+                                        { Segment=line; From=0.0<parameter>; To=1.0<parameter> }
+                                        { Segment=curve; From=0.0<parameter>; To=1.0<parameter> }
+                                        (clamp01 (lineProjectionT point start finish)) t
+                                    |> Result.map (fun minimum -> minimum::minima)))) (Ok boundary))))
+
+    let private lineArcProjection line curve lineIsLeft options =
+        let left,right = if lineIsLeft then line,curve else curve,line
+        let minima =
+            match lineArcProjectionMinima line curve options with
+            | Ok minima -> Ok(minima |> List.map (fun minimum ->
+                if lineIsLeft then minimum
+                else { minimum with LeftT=minimum.RightT; RightT=minimum.LeftT }))
+            | Error _ -> segmentPairProjectionMinima left right options
+        minima |> Result.bind (fun minima ->
+            let best = List.reduce closerMinimum minima
+            projectionAt left right best.LeftT best.RightT)
+
     let internal segmentSegmentClosestPairWith left right options =
         validateOptions options
         |> Result.bind (fun () ->
@@ -1128,6 +1203,10 @@ module Intersections =
                 | overlap :: _ -> projectionFromOverlap left right overlap
                 | [] when (match left, right with Line _, Line _ -> true | _ -> false) ->
                     lineLineProjection left right options
+                | [] when (match left,right with Line _,Arc _ -> true | _ -> false) ->
+                    lineArcProjection left right true options
+                | [] when (match left,right with Arc _,Line _ -> true | _ -> false) ->
+                    lineArcProjection right left false options
                 | [] ->
                     segmentPairProjectionMinima left right options
                     |> Result.bind (fun minima ->

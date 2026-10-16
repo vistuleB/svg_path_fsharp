@@ -9,6 +9,8 @@ module Csg =
     [<Struct>]
     /// Finite positive tolerances. MinimumLength is the
     /// segment-length upper-bound threshold, not endpoint chord distance.
+    /// If discarding pieces opens an operand boundary, RefinedBoundaryNotClosed
+    /// is returned without silently lowering the threshold or widening clustering.
     type Options =
         { Tolerance: float<length>
           MinimumLength: float<length> }
@@ -20,6 +22,10 @@ module Csg =
     type Error =
         | CsgArrangementError of error: Arrangement.Error
         | CsgPathError of error: SegmentError
+        /// Refinement left an open operand boundary. pathIndex is zero-based
+        /// (left 0, right 1); netFlow is incoming minus outgoing multiplicity.
+        /// Reducing MinimumLength may retain the missing connections.
+        | RefinedBoundaryNotClosed of pathIndex: int * vertex: int * netFlow: int
         | InternalBoundaryTopologyError of vertex: int * reason: BoundaryTopologyFailure
 
     /// Binary output endpoints use the shared arrangement vertex positions, moving
@@ -61,10 +67,31 @@ module Csg =
                 if List.isEmpty segments || Point.near 0.0<length> start finish then segments
                 else segments @ [Line(finish,start)])
 
+    let private validateRefinedBoundaries paths (built: Arrangement.ArrangementSegmentBuild) =
+        let edges = built.Graph.Edges |> List.map (fun edge -> edge.Id,edge) |> Map.ofList
+        let add vertex delta flows =
+            Map.add vertex (delta + (Map.tryFind vertex flows |> Option.defaultValue 0)) flows
+        let rec check pathIndex firstSegment paths =
+            match paths with
+            | [] -> Ok built
+            | path::rest ->
+                let nextSegment = firstSegment + List.length (pathSegments [path])
+                let flows = built.EdgeImages |> List.fold (fun flows image ->
+                    let weight = image.Sources |> List.sumBy (fun source ->
+                        if source.SegmentIndex < firstSegment || source.SegmentIndex >= nextSegment then 0
+                        elif source.Reversed then -1 else 1)
+                    let edge = Map.find image.EdgeId edges
+                    flows |> add edge.StartVertex (-weight) |> add edge.EndVertex weight) Map.empty
+                match flows |> Map.toList |> List.tryFind (fun (_,flow) -> flow <> 0) with
+                | Some(vertex,flow) -> Error(RefinedBoundaryNotClosed(pathIndex,vertex,flow))
+                | None -> check (pathIndex+1) nextSegment rest
+        check 0 0 paths
+
     let private build paths options =
         let segments = pathSegments paths
         Arrangement.buildWith segments options.Tolerance options.MinimumLength 0.0<parameter>
         |> Result.mapError (Arrangement.publicError >> CsgArrangementError)
+        |> Result.bind (validateRefinedBoundaries paths)
 
     let private filled winding fillRule =
         match fillRule with

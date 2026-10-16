@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Mirror FL002–FL004: certify affine line overlaps from endpoint distances,
+  reject backwards line correspondences, and evaluate cyclic-order samples
+  relative to their arrangement vertex to avoid large-coordinate rounding.
+- Report `Csg.RefinedBoundaryNotClosed` with the operand, vertex, and net flow
+  when refinement removes connections needed for a closed boundary.
+- Mirror FL005: bound line/arc closest-pair searches with endpoint, crossing,
+  and stationary-projection candidates; prune arc/arc searches with conservative
+  directional projection gaps. Caller distance tolerance is unchanged.
+
 - Mirror the FL006 arc-direction guard so a backwards endpoint overlap cannot
   suppress a separate interior crossing during Boolean refinement.
 

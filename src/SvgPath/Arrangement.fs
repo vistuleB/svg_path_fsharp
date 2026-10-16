@@ -332,15 +332,24 @@ module Arrangement =
             [ if edge.StartVertex = vertex then yield ({ EdgeId = edge.Id; Reversed = false }: OrientedArrangementEdge)
               if edge.EndVertex = vertex then yield ({ EdgeId = edge.Id; Reversed = true }: OrientedArrangementEdge) ])
 
+    let private segmentRelativeTo origin segment =
+        let local point = Point.displacement origin point
+        match segment with
+        | Line(a,b) -> Line(local a,local b)
+        | QuadraticBezier(a,b,c) -> QuadraticBezier(local a,local b,local c)
+        | CubicBezier(a,b,c,d) -> CubicBezier(local a,local b,local c,local d)
+        | Arc arc -> Arc { arc with Start=local arc.Start; End=local arc.End }
+
     let private circleSample (graph: ArrangementGraph) (vertex: Point<length>) vertexId (radius: float<length>) tolerance (oriented: OrientedArrangementEdge) =
         orientedSegment graph oriented
         |> Result.bind (fun segment ->
+            let segment = segmentRelativeTo vertex segment
             // `Segment.crossingsWith` is length-valued in F#, so use radial
             // distance instead of Gleam's equivalent squared-distance residual.
             // The roots are identical and the tolerance remains a radial error.
             Segment.crossingsWith
                 segment
-                (fun point -> Point.distance point vertex - radius)
+                (fun point -> Point.norm point - radius)
                 { Samples = 100
                   SignedLineDistanceTolerance = tolerance
                   MaxIterations = 100 }
@@ -354,7 +363,7 @@ module Arrangement =
                     |> Result.map (fun point ->
                         { OrientedEdge = oriented
                           Point = point
-                          Angle = Point.heading (Point.displacement vertex point) })))
+                          Angle = Point.heading point })))
 
     let private separated tolerance (first: CyclicSample) (second: CyclicSample) =
         let rawAngle = abs (Degree.toFloat second.Angle - Degree.toFloat first.Angle)

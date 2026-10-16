@@ -1,7 +1,8 @@
 namespace SvgPath
 
 /// Parametric overlap detection between SVG segments and paths.
-/// Arc/arc correspondences must agree with their paired traversal directions;
+/// Line/line overlaps use an affine endpoint-distance bound.
+/// Line/line and arc/arc correspondences must agree with their paired traversal directions;
 /// endpoint proximity alone does not establish a backwards overlap.
 [<RequireQualifiedAccess>]
 module Overlaps =

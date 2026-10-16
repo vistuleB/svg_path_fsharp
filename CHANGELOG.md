@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Mirror the FL006 arc-direction guard so a backwards endpoint overlap cannot
+  suppress a separate interior crossing during Boolean refinement.
+
 - Mirror the FL006 curve-intersection ranking fix: use four corners and one
   chord-derived sample to retain a short-arc crossing previously discarded by
   the bounded search. The portable regression checks both operand orders.

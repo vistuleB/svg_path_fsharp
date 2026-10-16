@@ -229,19 +229,38 @@ module internal OverlapDetection =
 
     let private samplePortions samples = [ 1 .. samples ] |> List.map (fun index -> float index / float (samples + 1))
 
+    // Proximity can admit backwards arc maps near a shared endpoint. Compare
+    // normalized tangents in the paired interval directions before sampling.
+    let private arcCorrespondenceDirectionsAgree overlap left right =
+        match left,right with
+        | Arc _, Arc _ ->
+            let lf,lt,rf,rt = overlap.LeftFrom,overlap.LeftTo,overlap.RightFrom,overlap.RightTo
+            Segment.derivative left (lf+(lt-lf)/2.0) |> Result.bind (fun a ->
+                Segment.derivative right (rf+(rt-rf)/2.0) |> Result.map (fun b ->
+                    match Point.normalize a, Point.normalize b with
+                    | Some a, Some b ->
+                        let direction = Point.dot a b
+                        if (lt>lf) = (rt>rf) then direction>0.0 else direction<0.0
+                    | _ -> false))
+        | _ -> Ok true
+
     let private sampledOverlapValid overlap left right tolerance samples =
-        Segment.betweenInside right (min overlap.RightFrom overlap.RightTo) (max overlap.RightFrom overlap.RightTo)
-        |> Result.bind (fun rightPiece ->
-            samplePortions samples
-            |> List.fold (fun state portion ->
-                state
-                |> Result.bind (fun valid ->
-                    if not valid then Ok false
-                    else
-                        let t = overlap.LeftFrom + portion * (overlap.LeftTo - overlap.LeftFrom)
-                        Segment.point left t
-                        |> Result.bind (fun sample -> Segment.distance rightPiece sample)
-                        |> Result.map (fun distance -> distance <= tolerance))) (Ok true))
+        arcCorrespondenceDirectionsAgree overlap left right |> Result.bind (fun aligned ->
+            if not aligned then Ok false
+            else
+                Segment.betweenInside right (min overlap.RightFrom overlap.RightTo) (max overlap.RightFrom overlap.RightTo)
+                |> Result.bind (fun rightPiece ->
+                    samplePortions samples
+                    |> List.fold (fun state portion ->
+                        state
+                        |> Result.bind (fun valid ->
+                            if not valid then Ok false
+                            else
+                                let t = overlap.LeftFrom + portion * (overlap.LeftTo - overlap.LeftFrom)
+                                Segment.point left t
+                                |> Result.bind (fun sample -> Segment.distance rightPiece sample)
+                                |> Result.map (fun distance -> distance <= tolerance))) (Ok true))
+        )
 
     let private affineValid overlap left right tolerance samples =
         samplePortions samples
